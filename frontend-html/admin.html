@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Administração — Save Point Finanças</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<div class="app-shell">
+  <div id="sidebar-mount"></div>
+  <div class="main-content">
+    <div class="page-header">
+      <div class="page-title">
+        <span style="color:var(--amber)">⬡</span> Painel Superadmin
+      </div>
+    </div>
+
+    <div class="page-body">
+      <!-- Stats row -->
+      <div class="stat-grid" style="margin-bottom:24px">
+        <div class="stat-card stat-card--income">
+          <div class="stat-label">Workspaces ativos</div>
+          <div class="stat-value stat-value--income" id="stat-active-tenants">—</div>
+        </div>
+        <div class="stat-card stat-card--balance">
+          <div class="stat-label">Total de usuários</div>
+          <div class="stat-value stat-value--balance" id="stat-users">—</div>
+        </div>
+        <div class="stat-card stat-card--neutral">
+          <div class="stat-label">A expirar em 30 dias</div>
+          <div class="stat-value" style="color:var(--amber)" id="stat-expiring">—</div>
+        </div>
+        <div class="stat-card stat-card--expense">
+          <div class="stat-label">Expirados</div>
+          <div class="stat-value stat-value--expense" id="stat-expired">—</div>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="tabs">
+        <div class="tab active" data-admin-tab="tenants">Workspaces</div>
+        <div class="tab" data-admin-tab="users">Usuários</div>
+      </div>
+
+      <!-- TENANTS view -->
+      <div id="admin-tenants">
+        <div class="filters-bar">
+          <input type="text" class="search-input" id="tenant-search" placeholder="Buscar workspace...">
+          <label style="display:flex;align-items:center;gap:6px;font-size:0.8rem;color:var(--text-2);cursor:pointer">
+            <input type="checkbox" id="tenant-active-only" style="accent-color:var(--em)"> Somente ativos
+          </label>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>Plano</th>
+                <th>Usuários</th>
+                <th>Status</th>
+                <th>Expira em</th>
+                <th>Criado em</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="tenants-tbody">
+              <tr><td colspan="7" style="padding:24px;text-align:center;color:var(--text-3)">Carregando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination">
+          <span id="t-pag-info"></span>
+          <div class="pagination-btns">
+            <button class="btn btn--ghost btn--sm" id="t-prev">Anterior</button>
+            <button class="btn btn--ghost btn--sm" id="t-next">Próximo</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- USERS view -->
+      <div id="admin-users" class="hidden">
+        <div class="filters-bar">
+          <input type="text" class="search-input" id="user-search" placeholder="Buscar usuário...">
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>E-mail</th>
+                <th>Função</th>
+                <th>Status</th>
+                <th>Criado em</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="users-tbody">
+              <tr><td colspan="6" style="padding:24px;text-align:center;color:var(--text-3)">Carregando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination">
+          <span id="u-pag-info"></span>
+          <div class="pagination-btns">
+            <button class="btn btn--ghost btn--sm" id="u-prev">Anterior</button>
+            <button class="btn btn--ghost btn--sm" id="u-next">Próximo</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Tenant Edit Modal -->
+<div class="modal" id="tenant-modal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>Editar Workspace</h3>
+      <button class="btn btn--ghost btn--icon" data-close-modal>✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="te-name-display" style="font-size:1rem;font-weight:700;color:var(--em);margin-bottom:8px"></div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Plano</label>
+          <select id="te-plan" class="form-control">
+            <option value="free">Free</option>
+            <option value="basic">Basic</option>
+            <option value="pro">Pro</option>
+            <option value="enterprise">Enterprise</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Máx. usuários</label>
+          <input type="number" id="te-max-users" class="form-control" min="1">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Status</label>
+          <select id="te-is-active" class="form-control">
+            <option value="true">Ativo</option>
+            <option value="false">Suspenso</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Expira em (UTC)</label>
+          <input type="datetime-local" id="te-expires" class="form-control">
+          <div class="form-hint">Deixe em branco para sem expiração</div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn--danger btn--sm" id="te-delete-btn">Excluir workspace</button>
+      <div style="flex:1"></div>
+      <button class="btn btn--ghost" data-close-modal>Cancelar</button>
+      <button class="btn btn--primary" id="te-save-btn">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- User Edit Modal -->
+<div class="modal" id="user-modal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>Editar Usuário</h3>
+      <button class="btn btn--ghost btn--icon" data-close-modal>✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="ue-email-display" style="font-size:0.85rem;color:var(--text-3);margin-bottom:8px"></div>
+      <div class="form-group">
+        <label class="form-label">Nome</label>
+        <input type="text" id="ue-name" class="form-control">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Função</label>
+          <select id="ue-role" class="form-control">
+            <option value="member">Membro</option>
+            <option value="admin">Admin</option>
+            <option value="superadmin">Superadmin</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Status</label>
+          <select id="ue-active" class="form-control">
+            <option value="true">Ativo</option>
+            <option value="false">Inativo</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nova senha (opcional)</label>
+        <input type="password" id="ue-password" class="form-control" placeholder="Deixe em branco para não alterar">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn--danger btn--sm" id="ue-delete-btn">Excluir usuário</button>
+      <div style="flex:1"></div>
+      <button class="btn btn--ghost" data-close-modal>Cancelar</button>
+      <button class="btn btn--primary" id="ue-save-btn">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { Auth } from './js/api.js';
+  import { requireAuthAndRender } from './js/nav.js';
+  import { adminApi } from './js/api.js';
+  import { formatDate, toast, confirm, openModal, closeModal, setupModalClose } from './js/utils.js';
+
+  // Superadmin gate
+  if (!Auth.requireAuth()) throw new Error('not auth');
+  if (!Auth.isSuperadmin()) { window.location.href = 'dashboard.html'; throw new Error('not superadmin'); }
+  requireAuthAndRender('admin.html');
+
+  let tenantSkip = 0, userSkip = 0;
+  const LIMIT = 25;
+  let editTenantId = null, editUserId = null;
+
+  // ── Stats ──────────────────────────────────────────────────────────
+  async function loadStats() {
+    try {
+      const s = await adminApi.stats();
+      document.getElementById('stat-active-tenants').textContent = s.active_tenants;
+      document.getElementById('stat-users').textContent = s.total_users;
+      document.getElementById('stat-expiring').textContent = s.expiring_soon_30d;
+      document.getElementById('stat-expired').textContent = s.expired_tenants;
+    } catch {}
+  }
+
+  // ── TENANTS ────────────────────────────────────────────────────────
+  async function loadTenants() {
+    const tbody = document.getElementById('tenants-tbody');
+    tbody.innerHTML = `<tr><td colspan="7" style="padding:24px;text-align:center;color:var(--text-3)">Carregando...</td></tr>`;
+    const search = document.getElementById('tenant-search').value;
+    const activeOnly = document.getElementById('tenant-active-only').checked;
+    try {
+      const res = await adminApi.listTenants({ search, active_only: activeOnly, skip: tenantSkip, limit: LIMIT });
+      document.getElementById('t-pag-info').textContent =
+        `${tenantSkip + 1}–${Math.min(tenantSkip + res.items.length, res.total)} de ${res.total}`;
+      document.getElementById('t-prev').disabled = tenantSkip === 0;
+      document.getElementById('t-next').disabled = tenantSkip + LIMIT >= res.total;
+
+      if (!res.items.length) {
+        tbody.innerHTML = `<tr><td colspan="7" style="padding:24px;text-align:center;color:var(--text-3)">Nenhum workspace encontrado.</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = res.items.map(t => {
+        let expBadge = '';
+        if (t.expires_at) {
+          const exp = new Date(t.expires_at);
+          const now = new Date();
+          const diff = (exp - now) / 86400000;
+          if (diff < 0) expBadge = `<span class="badge badge--expense">Expirado</span>`;
+          else if (diff < 30) expBadge = `<span class="badge badge--warn">Em ${Math.ceil(diff)}d</span>`;
+          else expBadge = formatDate(t.expires_at);
+        } else {
+          expBadge = '<span class="text-muted">—</span>';
+        }
+        return `
+          <tr>
+            <td class="text-strong">${t.name}</td>
+            <td><span class="badge badge--info">${t.plan || 'free'}</span></td>
+            <td class="text-muted">${t.active_users}/${t.max_users}</td>
+            <td>${t.is_active ? '<span class="badge badge--active">Ativo</span>' : '<span class="badge badge--inactive">Suspenso</span>'}</td>
+            <td>${expBadge}</td>
+            <td class="text-muted">${formatDate(t.created_at)}</td>
+            <td><button class="btn btn--ghost btn--sm" onclick="openTenantEdit('${t.id}','${t.name.replace(/'/g, "\\'")}','${t.plan||'free'}','${t.max_users}','${t.is_active}','${t.expires_at||''}')">✎</button></td>
+          </tr>`;
+      }).join('');
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="7" style="color:var(--red);padding:20px">${err.message}</td></tr>`;
+    }
+  }
+
+  window.openTenantEdit = (id, name, plan, maxUsers, isActive, expiresAt) => {
+    editTenantId = id;
+    document.getElementById('te-name-display').textContent = name;
+    document.getElementById('te-plan').value = plan;
+    document.getElementById('te-max-users').value = maxUsers;
+    document.getElementById('te-is-active').value = isActive;
+    document.getElementById('te-expires').value = expiresAt ? expiresAt.replace('Z', '') : '';
+    openModal('tenant-modal');
+  };
+
+  document.getElementById('te-save-btn').onclick = async () => {
+    const btn = document.getElementById('te-save-btn');
+    btn.disabled = true;
+    try {
+      const expiresRaw = document.getElementById('te-expires').value;
+      const body = {
+        plan: document.getElementById('te-plan').value,
+        max_users: parseInt(document.getElementById('te-max-users').value),
+        is_active: document.getElementById('te-is-active').value === 'true',
+        expires_at: expiresRaw ? new Date(expiresRaw).toISOString() : null,
+      };
+      await adminApi.updateTenant(editTenantId, body);
+      toast('Workspace atualizado.', 'success');
+      closeModal('tenant-modal');
+      loadTenants(); loadStats();
+    } catch (err) { toast(err.message, 'error'); } finally { btn.disabled = false; }
+  };
+
+  document.getElementById('te-delete-btn').onclick = async () => {
+    if (!await confirm('Excluir este workspace e TODOS os seus dados? Esta ação é irreversível.')) return;
+    try {
+      await adminApi.deleteTenant(editTenantId);
+      toast('Workspace excluído.', 'success');
+      closeModal('tenant-modal');
+      loadTenants(); loadStats();
+    } catch (err) { toast(err.message, 'error'); }
+  };
+
+  // ── USERS ──────────────────────────────────────────────────────────
+  async function loadUsers() {
+    const tbody = document.getElementById('users-tbody');
+    tbody.innerHTML = `<tr><td colspan="6" style="padding:24px;text-align:center;color:var(--text-3)">Carregando...</td></tr>`;
+    const search = document.getElementById('user-search').value;
+    try {
+      const res = await adminApi.listUsers({ search, skip: userSkip, limit: LIMIT });
+      document.getElementById('u-pag-info').textContent =
+        `${userSkip + 1}–${Math.min(userSkip + res.items.length, res.total)} de ${res.total}`;
+      document.getElementById('u-prev').disabled = userSkip === 0;
+      document.getElementById('u-next').disabled = userSkip + LIMIT >= res.total;
+
+      if (!res.items.length) {
+        tbody.innerHTML = `<tr><td colspan="6" style="padding:24px;text-align:center;color:var(--text-3)">Nenhum usuário encontrado.</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = res.items.map(u => {
+        const roleBadge = u.role === 'superadmin'
+          ? `<span class="badge badge--warn">Superadmin</span>`
+          : u.role === 'admin' ? `<span class="badge badge--info">Admin</span>` : `<span class="badge badge--inactive">Membro</span>`;
+        return `
+          <tr>
+            <td class="text-strong">${u.name}</td>
+            <td class="text-muted">${u.email}</td>
+            <td>${roleBadge}</td>
+            <td>${u.is_active ? '<span class="badge badge--active">Ativo</span>' : '<span class="badge badge--inactive">Inativo</span>'}</td>
+            <td class="text-muted">${formatDate(u.created_at)}</td>
+            <td><button class="btn btn--ghost btn--sm" onclick="openUserEdit('${u.id}','${u.name.replace(/'/g,"\\'")}','${u.email}','${u.role}','${u.is_active}')">✎</button></td>
+          </tr>`;
+      }).join('');
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="6" style="color:var(--red);padding:20px">${err.message}</td></tr>`;
+    }
+  }
+
+  window.openUserEdit = (id, name, email, role, isActive) => {
+    editUserId = id;
+    document.getElementById('ue-email-display').textContent = email;
+    document.getElementById('ue-name').value = name;
+    document.getElementById('ue-role').value = role;
+    document.getElementById('ue-active').value = isActive;
+    document.getElementById('ue-password').value = '';
+    openModal('user-modal');
+  };
+
+  document.getElementById('ue-save-btn').onclick = async () => {
+    const btn = document.getElementById('ue-save-btn');
+    btn.disabled = true;
+    try {
+      const body = {
+        name: document.getElementById('ue-name').value,
+        role: document.getElementById('ue-role').value,
+        is_active: document.getElementById('ue-active').value === 'true',
+      };
+      const pwd = document.getElementById('ue-password').value;
+      if (pwd) body.new_password = pwd;
+      await adminApi.updateUser(editUserId, body);
+      toast('Usuário atualizado.', 'success');
+      closeModal('user-modal');
+      loadUsers();
+    } catch (err) { toast(err.message, 'error'); } finally { btn.disabled = false; }
+  };
+
+  document.getElementById('ue-delete-btn').onclick = async () => {
+    if (!await confirm('Excluir este usuário permanentemente?')) return;
+    try {
+      await adminApi.deleteUser(editUserId);
+      toast('Usuário excluído.', 'success');
+      closeModal('user-modal');
+      loadUsers(); loadStats();
+    } catch (err) { toast(err.message, 'error'); }
+  };
+
+  // ── Tabs & pagination ──────────────────────────────────────────────
+  document.querySelectorAll('[data-admin-tab]').forEach(tab => {
+    tab.onclick = () => {
+      document.querySelectorAll('[data-admin-tab]').forEach(t => t.classList.toggle('active', t === tab));
+      document.getElementById('admin-tenants').classList.toggle('hidden', tab.dataset.adminTab !== 'tenants');
+      document.getElementById('admin-users').classList.toggle('hidden', tab.dataset.adminTab !== 'users');
+      if (tab.dataset.adminTab === 'users') loadUsers();
+    };
+  });
+
+  document.getElementById('t-prev').onclick = () => { tenantSkip = Math.max(0, tenantSkip - LIMIT); loadTenants(); };
+  document.getElementById('t-next').onclick = () => { tenantSkip += LIMIT; loadTenants(); };
+  document.getElementById('u-prev').onclick = () => { userSkip = Math.max(0, userSkip - LIMIT); loadUsers(); };
+  document.getElementById('u-next').onclick = () => { userSkip += LIMIT; loadUsers(); };
+
+  let searchTimer;
+  document.getElementById('tenant-search').oninput = () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => { tenantSkip = 0; loadTenants(); }, 400); };
+  document.getElementById('user-search').oninput = () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => { userSkip = 0; loadUsers(); }, 400); };
+  document.getElementById('tenant-active-only').onchange = () => { tenantSkip = 0; loadTenants(); };
+
+  setupModalClose('tenant-modal');
+  setupModalClose('user-modal');
+
+  loadStats();
+  loadTenants();
+</script>
+</body>
+</html>

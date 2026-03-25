@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login — Save Point Finanças</title>
+  <meta name="description" content="Acesse sua conta Save Point Finanças e controle suas finanças com precisão.">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<div class="auth-page" id="auth-page">
+  <!-- LEFT -->
+  <div class="auth-left">
+    <div class="auth-brand">
+      <div class="auth-brand-mark">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="12" y1="1" x2="12" y2="23"></line>
+          <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+        </svg>
+      </div>
+      <div class="auth-brand-name">Save Point <span>Finanças</span></div>
+    </div>
+
+    <div class="auth-headline">Controle total<br>das suas finanças.</div>
+    <p class="auth-sub">
+      Gerencie receitas, despesas, parcelados e assinaturas com inteligência e clareza.
+    </p>
+
+    <div class="auth-features">
+      <div class="auth-feature"><div class="auth-feature-dot"></div>Dashboard com visão completa do mês</div>
+      <div class="auth-feature"><div class="auth-feature-dot"></div>Controle de parcelados e assinaturas</div>
+      <div class="auth-feature"><div class="auth-feature-dot"></div>Relatórios detalhados por categoria</div>
+      <div class="auth-feature"><div class="auth-feature-dot"></div>Classificação automática por IA</div>
+    </div>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="auth-right">
+    <!-- LOGIN PANEL -->
+    <div class="auth-form-box" id="panel-login">
+      <div class="auth-form-title">Entrar</div>
+      <div class="auth-form-sub">Acesse sua conta</div>
+
+      <div id="login-error" class="auth-error hidden"></div>
+
+      <form class="auth-form" id="login-form">
+        <div class="form-group">
+          <label class="form-label">E-mail</label>
+          <input id="login-email" type="email" class="form-control" placeholder="seu@email.com" required autocomplete="email">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Senha</label>
+          <input id="login-password" type="password" class="form-control" placeholder="••••••••" required autocomplete="current-password">
+        </div>
+        <button type="submit" class="btn btn--primary btn--lg" id="login-btn">Entrar</button>
+      </form>
+
+      <div class="auth-switch">
+        <a href="#" id="go-forgot" style="font-size:0.8rem;color:var(--text-3)">Esqueci minha senha</a>
+      </div>
+      <div class="auth-switch mt-8">
+        Não tem conta? <a href="#" id="go-register">Criar workspace</a>
+      </div>
+    </div>
+
+    <!-- REGISTER PANEL -->
+    <div class="auth-form-box hidden" id="panel-register">
+      <div class="auth-form-title">Criar conta</div>
+      <div class="auth-form-sub">Novo workspace — grátis para começar</div>
+
+      <div id="register-error" class="auth-error hidden"></div>
+
+      <form class="auth-form" id="register-form">
+        <div class="form-group">
+          <label class="form-label">Nome do workspace</label>
+          <input id="reg-workspace" type="text" class="form-control" placeholder="Ex: Família Silva" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Seu nome</label>
+          <input id="reg-name" type="text" class="form-control" placeholder="João Silva" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">E-mail</label>
+          <input id="reg-email" type="email" class="form-control" placeholder="seu@email.com" required autocomplete="email">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Senha</label>
+          <input id="reg-password" type="password" class="form-control" placeholder="Mínimo 6 caracteres" required autocomplete="new-password">
+        </div>
+        <button type="submit" class="btn btn--primary btn--lg" id="register-btn">Criar conta</button>
+      </form>
+
+      <div class="auth-switch mt-8">
+        Já tem conta? <a href="#" id="go-login">Entrar</a>
+      </div>
+    </div>
+
+    <!-- FORGOT PASSWORD PANEL -->
+    <div class="auth-form-box hidden" id="panel-forgot">
+      <div class="auth-form-title">Recuperar senha</div>
+      <div class="auth-form-sub">Informe seu e-mail para receber o token de reset</div>
+
+      <div id="forgot-error" class="auth-error hidden"></div>
+      <div id="forgot-success" class="hidden" style="background:var(--em-bg);border:1px solid var(--em-border);border-radius:var(--radius);color:var(--em);font-size:0.8rem;padding:10px 12px;"></div>
+
+      <form class="auth-form" id="forgot-form">
+        <div class="form-group">
+          <label class="form-label">E-mail</label>
+          <input id="forgot-email" type="email" class="form-control" placeholder="seu@email.com" required>
+        </div>
+        <button type="submit" class="btn btn--primary btn--lg" id="forgot-btn">Enviar token</button>
+      </form>
+
+      <!-- Reset form (shown after token is received) -->
+      <div id="reset-section" class="hidden mt-16">
+        <div class="auth-form-sub" style="margin-bottom:14px">Cole o token recebido:</div>
+        <form class="auth-form" id="reset-form">
+          <div class="form-group">
+            <label class="form-label">Token</label>
+            <input id="reset-token" type="text" class="form-control" placeholder="Cole o token aqui">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Nova senha</label>
+            <input id="reset-password" type="password" class="form-control" placeholder="Mínimo 6 caracteres">
+          </div>
+          <button type="submit" class="btn btn--primary btn--lg" id="reset-btn">Redefinir senha</button>
+        </form>
+      </div>
+
+      <div class="auth-switch mt-8">
+        Lembrou? <a href="#" id="go-login-2">Entrar</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { authApi, Auth } from './js/api.js';
+  import { setLoading } from './js/utils.js';
+
+  // Redirect if already logged in
+  if (Auth.isLoggedIn()) window.location.href = 'dashboard.html';
+
+  function showPanel(id) {
+    ['panel-login', 'panel-register', 'panel-forgot'].forEach(p =>
+      document.getElementById(p).classList.toggle('hidden', p !== id)
+    );
+  }
+
+  document.getElementById('go-register').onclick = (e) => { e.preventDefault(); showPanel('panel-register'); };
+  document.getElementById('go-login').onclick = (e) => { e.preventDefault(); showPanel('panel-login'); };
+  document.getElementById('go-forgot').onclick = (e) => { e.preventDefault(); showPanel('panel-forgot'); };
+  document.getElementById('go-login-2').onclick = (e) => { e.preventDefault(); showPanel('panel-login'); };
+
+  function showError(id, msg) {
+    const el = document.getElementById(id);
+    el.textContent = msg;
+    el.classList.remove('hidden');
+  }
+  function hideError(id) { document.getElementById(id).classList.add('hidden'); }
+
+  // ── LOGIN ─────────────────────────────────────────────────────────
+  document.getElementById('login-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    hideError('login-error');
+    const btn = document.getElementById('login-btn');
+    setLoading(btn, true);
+    try {
+      const data = await authApi.login(
+        document.getElementById('login-email').value,
+        document.getElementById('login-password').value
+      );
+      Auth.setTokens(data.access_token, data.refresh_token);
+      const me = await authApi.me();
+      Auth.setUser(me);
+      window.location.href = 'dashboard.html';
+    } catch (err) {
+      showError('login-error', err.message);
+    } finally {
+      setLoading(btn, false);
+    }
+  });
+
+  // ── REGISTER ──────────────────────────────────────────────────────
+  document.getElementById('register-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    hideError('register-error');
+    const btn = document.getElementById('register-btn');
+    setLoading(btn, true);
+    try {
+      const data = await authApi.register(
+        document.getElementById('reg-workspace').value,
+        document.getElementById('reg-name').value,
+        document.getElementById('reg-email').value,
+        document.getElementById('reg-password').value
+      );
+      Auth.setTokens(data.access_token, data.refresh_token);
+      const me = await authApi.me();
+      Auth.setUser(me);
+      window.location.href = 'dashboard.html';
+    } catch (err) {
+      showError('register-error', err.message);
+    } finally {
+      setLoading(btn, false);
+    }
+  });
+
+  // ── FORGOT PASSWORD ───────────────────────────────────────────────
+  document.getElementById('forgot-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    hideError('forgot-error');
+    const btn = document.getElementById('forgot-btn');
+    setLoading(btn, true);
+    try {
+      const res = await authApi.forgotPassword(document.getElementById('forgot-email').value);
+      const suc = document.getElementById('forgot-success');
+      suc.classList.remove('hidden');
+
+      if (res.reset_token) {
+        suc.innerHTML = `Token gerado (desenvolvimento): <br><strong style="font-family:monospace;word-break:break-all">${res.reset_token}</strong><br><small style="opacity:.7">Cole abaixo para redefinir.</small>`;
+        document.getElementById('reset-token').value = res.reset_token;
+        document.getElementById('reset-section').classList.remove('hidden');
+      } else {
+        suc.textContent = res.message;
+        document.getElementById('reset-section').classList.remove('hidden');
+      }
+    } catch (err) {
+      showError('forgot-error', err.message);
+    } finally {
+      setLoading(btn, false);
+    }
+  });
+
+  document.getElementById('reset-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('reset-btn');
+    setLoading(btn, true);
+    try {
+      await authApi.resetPassword(
+        document.getElementById('reset-token').value,
+        document.getElementById('reset-password').value
+      );
+      showPanel('panel-login');
+      document.getElementById('login-error').style.background = 'var(--em-bg)';
+      document.getElementById('login-error').style.borderColor = 'var(--em-border)';
+      document.getElementById('login-error').style.color = 'var(--em)';
+      document.getElementById('login-error').textContent = 'Senha redefinida! Faça login com a nova senha.';
+      document.getElementById('login-error').classList.remove('hidden');
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setLoading(btn, false);
+    }
+  });
+</script>
+</body>
+</html>

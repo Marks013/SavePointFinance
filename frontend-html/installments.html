@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Parcelados — Save Point Finanças</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<div class="app-shell">
+  <div id="sidebar-mount"></div>
+  <div class="main-content">
+    <div class="page-header">
+      <div class="page-title">Parcelados</div>
+      <div class="page-actions">
+        <label style="display:flex;align-items:center;gap:8px;font-size:0.8rem;color:var(--text-2);cursor:pointer">
+          <input type="checkbox" id="show-finished" style="accent-color:var(--em)">
+          Mostrar concluídos
+        </label>
+        <div style="width:1px;height:20px;background:var(--border)"></div>
+        <div class="month-nav">
+          <button class="btn btn--ghost btn--sm" id="prev-month">‹</button>
+          <div class="month-nav-label" id="month-label" style="font-size:0.8rem">Todos</div>
+          <button class="btn btn--ghost btn--sm" id="next-month">›</button>
+        </div>
+        <button class="btn btn--ghost btn--sm" id="btn-show-all">Ver grupos</button>
+        <button class="btn btn--ghost btn--sm" id="btn-show-month">Ver por mês</button>
+      </div>
+    </div>
+
+    <div class="page-body">
+      <!-- Summary -->
+      <div class="stat-grid" style="margin-bottom:20px">
+        <div class="stat-card stat-card--expense">
+          <div class="stat-label">Total parcelado</div>
+          <div class="stat-value stat-value--expense" id="stat-total">—</div>
+        </div>
+        <div class="stat-card stat-card--income">
+          <div class="stat-label">Pago</div>
+          <div class="stat-value stat-value--income" id="stat-paid">—</div>
+        </div>
+        <div class="stat-card stat-card--neutral">
+          <div class="stat-label">Restante</div>
+          <div class="stat-value" style="color:var(--amber)" id="stat-remaining">—</div>
+        </div>
+        <div class="stat-card stat-card--balance">
+          <div class="stat-label">Grupos ativos</div>
+          <div class="stat-value stat-value--balance" id="stat-groups">—</div>
+        </div>
+      </div>
+
+      <!-- All groups view -->
+      <div id="view-groups">
+        <div id="groups-container">
+          <div class="empty-state" id="groups-loading">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+            <div class="empty-state-title">Carregando...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Month view -->
+      <div id="view-month" class="hidden">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title" id="month-view-title">Parcelas do mês</div>
+            <div style="font-size:0.8rem;color:var(--text-3)">Total: <strong id="month-total" style="color:var(--red)">—</strong></div>
+          </div>
+          <div class="table-wrapper" style="border:none">
+            <table>
+              <thead>
+                <tr><th>Data</th><th>Descrição</th><th>Parcela</th><th style="text-align:right">Valor da parcela</th></tr>
+              </thead>
+              <tbody id="month-tbody">
+                <tr><td colspan="4" style="padding:24px;text-align:center;color:var(--text-3)">Carregando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { requireAuthAndRender } from './js/nav.js';
+  import { installmentsApi } from './js/api.js';
+  import { formatBRL, formatDate, formatMonth, currentYearMonth, toast } from './js/utils.js';
+
+  if (!requireAuthAndRender('installments.html')) throw new Error('not auth');
+
+  let { year, month } = currentYearMonth();
+  let viewMode = 'groups';
+
+  function updateMonthLabel() {
+    const lbl = formatMonth(year, month);
+    document.getElementById('month-label').textContent = lbl.charAt(0).toUpperCase() + lbl.slice(1);
+  }
+
+  function setView(mode) {
+    viewMode = mode;
+    document.getElementById('view-groups').classList.toggle('hidden', mode !== 'groups');
+    document.getElementById('view-month').classList.toggle('hidden', mode !== 'month');
+    if (mode === 'groups') loadGroups();
+    else loadByMonth();
+  }
+
+  document.getElementById('btn-show-all').onclick = () => setView('groups');
+  document.getElementById('btn-show-month').onclick = () => setView('month');
+
+  async function loadGroups() {
+    const container = document.getElementById('groups-container');
+    container.innerHTML = `<div class="empty-state" id="groups-loading">
+      <div class="empty-state-title">Carregando...</div></div>`;
+
+    const includeFinished = document.getElementById('show-finished').checked;
+    try {
+      const groups = await installmentsApi.list({ include_finished: includeFinished });
+
+      let total = 0, paid = 0, remaining = 0;
+      groups.forEach(g => { total += g.total_amount; paid += g.paid_amount; remaining += g.remaining_amount; });
+
+      document.getElementById('stat-total').textContent = formatBRL(total);
+      document.getElementById('stat-paid').textContent = formatBRL(paid);
+      document.getElementById('stat-remaining').textContent = formatBRL(remaining);
+      document.getElementById('stat-groups').textContent = groups.filter(g => !g.is_finished).length;
+
+      if (!groups.length) {
+        container.innerHTML = `<div class="empty-state">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+          <div class="empty-state-title">Nenhum parcelado encontrado</div>
+          <div class="empty-state-sub">Crie uma transação com mais de 1x em Transações</div></div>`;
+        return;
+      }
+
+      container.innerHTML = groups.map(g => {
+        const pct = Math.round((g.installments_paid / g.installments_total) * 100);
+        const nextDate = g.next_installment_date ? formatDate(g.next_installment_date) : 'Concluído';
+        return `
+          <div class="inst-card" style="margin-bottom:12px">
+            <div class="inst-card-header">
+              <div>
+                <div class="inst-card-title">${g.description}</div>
+                <div style="font-size:0.75rem;color:var(--text-3);margin-top:2px">Início: ${formatDate(g.start_date)}</div>
+              </div>
+              ${g.is_finished ? '<span class="badge badge--active">Concluído</span>' : '<span class="badge badge--warn">Em andamento</span>'}
+            </div>
+            <div class="inst-meta-row">
+              <div class="inst-meta"><div class="inst-meta-label">Total</div><div class="inst-meta-value">${formatBRL(g.total_amount)}</div></div>
+              <div class="inst-meta"><div class="inst-meta-label">Pago</div><div class="inst-meta-value" style="color:var(--em)">${formatBRL(g.paid_amount)}</div></div>
+              <div class="inst-meta"><div class="inst-meta-label">Restante</div><div class="inst-meta-value" style="color:var(--red)">${formatBRL(g.remaining_amount)}</div></div>
+              <div class="inst-meta"><div class="inst-meta-label">Parcelas</div><div class="inst-meta-value">${g.installments_paid}/${g.installments_total}</div></div>
+              <div class="inst-meta"><div class="inst-meta-label">Próxima</div><div class="inst-meta-value" style="font-family:inherit;font-size:0.8rem">${nextDate}</div></div>
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;font-size:0.72rem;color:var(--text-3);margin-bottom:6px">
+                <span>Progresso</span><span>${pct}%</span>
+              </div>
+              <div class="progress-bar">
+                <div class="progress-fill" style="width:${pct}%;background:${g.is_finished ? 'var(--em)' : 'var(--amber)'}"></div>
+              </div>
+            </div>
+          </div>`;
+      }).join('');
+    } catch (err) {
+      container.innerHTML = `<div class="empty-state"><div class="empty-state-title" style="color:var(--red)">${err.message}</div></div>`;
+    }
+  }
+
+  async function loadByMonth() {
+    const tbody = document.getElementById('month-tbody');
+    tbody.innerHTML = `<tr><td colspan="4" style="padding:24px;text-align:center;color:var(--text-3)">Carregando...</td></tr>`;
+    document.getElementById('month-view-title').textContent =
+      `Parcelas de ${formatMonth(year, month)}`;
+    try {
+      const res = await installmentsApi.byMonth(year, month);
+      document.getElementById('month-total').textContent = formatBRL(res.total_amount);
+      if (!res.items.length) {
+        tbody.innerHTML = `<tr><td colspan="4" style="padding:32px;text-align:center;color:var(--text-3)">Sem parcelas neste mês.</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = res.items.map(t => `
+        <tr>
+          <td>${formatDate(t.date)}</td>
+          <td class="text-strong">${t.description}</td>
+          <td><span class="badge badge--info">${t.installment_number}/${t.installments_total}</span></td>
+          <td class="td-amount td-amount--expense text-right">${formatBRL(t.amount)}</td>
+        </tr>`).join('');
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="4" style="padding:24px;text-align:center;color:var(--red)">${err.message}</td></tr>`;
+    }
+  }
+
+  document.getElementById('show-finished').onchange = loadGroups;
+  document.getElementById('prev-month').onclick = () => {
+    month--; if (month < 1) { month = 12; year--; }
+    updateMonthLabel();
+    if (viewMode === 'month') loadByMonth();
+  };
+  document.getElementById('next-month').onclick = () => {
+    month++; if (month > 12) { month = 1; year++; }
+    updateMonthLabel();
+    if (viewMode === 'month') loadByMonth();
+  };
+
+  updateMonthLabel();
+  loadGroups();
+</script>
+</body>
+</html>

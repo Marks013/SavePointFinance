@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — Save Point Finanças</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<div class="app-shell">
+  <div id="sidebar-mount"></div>
+
+  <div class="main-content">
+    <div class="top-bar" style="display:flex;justify-content:space-between;align-items:center;padding:16px 32px;border-bottom:1px solid var(--bg-card);background:var(--bg-card);margin-bottom:24px;">
+      <div style="font-size:1.25rem;font-weight:600;color:var(--text-1)" id="user-greeting">Carregando... 👋</div>
+      <div style="display:flex;gap:12px;">
+        <button class="btn btn--ghost" style="padding:8px 12px">🔔 Notificações</button>
+        <button class="btn btn--primary" onclick="window.location='transactions.html'">+ Novo Lançamento</button>
+      </div>
+    </div>
+
+    <div class="page-header" style="padding-top:0;">
+      <div class="page-title" id="dash-month-title">Dashboard</div>
+      <div class="page-actions">
+        <div class="month-nav">
+          <button class="btn btn--ghost btn--sm" id="prev-month">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          </button>
+          <div class="month-nav-label" id="month-label">—</div>
+          <button class="btn btn--ghost btn--sm" id="next-month">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="page-body">
+      <!-- Stats row -->
+      <div class="stat-grid" id="stat-grid">
+        <div class="stat-card stat-card--income">
+          <div class="stat-icon stat-icon--income">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
+          </div>
+          <div class="stat-label">Receitas</div>
+          <div class="stat-value stat-value--income" id="stat-income">—</div>
+          <div class="stat-sub" id="stat-income-sub">do mês</div>
+        </div>
+        <div class="stat-card stat-card--expense">
+          <div class="stat-icon stat-icon--expense">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline><polyline points="17 18 23 18 23 12"></polyline></svg>
+          </div>
+          <div class="stat-label">Despesas</div>
+          <div class="stat-value stat-value--expense" id="stat-expense">—</div>
+          <div class="stat-sub" id="stat-expense-sub">do mês</div>
+        </div>
+        <div class="stat-card stat-card--balance">
+          <div class="stat-icon stat-icon--balance">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+          </div>
+          <div class="stat-label">Saldo</div>
+          <div class="stat-value stat-value--balance" id="stat-balance">—</div>
+          <div class="stat-sub">= receitas − despesas</div>
+        </div>
+        <div class="stat-card stat-card--neutral">
+          <div class="stat-icon stat-icon--neutral">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+          </div>
+          <div class="stat-label">Assinaturas ativas</div>
+          <div class="stat-value" id="stat-subs" style="color:var(--amber)">—</div>
+          <div class="stat-sub" id="stat-subs-sub">recorrências</div>
+        </div>
+      </div>
+
+      <!-- Strategy row: Budget and Cards -->
+      <div class="grid-2" style="margin-bottom:24px">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Orçamento Total Planejado</div>
+          </div>
+          <div class="chart-area" style="height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;">
+            <canvas id="gauge-chart"></canvas>
+            <div style="position:absolute;bottom:20px;text-align:center;">
+              <div id="gauge-percent" style="font-size:1.8rem;font-weight:700;color:var(--text-1)">0%</div>
+              <div id="gauge-text" style="font-size:0.85rem;color:var(--text-3)">do limite gasto</div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Faturas Abertas (Cartão de Crédito)</div>
+            <a href="settings.html" class="btn btn--ghost btn--sm">Gerenciar</a>
+          </div>
+          <div class="card-body" style="padding:0">
+            <div class="table-wrapper" style="border:none;max-height:220px;overflow-y:auto;margin:0">
+              <table style="width:100%;text-align:left;border-collapse:collapse;">
+                <tbody id="cards-tbody">
+                  <tr><td style="padding:24px;text-align:center;color:var(--text-3)">Carregando...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Charts row -->
+      <div class="grid-2" style="margin-bottom:24px">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Evolução mensal</div>
+            <div style="display:flex;gap:12px;align-items:center;">
+              <select class="filter-control" id="evo-future" style="background:var(--bg-lighter)">
+                <option value="0" selected>Sem previsão</option>
+                <option value="3">+3 meses proj.</option>
+                <option value="6">+6 meses proj.</option>
+              </select>
+              <select class="filter-control" id="evo-months">
+                <option value="6">6 meses</option>
+                <option value="12" selected>12 meses</option>
+                <option value="24">24 meses</option>
+              </select>
+            </div>
+          </div>
+          <div class="chart-area" style="height:220px">
+            <canvas id="evo-chart"></canvas>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Gastos por categoria</div>
+          </div>
+          <div class="chart-area" style="height:220px;display:flex;align-items:center;justify-content:center">
+            <canvas id="cat-chart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent transactions -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Últimas transações</div>
+          <a href="transactions.html" class="btn btn--ghost btn--sm">Ver todas →</a>
+        </div>
+        <div class="table-wrapper" style="border:none">
+          <table id="recent-table">
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Descrição</th>
+                <th>Categoria</th>
+                <th style="text-align:right">Valor</th>
+                <th>Tipo</th>
+              </tr>
+            </thead>
+            <tbody id="recent-tbody">
+              <tr><td colspan="5" class="text-muted" style="padding:24px;text-align:center">Carregando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { requireAuthAndRender } from './js/nav.js';
+  import { reportsApi, transactionsApi, subscriptionsApi, categoriesApi } from './js/api.js';
+  import { formatBRL, formatDate, formatMonth, currentYearMonth, monthLabel } from './js/utils.js';
+
+  if (!requireAuthAndRender('dashboard.html')) throw new Error('not auth');
+
+  let { year, month } = currentYearMonth();
+  let evoChart, catChart, gaugeChart;
+  let categories = [];
+
+  // Update Hello Greeting
+  const user = Auth.getUser();
+  if (user) {
+    const firstName = (user.name || user.email).split(' ')[0];
+    document.getElementById('user-greeting').innerHTML = `Olá, <strong>${firstName}</strong> 👋`;
+  }
+
+  async function loadCategories() {
+    try { categories = await categoriesApi.list(); } catch {}
+  }
+
+  function getCatName(id) {
+    const c = categories.find(x => x.id === id);
+    return c ? c.name : '—';
+  }
+
+  function updateMonthLabel() {
+    const label = formatMonth(year, month);
+    document.getElementById('month-label').textContent = label;
+    document.getElementById('dash-month-title').textContent =
+      `Visão Geral — ${label.charAt(0).toUpperCase() + label.slice(1)}`;
+  }
+
+  async function loadSummary() {
+    try {
+      const s = await reportsApi.summary(year, month);
+      const fmtInc = formatBRL(s.income);
+      const fmtExp = formatBRL(s.expenses);
+      const fmtBal = formatBRL(s.balance);
+
+      document.getElementById('stat-income').textContent = fmtInc;
+      document.getElementById('stat-expense').textContent = fmtExp;
+      document.getElementById('stat-balance').textContent = fmtBal;
+      document.getElementById('stat-balance').className =
+        'stat-value ' + (s.balance >= 0 ? 'stat-value--income' : 'stat-value--expense');
+
+      // Gauge Chart Update
+      let percent = 0;
+      if (s.limit_planned > 0) {
+        percent = Math.min(100, Math.round((s.limit_used / s.limit_planned) * 100));
+      }
+      document.getElementById('gauge-percent').textContent = `${percent}%`;
+      
+      let gaugeColor = '#00E57A';
+      if (percent > 75) gaugeColor = '#F59E0B';
+      if (percent >= 90) gaugeColor = '#FF4D65';
+
+      if (gaugeChart) gaugeChart.destroy();
+      gaugeChart = new Chart(document.getElementById('gauge-chart'), {
+        type: 'doughnut',
+        data: {
+          labels: ['Usado', 'Disponível'],
+          datasets: [{
+            data: [s.limit_used, Math.max(0, s.limit_planned - s.limit_used)],
+            backgroundColor: [gaugeColor, '#1E2D3D'],
+            borderWidth: 0,
+            borderRadius: [4, 0]
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          cutout: '80%', circumference: 180, rotation: -90,
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => formatBRL(ctx.raw) } } }
+        }
+      });
+      if (s.limit_planned === 0) {
+        document.getElementById('gauge-text').textContent = "Defina limites nas categorias";
+      } else {
+        document.getElementById('gauge-text').textContent = `de ${formatBRL(s.limit_planned)} (orçado)`;
+      }
+
+    } catch {}
+  }
+
+  async function loadSubs() {
+    try {
+      const subs = await subscriptionsApi.list({ active_only: true });
+      document.getElementById('stat-subs').textContent = subs.length;
+      document.getElementById('stat-subs-sub').textContent = `= ${formatBRL(subs.reduce((a, s) => a + s.amount, 0))}/mês`;
+    } catch {}
+  }
+
+  async function loadEvolution() {
+    const months = +document.getElementById('evo-months').value;
+    const future = +document.getElementById('evo-future').value;
+    try {
+      const data = await reportsApi.monthlyEvolution(months, future);
+      const labels = data.map(d => monthLabel(d.period) + (d.projected ? '*' : ''));
+      const incomes = data.map(d => d.income);
+      const expenses = data.map(d => d.expenses);
+      
+      const incColors = data.map(d => d.projected ? 'rgba(0,229,122,0.2)' : 'rgba(0,229,122,0.6)');
+      const expColors = data.map(d => d.projected ? 'rgba(255,77,101,0.2)' : 'rgba(255,77,101,0.5)');
+      const incBorder = data.map(d => d.projected ? '#00E57Aaa' : '#00E57A');
+      const expBorder = data.map(d => d.projected ? '#FF4D65aa' : '#FF4D65');
+
+      if (evoChart) evoChart.destroy();
+      evoChart = new Chart(document.getElementById('evo-chart'), {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            { label: 'Receitas', data: incomes, backgroundColor: incColors, borderColor: incBorder, borderWidth: 1, borderRadius: 2 },
+            { label: 'Despesas', data: expenses, backgroundColor: expColors, borderColor: expBorder, borderWidth: 1, borderRadius: 2 },
+          ],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { labels: { color: '#8FA3B8', font: { size: 11 } } }, tooltip: { callbacks: { label: ctx => formatBRL(ctx.raw) } } },
+          scales: {
+            x: { grid: { color: '#1E2D3D' }, ticks: { color: '#556070', font: { size: 10 } } },
+            y: { grid: { color: '#1E2D3D' }, ticks: { color: '#556070', font: { size: 10 }, callback: v => 'R$' + (v/1000).toFixed(0) + 'k' } },
+          },
+        },
+      });
+    } catch {}
+  }
+
+  async function loadCategoryChart() {
+    try {
+      const data = await reportsApi.byCategory(year, month, 'expense');
+      if (!data.length) return;
+
+      if (catChart) catChart.destroy();
+      catChart = new Chart(document.getElementById('cat-chart'), {
+        type: 'doughnut',
+        data: {
+          labels: data.map(d => d.name),
+          datasets: [{
+            data: data.map(d => d.total),
+            backgroundColor: data.map(d => d.color + 'CC'),
+            borderColor: data.map(d => d.color),
+            borderWidth: 1,
+          }],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          cutout: '68%',
+          plugins: {
+            legend: { position: 'right', labels: { color: '#8FA3B8', font: { size: 10 }, boxWidth: 12, padding: 8 } },
+            tooltip: { callbacks: { label: ctx => `${ctx.label}: ${formatBRL(ctx.raw)}` } },
+          },
+        },
+      });
+    } catch {}
+  }
+
+  async function loadRecentTx() {
+    const tbody = document.getElementById('recent-tbody');
+    try {
+      const res = await transactionsApi.list({ year, month, limit: 8 });
+      if (!res.items.length) {
+        tbody.innerHTML = `<tr><td colspan="5" style="padding:32px;text-align:center;color:var(--text-3)">Sem transações neste mês.</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = res.items.map(t => `
+        <tr>
+          <td>${formatDate(t.date)}</td>
+          <td class="text-strong">${t.description}</td>
+          <td class="text-muted">${getCatName(t.category_id)}</td>
+          <td class="td-amount td-amount--${t.type} text-right">${t.type === 'income' ? '+' : '-'}${formatBRL(t.amount)}</td>
+          <td>${t.type === 'income' ? '<span class="badge badge--income">Receita</span>' : '<span class="badge badge--expense">Despesa</span>'}</td>
+        </tr>`).join('');
+    } catch {
+      tbody.innerHTML = `<tr><td colspan="5" style="padding:24px;text-align:center;color:var(--red)">Erro ao carregar.</td></tr>`;
+    }
+  }
+
+  async function loadCards() {
+    const tbody = document.getElementById('cards-tbody');
+    try {
+      const cards = await reportsApi.cardsUsage(year, month);
+      if (!cards || cards.length === 0) {
+        tbody.innerHTML = `<tr><td style="padding:24px;text-align:center;color:var(--text-3)">Nenhum cartão ativo.</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = cards.map(c => {
+        const perc = c.limit > 0 ? Math.min(100, (c.spent / c.limit) * 100) : 0;
+        return `
+        <tr style="border-bottom:1px solid var(--border-color)">
+          <td style="padding:12px 16px;">
+            <div style="display:flex;align-items:center;gap:12px;">
+              <div style="width:12px;height:12px;border-radius:50%;background:${c.color || '#556070'}"></div>
+              <div>
+                <div style="font-weight:600;color:var(--text-1)">${c.name} <span style="font-size:0.8rem;color:var(--text-3)">(${c.last4})</span></div>
+                <div style="font-size:0.85rem;color:var(--text-3)">${formatBRL(c.spent)} de ${formatBRL(c.limit)}</div>
+              </div>
+            </div>
+            <div style="margin-top:8px;height:4px;background:var(--bg-lighter);border-radius:2px;overflow:hidden;width:100%;">
+              <div style="height:100%;width:${perc}%;background:${perc > 85 ? 'var(--red)' : c.color};transition:width 0.5s ease;"></div>
+            </div>
+          </td>
+        </tr>`;
+      }).join('');
+    } catch {
+      tbody.innerHTML = `<tr><td style="padding:24px;text-align:center;color:var(--red)">Erro ao carregar cartões.</td></tr>`;
+    }
+  }
+
+  async function loadAll() {
+    updateMonthLabel();
+    await loadCategories();
+    await Promise.all([loadSummary(), loadSubs(), loadEvolution(), loadCategoryChart(), loadRecentTx(), loadCards()]);
+  }
+
+  document.getElementById('prev-month').onclick = () => {
+    month--; if (month < 1) { month = 12; year--; } loadAll();
+  };
+  document.getElementById('next-month').onclick = () => {
+    month++; if (month > 12) { month = 1; year++; } loadAll();
+  };
+  document.getElementById('evo-months').onchange = loadEvolution;
+  document.getElementById('evo-future').onchange = loadEvolution;
+
+  loadAll();
+</script>
+</body>
+</html>
