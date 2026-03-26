@@ -1,18 +1,44 @@
 /**
- * Save Point Finanças API Client
- * Central module for all API calls to the FastAPI backend.
+ * Save Point Finanças — API Client
  *
- * BUGFIX: Auto-refresh on 401 agora verifica se existe refresh token ANTES
- * de tentar o refresh. Sem isso, o login com credenciais erradas entrava em
- * loop: 401 → tryRefresh falha → Auth.clear() → redirect /login.html → reload.
+ * FIX COOLIFY: API_BASE é detectado dinamicamente.
+ * No Coolify os serviços têm domínios separados:
+ *   Frontend: https://savepoint.161.153.204.226.sslip.io
+ *   Backend:  https://api.161.153.204.226.sslip.io
+ *
+ * O frontend detecta o padrão e chama o backend diretamente via HTTPS,
+ * eliminando dependência do proxy Nginx interno (que pode falhar no Coolify).
  */
 
-const API_BASE = '/api/v1';
+function detectApiBase() {
+  const { protocol, hostname, port } = window.location;
 
-// ── Token Management ─────────────────────────────────────────────────────────
+  // Desenvolvimento local → usa proxy Nginx
+  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '0.0.0.0') {
+    return '/api/v1';
+  }
+
+  // Padrão Coolify: frontend tem subdomínio, backend tem prefixo "api."
+  // Ex: savepoint.161.153.204.226.sslip.io → api.161.153.204.226.sslip.io
+  const parts = hostname.split('.');
+  if (parts.length >= 2) {
+    const baseHost = parts.slice(1).join('.'); // remove primeiro subdomínio
+    return `${protocol}//api.${baseHost}/api/v1`;
+  }
+
+  // Fallback: mesmo host, path relativo
+  return '/api/v1';
+}
+
+const API_BASE = detectApiBase();
+
+// Log para diagnóstico (visível no console do browser)
+console.info(`[SavePoint] API_BASE detectado: ${API_BASE}`);
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
 
 export const Auth = {
-  getToken() { return localStorage.getItem('ff_access_token'); },
+  getToken()        { return localStorage.getItem('ff_access_token'); },
   getRefreshToken() { return localStorage.getItem('ff_refresh_token'); },
   getUser() {
     try { return JSON.parse(localStorage.getItem('ff_user') || 'null'); }
@@ -28,253 +54,179 @@ export const Auth = {
     localStorage.removeItem('ff_refresh_token');
     localStorage.removeItem('ff_user');
   },
-  isLoggedIn() { return !!this.getToken(); },
-  isSuperadmin() { return this.getUser()?.role === 'superadmin'; },
+  isLoggedIn()    { return !!this.getToken(); },
+  isSuperadmin()  { return this.getUser()?.role === 'superadmin'; },
   requireAuth() {
-    if (!this.isLoggedIn()) {
-      window.location.href = '/login.html';
-      return false;
-    }
-    return true;
-  },
-  requireSuperadmin() {
-    if (!this.isLoggedIn() || !this.isSuperadmin()) {
-      window.location.href = '/dashboard.html';
-      return false;
-    }
+    if (!this.isLoggedIn()) { window.location.href = '/login.html'; return false; }
     return true;
   },
 };
 
-// ── Health Check ─────────────────────────────────────────────────────────────
+// ── Fetch core ────────────────────────────────────────────────────────────────
 
-export async function checkBackendHealth() {
-  try {
-    const res = await fetch('/api/health', { method: 'GET', signal: AbortSignal.timeout(5000) });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
-
-// ── Global Error Banner ───────────────────────────────────────────────────────
-
-export function showGlobalError(message) {
-  let banner = document.getElementById('_global_err_banner');
-  if (!banner) {
-    banner = document.createElement('div');
-    banner.id = '_global_err_banner';
-    banner.style.cssText = `
-      position: fixed; top: 0; left: 0; right: 0; z-index: 9998;
-      background: #2D0A0F; border-bottom: 2px solid #FF4D65;
-      color: #FF4D65; font-size: 0.8125rem; font-family: inherit;
-      padding: 10px 20px; display: flex; align-items: center; gap: 10px;
-    `;
-    banner.innerHTML = `
-      <span style="font-size:1rem">⚠️</span>
-      <span id="_global_err_msg"></span>
-      <button onclick="this.parentElement.remove()" style="
-        margin-left:auto; background:none; border:1px solid #FF4D65;
-        color:#FF4D65; cursor:pointer; padding:2px 8px; border-radius:3px;
-        font-size:0.75rem;
-      ">✕ Fechar</button>
-    `;
-    document.body.prepend(banner);
-  }
-  document.getElementById('_global_err_msg').textContent = message;
-}
-
-export function hideGlobalError() {
-  document.getElementById('_global_err_banner')?.remove();
-}
-
-// ── Core Fetch Wrapper ───────────────────────────────────────────────────────
-
-async function request(method, path, body = null, options = {}) {
-  const headers = { 'Content-Type': 'application/json' };
+async function request(method, path, body = null, skipRefresh = false) {
   const token = Auth.getToken();
+  const headers = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const config = { method, headers };
-  if (body) config.body = JSON.stringify(body);
+  const cfg = { method, headers };
+  if (body) cfg.body = JSON.stringify(body);
 
+  let res;
   try {
-    let res = await fetch(`${API_BASE}${path}`, config);
-
-    // ── BUGFIX: Auto-refresh on 401 ──────────────────────────────────────────
-    // Verifica se existe refresh token ANTES de tentar o refresh.
-    // Sem esta checagem, o login com senha errada causava loop infinito:
-    //   401 → tryRefresh() (sem token) → false → Auth.clear()
-    //   → redirect /login.html → página recarrega → formulário limpo → loop.
-    if (res.status === 401 && !options.skipRefresh) {
-      const rt = Auth.getRefreshToken();
-      if (rt) {
-        // Tem refresh token: tenta renovar a sessão
-        const refreshed = await tryRefresh();
-        if (refreshed) {
-          headers['Authorization'] = `Bearer ${Auth.getToken()}`;
-          res = await fetch(`${API_BASE}${path}`, { ...config, headers });
-        } else {
-          // Refresh falhou (token expirado/inválido) → força novo login
-          Auth.clear();
-          window.location.href = '/login.html';
-          return null;
-        }
-      }
-      // Sem refresh token (usuário não logado / na tela de login):
-      // NÃO redireciona. Cai no tratamento de erro abaixo para exibir
-      // a mensagem correta ao usuário (ex: "E-mail ou senha incorretos").
-    }
-    // ── fim BUGFIX ───────────────────────────────────────────────────────────
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ detail: `Erro HTTP ${res.status}` }));
-      throw new ApiError(err.detail || `Erro HTTP ${res.status}`, res.status);
-    }
-
-    if (res.status === 204) return null;
-    return res.json();
-  } catch (e) {
-    if (e instanceof ApiError) throw e;
-    // Network / CORS error
+    res = await fetch(`${API_BASE}${path}`, cfg);
+  } catch (networkErr) {
+    // Falha de rede / CORS / backend offline
     throw new ApiError(
-      'Sem conexão com o servidor. Verifique se o backend está rodando e se o ALLOWED_ORIGINS do .env está correto.',
+      `Sem conexão com o backend (${API_BASE}). Verifique se o serviço está rodando no Coolify.`,
       0
     );
   }
+
+  // Tentar refresh automático em 401
+  if (res.status === 401 && !skipRefresh) {
+    const rt = Auth.getRefreshToken();
+    if (rt) {
+      try {
+        const rr = await fetch(
+          `${API_BASE}/auth/refresh?refresh_token=${encodeURIComponent(rt)}`,
+          { method: 'POST', headers: { 'Content-Type': 'application/json' } }
+        );
+        if (rr.ok) {
+          const rd = await rr.json();
+          Auth.setTokens(rd.access_token, rd.refresh_token);
+          headers['Authorization'] = `Bearer ${rd.access_token}`;
+          res = await fetch(`${API_BASE}${path}`, { ...cfg, headers });
+        }
+      } catch (_) { /* refresh falhou */ }
+    }
+
+    // Ainda 401 após tentativa de refresh → redirecionar
+    if (res.status === 401) {
+      Auth.clear();
+      window.location.href = '/login.html';
+      throw new ApiError('Sessão expirada. Faça login novamente.', 401);
+    }
+  }
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: `Erro HTTP ${res.status}` }));
+    throw new ApiError(err.detail || `Erro HTTP ${res.status}`, res.status);
+  }
+
+  if (res.status === 204) return null;
+  return res.json();
 }
 
 async function tryRefresh() {
   const rt = Auth.getRefreshToken();
   if (!rt) return false;
   try {
-    const res = await fetch(`${API_BASE}/auth/refresh?refresh_token=${encodeURIComponent(rt)}`, {
-      method: 'POST',
-    });
+    const res = await fetch(
+      `${API_BASE}/auth/refresh?refresh_token=${encodeURIComponent(rt)}`,
+      { method: 'POST' }
+    );
     if (!res.ok) return false;
     const data = await res.json();
     Auth.setTokens(data.access_token, data.refresh_token);
     return true;
-  } catch {
-    return false;
-  }
+  } catch { return false; }
 }
 
 export class ApiError extends Error {
-  constructor(message, status) {
-    super(message);
-    this.status = status;
-  }
+  constructor(message, status) { super(message); this.status = status; }
 }
 
-const get = (path, params = {}) => {
+const get  = (path, params = {}) => {
   const qs = new URLSearchParams(
-    Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== ''))
+    Object.fromEntries(Object.entries(params).filter(([, v]) => v != null && v !== ''))
   ).toString();
   return request('GET', qs ? `${path}?${qs}` : path);
 };
-const post = (path, body) => request('POST', path, body);
-const put = (path, body) => request('PUT', path, body);
-const patch = (path, body) => request('PATCH', path, body);
-const del = (path) => request('DELETE', path);
+const post  = (path, body)  => request('POST',   path, body);
+const put   = (path, body)  => request('PUT',    path, body);
+const patch = (path, body)  => request('PATCH',  path, body);
+const del   = (path)        => request('DELETE', path);
 
-// ── Auth Endpoints ───────────────────────────────────────────────────────────
+// ── Endpoints ─────────────────────────────────────────────────────────────────
 
 export const authApi = {
-  login: (email, password) => post('/auth/login', { email, password }),
-  register: (workspace_name, name, email, password) =>
-    post('/auth/register', { workspace_name, name, email, password }),
-  me: () => get('/auth/me'),
-  forgotPassword: (email) => post('/auth/forgot-password', { email }),
-  resetPassword: (token, new_password) => post('/auth/reset-password', { token, new_password }),
+  login:          (email, password)      => post('/auth/login',           { email, password }),
+  register:       (workspace_name, name, email, password) =>
+                  post('/auth/register', { workspace_name, name, email, password }),
+  me:             ()                     => get('/auth/me'),
+  forgotPassword: (email)                => post('/auth/forgot-password', { email }),
+  resetPassword:  (token, new_password)  => post('/auth/reset-password',  { token, new_password }),
   changePassword: (current_password, new_password) =>
-    post('/auth/change-password', { current_password, new_password }),
+                  post('/auth/change-password', { current_password, new_password }),
 };
-
-// ── Transactions ─────────────────────────────────────────────────────────────
 
 export const transactionsApi = {
-  list: (params = {}) => get('/transactions', params),
-  get: (id) => get(`/transactions/${id}`),
-  create: (body) => post('/transactions', body),
-  update: (id, body) => put(`/transactions/${id}`, body),
-  delete: (id, deleteAll = false) =>
-    del(`/transactions/${id}${deleteAll ? '?delete_all_installments=true' : ''}`),
+  list:   (params = {}) => get('/transactions', params),
+  get:    (id)          => get(`/transactions/${id}`),
+  create: (body)        => post('/transactions', body),
+  update: (id, body)    => put(`/transactions/${id}`, body),
+  delete: (id, all = false) =>
+    del(`/transactions/${id}${all ? '?delete_all_installments=true' : ''}`),
 };
-
-// ── Categories ───────────────────────────────────────────────────────────────
 
 export const categoriesApi = {
-  list: () => get('/categories'),
-  create: (body) => post('/categories', body),
-  update: (id, body) => put(`/categories/${id}`, body),
-  delete: (id) => del(`/categories/${id}`),
+  list:   ()           => get('/categories'),
+  create: (body)       => post('/categories', body),
+  update: (id, body)   => put(`/categories/${id}`, body),
+  delete: (id)         => del(`/categories/${id}`),
 };
 
-// ── Accounts & Cards ─────────────────────────────────────────────────────────
-
 export const accountsApi = {
-  list: () => get('/accounts'),
-  create: (body) => post('/accounts', body),
-  update: (id, body) => put(`/accounts/${id}`, body),
-  delete: (id) => del(`/accounts/${id}`),
+  list:   ()           => get('/accounts'),
+  create: (body)       => post('/accounts', body),
+  update: (id, body)   => put(`/accounts/${id}`, body),
+  delete: (id)         => del(`/accounts/${id}`),
 };
 
 export const cardsApi = {
-  list: () => get('/cards'),
-  create: (body) => post('/cards', body),
-  update: (id, body) => put(`/cards/${id}`, body),
-  delete: (id) => del(`/cards/${id}`),
+  list:   ()           => get('/cards'),
+  create: (body)       => post('/cards', body),
+  update: (id, body)   => put(`/cards/${id}`, body),
+  delete: (id)         => del(`/cards/${id}`),
 };
-
-// ── Subscriptions ────────────────────────────────────────────────────────────
 
 export const subscriptionsApi = {
-  list: (params = {}) => get('/subscriptions/', params),
-  create: (body) => post('/subscriptions/', body),
-  update: (id, body) => put(`/subscriptions/${id}`, body),
-  delete: (id) => del(`/subscriptions/${id}`),
-  generateTransaction: (id) => post(`/subscriptions/${id}/generate-transaction`),
+  list:                (params = {}) => get('/subscriptions/', params),
+  create:              (body)        => post('/subscriptions/', body),
+  update:              (id, body)    => put(`/subscriptions/${id}`, body),
+  delete:              (id)          => del(`/subscriptions/${id}`),
+  generateTransaction: (id)          => post(`/subscriptions/${id}/generate-transaction`),
 };
-
-// ── Installments ─────────────────────────────────────────────────────────────
 
 export const installmentsApi = {
-  list: (params = {}) => get('/installments', params),
-  byMonth: (year, month) => get('/installments/by-month', { year, month }),
+  list:    (params = {})       => get('/installments', params),
+  byMonth: (year, month)       => get('/installments/by-month', { year, month }),
 };
-
-// ── Reports ──────────────────────────────────────────────────────────────────
 
 export const reportsApi = {
-  summary: (year, month) => get('/reports/summary', { year, month }),
+  summary:          (year, month)                  => get('/reports/summary',           { year, month }),
   monthlyEvolution: (months = 12, future_months = 0) =>
-    get('/reports/monthly-evolution', { months, future_months }),
-  byCategory: (year, month, type = 'expense') =>
-    get('/reports/by-category', { year, month, type }),
-  topTransactions: (year, month, limit = 10) =>
-    get('/reports/top-transactions', { year, month, limit }),
-  cardsUsage: (year, month) => get('/reports/cards-usage', { year, month }),
+                    get('/reports/monthly-evolution', { months, future_months }),
+  byCategory:       (year, month, type = 'expense') => get('/reports/by-category',     { year, month, type }),
+  topTransactions:  (year, month, limit = 10)        => get('/reports/top-transactions', { year, month, limit }),
+  cardsUsage:       (year, month)                  => get('/reports/cards-usage',       { year, month }),
 };
-
-// ── Admin ────────────────────────────────────────────────────────────────────
 
 export const adminApi = {
-  stats: () => get('/admin/stats'),
-  listTenants: (params = {}) => get('/admin/tenants', params),
-  getTenant: (id) => get(`/admin/tenants/${id}`),
-  updateTenant: (id, body) => patch(`/admin/tenants/${id}`, body),
-  deleteTenant: (id) => del(`/admin/tenants/${id}`),
-  listUsers: (params = {}) => get('/admin/users', params),
-  updateUser: (id, body) => patch(`/admin/users/${id}`, body),
-  deleteUser: (id) => del(`/admin/users/${id}`),
+  stats:        ()           => get('/admin/stats'),
+  listTenants:  (params = {}) => get('/admin/tenants', params),
+  getTenant:    (id)         => get(`/admin/tenants/${id}`),
+  updateTenant: (id, body)   => patch(`/admin/tenants/${id}`, body),
+  deleteTenant: (id)         => del(`/admin/tenants/${id}`),
+  listUsers:    (params = {}) => get('/admin/users', params),
+  updateUser:   (id, body)   => patch(`/admin/users/${id}`, body),
+  deleteUser:   (id)         => del(`/admin/users/${id}`),
 };
 
-// ── Goals ─────────────────────────────────────────────────────────────────────
-
 export const goalsApi = {
-  list: () => get('/goals'),
-  create: (body) => post('/goals', body),
-  update: (id, body) => put(`/goals/${id}`, body),
-  delete: (id) => del(`/goals/${id}`),
+  list:   ()           => get('/goals'),
+  create: (body)       => post('/goals', body),
+  update: (id, body)   => put(`/goals/${id}`, body),
+  delete: (id)         => del(`/goals/${id}`),
 };
