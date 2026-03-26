@@ -8,7 +8,11 @@ class Settings(BaseSettings):
     APP_NAME: str = "Save Point Finanças"
     APP_ENV: str = "development"
     SECRET_KEY: str = "change_me"
-    ALLOWED_ORIGINS: List[str] = ["http://localhost:3000"]
+
+    # FIX: aceita lista JSON do .env
+    # Exemplo no .env:
+    # ALLOWED_ORIGINS=["https://savepoint.161.153.204.226.sslip.io","http://localhost"]
+    ALLOWED_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost"]
 
     DATABASE_URL: str = "postgresql+asyncpg://savepoint:changeme@localhost:5432/savepoint"
     REDIS_PASSWORD: str = "changeme"
@@ -16,8 +20,8 @@ class Settings(BaseSettings):
 
     JWT_SECRET_KEY: str = "change_me_jwt"
     JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 30
 
     ANTHROPIC_API_KEY: str = ""
 
