@@ -10,9 +10,8 @@ from app.database import get_db
 from app.auth import get_current_user
 from app.models.user import User
 from app.models.transaction import Transaction, TransactionType, TransactionSource, PaymentMethod
-# Imports temporarily disabled because files are missing from app/services/
-# from app.services.ai_classifier import classify_transaction
-# from app.services.category_rules import classify_by_rules
+from app.services.ai_classifier import classify_transaction
+from app.services.category_rules import classify_by_rules
 
 router = APIRouter(prefix="/api/v1/transactions", tags=["transactions"])
 
@@ -163,8 +162,17 @@ async def create_transaction(
     ai_confidence = None
 
     if not category_id and auto_classify:
-        # AI Classification disabled due to missing 'app.services.ai_classifier' and 'category_rules' modules
-        pass
+        rule_result = await classify_by_rules(body.description, str(current_user.tenant_id), db)
+        if rule_result:
+            category_id = rule_result
+        else:
+            ai_result = await classify_transaction(
+                body.description, body.type.value, str(current_user.tenant_id), db
+            )
+            if ai_result:
+                category_id = ai_result["category_id"]
+                ai_classified = True
+                ai_confidence = ai_result["confidence"]
 
     from dateutil.relativedelta import relativedelta
 

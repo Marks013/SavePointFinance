@@ -33,6 +33,9 @@ Escolha a categoria que MELHOR se aplica à transação. Sua resposta DEVE ser e
   "confidence": 0.95
 }}
 """
+        if not anthropic_client:
+            return None
+        
         response = await anthropic_client.messages.create(
             model="claude-3-5-haiku-20241022",
             max_tokens=150,

@@ -3,7 +3,9 @@ from anthropic import AsyncAnthropic
 from app.config import settings
 from typing import Optional, Dict, Any
 
-anthropic_client = AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+anthropic_client = None
+if settings.ANTHROPIC_API_KEY:
+    anthropic_client = AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
 
 
 async def analyze_transaction(user_message: str, user_categories: list[dict]) -> Dict[str, Any]:
@@ -37,7 +39,9 @@ Formato esperado de saída JSON:
   "category_id": "uuid-da-categoria-ou-null"
 }}
 """
-    try:
+        if not anthropic_client:
+            return {"value": 0.0, "description": "Chave Anthropic ausente", "type": "expense", "category_id": None}
+            
         response = await anthropic_client.messages.create(
             model="claude-3-5-haiku-20241022",
             max_tokens=256,

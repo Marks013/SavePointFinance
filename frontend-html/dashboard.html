@@ -174,11 +174,15 @@
   let evoChart, catChart, gaugeChart;
   let categories = [];
 
-  // Update Hello Greeting
-  const user = Auth.getUser();
-  if (user) {
-    const firstName = (user.name || user.email).split(' ')[0];
-    document.getElementById('user-greeting').innerHTML = `Olá, <strong>${firstName}</strong> 👋`;
+  // Update Hello Greeting (with explicit error boundary)
+  try {
+    const user = Auth.getUser();
+    if (user) {
+      const firstName = (user.name || user.email).split(' ')[0];
+      document.getElementById('user-greeting').innerHTML = `Olá, <strong>${firstName}</strong> 👋`;
+    }
+  } catch (e) {
+    alert("Erro crítico no dashboard: " + e.message);
   }
 
   async function loadCategories() {
