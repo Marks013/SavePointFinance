@@ -1,6 +1,10 @@
 /**
  * Save Point Finanças API Client
  * Central module for all API calls to the FastAPI backend.
+ *
+ * BUGFIX: Auto-refresh on 401 agora verifica se existe refresh token ANTES
+ * de tentar o refresh. Sem isso, o login com credenciais erradas entrava em
+ * loop: 401 → tryRefresh falha → Auth.clear() → redirect /login.html → reload.
  */
 
 const API_BASE = '/api/v1';
@@ -97,18 +101,31 @@ async function request(method, path, body = null, options = {}) {
   try {
     let res = await fetch(`${API_BASE}${path}`, config);
 
-    // Auto-refresh on 401
+    // ── BUGFIX: Auto-refresh on 401 ──────────────────────────────────────────
+    // Verifica se existe refresh token ANTES de tentar o refresh.
+    // Sem esta checagem, o login com senha errada causava loop infinito:
+    //   401 → tryRefresh() (sem token) → false → Auth.clear()
+    //   → redirect /login.html → página recarrega → formulário limpo → loop.
     if (res.status === 401 && !options.skipRefresh) {
-      const refreshed = await tryRefresh();
-      if (refreshed) {
-        headers['Authorization'] = `Bearer ${Auth.getToken()}`;
-        res = await fetch(`${API_BASE}${path}`, { ...config, headers });
-      } else {
-        Auth.clear();
-        window.location.href = '/login.html';
-        return null;
+      const rt = Auth.getRefreshToken();
+      if (rt) {
+        // Tem refresh token: tenta renovar a sessão
+        const refreshed = await tryRefresh();
+        if (refreshed) {
+          headers['Authorization'] = `Bearer ${Auth.getToken()}`;
+          res = await fetch(`${API_BASE}${path}`, { ...config, headers });
+        } else {
+          // Refresh falhou (token expirado/inválido) → força novo login
+          Auth.clear();
+          window.location.href = '/login.html';
+          return null;
+        }
       }
+      // Sem refresh token (usuário não logado / na tela de login):
+      // NÃO redireciona. Cai no tratamento de erro abaixo para exibir
+      // a mensagem correta ao usuário (ex: "E-mail ou senha incorretos").
     }
+    // ── fim BUGFIX ───────────────────────────────────────────────────────────
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({ detail: `Erro HTTP ${res.status}` }));
