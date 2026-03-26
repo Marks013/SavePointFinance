@@ -17,7 +17,6 @@ from app.routers.admin import router as admin_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Create all tables on startup (idempotent)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield
@@ -32,15 +31,37 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# ── CORS ──────────────────────────────────────────────────────────────────────
+# FIX para Coolify: o frontend (savepoint.*) chama o backend (api.*) diretamente.
+# Isso é uma requisição cross-origin, então CORS precisa estar configurado corretamente.
+#
+# ALLOWED_ORIGINS no .env deve conter o domínio do frontend:
+#   ALLOWED_ORIGINS=["https://savepoint.161.153.204.226.sslip.io"]
+#
+# Se ALLOWED_ORIGINS contiver "*", todas as origens são permitidas (útil para debug).
 
-# Public/user routers
+allowed = settings.ALLOWED_ORIGINS
+
+# Detecta se o wildcard foi configurado
+if "*" in allowed:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=False,  # credentials não funciona com wildcard
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+else:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=allowed,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+        expose_headers=["*"],
+    )
+
+# ── Routers ───────────────────────────────────────────────────────────────────
 app.include_router(auth_router)
 app.include_router(transactions_router)
 app.include_router(categories_router)
@@ -51,8 +72,6 @@ app.include_router(webhook_router)
 app.include_router(subscriptions_router)
 app.include_router(installments_router)
 app.include_router(goals_router)
-
-# Admin router (superadmin only — protected at endpoint level)
 app.include_router(admin_router)
 
 
