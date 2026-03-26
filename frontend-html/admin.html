@@ -18,7 +18,6 @@
     </div>
 
     <div class="page-body">
-      <!-- Stats row -->
       <div class="stat-grid" style="margin-bottom:24px">
         <div class="stat-card stat-card--income">
           <div class="stat-label">Workspaces ativos</div>
@@ -38,13 +37,12 @@
         </div>
       </div>
 
-      <!-- Tabs -->
       <div class="tabs">
         <div class="tab active" data-admin-tab="tenants">Workspaces</div>
         <div class="tab" data-admin-tab="users">Usuários</div>
       </div>
 
-      <!-- TENANTS view -->
+      <!-- TENANTS -->
       <div id="admin-tenants">
         <div class="filters-bar">
           <input type="text" class="search-input" id="tenant-search" placeholder="Buscar workspace...">
@@ -55,15 +53,7 @@
         <div class="table-wrapper">
           <table>
             <thead>
-              <tr>
-                <th>Nome</th>
-                <th>Plano</th>
-                <th>Usuários</th>
-                <th>Status</th>
-                <th>Expira em</th>
-                <th>Criado em</th>
-                <th></th>
-              </tr>
+              <tr><th>Nome</th><th>Plano</th><th>Usuários</th><th>Status</th><th>Expira em</th><th>Criado em</th><th></th></tr>
             </thead>
             <tbody id="tenants-tbody">
               <tr><td colspan="7" style="padding:24px;text-align:center;color:var(--text-3)">Carregando...</td></tr>
@@ -79,7 +69,7 @@
         </div>
       </div>
 
-      <!-- USERS view -->
+      <!-- USERS -->
       <div id="admin-users" class="hidden">
         <div class="filters-bar">
           <input type="text" class="search-input" id="user-search" placeholder="Buscar usuário...">
@@ -87,14 +77,7 @@
         <div class="table-wrapper">
           <table>
             <thead>
-              <tr>
-                <th>Nome</th>
-                <th>E-mail</th>
-                <th>Função</th>
-                <th>Status</th>
-                <th>Criado em</th>
-                <th></th>
-              </tr>
+              <tr><th>Nome</th><th>E-mail</th><th>Função</th><th>Status</th><th>Criado em</th><th></th></tr>
             </thead>
             <tbody id="users-tbody">
               <tr><td colspan="6" style="padding:24px;text-align:center;color:var(--text-3)">Carregando...</td></tr>
@@ -211,7 +194,6 @@
   import { adminApi } from './js/api.js';
   import { formatDate, toast, confirm, openModal, closeModal, setupModalClose } from './js/utils.js';
 
-  // Superadmin gate
   if (!Auth.requireAuth()) throw new Error('not auth');
   if (!Auth.isSuperadmin()) { window.location.href = 'dashboard.html'; throw new Error('not superadmin'); }
   requireAuthAndRender('admin.html');
@@ -220,22 +202,23 @@
   const LIMIT = 25;
   let editTenantId = null, editUserId = null;
 
-  // ── Stats ──────────────────────────────────────────────────────────
   async function loadStats() {
     try {
       const s = await adminApi.stats();
       document.getElementById('stat-active-tenants').textContent = s.active_tenants;
-      document.getElementById('stat-users').textContent = s.total_users;
-      document.getElementById('stat-expiring').textContent = s.expiring_soon_30d;
-      document.getElementById('stat-expired').textContent = s.expired_tenants;
-    } catch {}
+      document.getElementById('stat-users').textContent          = s.total_users;
+      document.getElementById('stat-expiring').textContent       = s.expiring_soon_30d;
+      document.getElementById('stat-expired').textContent        = s.expired_tenants;
+    } catch (err) {
+      console.error('[Admin] loadStats:', err);
+      toast('Erro ao carregar estatísticas: ' + err.message, 'error');
+    }
   }
 
-  // ── TENANTS ────────────────────────────────────────────────────────
   async function loadTenants() {
     const tbody = document.getElementById('tenants-tbody');
     tbody.innerHTML = `<tr><td colspan="7" style="padding:24px;text-align:center;color:var(--text-3)">Carregando...</td></tr>`;
-    const search = document.getElementById('tenant-search').value;
+    const search     = document.getElementById('tenant-search').value;
     const activeOnly = document.getElementById('tenant-active-only').checked;
     try {
       const res = await adminApi.listTenants({ search, active_only: activeOnly, skip: tenantSkip, limit: LIMIT });
@@ -251,10 +234,8 @@
       tbody.innerHTML = res.items.map(t => {
         let expBadge = '';
         if (t.expires_at) {
-          const exp = new Date(t.expires_at);
-          const now = new Date();
-          const diff = (exp - now) / 86400000;
-          if (diff < 0) expBadge = `<span class="badge badge--expense">Expirado</span>`;
+          const diff = (new Date(t.expires_at) - new Date()) / 86400000;
+          if (diff < 0)  expBadge = `<span class="badge badge--expense">Expirado</span>`;
           else if (diff < 30) expBadge = `<span class="badge badge--warn">Em ${Math.ceil(diff)}d</span>`;
           else expBadge = formatDate(t.expires_at);
         } else {
@@ -265,24 +246,29 @@
             <td class="text-strong">${t.name}</td>
             <td><span class="badge badge--info">${t.plan || 'free'}</span></td>
             <td class="text-muted">${t.active_users}/${t.max_users}</td>
-            <td>${t.is_active ? '<span class="badge badge--active">Ativo</span>' : '<span class="badge badge--inactive">Suspenso</span>'}</td>
+            <td>${t.is_active
+              ? '<span class="badge badge--active">Ativo</span>'
+              : '<span class="badge badge--inactive">Suspenso</span>'}</td>
             <td>${expBadge}</td>
             <td class="text-muted">${formatDate(t.created_at)}</td>
-            <td><button class="btn btn--ghost btn--sm" onclick="openTenantEdit('${t.id}','${t.name.replace(/'/g, "\\'")}','${t.plan||'free'}','${t.max_users}','${t.is_active}','${t.expires_at||''}')">✎</button></td>
+            <td><button class="btn btn--ghost btn--sm"
+              onclick="openTenantEdit('${t.id}','${t.name.replace(/'/g,"\\'")}','${t.plan||'free'}','${t.max_users}','${t.is_active}','${t.expires_at||''}')">✎</button></td>
           </tr>`;
       }).join('');
     } catch (err) {
-      tbody.innerHTML = `<tr><td colspan="7" style="color:var(--red);padding:20px">${err.message}</td></tr>`;
+      console.error('[Admin] loadTenants:', err);
+      tbody.innerHTML = `<tr><td colspan="7" style="padding:20px;color:var(--red)">⚠️ ${err.message}</td></tr>`;
+      toast('Erro ao carregar workspaces: ' + err.message, 'error');
     }
   }
 
   window.openTenantEdit = (id, name, plan, maxUsers, isActive, expiresAt) => {
     editTenantId = id;
     document.getElementById('te-name-display').textContent = name;
-    document.getElementById('te-plan').value = plan;
-    document.getElementById('te-max-users').value = maxUsers;
-    document.getElementById('te-is-active').value = isActive;
-    document.getElementById('te-expires').value = expiresAt ? expiresAt.replace('Z', '') : '';
+    document.getElementById('te-plan').value        = plan;
+    document.getElementById('te-max-users').value   = maxUsers;
+    document.getElementById('te-is-active').value   = isActive;
+    document.getElementById('te-expires').value     = expiresAt ? expiresAt.replace('Z', '') : '';
     openModal('tenant-modal');
   };
 
@@ -291,17 +277,17 @@
     btn.disabled = true;
     try {
       const expiresRaw = document.getElementById('te-expires').value;
-      const body = {
-        plan: document.getElementById('te-plan').value,
-        max_users: parseInt(document.getElementById('te-max-users').value),
-        is_active: document.getElementById('te-is-active').value === 'true',
+      await adminApi.updateTenant(editTenantId, {
+        plan:       document.getElementById('te-plan').value,
+        max_users:  parseInt(document.getElementById('te-max-users').value),
+        is_active:  document.getElementById('te-is-active').value === 'true',
         expires_at: expiresRaw ? new Date(expiresRaw).toISOString() : null,
-      };
-      await adminApi.updateTenant(editTenantId, body);
+      });
       toast('Workspace atualizado.', 'success');
       closeModal('tenant-modal');
       loadTenants(); loadStats();
-    } catch (err) { toast(err.message, 'error'); } finally { btn.disabled = false; }
+    } catch (err) { toast(err.message, 'error'); }
+    finally { btn.disabled = false; }
   };
 
   document.getElementById('te-delete-btn').onclick = async () => {
@@ -314,7 +300,6 @@
     } catch (err) { toast(err.message, 'error'); }
   };
 
-  // ── USERS ──────────────────────────────────────────────────────────
   async function loadUsers() {
     const tbody = document.getElementById('users-tbody');
     tbody.innerHTML = `<tr><td colspan="6" style="padding:24px;text-align:center;color:var(--text-3)">Carregando...</td></tr>`;
@@ -333,28 +318,35 @@
       tbody.innerHTML = res.items.map(u => {
         const roleBadge = u.role === 'superadmin'
           ? `<span class="badge badge--warn">Superadmin</span>`
-          : u.role === 'admin' ? `<span class="badge badge--info">Admin</span>` : `<span class="badge badge--inactive">Membro</span>`;
+          : u.role === 'admin'
+            ? `<span class="badge badge--info">Admin</span>`
+            : `<span class="badge badge--inactive">Membro</span>`;
         return `
           <tr>
             <td class="text-strong">${u.name}</td>
             <td class="text-muted">${u.email}</td>
             <td>${roleBadge}</td>
-            <td>${u.is_active ? '<span class="badge badge--active">Ativo</span>' : '<span class="badge badge--inactive">Inativo</span>'}</td>
+            <td>${u.is_active
+              ? '<span class="badge badge--active">Ativo</span>'
+              : '<span class="badge badge--inactive">Inativo</span>'}</td>
             <td class="text-muted">${formatDate(u.created_at)}</td>
-            <td><button class="btn btn--ghost btn--sm" onclick="openUserEdit('${u.id}','${u.name.replace(/'/g,"\\'")}','${u.email}','${u.role}','${u.is_active}')">✎</button></td>
+            <td><button class="btn btn--ghost btn--sm"
+              onclick="openUserEdit('${u.id}','${u.name.replace(/'/g,"\\'")}','${u.email}','${u.role}','${u.is_active}')">✎</button></td>
           </tr>`;
       }).join('');
     } catch (err) {
-      tbody.innerHTML = `<tr><td colspan="6" style="color:var(--red);padding:20px">${err.message}</td></tr>`;
+      console.error('[Admin] loadUsers:', err);
+      tbody.innerHTML = `<tr><td colspan="6" style="padding:20px;color:var(--red)">⚠️ ${err.message}</td></tr>`;
+      toast('Erro ao carregar usuários: ' + err.message, 'error');
     }
   }
 
   window.openUserEdit = (id, name, email, role, isActive) => {
     editUserId = id;
     document.getElementById('ue-email-display').textContent = email;
-    document.getElementById('ue-name').value = name;
-    document.getElementById('ue-role').value = role;
-    document.getElementById('ue-active').value = isActive;
+    document.getElementById('ue-name').value    = name;
+    document.getElementById('ue-role').value    = role;
+    document.getElementById('ue-active').value  = isActive;
     document.getElementById('ue-password').value = '';
     openModal('user-modal');
   };
@@ -364,8 +356,8 @@
     btn.disabled = true;
     try {
       const body = {
-        name: document.getElementById('ue-name').value,
-        role: document.getElementById('ue-role').value,
+        name:      document.getElementById('ue-name').value,
+        role:      document.getElementById('ue-role').value,
         is_active: document.getElementById('ue-active').value === 'true',
       };
       const pwd = document.getElementById('ue-password').value;
@@ -374,7 +366,8 @@
       toast('Usuário atualizado.', 'success');
       closeModal('user-modal');
       loadUsers();
-    } catch (err) { toast(err.message, 'error'); } finally { btn.disabled = false; }
+    } catch (err) { toast(err.message, 'error'); }
+    finally { btn.disabled = false; }
   };
 
   document.getElementById('ue-delete-btn').onclick = async () => {
@@ -387,24 +380,28 @@
     } catch (err) { toast(err.message, 'error'); }
   };
 
-  // ── Tabs & pagination ──────────────────────────────────────────────
+  // Tabs
   document.querySelectorAll('[data-admin-tab]').forEach(tab => {
     tab.onclick = () => {
       document.querySelectorAll('[data-admin-tab]').forEach(t => t.classList.toggle('active', t === tab));
       document.getElementById('admin-tenants').classList.toggle('hidden', tab.dataset.adminTab !== 'tenants');
-      document.getElementById('admin-users').classList.toggle('hidden', tab.dataset.adminTab !== 'users');
+      document.getElementById('admin-users').classList.toggle('hidden',   tab.dataset.adminTab !== 'users');
       if (tab.dataset.adminTab === 'users') loadUsers();
     };
   });
 
   document.getElementById('t-prev').onclick = () => { tenantSkip = Math.max(0, tenantSkip - LIMIT); loadTenants(); };
   document.getElementById('t-next').onclick = () => { tenantSkip += LIMIT; loadTenants(); };
-  document.getElementById('u-prev').onclick = () => { userSkip = Math.max(0, userSkip - LIMIT); loadUsers(); };
-  document.getElementById('u-next').onclick = () => { userSkip += LIMIT; loadUsers(); };
+  document.getElementById('u-prev').onclick = () => { userSkip  = Math.max(0, userSkip  - LIMIT); loadUsers(); };
+  document.getElementById('u-next').onclick = () => { userSkip  += LIMIT; loadUsers(); };
 
   let searchTimer;
-  document.getElementById('tenant-search').oninput = () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => { tenantSkip = 0; loadTenants(); }, 400); };
-  document.getElementById('user-search').oninput = () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => { userSkip = 0; loadUsers(); }, 400); };
+  document.getElementById('tenant-search').oninput = () => {
+    clearTimeout(searchTimer); searchTimer = setTimeout(() => { tenantSkip = 0; loadTenants(); }, 400);
+  };
+  document.getElementById('user-search').oninput = () => {
+    clearTimeout(searchTimer); searchTimer = setTimeout(() => { userSkip = 0; loadUsers(); }, 400);
+  };
   document.getElementById('tenant-active-only').onchange = () => { tenantSkip = 0; loadTenants(); };
 
   setupModalClose('tenant-modal');

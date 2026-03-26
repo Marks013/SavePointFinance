@@ -24,6 +24,16 @@
     </div>
 
     <div class="page-body">
+      <!-- Error banner -->
+      <div id="rep-error" class="hidden" style="
+        background:var(--red-bg);border:1px solid var(--red-border);
+        border-radius:var(--radius-lg);padding:12px 16px;margin-bottom:16px;
+        color:var(--red);font-size:0.8rem;display:flex;align-items:center;gap:8px
+      ">
+        <span>⚠️</span>
+        <span id="rep-error-msg"></span>
+      </div>
+
       <!-- Summary row -->
       <div class="stat-grid" style="margin-bottom:24px">
         <div class="stat-card stat-card--income">
@@ -52,7 +62,7 @@
         </div>
         <div class="card">
           <div class="card-header">
-            <div class="card-title">Despesas por categoria</div>
+            <div class="card-title">Por categoria</div>
             <select id="cat-type-filter" class="filter-control">
               <option value="expense">Despesas</option>
               <option value="income">Receitas</option>
@@ -64,7 +74,7 @@
         </div>
       </div>
 
-      <!-- Row 2: Top transactions + category list -->
+      <!-- Row 2: Top transactions + category ranking -->
       <div class="grid-2">
         <div class="card">
           <div class="card-header">
@@ -85,7 +95,7 @@
           <div class="card-header">
             <div class="card-title">Ranking por categoria</div>
           </div>
-          <div id="cat-ranking" style="display:flex;flex-direction:column;gap:10px">
+          <div id="cat-ranking" style="display:flex;flex-direction:column;gap:10px;padding:0 4px">
             <div style="color:var(--text-3);font-size:0.8rem;text-align:center;padding:20px">Carregando...</div>
           </div>
         </div>
@@ -97,12 +107,17 @@
 <script type="module">
   import { requireAuthAndRender } from './js/nav.js';
   import { reportsApi } from './js/api.js';
-  import { formatBRL, formatMonth, currentYearMonth, monthLabel } from './js/utils.js';
+  import { formatBRL, formatMonth, currentYearMonth, monthLabel, toast } from './js/utils.js';
 
   if (!requireAuthAndRender('reports.html')) throw new Error('not auth');
 
   let { year, month } = currentYearMonth();
   let evoChart, catChart;
+
+  function showError(msg) {
+    document.getElementById('rep-error-msg').textContent = msg;
+    document.getElementById('rep-error').classList.remove('hidden');
+  }
 
   function updateMonthLabel() {
     const lbl = formatMonth(year, month);
@@ -112,43 +127,36 @@
   async function loadSummary() {
     try {
       const s = await reportsApi.summary(year, month);
-      document.getElementById('rep-income').textContent = formatBRL(s.income);
+      document.getElementById('rep-income').textContent  = formatBRL(s.income);
       document.getElementById('rep-expense').textContent = formatBRL(s.expenses);
       const balEl = document.getElementById('rep-balance');
       balEl.textContent = formatBRL(s.balance);
       balEl.className = 'stat-value ' + (s.balance >= 0 ? 'stat-value--income' : 'stat-value--expense');
-    } catch {}
+    } catch (err) {
+      console.error('[Relatórios] loadSummary:', err);
+      showError('Falha ao carregar resumo: ' + err.message);
+    }
   }
 
   async function loadEvolution() {
-    if (evoChart) evoChart.destroy();
     try {
       const data = await reportsApi.monthlyEvolution(12);
       const labels = data.map(d => monthLabel(d.period));
+      if (evoChart) evoChart.destroy();
       evoChart = new Chart(document.getElementById('evo-chart'), {
         type: 'line',
         data: {
           labels,
           datasets: [
             {
-              label: 'Receitas',
-              data: data.map(d => d.income),
-              borderColor: '#00E57A',
-              backgroundColor: 'rgba(0,229,122,0.08)',
-              borderWidth: 2,
-              pointRadius: 3,
-              tension: 0.3,
-              fill: true,
+              label: 'Receitas', data: data.map(d => d.income),
+              borderColor: '#00E57A', backgroundColor: 'rgba(0,229,122,0.08)',
+              borderWidth: 2, pointRadius: 3, tension: 0.3, fill: true,
             },
             {
-              label: 'Despesas',
-              data: data.map(d => d.expenses),
-              borderColor: '#FF4D65',
-              backgroundColor: 'rgba(255,77,101,0.07)',
-              borderWidth: 2,
-              pointRadius: 3,
-              tension: 0.3,
-              fill: true,
+              label: 'Despesas', data: data.map(d => d.expenses),
+              borderColor: '#FF4D65', backgroundColor: 'rgba(255,77,101,0.07)',
+              borderWidth: 2, pointRadius: 3, tension: 0.3, fill: true,
             },
           ],
         },
@@ -160,11 +168,18 @@
           },
           scales: {
             x: { grid: { color: '#1E2D3D' }, ticks: { color: '#556070', font: { size: 10 } } },
-            y: { grid: { color: '#1E2D3D' }, ticks: { color: '#556070', font: { size: 10 }, callback: v => 'R$' + (v/1000).toFixed(0) + 'k' } },
+            y: {
+              grid: { color: '#1E2D3D' },
+              ticks: { color: '#556070', font: { size: 10 }, callback: v => 'R$' + (v / 1000).toFixed(0) + 'k' }
+            },
           },
         },
       });
-    } catch {}
+    } catch (err) {
+      console.error('[Relatórios] loadEvolution:', err);
+      document.getElementById('evo-chart').parentElement.innerHTML =
+        `<div style="display:flex;align-items:center;justify-content:center;height:240px;color:var(--text-3);font-size:0.8rem">Erro: ${err.message}</div>`;
+    }
   }
 
   async function loadCategoryChart() {
@@ -172,7 +187,13 @@
     const type = document.getElementById('cat-type-filter').value;
     try {
       const data = await reportsApi.byCategory(year, month, type);
-      if (!data.length) return;
+      if (!data.length) {
+        document.getElementById('cat-chart').parentElement.innerHTML =
+          `<div style="display:flex;align-items:center;justify-content:center;height:240px;color:var(--text-3);font-size:0.8rem">Sem dados no mês.</div>`;
+        document.getElementById('cat-ranking').innerHTML =
+          `<div style="color:var(--text-3);font-size:0.8rem;text-align:center;padding:20px">Sem dados.</div>`;
+        return;
+      }
 
       catChart = new Chart(document.getElementById('cat-chart'), {
         type: 'doughnut',
@@ -186,8 +207,7 @@
           }],
         },
         options: {
-          responsive: true, maintainAspectRatio: false,
-          cutout: '65%',
+          responsive: true, maintainAspectRatio: false, cutout: '65%',
           plugins: {
             legend: { position: 'right', labels: { color: '#8FA3B8', font: { size: 10 }, boxWidth: 12, padding: 8 } },
             tooltip: { callbacks: { label: ctx => `${ctx.label}: ${formatBRL(ctx.raw)}` } },
@@ -195,18 +215,16 @@
         },
       });
 
-      // Also update ranking list
       const total = data.reduce((a, d) => a + d.total, 0);
-      const ranking = document.getElementById('cat-ranking');
-      ranking.innerHTML = data.slice(0, 10).map(d => {
-        const pct = Math.round((d.total / total) * 100);
+      document.getElementById('cat-ranking').innerHTML = data.slice(0, 10).map(d => {
+        const pct = total > 0 ? Math.round((d.total / total) * 100) : 0;
         return `
           <div>
             <div style="display:flex;justify-content:space-between;font-size:0.8rem;margin-bottom:4px">
               <div style="display:flex;align-items:center;gap:6px">
                 <span class="color-dot" style="background:${d.color}"></span>
                 <span style="color:var(--text)">${d.name}</span>
-                <span class="text-muted">(${d.count} lançamentos)</span>
+                <span class="text-muted">(${d.count})</span>
               </div>
               <span class="mono" style="color:var(--text)">${formatBRL(d.total)}</span>
             </div>
@@ -215,7 +233,10 @@
             </div>
           </div>`;
       }).join('');
-    } catch {}
+    } catch (err) {
+      console.error('[Relatórios] loadCategoryChart:', err);
+      showError('Erro ao carregar categorias: ' + err.message);
+    }
   }
 
   async function loadTopTransactions() {
@@ -232,12 +253,20 @@
           <td class="text-strong">${t.description}</td>
           <td class="td-amount td-amount--expense text-right">${formatBRL(t.amount)}</td>
         </tr>`).join('');
-    } catch {}
+    } catch (err) {
+      console.error('[Relatórios] loadTopTransactions:', err);
+      tbody.innerHTML = `<tr><td colspan="3" style="padding:20px;text-align:center;color:var(--red)">${err.message}</td></tr>`;
+    }
   }
 
   async function loadAll() {
     updateMonthLabel();
-    await Promise.all([loadSummary(), loadEvolution(), loadCategoryChart(), loadTopTransactions()]);
+    await Promise.allSettled([
+      loadSummary(),
+      loadEvolution(),
+      loadCategoryChart(),
+      loadTopTransactions()
+    ]);
   }
 
   document.getElementById('prev-month').onclick = () => { month--; if (month < 1) { month = 12; year--; } loadAll(); };

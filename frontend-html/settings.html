@@ -16,14 +16,13 @@
     </div>
 
     <div class="page-body">
-      <!-- Tabs -->
       <div class="tabs">
         <div class="tab active" data-section="accounts">Contas bancárias</div>
         <div class="tab" data-section="cards">Cartões de crédito</div>
         <div class="tab" data-section="password">Alterar senha</div>
       </div>
 
-      <!-- ACCOUNTS SECTION -->
+      <!-- ACCOUNTS -->
       <div id="section-accounts">
         <div class="section-header">
           <div class="section-title">Contas</div>
@@ -35,7 +34,7 @@
         <div class="table-wrapper">
           <table>
             <thead>
-              <tr><th style="width:10px"></th><th>Nome</th><th>Tipo</th><th style="text-align:right">Saldo inicial</th><th>Moeda</th><th>Status</th><th></th></tr>
+              <tr><th style="width:10px"></th><th>Nome</th><th>Tipo</th><th style="text-align:right">Saldo</th><th>Moeda</th><th>Status</th><th></th></tr>
             </thead>
             <tbody id="accounts-tbody">
               <tr><td colspan="7" style="padding:24px;text-align:center;color:var(--text-3)">Carregando...</td></tr>
@@ -44,7 +43,7 @@
         </div>
       </div>
 
-      <!-- CARDS SECTION -->
+      <!-- CARDS -->
       <div id="section-cards" class="hidden">
         <div class="section-header">
           <div class="section-title">Cartões</div>
@@ -65,13 +64,13 @@
         </div>
       </div>
 
-      <!-- PASSWORD SECTION -->
+      <!-- PASSWORD -->
       <div id="section-password" class="hidden">
         <div class="card" style="max-width:420px">
           <div class="card-header"><div class="card-title">Alterar senha</div></div>
-          <div class="modal-body" style="padding:0">
+          <div style="padding:20px;display:flex;flex-direction:column;gap:14px">
             <div id="pwd-error" class="auth-error hidden"></div>
-            <div id="pwd-success" class="hidden" style="background:var(--em-bg);border:1px solid var(--em-border);border-radius:var(--radius);color:var(--em);font-size:0.8rem;padding:10px 12px;margin-bottom:8px"></div>
+            <div id="pwd-success" class="hidden" style="background:var(--em-bg);border:1px solid var(--em-border);border-radius:var(--radius);color:var(--em);font-size:0.8rem;padding:10px 12px"></div>
             <form id="pwd-form" style="display:flex;flex-direction:column;gap:14px">
               <div class="form-group">
                 <label class="form-label">Senha atual</label>
@@ -85,7 +84,9 @@
                 <label class="form-label">Confirmar nova senha</label>
                 <input type="password" id="pwd-confirm" class="form-control">
               </div>
-              <button type="submit" class="btn btn--primary" style="align-self:flex-start" id="pwd-btn">Alterar senha</button>
+              <button type="submit" class="btn btn--primary" style="align-self:flex-start" id="pwd-btn">
+                Alterar senha
+              </button>
             </form>
           </div>
         </div>
@@ -113,8 +114,7 @@
             <option value="checking">Conta corrente</option>
             <option value="savings">Poupança</option>
             <option value="investment">Investimento</option>
-            <option value="cash">Dinheiro</option>
-            <option value="other">Outro</option>
+            <option value="wallet">Carteira</option>
           </select>
         </div>
         <div class="form-group">
@@ -124,7 +124,8 @@
       </div>
       <div class="form-group">
         <label class="form-label">Cor</label>
-        <input type="color" id="acc-color" value="#10B981" style="height:36px;width:60px;border:1px solid var(--border-2);border-radius:4px">
+        <input type="color" id="acc-color" value="#10B981"
+          style="height:36px;width:60px;border:1px solid var(--border-2);border-radius:4px">
       </div>
     </div>
     <div class="modal-footer">
@@ -150,7 +151,8 @@
         <div class="form-group">
           <label class="form-label">Bandeira</label>
           <select id="card-brand" class="form-control">
-            <option>Visa</option><option>Mastercard</option><option>Elo</option><option>Amex</option><option>Hipercard</option>
+            <option>Visa</option><option>Mastercard</option><option>Elo</option>
+            <option>Amex</option><option>Hipercard</option>
           </select>
         </div>
       </div>
@@ -176,7 +178,8 @@
       </div>
       <div class="form-group">
         <label class="form-label">Cor</label>
-        <input type="color" id="card-color" value="#374151" style="height:36px;width:60px;border:1px solid var(--border-2);border-radius:4px">
+        <input type="color" id="card-color" value="#374151"
+          style="height:36px;width:60px;border:1px solid var(--border-2);border-radius:4px">
       </div>
     </div>
     <div class="modal-footer">
@@ -196,7 +199,6 @@
   let editAccId = null, editCardId = null;
   let accounts = [], cards = [];
 
-  // ── Tabs ──────────────────────────────────────────────────────────
   const sections = ['accounts', 'cards', 'password'];
   document.querySelectorAll('[data-section]').forEach(tab => {
     tab.onclick = () => {
@@ -212,11 +214,11 @@
     const tbody = document.getElementById('accounts-tbody');
     try {
       accounts = await accountsApi.list();
+      const typeMap = { checking: 'Corrente', savings: 'Poupança', investment: 'Investimento', wallet: 'Carteira' };
       if (!accounts.length) {
         tbody.innerHTML = `<tr><td colspan="7" style="padding:24px;text-align:center;color:var(--text-3)">Nenhuma conta cadastrada.</td></tr>`;
         return;
       }
-      const typeMap = { checking: 'Corrente', savings: 'Poupança', investment: 'Investimento', cash: 'Dinheiro', other: 'Outro' };
       tbody.innerHTML = accounts.map(a => `
         <tr>
           <td><span class="color-dot" style="background:${a.color}"></span></td>
@@ -224,13 +226,20 @@
           <td>${typeMap[a.type] || a.type}</td>
           <td class="td-amount text-right">${formatBRL(a.balance)}</td>
           <td class="text-muted">${a.currency}</td>
-          <td>${a.is_active ? '<span class="badge badge--active">Ativa</span>' : '<span class="badge badge--inactive">Inativa</span>'}</td>
+          <td>${a.is_active
+            ? '<span class="badge badge--active">Ativa</span>'
+            : '<span class="badge badge--inactive">Inativa</span>'}</td>
           <td class="td-actions">
             <button class="btn btn--ghost btn--sm" onclick="editAcc('${a.id}')">✎</button>
-            <button class="btn btn--ghost btn--sm" style="color:var(--red)" onclick="deleteAcc('${a.id}','${a.name}')">✕</button>
+            <button class="btn btn--ghost btn--sm" style="color:var(--red)"
+              onclick="deleteAcc('${a.id}','${a.name.replace(/'/g,"\\'")}')">✕</button>
           </td>
         </tr>`).join('');
-    } catch (err) { tbody.innerHTML = `<tr><td colspan="7" style="color:var(--red);padding:20px">${err.message}</td></tr>`; }
+    } catch (err) {
+      console.error('[Configurações] loadAccounts:', err);
+      tbody.innerHTML = `<tr><td colspan="7" style="padding:24px;text-align:center;color:var(--red)">⚠️ ${err.message}</td></tr>`;
+      toast('Erro ao carregar contas: ' + err.message, 'error');
+    }
   }
 
   window.editAcc = (id) => {
@@ -238,10 +247,10 @@
     if (!a) return;
     editAccId = id;
     document.getElementById('acc-modal-title').textContent = 'Editar Conta';
-    document.getElementById('acc-name').value = a.name;
-    document.getElementById('acc-type').value = a.type;
+    document.getElementById('acc-name').value    = a.name;
+    document.getElementById('acc-type').value    = a.type;
     document.getElementById('acc-balance').value = a.balance;
-    document.getElementById('acc-color').value = a.color;
+    document.getElementById('acc-color').value   = a.color;
     openModal('acc-modal');
   };
 
@@ -254,28 +263,32 @@
   document.getElementById('btn-new-account').onclick = () => {
     editAccId = null;
     document.getElementById('acc-modal-title').textContent = 'Nova Conta';
-    document.getElementById('acc-name').value = '';
-    document.getElementById('acc-type').value = 'checking';
+    document.getElementById('acc-name').value    = '';
+    document.getElementById('acc-type').value    = 'checking';
     document.getElementById('acc-balance').value = '0';
-    document.getElementById('acc-color').value = '#10B981';
+    document.getElementById('acc-color').value   = '#10B981';
     openModal('acc-modal');
   };
 
   document.getElementById('acc-save-btn').onclick = async () => {
     const btn = document.getElementById('acc-save-btn');
+    const name = document.getElementById('acc-name').value.trim();
+    if (!name) { toast('Informe um nome para a conta.', 'warning'); return; }
     btn.disabled = true;
     try {
       const body = {
-        name: document.getElementById('acc-name').value,
-        type: document.getElementById('acc-type').value,
-        balance: parseFloat(document.getElementById('acc-balance').value),
+        name,
+        type:     document.getElementById('acc-type').value,
+        balance:  parseFloat(document.getElementById('acc-balance').value) || 0,
         currency: 'BRL',
-        color: document.getElementById('acc-color').value,
+        color:    document.getElementById('acc-color').value,
       };
       if (editAccId) { await accountsApi.update(editAccId, body); toast('Conta atualizada.', 'success'); }
-      else { await accountsApi.create(body); toast('Conta criada.', 'success'); }
-      closeModal('acc-modal'); loadAccounts();
-    } catch (err) { toast(err.message, 'error'); } finally { btn.disabled = false; }
+      else           { await accountsApi.create(body);             toast('Conta criada.', 'success'); }
+      closeModal('acc-modal');
+      loadAccounts();
+    } catch (err) { toast(err.message, 'error'); }
+    finally { btn.disabled = false; }
   };
 
   // ── CARDS ─────────────────────────────────────────────────────────
@@ -298,10 +311,15 @@
           <td class="text-muted">Dia ${c.due_day}</td>
           <td class="td-actions">
             <button class="btn btn--ghost btn--sm" onclick="editCard('${c.id}')">✎</button>
-            <button class="btn btn--ghost btn--sm" style="color:var(--red)" onclick="deleteCard('${c.id}','${c.name}')">✕</button>
+            <button class="btn btn--ghost btn--sm" style="color:var(--red)"
+              onclick="deleteCard('${c.id}','${c.name.replace(/'/g,"\\'")}')">✕</button>
           </td>
         </tr>`).join('');
-    } catch (err) { tbody.innerHTML = `<tr><td colspan="8" style="color:var(--red);padding:20px">${err.message}</td></tr>`; }
+    } catch (err) {
+      console.error('[Configurações] loadCards:', err);
+      tbody.innerHTML = `<tr><td colspan="8" style="padding:24px;text-align:center;color:var(--red)">⚠️ ${err.message}</td></tr>`;
+      toast('Erro ao carregar cartões: ' + err.message, 'error');
+    }
   }
 
   window.editCard = (id) => {
@@ -309,12 +327,12 @@
     if (!c) return;
     editCardId = id;
     document.getElementById('card-modal-title').textContent = 'Editar Cartão';
-    document.getElementById('card-name').value = c.name;
+    document.getElementById('card-name').value  = c.name;
     document.getElementById('card-brand').value = c.brand;
     document.getElementById('card-last4').value = c.last4 || '';
     document.getElementById('card-limit').value = c.limit_amount;
     document.getElementById('card-close').value = c.close_day;
-    document.getElementById('card-due').value = c.due_day;
+    document.getElementById('card-due').value   = c.due_day;
     document.getElementById('card-color').value = c.color;
     openModal('card-modal');
   };
@@ -332,28 +350,32 @@
     document.getElementById('card-brand').value = 'Visa';
     document.getElementById('card-limit').value = '0';
     document.getElementById('card-close').value = '3';
-    document.getElementById('card-due').value = '10';
+    document.getElementById('card-due').value   = '10';
     document.getElementById('card-color').value = '#374151';
     openModal('card-modal');
   };
 
   document.getElementById('card-save-btn').onclick = async () => {
     const btn = document.getElementById('card-save-btn');
+    const name = document.getElementById('card-name').value.trim();
+    if (!name) { toast('Informe um nome para o cartão.', 'warning'); return; }
     btn.disabled = true;
     try {
       const body = {
-        name: document.getElementById('card-name').value,
-        brand: document.getElementById('card-brand').value,
-        last4: document.getElementById('card-last4').value || null,
-        limit_amount: parseFloat(document.getElementById('card-limit').value),
-        close_day: parseInt(document.getElementById('card-close').value),
-        due_day: parseInt(document.getElementById('card-due').value),
-        color: document.getElementById('card-color').value,
+        name,
+        brand:        document.getElementById('card-brand').value,
+        last4:        document.getElementById('card-last4').value || null,
+        limit_amount: parseFloat(document.getElementById('card-limit').value) || 0,
+        close_day:    parseInt(document.getElementById('card-close').value),
+        due_day:      parseInt(document.getElementById('card-due').value),
+        color:        document.getElementById('card-color').value,
       };
       if (editCardId) { await cardsApi.update(editCardId, body); toast('Cartão atualizado.', 'success'); }
-      else { await cardsApi.create(body); toast('Cartão criado.', 'success'); }
-      closeModal('card-modal'); loadCards();
-    } catch (err) { toast(err.message, 'error'); } finally { btn.disabled = false; }
+      else            { await cardsApi.create(body);              toast('Cartão criado.', 'success'); }
+      closeModal('card-modal');
+      loadCards();
+    } catch (err) { toast(err.message, 'error'); }
+    finally { btn.disabled = false; }
   };
 
   // ── PASSWORD ──────────────────────────────────────────────────────
@@ -364,7 +386,7 @@
     errEl.classList.add('hidden');
     sucEl.classList.add('hidden');
 
-    const newPwd = document.getElementById('pwd-new').value;
+    const newPwd     = document.getElementById('pwd-new').value;
     const confirmPwd = document.getElementById('pwd-confirm').value;
     if (newPwd !== confirmPwd) {
       errEl.textContent = 'As senhas não coincidem.';
@@ -375,10 +397,7 @@
     const btn = document.getElementById('pwd-btn');
     setLoading(btn, true);
     try {
-      await authApi.changePassword(
-        document.getElementById('pwd-current').value,
-        newPwd
-      );
+      await authApi.changePassword(document.getElementById('pwd-current').value, newPwd);
       sucEl.textContent = 'Senha alterada com sucesso!';
       sucEl.classList.remove('hidden');
       document.getElementById('pwd-form').reset();

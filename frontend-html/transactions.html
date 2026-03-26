@@ -45,13 +45,12 @@
           <option value="debit_card">Cartão de Débito</option>
           <option value="pix">Pix</option>
           <option value="money">Dinheiro</option>
-          <option value="bank_transfer">Transferência</option>
-          <option value="boleto">Boleto</option>
+          <option value="transfer">Transferência</option>
         </select>
       </div>
 
       <!-- Summary chips -->
-      <div style="display:flex;gap:12px;margin-bottom:16px;font-size:0.8rem">
+      <div style="display:flex;gap:12px;margin-bottom:16px;font-size:0.8rem;flex-wrap:wrap">
         <div style="background:var(--em-bg);border:1px solid var(--em-border);border-radius:4px;padding:5px 12px;color:var(--em)">
           Receitas: <strong id="sum-income">—</strong>
         </div>
@@ -123,7 +122,7 @@
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">Valor (R$) *</label>
-          <input type="number" id="tx-amount" class="form-control" placeholder="0,00" step="0.01" min="0" required>
+          <input type="number" id="tx-amount" class="form-control" placeholder="0,00" step="0.01" min="0.01" required>
         </div>
         <div class="form-group">
           <label class="form-label">Forma de Pagamento *</label>
@@ -132,8 +131,7 @@
             <option value="credit_card">Cartão de Crédito</option>
             <option value="debit_card">Cartão de Débito</option>
             <option value="money">Dinheiro</option>
-            <option value="bank_transfer">Transferência</option>
-            <option value="boleto">Boleto</option>
+            <option value="transfer">Transferência</option>
           </select>
         </div>
       </div>
@@ -184,7 +182,11 @@
 <script type="module">
   import { requireAuthAndRender } from './js/nav.js';
   import { transactionsApi, categoriesApi, accountsApi, cardsApi } from './js/api.js';
-  import { formatBRL, formatDate, formatMonth, currentYearMonth, paymentLabel, toast, confirm, openModal, closeModal, setupModalClose, fillSelect } from './js/utils.js';
+  import {
+    formatBRL, formatDate, formatMonth, currentYearMonth,
+    paymentLabel, toast, confirm, openModal, closeModal,
+    setupModalClose, fillSelect
+  } from './js/utils.js';
 
   if (!requireAuthAndRender('transactions.html')) throw new Error('not auth');
 
@@ -194,17 +196,22 @@
   let editId = null;
   let categories = [], accounts = [], cards = [];
 
-  // ── Load refs ─────────────────────────────────────────────────────
+  // ── Carregar refs ──────────────────────────────────────────────────
   async function loadRefs() {
-    [categories, accounts, cards] = await Promise.all([
-      categoriesApi.list().catch(() => []),
-      accountsApi.list().catch(() => []),
-      cardsApi.list().catch(() => []),
-    ]);
-    fillSelect(document.getElementById('filter-category'), categories, 'id', 'name', 'Todas as categorias');
-    fillSelect(document.getElementById('tx-category'), categories, 'id', 'name', '— Nenhuma —');
-    fillSelect(document.getElementById('tx-account'), accounts, 'id', 'name', '— Nenhuma —');
-    fillSelect(document.getElementById('tx-card'), cards, 'id', 'name', '— Nenhum —');
+    try {
+      [categories, accounts, cards] = await Promise.all([
+        categoriesApi.list().catch(e => { console.error('Erro categorias:', e); return []; }),
+        accountsApi.list().catch(e => { console.error('Erro contas:', e); return []; }),
+        cardsApi.list().catch(e => { console.error('Erro cartões:', e); return []; }),
+      ]);
+      fillSelect(document.getElementById('filter-category'), categories, 'id', 'name', 'Todas as categorias');
+      fillSelect(document.getElementById('tx-category'), categories, 'id', 'name', '— Nenhuma —');
+      fillSelect(document.getElementById('tx-account'), accounts, 'id', 'name', '— Nenhuma —');
+      fillSelect(document.getElementById('tx-card'), cards, 'id', 'name', '— Nenhum —');
+    } catch (err) {
+      console.error('[Transações] Erro em loadRefs:', err);
+      toast('Erro ao carregar categorias/contas: ' + err.message, 'error');
+    }
   }
 
   function catName(id) { return categories.find(c => c.id === id)?.name || '—'; }
@@ -220,14 +227,14 @@
 
     const params = { year, month, skip, limit: LIMIT };
     const type = document.getElementById('filter-type').value;
-    const cat = document.getElementById('filter-category').value;
-    const pm  = document.getElementById('filter-payment').value;
-    const q   = document.getElementById('search-input').value;
+    const cat  = document.getElementById('filter-category').value;
+    const pm   = document.getElementById('filter-payment').value;
+    const q    = document.getElementById('search-input').value;
 
     if (type) params.type = type;
-    if (cat) params.category_id = cat;
-    if (pm) params.payment_method = pm;
-    if (q) params.search = q;
+    if (cat)  params.category_id = cat;
+    if (pm)   params.payment_method = pm;
+    if (q)    params.search = q;
 
     try {
       const res = await transactionsApi.list(params);
@@ -236,7 +243,7 @@
       // Summary
       let income = 0, expense = 0;
       items.forEach(t => { if (t.type === 'income') income += t.amount; else expense += t.amount; });
-      document.getElementById('sum-income').textContent = formatBRL(income);
+      document.getElementById('sum-income').textContent  = formatBRL(income);
       document.getElementById('sum-expense').textContent = formatBRL(expense);
       const bal = income - expense;
       const balEl = document.getElementById('sum-balance');
@@ -249,11 +256,24 @@
       document.getElementById('pag-next').disabled = skip + LIMIT >= res.total;
 
       if (!items.length) {
-        tbody.innerHTML = `<tr><td colspan="8" style="padding:40px;text-align:center;color:var(--text-3)">Nenhuma transação encontrada.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" style="padding:40px;text-align:center;color:var(--text-3)">
+          Nenhuma transação encontrada.
+          <a href="#" id="clear-filters-link" style="color:var(--em)">Limpar filtros?</a>
+        </td></tr>`;
+        document.getElementById('clear-filters-link')?.addEventListener('click', (e) => {
+          e.preventDefault();
+          document.getElementById('filter-type').value = '';
+          document.getElementById('filter-category').value = '';
+          document.getElementById('filter-payment').value = '';
+          document.getElementById('search-input').value = '';
+          skip = 0;
+          loadTransactions();
+        });
         return;
       }
 
       tbody.innerHTML = items.map(t => {
+        const catColor = categories.find(c => c.id === t.category_id)?.color || '#6B7280';
         const inst = t.installments_total > 1
           ? `<span class="badge badge--info">${t.installment_number}/${t.installments_total}</span>`
           : '—';
@@ -261,46 +281,60 @@
           <tr>
             <td class="text-muted">${formatDate(t.date)}</td>
             <td class="text-strong">${t.description}</td>
-            <td><span class="color-dot" style="background:${categories.find(c=>c.id===t.category_id)?.color||'#6B7280'};margin-right:6px"></span>${catName(t.category_id)}</td>
+            <td>
+              <span class="color-dot" style="background:${catColor};margin-right:6px"></span>
+              ${catName(t.category_id)}
+            </td>
             <td class="text-muted">${paymentLabel(t.payment_method)}</td>
             <td>${inst}</td>
-            <td class="td-amount td-amount--${t.type} text-right">${t.type === 'income' ? '+' : '-'}${formatBRL(t.amount)}</td>
-            <td>${t.type === 'income' ? '<span class="badge badge--income">Receita</span>' : '<span class="badge badge--expense">Despesa</span>'}</td>
+            <td class="td-amount td-amount--${t.type} text-right">
+              ${t.type === 'income' ? '+' : '-'}${formatBRL(t.amount)}
+            </td>
+            <td>${t.type === 'income'
+              ? '<span class="badge badge--income">Receita</span>'
+              : '<span class="badge badge--expense">Despesa</span>'}</td>
             <td class="td-actions">
               <button class="btn btn--ghost btn--sm" onclick="editTx('${t.id}')">✎</button>
-              <button class="btn btn--ghost btn--sm" style="color:var(--red)" onclick="deleteTx('${t.id}','${t.installments_total}')">✕</button>
+              <button class="btn btn--ghost btn--sm" style="color:var(--red)"
+                onclick="deleteTx('${t.id}','${t.installments_total}')">✕</button>
             </td>
           </tr>`;
       }).join('');
     } catch (err) {
-      tbody.innerHTML = `<tr><td colspan="8" style="padding:24px;text-align:center;color:var(--red)">${err.message}</td></tr>`;
+      console.error('[Transações] Erro em loadTransactions:', err);
+      tbody.innerHTML = `<tr><td colspan="8" style="padding:24px;text-align:center;color:var(--red)">
+        ⚠️ ${err.message}
+      </td></tr>`;
+      toast('Erro ao carregar transações: ' + err.message, 'error');
     }
   }
 
-  // ── Edit / Delete (exposed to window for inline onclick) ──────────
+  // ── Editar / Excluir ──────────────────────────────────────────────
   window.editTx = async (id) => {
     try {
       const t = await transactionsApi.get(id);
       editId = id;
       document.getElementById('tx-modal-title').textContent = 'Editar Transação';
-      document.getElementById('tx-date').value = t.date;
-      document.getElementById('tx-type').value = t.type;
-      document.getElementById('tx-desc').value = t.description;
-      document.getElementById('tx-amount').value = t.amount;
+      document.getElementById('tx-date').value    = t.date;
+      document.getElementById('tx-type').value    = t.type;
+      document.getElementById('tx-desc').value    = t.description;
+      document.getElementById('tx-amount').value  = t.amount;
       document.getElementById('tx-payment').value = t.payment_method;
       document.getElementById('tx-category').value = t.category_id || '';
-      document.getElementById('tx-account').value = t.account_id || '';
-      document.getElementById('tx-card').value = t.card_id || '';
-      document.getElementById('tx-notes').value = t.notes || '';
+      document.getElementById('tx-account').value  = t.account_id || '';
+      document.getElementById('tx-card').value     = t.card_id || '';
+      document.getElementById('tx-notes').value    = t.notes || '';
       document.getElementById('tx-installments').value = 1;
       openModal('tx-modal');
-    } catch (err) { toast(err.message, 'error'); }
+    } catch (err) {
+      toast('Erro ao carregar transação: ' + err.message, 'error');
+    }
   };
 
   window.deleteTx = async (id, totalInst) => {
     let deleteAll = false;
     if (+totalInst > 1) {
-      const choice = await confirm(`Esta transação tem ${totalInst} parcelas. Deseja excluir TODAS as parcelas?`);
+      const choice = await confirm(`Esta transação tem ${totalInst} parcelas. Excluir TODAS as parcelas?`);
       if (choice === null) return;
       deleteAll = choice;
     } else {
@@ -310,24 +344,37 @@
       await transactionsApi.delete(id, deleteAll);
       toast('Transação excluída.', 'success');
       loadTransactions();
-    } catch (err) { toast(err.message, 'error'); }
+    } catch (err) {
+      toast('Erro ao excluir: ' + err.message, 'error');
+    }
   };
 
-  // ── Save modal ────────────────────────────────────────────────────
+  // ── Salvar modal ──────────────────────────────────────────────────
   document.getElementById('tx-save-btn').onclick = async () => {
     const btn = document.getElementById('tx-save-btn');
     btn.disabled = true;
+
+    const dateVal   = document.getElementById('tx-date').value;
+    const descVal   = document.getElementById('tx-desc').value.trim();
+    const amountVal = parseFloat(document.getElementById('tx-amount').value);
+
+    if (!dateVal || !descVal || !amountVal || amountVal <= 0) {
+      toast('Preencha data, descrição e valor corretamente.', 'warning');
+      btn.disabled = false;
+      return;
+    }
+
     try {
       const body = {
-        date: document.getElementById('tx-date').value,
-        description: document.getElementById('tx-desc').value,
-        amount: parseFloat(document.getElementById('tx-amount').value),
+        date: dateVal,
+        description: descVal,
+        amount: amountVal,
         type: document.getElementById('tx-type').value,
         payment_method: document.getElementById('tx-payment').value,
         category_id: document.getElementById('tx-category').value || null,
-        account_id: document.getElementById('tx-account').value || null,
-        card_id: document.getElementById('tx-card').value || null,
-        notes: document.getElementById('tx-notes').value || null,
+        account_id:  document.getElementById('tx-account').value  || null,
+        card_id:     document.getElementById('tx-card').value     || null,
+        notes:       document.getElementById('tx-notes').value    || null,
         installments: parseInt(document.getElementById('tx-installments').value),
       };
 
@@ -337,54 +384,57 @@
       } else {
         await transactionsApi.create(body);
         const inst = body.installments;
-        toast(inst > 1 ? `${inst} parcelas criadas com sucesso!` : 'Transação criada.', 'success');
+        toast(inst > 1 ? `${inst} parcelas criadas!` : 'Transação criada.', 'success');
       }
       closeModal('tx-modal');
       loadTransactions();
-    } catch (err) { toast(err.message, 'error'); } finally { btn.disabled = false; }
+    } catch (err) {
+      toast('Erro ao salvar: ' + err.message, 'error');
+    } finally {
+      btn.disabled = false;
+    }
   };
 
-  // ── Open new tx modal ─────────────────────────────────────────────
+  // ── Abrir modal nova tx ───────────────────────────────────────────
   document.getElementById('btn-new-tx').onclick = () => {
     editId = null;
     document.getElementById('tx-modal-title').textContent = 'Nova Transação';
-    
-    // Fix UTC timezone offset to get correct local date in input
     const today = new Date();
-    const localDate = new Date(today.getTime() - (today.getTimezoneOffset() * 60000)).toISOString().slice(0, 10);
-    document.getElementById('tx-date').value = localDate;
-    
-    document.getElementById('tx-desc').value = '';
-    document.getElementById('tx-amount').value = '';
+    const localDate = new Date(today.getTime() - today.getTimezoneOffset() * 60000)
+      .toISOString().slice(0, 10);
+    document.getElementById('tx-date').value    = localDate;
+    document.getElementById('tx-desc').value    = '';
+    document.getElementById('tx-amount').value  = '';
     document.getElementById('tx-payment').value = 'pix';
+    document.getElementById('tx-type').value    = 'expense';
     document.getElementById('tx-category').value = '';
-    document.getElementById('tx-account').value = '';
-    document.getElementById('tx-card').value = '';
-    document.getElementById('tx-notes').value = '';
+    document.getElementById('tx-account').value  = '';
+    document.getElementById('tx-card').value     = '';
+    document.getElementById('tx-notes').value    = '';
     document.getElementById('tx-installments').value = '1';
     openModal('tx-modal');
   };
 
   setupModalClose('tx-modal');
 
-  // ── Filters & pagination ──────────────────────────────────────────
-  document.getElementById('prev-month').onclick = () => { month--; if (month < 1) { month = 12; year--; } skip = 0; updateMonthLabel(); loadTransactions(); };
-  document.getElementById('next-month').onclick = () => { month++; if (month > 12) { month = 1; year++; } skip = 0; updateMonthLabel(); loadTransactions(); };
+  document.getElementById('prev-month').onclick = () => {
+    month--; if (month < 1) { month = 12; year--; } skip = 0; updateMonthLabel(); loadTransactions();
+  };
+  document.getElementById('next-month').onclick = () => {
+    month++; if (month > 12) { month = 1; year++; } skip = 0; updateMonthLabel(); loadTransactions();
+  };
   document.getElementById('pag-prev').onclick = () => { skip = Math.max(0, skip - LIMIT); loadTransactions(); };
   document.getElementById('pag-next').onclick = () => { skip += LIMIT; loadTransactions(); };
-  ['filter-type','filter-category','filter-payment'].forEach(id => {
+
+  ['filter-type', 'filter-category', 'filter-payment'].forEach(id => {
     document.getElementById(id).onchange = () => { skip = 0; loadTransactions(); };
   });
+
   let searchTimer;
   document.getElementById('search-input').oninput = () => {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(() => { skip = 0; loadTransactions(); }, 400);
   };
-
-  // Set today's date as default
-  const today = new Date();
-  const localDate = new Date(today.getTime() - (today.getTimezoneOffset() * 60000)).toISOString().slice(0, 10);
-  document.getElementById('tx-date').value = localDate;
 
   updateMonthLabel();
   await loadRefs();

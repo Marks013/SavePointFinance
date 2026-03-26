@@ -70,7 +70,7 @@
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">Valor (R$) *</label>
-          <input type="number" id="sub-amount" class="form-control" step="0.01" min="0" placeholder="0,00">
+          <input type="number" id="sub-amount" class="form-control" step="0.01" min="0.01" placeholder="0,00">
         </div>
         <div class="form-group">
           <label class="form-label">Dia de cobrança *</label>
@@ -102,7 +102,10 @@
 <script type="module">
   import { requireAuthAndRender } from './js/nav.js';
   import { subscriptionsApi, categoriesApi, cardsApi } from './js/api.js';
-  import { formatBRL, formatDate, toast, confirm, openModal, closeModal, setupModalClose, fillSelect } from './js/utils.js';
+  import {
+    formatBRL, formatDate, toast, confirm,
+    openModal, closeModal, setupModalClose, fillSelect
+  } from './js/utils.js';
   import { brandAvatar, getBrand } from './js/brands.js';
 
   if (!requireAuthAndRender('subscriptions.html')) throw new Error('not auth');
@@ -112,12 +115,17 @@
   let categories = [], cards = [];
 
   async function loadRefs() {
-    [categories, cards] = await Promise.all([
-      categoriesApi.list().catch(() => []),
-      cardsApi.list().catch(() => []),
-    ]);
-    fillSelect(document.getElementById('sub-category'), categories, 'id', 'name', '— Nenhuma —');
-    fillSelect(document.getElementById('sub-card'), cards, 'id', 'name', '— Nenhum —');
+    try {
+      [categories, cards] = await Promise.all([
+        categoriesApi.list().catch(() => []),
+        cardsApi.list().catch(() => []),
+      ]);
+      fillSelect(document.getElementById('sub-category'), categories, 'id', 'name', '— Nenhuma —');
+      fillSelect(document.getElementById('sub-card'), cards, 'id', 'name', '— Nenhum —');
+    } catch (err) {
+      console.error('[Assinaturas] loadRefs:', err);
+      toast('Erro ao carregar referências: ' + err.message, 'error');
+    }
   }
 
   function catName(id) { return categories.find(c => c.id === id)?.name || null; }
@@ -126,7 +134,6 @@
   async function loadSubs() {
     const container = document.getElementById('subs-container');
     container.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="empty-state-title">Carregando...</div></div>`;
-
     const activeOnly = document.getElementById('active-only').checked;
 
     try {
@@ -135,55 +142,67 @@
       const activeSubs = allSubs.filter(s => s.is_active);
       const monthly = activeSubs.reduce((a, s) => a + s.amount, 0);
       document.getElementById('stat-total-monthly').textContent = formatBRL(monthly);
-      document.getElementById('stat-total-annual').textContent = formatBRL(monthly * 12);
+      document.getElementById('stat-total-annual').textContent  = formatBRL(monthly * 12);
       document.getElementById('stat-active').textContent = activeSubs.length;
 
-      // Next due
       const upcoming = [...activeSubs].sort((a, b) =>
-        new Date(a.next_billing_date) - new Date(b.next_billing_date)
-      );
+        new Date(a.next_billing_date) - new Date(b.next_billing_date));
       document.getElementById('stat-next-due').textContent =
         upcoming.length ? `${upcoming[0].name} — ${formatDate(upcoming[0].next_billing_date)}` : '—';
 
       if (!allSubs.length) {
         container.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:40px;height:40px;opacity:.3"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
           <div class="empty-state-title">Nenhuma assinatura cadastrada</div>
-          <div class="empty-state-sub">Adicione suas assinaturas recorrentes aqui</div></div>`;
+          <div class="empty-state-sub">Adicione suas assinaturas recorrentes aqui</div>
+        </div>`;
         return;
       }
 
       container.innerHTML = allSubs.map(s => {
-        const cat = catName(s.category_id);
+        const cat  = catName(s.category_id);
         const card = cardName(s.card_id);
-        const brand = getBrand(s.name, s.color || '#10B981');
+        const brand  = getBrand(s.name, s.color || '#10B981');
         const avatar = brandAvatar(s.name, s.color || '#10B981', 44);
         const daysToNext = Math.ceil((new Date(s.next_billing_date) - new Date()) / 86400000);
         const urgency = daysToNext <= 3 ? 'var(--red)' : daysToNext <= 7 ? 'var(--amber)' : 'var(--text-3)';
         return `
-          <div class="sub-card ${!s.is_active ? 'opacity-50' : ''}" style="border-top: 3px solid ${brand.color}">
+          <div class="sub-card" style="border-top:3px solid ${brand.color};opacity:${s.is_active ? 1 : 0.6}">
             <div class="sub-card-header" style="display:flex;align-items:center;gap:12px">
               ${avatar}
               <div style="flex:1;min-width:0">
-                <div class="sub-card-name">${brand.emoji} ${s.name}${!s.is_active ? ' <span class="badge badge--inactive" style="margin-left:4px">Inativa</span>' : ''}</div>
-                <div style="font-size:0.9rem;color:var(--text-3)">${s.type === 'income' ? '📈' : '📤'} ${s.type === 'income' ? 'Receita' : 'Despesa'} · ${s.frequency === 'monthly' ? 'Mensal' : s.frequency === 'yearly' ? 'Anual' : s.frequency}</div>
+                <div class="sub-card-name">
+                  ${brand.emoji} ${s.name}
+                  ${!s.is_active ? '<span class="badge badge--inactive" style="margin-left:4px">Inativa</span>' : ''}
+                </div>
+                <div style="font-size:0.85rem;color:var(--text-3)">${s.type === 'income' ? '📈 Receita' : '📤 Despesa'}</div>
               </div>
-              <div class="sub-card-amount" style="color:${brand.color};font-weight:700">−${formatBRL(s.amount)}</div>
+              <div class="sub-card-amount" style="color:${brand.color}">−${formatBRL(s.amount)}</div>
             </div>
-            <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border-color);">
-              ${cat ? `<div class="sub-card-meta">📂 ${cat}</div>` : ''}
+            <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+              ${cat  ? `<div class="sub-card-meta">📂 ${cat}</div>` : ''}
               ${card ? `<div class="sub-card-meta">💳 ${card}</div>` : ''}
-              <div class="sub-card-meta" style="color:${urgency}">📅 Todo dia ${s.billing_day} · próxima: <strong>${formatDate(s.next_billing_date)}</strong>${daysToNext <= 7 && s.is_active ? ` (${daysToNext <= 0 ? 'hoje/vencida' : daysToNext + 'd'})` : ''}</div>
+              <div class="sub-card-meta" style="color:${urgency}">
+                📅 Todo dia ${s.billing_day} · próxima: <strong>${formatDate(s.next_billing_date)}</strong>
+                ${daysToNext <= 7 && s.is_active
+                  ? ` <span>(${daysToNext <= 0 ? 'hoje/vencida' : daysToNext + 'd'})</span>`
+                  : ''}
+              </div>
             </div>
             <div class="sub-card-actions">
-              ${s.is_active ? `<button class="btn btn--secondary btn--sm" onclick="generateTx('${s.id}','${s.name}')">▶ Gerar tx</button>` : ''}
+              ${s.is_active
+                ? `<button class="btn btn--secondary btn--sm" onclick="generateTx('${s.id}','${s.name}')">▶ Gerar tx</button>`
+                : ''}
               <button class="btn btn--ghost btn--sm" onclick="editSub('${s.id}')">✎ Editar</button>
               <button class="btn btn--ghost btn--sm" style="color:var(--red)" onclick="deleteSub('${s.id}','${s.name}')">✕</button>
             </div>
           </div>`;
       }).join('');
     } catch (err) {
-      container.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="empty-state-title" style="color:var(--red)">${err.message}</div></div>`;
+      console.error('[Assinaturas] loadSubs:', err);
+      container.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
+        <div class="empty-state-title" style="color:var(--red)">⚠️ ${err.message}</div>
+      </div>`;
+      toast('Erro ao carregar assinaturas: ' + err.message, 'error');
     }
   }
 
@@ -192,12 +211,12 @@
     if (!s) return;
     editId = id;
     document.getElementById('sub-modal-title').textContent = 'Editar Assinatura';
-    document.getElementById('sub-name').value = s.name;
-    document.getElementById('sub-amount').value = s.amount;
-    document.getElementById('sub-day').value = s.billing_day;
+    document.getElementById('sub-name').value      = s.name;
+    document.getElementById('sub-amount').value    = s.amount;
+    document.getElementById('sub-day').value       = s.billing_day;
     document.getElementById('sub-next-date').value = s.next_billing_date;
-    document.getElementById('sub-category').value = s.category_id || '';
-    document.getElementById('sub-card').value = s.card_id || '';
+    document.getElementById('sub-category').value  = s.category_id || '';
+    document.getElementById('sub-card').value      = s.card_id || '';
     openModal('sub-modal');
   };
 
@@ -207,25 +226,23 @@
       await subscriptionsApi.delete(id);
       toast('Assinatura excluída.', 'success');
       loadSubs();
-    } catch (err) { toast(err.message, 'error'); }
+    } catch (err) { toast('Erro ao excluir: ' + err.message, 'error'); }
   };
 
   window.generateTx = async (id, name) => {
     if (!await confirm(`Gerar transação de cobrança para "${name}"?`)) return;
     try {
       const res = await subscriptionsApi.generateTransaction(id);
-      toast(`Transação gerada! Próxima cobrança: ${res.next_billing_date}`, 'success');
+      toast(`Transação gerada! Próxima: ${res.next_billing_date}`, 'success');
       loadSubs();
-    } catch (err) { toast(err.message, 'error'); }
+    } catch (err) { toast('Erro ao gerar: ' + err.message, 'error'); }
   };
 
   document.getElementById('btn-new-sub').onclick = () => {
     editId = null;
     document.getElementById('sub-modal-title').textContent = 'Nova Assinatura';
-    document.getElementById('sub-name').value = '';
-    document.getElementById('sub-amount').value = '';
-    document.getElementById('sub-day').value = '';
-    document.getElementById('sub-next-date').value = '';
+    ['sub-name','sub-amount','sub-day','sub-next-date'].forEach(id =>
+      document.getElementById(id).value = '');
     document.getElementById('sub-category').value = '';
     document.getElementById('sub-card').value = '';
     openModal('sub-modal');
@@ -233,15 +250,22 @@
 
   document.getElementById('sub-save-btn').onclick = async () => {
     const btn = document.getElementById('sub-save-btn');
+    const name   = document.getElementById('sub-name').value.trim();
+    const amount = parseFloat(document.getElementById('sub-amount').value);
+    const day    = parseInt(document.getElementById('sub-day').value);
+    const date   = document.getElementById('sub-next-date').value;
+
+    if (!name || !amount || !day || !date) {
+      toast('Preencha todos os campos obrigatórios.', 'warning');
+      return;
+    }
+
     btn.disabled = true;
     try {
       const body = {
-        name: document.getElementById('sub-name').value,
-        amount: parseFloat(document.getElementById('sub-amount').value),
-        billing_day: parseInt(document.getElementById('sub-day').value),
-        next_billing_date: document.getElementById('sub-next-date').value,
+        name, amount, billing_day: day, next_billing_date: date,
         category_id: document.getElementById('sub-category').value || null,
-        card_id: document.getElementById('sub-card').value || null,
+        card_id:     document.getElementById('sub-card').value     || null,
       };
       if (editId) {
         await subscriptionsApi.update(editId, body);
@@ -252,7 +276,8 @@
       }
       closeModal('sub-modal');
       loadSubs();
-    } catch (err) { toast(err.message, 'error'); } finally { btn.disabled = false; }
+    } catch (err) { toast('Erro ao salvar: ' + err.message, 'error'); }
+    finally { btn.disabled = false; }
   };
 
   document.getElementById('active-only').onchange = loadSubs;

@@ -26,6 +26,15 @@
     </div>
 
     <div class="page-body">
+      <!-- Error banner -->
+      <div id="cat-error" class="hidden" style="
+        background:var(--red-bg);border:1px solid var(--red-border);
+        border-radius:var(--radius-lg);padding:12px 16px;margin-bottom:16px;
+        color:var(--red);font-size:0.8rem;display:flex;align-items:center;gap:8px
+      ">
+        <span>⚠️</span><span id="cat-error-msg"></span>
+      </div>
+
       <div class="table-wrapper">
         <table>
           <thead>
@@ -70,20 +79,23 @@
         <div class="form-group">
           <label class="form-label">Ícone</label>
           <input type="text" id="cat-icon" class="form-control" placeholder="tag">
-          <div class="form-hint">Nome do ícone Feather (tag, home, car...)</div>
+          <div class="form-hint">Nome Feather icon (tag, home, car...)</div>
         </div>
       </div>
       <div class="form-group">
         <label class="form-label">Cor</label>
         <div style="display:flex;gap:8px;align-items:center">
-          <input type="color" id="cat-color" value="#10B981" style="height:36px;width:48px;border:1px solid var(--border-2);border-radius:4px;background:transparent;cursor:pointer">
-          <input type="text" id="cat-color-hex" class="form-control" placeholder="#10B981" style="font-family:monospace">
+          <input type="color" id="cat-color" value="#10B981"
+            style="height:36px;width:48px;border:1px solid var(--border-2);border-radius:4px;background:transparent;cursor:pointer">
+          <input type="text" id="cat-color-hex" class="form-control" placeholder="#10B981"
+            style="font-family:monospace">
         </div>
       </div>
       <div class="form-group">
         <label class="form-label">Palavras-chave para auto-classificação</label>
-        <input type="text" id="cat-keywords" class="form-control" placeholder="ifood, mercado, restaurante (separadas por vírgula)">
-        <div class="form-hint">O sistema usará essas palavras para classificar novas transações automaticamente.</div>
+        <input type="text" id="cat-keywords" class="form-control"
+          placeholder="ifood, mercado, restaurante (separadas por vírgula)">
+        <div class="form-hint">Usadas para classificar novas transações automaticamente.</div>
       </div>
     </div>
     <div class="modal-footer">
@@ -104,13 +116,21 @@
   let activeTab = 'expense';
   let allCats = [];
 
+  function showError(msg) {
+    document.getElementById('cat-error-msg').textContent = msg;
+    document.getElementById('cat-error').classList.remove('hidden');
+  }
+
   async function loadCats() {
     const tbody = document.getElementById('cat-tbody');
     try {
       allCats = await categoriesApi.list();
+      document.getElementById('cat-error').classList.add('hidden');
       renderTable();
     } catch (err) {
-      tbody.innerHTML = `<tr><td colspan="6" style="padding:24px;text-align:center;color:var(--red)">${err.message}</td></tr>`;
+      console.error('[Categorias] loadCats:', err);
+      showError('Erro ao carregar categorias: ' + err.message);
+      tbody.innerHTML = `<tr><td colspan="6" style="padding:24px;text-align:center;color:var(--red)">⚠️ ${err.message}</td></tr>`;
     }
   }
 
@@ -118,19 +138,26 @@
     const tbody = document.getElementById('cat-tbody');
     const filtered = allCats.filter(c => c.type === activeTab);
     if (!filtered.length) {
-      tbody.innerHTML = `<tr><td colspan="6" style="padding:40px;text-align:center;color:var(--text-3)">Nenhuma categoria de ${activeTab === 'expense' ? 'despesa' : 'receita'} cadastrada.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="6" style="padding:40px;text-align:center;color:var(--text-3)">
+        Nenhuma categoria de ${activeTab === 'expense' ? 'despesa' : 'receita'} cadastrada.
+      </td></tr>`;
       return;
     }
     tbody.innerHTML = filtered.map(c => `
       <tr>
         <td><span class="color-dot" style="background:${c.color}"></span></td>
         <td class="text-strong">${c.name}</td>
-        <td>${c.type === 'expense' ? '<span class="badge badge--expense">Despesa</span>' : '<span class="badge badge--income">Receita</span>'}</td>
+        <td>${c.type === 'expense'
+          ? '<span class="badge badge--expense">Despesa</span>'
+          : '<span class="badge badge--income">Receita</span>'}</td>
         <td class="text-muted text-sm">${(c.keywords || []).slice(0, 6).join(', ') || '—'}</td>
         <td>${c.is_default ? '<span class="badge badge--info">Padrão</span>' : '—'}</td>
         <td class="td-actions">
           <button class="btn btn--ghost btn--sm" onclick="editCat('${c.id}')">✎</button>
-          ${!c.is_default ? `<button class="btn btn--ghost btn--sm" style="color:var(--red)" onclick="deleteCat('${c.id}','${c.name}')">✕</button>` : ''}
+          ${!c.is_default
+            ? `<button class="btn btn--ghost btn--sm" style="color:var(--red)"
+                onclick="deleteCat('${c.id}','${c.name.replace(/'/g, "\\'")}')">✕</button>`
+            : ''}
         </td>
       </tr>`).join('');
   }
@@ -140,17 +167,17 @@
     if (!c) return;
     editId = id;
     document.getElementById('cat-modal-title').textContent = 'Editar Categoria';
-    document.getElementById('cat-name').value = c.name;
-    document.getElementById('cat-type').value = c.type;
-    document.getElementById('cat-icon').value = c.icon;
-    document.getElementById('cat-color').value = c.color;
+    document.getElementById('cat-name').value     = c.name;
+    document.getElementById('cat-type').value     = c.type;
+    document.getElementById('cat-icon').value     = c.icon;
+    document.getElementById('cat-color').value    = c.color;
     document.getElementById('cat-color-hex').value = c.color;
     document.getElementById('cat-keywords').value = (c.keywords || []).join(', ');
     openModal('cat-modal');
   };
 
   window.deleteCat = async (id, name) => {
-    if (!await confirm(`Excluir categoria "${name}"? Só é possível se nenhuma transação usa ela.`)) return;
+    if (!await confirm(`Excluir categoria "${name}"? Só é possível se nenhuma transação a usa.`)) return;
     try {
       await categoriesApi.delete(id);
       toast('Categoria excluída.', 'success');
@@ -161,12 +188,12 @@
   document.getElementById('btn-new-cat').onclick = () => {
     editId = null;
     document.getElementById('cat-modal-title').textContent = 'Nova Categoria';
-    document.getElementById('cat-name').value = '';
-    document.getElementById('cat-type').value = activeTab;
-    document.getElementById('cat-icon').value = 'tag';
-    document.getElementById('cat-color').value = '#10B981';
+    document.getElementById('cat-name').value      = '';
+    document.getElementById('cat-type').value      = activeTab;
+    document.getElementById('cat-icon').value      = 'tag';
+    document.getElementById('cat-color').value     = '#10B981';
     document.getElementById('cat-color-hex').value = '#10B981';
-    document.getElementById('cat-keywords').value = '';
+    document.getElementById('cat-keywords').value  = '';
     openModal('cat-modal');
   };
 
@@ -175,21 +202,23 @@
     document.getElementById('cat-color-hex').value = e.target.value;
   };
   document.getElementById('cat-color-hex').oninput = (e) => {
-    const v = e.target.value;
-    if (/^#[0-9A-Fa-f]{6}$/.test(v)) document.getElementById('cat-color').value = v;
+    if (/^#[0-9A-Fa-f]{6}$/.test(e.target.value))
+      document.getElementById('cat-color').value = e.target.value;
   };
 
   document.getElementById('cat-save-btn').onclick = async () => {
     const btn = document.getElementById('cat-save-btn');
+    const name = document.getElementById('cat-name').value.trim();
+    if (!name) { toast('Informe um nome para a categoria.', 'warning'); return; }
     btn.disabled = true;
     try {
       const kw = document.getElementById('cat-keywords').value
         .split(',').map(s => s.trim()).filter(Boolean);
       const body = {
-        name: document.getElementById('cat-name').value,
-        type: document.getElementById('cat-type').value,
-        icon: document.getElementById('cat-icon').value || 'tag',
-        color: document.getElementById('cat-color-hex').value || '#6B7280',
+        name,
+        type:     document.getElementById('cat-type').value,
+        icon:     document.getElementById('cat-icon').value || 'tag',
+        color:    document.getElementById('cat-color-hex').value || '#6B7280',
         keywords: kw,
       };
       if (editId) {
@@ -201,7 +230,8 @@
       }
       closeModal('cat-modal');
       loadCats();
-    } catch (err) { toast(err.message, 'error'); } finally { btn.disabled = false; }
+    } catch (err) { toast(err.message, 'error'); }
+    finally { btn.disabled = false; }
   };
 
   // Tabs

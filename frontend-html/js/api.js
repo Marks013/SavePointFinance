@@ -42,6 +42,48 @@ export const Auth = {
   },
 };
 
+// ── Health Check ─────────────────────────────────────────────────────────────
+
+export async function checkBackendHealth() {
+  try {
+    const res = await fetch('/api/health', { method: 'GET', signal: AbortSignal.timeout(5000) });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+// ── Global Error Banner ───────────────────────────────────────────────────────
+
+export function showGlobalError(message) {
+  let banner = document.getElementById('_global_err_banner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = '_global_err_banner';
+    banner.style.cssText = `
+      position: fixed; top: 0; left: 0; right: 0; z-index: 9998;
+      background: #2D0A0F; border-bottom: 2px solid #FF4D65;
+      color: #FF4D65; font-size: 0.8125rem; font-family: inherit;
+      padding: 10px 20px; display: flex; align-items: center; gap: 10px;
+    `;
+    banner.innerHTML = `
+      <span style="font-size:1rem">⚠️</span>
+      <span id="_global_err_msg"></span>
+      <button onclick="this.parentElement.remove()" style="
+        margin-left:auto; background:none; border:1px solid #FF4D65;
+        color:#FF4D65; cursor:pointer; padding:2px 8px; border-radius:3px;
+        font-size:0.75rem;
+      ">✕ Fechar</button>
+    `;
+    document.body.prepend(banner);
+  }
+  document.getElementById('_global_err_msg').textContent = message;
+}
+
+export function hideGlobalError() {
+  document.getElementById('_global_err_banner')?.remove();
+}
+
 // ── Core Fetch Wrapper ───────────────────────────────────────────────────────
 
 async function request(method, path, body = null, options = {}) {
@@ -69,15 +111,19 @@ async function request(method, path, body = null, options = {}) {
     }
 
     if (!res.ok) {
-      const err = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));
-      throw new ApiError(err.detail || 'Erro desconhecido', res.status);
+      const err = await res.json().catch(() => ({ detail: `Erro HTTP ${res.status}` }));
+      throw new ApiError(err.detail || `Erro HTTP ${res.status}`, res.status);
     }
 
     if (res.status === 204) return null;
     return res.json();
   } catch (e) {
     if (e instanceof ApiError) throw e;
-    throw new ApiError('Sem conexão com o servidor. Verifique se o backend está rodando.', 0);
+    // Network / CORS error
+    throw new ApiError(
+      'Sem conexão com o servidor. Verifique se o backend está rodando e se o ALLOWED_ORIGINS do .env está correto.',
+      0
+    );
   }
 }
 
@@ -105,7 +151,9 @@ export class ApiError extends Error {
 }
 
 const get = (path, params = {}) => {
-  const qs = new URLSearchParams(params).toString();
+  const qs = new URLSearchParams(
+    Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== ''))
+  ).toString();
   return request('GET', qs ? `${path}?${qs}` : path);
 };
 const post = (path, body) => request('POST', path, body);
@@ -183,7 +231,8 @@ export const installmentsApi = {
 
 export const reportsApi = {
   summary: (year, month) => get('/reports/summary', { year, month }),
-  monthlyEvolution: (months = 12, future_months = 0) => get('/reports/monthly-evolution', { months, future_months }),
+  monthlyEvolution: (months = 12, future_months = 0) =>
+    get('/reports/monthly-evolution', { months, future_months }),
   byCategory: (year, month, type = 'expense') =>
     get('/reports/by-category', { year, month, type }),
   topTransactions: (year, month, limit = 10) =>

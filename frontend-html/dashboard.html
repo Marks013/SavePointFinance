@@ -13,16 +13,38 @@
   <div id="sidebar-mount"></div>
 
   <div class="main-content">
-    <div class="top-bar" style="display:flex;justify-content:space-between;align-items:center;padding:16px 32px;border-bottom:1px solid var(--bg-card);background:var(--bg-card);margin-bottom:24px;">
-      <div style="font-size:1.25rem;font-weight:600;color:var(--text-1)" id="user-greeting">Carregando... 👋</div>
-      <div style="display:flex;gap:12px;">
-        <button class="btn btn--ghost" style="padding:8px 12px">🔔 Notificações</button>
-        <button class="btn btn--primary" onclick="window.location='transactions.html'">+ Novo Lançamento</button>
+    <!-- Error Banner -->
+    <div id="dash-error-banner" class="hidden" style="
+      background: var(--red-bg);
+      border: 1px solid var(--red-border);
+      border-radius: var(--radius-lg);
+      margin: 16px 28px 0;
+      padding: 14px 18px;
+      color: var(--red);
+      font-size: 0.8125rem;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    ">
+      <span style="font-size:1.1rem;flex-shrink:0">⚠️</span>
+      <div style="flex:1">
+        <strong>Falha ao carregar dados</strong>
+        <div id="dash-error-msg" style="margin-top:4px;opacity:0.85"></div>
+        <div style="margin-top:6px;font-size:0.75rem;opacity:0.7">
+          Dica: verifique se o backend está rodando com <code style="background:rgba(255,77,101,0.15);padding:1px 5px;border-radius:3px">docker compose ps</code>
+          e se <code style="background:rgba(255,77,101,0.15);padding:1px 5px;border-radius:3px">ALLOWED_ORIGINS</code> no <code>.env</code> contém a URL que você está acessando.
+        </div>
       </div>
+      <button onclick="document.getElementById('dash-error-banner').classList.add('hidden')" style="
+        background:none;border:none;color:var(--red);cursor:pointer;font-size:1rem;padding:0;flex-shrink:0
+      ">✕</button>
     </div>
 
-    <div class="page-header" style="padding-top:0;">
-      <div class="page-title" id="dash-month-title">Dashboard</div>
+    <div class="page-header" style="margin-top:16px">
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <div id="user-greeting" style="font-size:1rem;font-weight:600;color:var(--text)">Olá! 👋</div>
+        <div class="page-title" id="dash-month-title">Dashboard</div>
+      </div>
       <div class="page-actions">
         <div class="month-nav">
           <button class="btn btn--ghost btn--sm" id="prev-month">
@@ -33,6 +55,7 @@
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
           </button>
         </div>
+        <button class="btn btn--primary" onclick="window.location='transactions.html'">+ Novo Lançamento</button>
       </div>
     </div>
 
@@ -45,7 +68,7 @@
           </div>
           <div class="stat-label">Receitas</div>
           <div class="stat-value stat-value--income" id="stat-income">—</div>
-          <div class="stat-sub" id="stat-income-sub">do mês</div>
+          <div class="stat-sub">do mês</div>
         </div>
         <div class="stat-card stat-card--expense">
           <div class="stat-icon stat-icon--expense">
@@ -53,7 +76,7 @@
           </div>
           <div class="stat-label">Despesas</div>
           <div class="stat-value stat-value--expense" id="stat-expense">—</div>
-          <div class="stat-sub" id="stat-expense-sub">do mês</div>
+          <div class="stat-sub">do mês</div>
         </div>
         <div class="stat-card stat-card--balance">
           <div class="stat-icon stat-icon--balance">
@@ -82,7 +105,7 @@
           <div class="chart-area" style="height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;">
             <canvas id="gauge-chart"></canvas>
             <div style="position:absolute;bottom:20px;text-align:center;">
-              <div id="gauge-percent" style="font-size:1.8rem;font-weight:700;color:var(--text-1)">0%</div>
+              <div id="gauge-percent" style="font-size:1.8rem;font-weight:700;color:var(--text)">0%</div>
               <div id="gauge-text" style="font-size:0.85rem;color:var(--text-3)">do limite gasto</div>
             </div>
           </div>
@@ -92,14 +115,12 @@
             <div class="card-title">Faturas Abertas (Cartão de Crédito)</div>
             <a href="settings.html" class="btn btn--ghost btn--sm">Gerenciar</a>
           </div>
-          <div class="card-body" style="padding:0">
-            <div class="table-wrapper" style="border:none;max-height:220px;overflow-y:auto;margin:0">
-              <table style="width:100%;text-align:left;border-collapse:collapse;">
-                <tbody id="cards-tbody">
-                  <tr><td style="padding:24px;text-align:center;color:var(--text-3)">Carregando...</td></tr>
-                </tbody>
-              </table>
-            </div>
+          <div class="table-wrapper" style="border:none;max-height:220px;overflow-y:auto;margin:0">
+            <table style="width:100%;text-align:left;border-collapse:collapse;">
+              <tbody id="cards-tbody">
+                <tr><td style="padding:24px;text-align:center;color:var(--text-3)">Carregando...</td></tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -110,7 +131,7 @@
           <div class="card-header">
             <div class="card-title">Evolução mensal</div>
             <div style="display:flex;gap:12px;align-items:center;">
-              <select class="filter-control" id="evo-future" style="background:var(--bg-lighter)">
+              <select class="filter-control" id="evo-future">
                 <option value="0" selected>Sem previsão</option>
                 <option value="3">+3 meses proj.</option>
                 <option value="6">+6 meses proj.</option>
@@ -143,7 +164,7 @@
           <a href="transactions.html" class="btn btn--ghost btn--sm">Ver todas →</a>
         </div>
         <div class="table-wrapper" style="border:none">
-          <table id="recent-table">
+          <table>
             <thead>
               <tr>
                 <th>Data</th>
@@ -165,8 +186,11 @@
 
 <script type="module">
   import { requireAuthAndRender } from './js/nav.js';
-  import { Auth, reportsApi, transactionsApi, subscriptionsApi, categoriesApi } from './js/api.js';
-  import { formatBRL, formatDate, formatMonth, currentYearMonth, monthLabel } from './js/utils.js';
+  import {
+    Auth, checkBackendHealth, showGlobalError, hideGlobalError,
+    reportsApi, transactionsApi, subscriptionsApi, categoriesApi
+  } from './js/api.js';
+  import { formatBRL, formatDate, formatMonth, currentYearMonth, monthLabel, toast } from './js/utils.js';
 
   if (!requireAuthAndRender('dashboard.html')) throw new Error('not auth');
 
@@ -174,19 +198,33 @@
   let evoChart, catChart, gaugeChart;
   let categories = [];
 
-  // Update Hello Greeting (with explicit error boundary)
+  // ── Saudação ────────────────────────────────────────────────────────────────
   try {
     const user = Auth.getUser();
-    if (user) {
-      const firstName = (user.name || user.email).split(' ')[0];
+    if (user && user.name) {
+      const firstName = user.name.split(' ')[0];
       document.getElementById('user-greeting').innerHTML = `Olá, <strong>${firstName}</strong> 👋`;
+    } else if (user && user.email) {
+      document.getElementById('user-greeting').innerHTML = `Olá, <strong>${user.email}</strong> 👋`;
     }
   } catch (e) {
-    alert("Erro crítico no dashboard: " + e.message);
+    console.error('Erro ao carregar saudação:', e);
   }
 
+  // ── Mostrar erro no banner ──────────────────────────────────────────────────
+  function showDashError(msg) {
+    const banner = document.getElementById('dash-error-banner');
+    document.getElementById('dash-error-msg').textContent = msg;
+    banner.classList.remove('hidden');
+  }
+
+  // ── Categorias ──────────────────────────────────────────────────────────────
   async function loadCategories() {
-    try { categories = await categoriesApi.list(); } catch {}
+    try {
+      categories = await categoriesApi.list();
+    } catch (err) {
+      console.error('[Dashboard] Erro ao carregar categorias:', err);
+    }
   }
 
   function getCatName(id) {
@@ -201,26 +239,26 @@
       `Visão Geral — ${label.charAt(0).toUpperCase() + label.slice(1)}`;
   }
 
+  // ── Resumo Financeiro ───────────────────────────────────────────────────────
   async function loadSummary() {
     try {
       const s = await reportsApi.summary(year, month);
-      const fmtInc = formatBRL(s.income);
-      const fmtExp = formatBRL(s.expenses);
-      const fmtBal = formatBRL(s.balance);
+      hideGlobalError();
+      document.getElementById('dash-error-banner').classList.add('hidden');
 
-      document.getElementById('stat-income').textContent = fmtInc;
-      document.getElementById('stat-expense').textContent = fmtExp;
-      document.getElementById('stat-balance').textContent = fmtBal;
+      document.getElementById('stat-income').textContent = formatBRL(s.income);
+      document.getElementById('stat-expense').textContent = formatBRL(s.expenses);
+      document.getElementById('stat-balance').textContent = formatBRL(s.balance);
       document.getElementById('stat-balance').className =
         'stat-value ' + (s.balance >= 0 ? 'stat-value--income' : 'stat-value--expense');
 
-      // Gauge Chart Update
+      // Gauge
       let percent = 0;
       if (s.limit_planned > 0) {
         percent = Math.min(100, Math.round((s.limit_used / s.limit_planned) * 100));
       }
       document.getElementById('gauge-percent').textContent = `${percent}%`;
-      
+
       let gaugeColor = '#00E57A';
       if (percent > 75) gaugeColor = '#F59E0B';
       if (percent >= 90) gaugeColor = '#FF4D65';
@@ -231,7 +269,7 @@
         data: {
           labels: ['Usado', 'Disponível'],
           datasets: [{
-            data: [s.limit_used, Math.max(0, s.limit_planned - s.limit_used)],
+            data: [s.limit_used, Math.max(0.001, s.limit_planned - s.limit_used)],
             backgroundColor: [gaugeColor, '#1E2D3D'],
             borderWidth: 0,
             borderRadius: [4, 0]
@@ -240,26 +278,41 @@
         options: {
           responsive: true, maintainAspectRatio: false,
           cutout: '80%', circumference: 180, rotation: -90,
-          plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => formatBRL(ctx.raw) } } }
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: ctx => formatBRL(ctx.raw) } }
+          }
         }
       });
+
       if (s.limit_planned === 0) {
-        document.getElementById('gauge-text').textContent = "Defina limites nas categorias";
+        document.getElementById('gauge-text').textContent = 'Defina limites nas categorias';
       } else {
         document.getElementById('gauge-text').textContent = `de ${formatBRL(s.limit_planned)} (orçado)`;
       }
-
-    } catch {}
+    } catch (err) {
+      console.error('[Dashboard] Erro em loadSummary:', err);
+      showDashError(`Falha ao carregar resumo: ${err.message}`);
+      document.getElementById('stat-income').textContent = 'Erro';
+      document.getElementById('stat-expense').textContent = 'Erro';
+      document.getElementById('stat-balance').textContent = 'Erro';
+    }
   }
 
+  // ── Assinaturas ─────────────────────────────────────────────────────────────
   async function loadSubs() {
     try {
       const subs = await subscriptionsApi.list({ active_only: true });
       document.getElementById('stat-subs').textContent = subs.length;
-      document.getElementById('stat-subs-sub').textContent = `= ${formatBRL(subs.reduce((a, s) => a + s.amount, 0))}/mês`;
-    } catch {}
+      const total = subs.reduce((a, s) => a + s.amount, 0);
+      document.getElementById('stat-subs-sub').textContent = `= ${formatBRL(total)}/mês`;
+    } catch (err) {
+      console.error('[Dashboard] Erro em loadSubs:', err);
+      document.getElementById('stat-subs').textContent = '—';
+    }
   }
 
+  // ── Evolução Mensal ─────────────────────────────────────────────────────────
   async function loadEvolution() {
     const months = +document.getElementById('evo-months').value;
     const future = +document.getElementById('evo-future').value;
@@ -268,7 +321,7 @@
       const labels = data.map(d => monthLabel(d.period) + (d.projected ? '*' : ''));
       const incomes = data.map(d => d.income);
       const expenses = data.map(d => d.expenses);
-      
+
       const incColors = data.map(d => d.projected ? 'rgba(0,229,122,0.2)' : 'rgba(0,229,122,0.6)');
       const expColors = data.map(d => d.projected ? 'rgba(255,77,101,0.2)' : 'rgba(255,77,101,0.5)');
       const incBorder = data.map(d => d.projected ? '#00E57Aaa' : '#00E57A');
@@ -280,26 +333,48 @@
         data: {
           labels,
           datasets: [
-            { label: 'Receitas', data: incomes, backgroundColor: incColors, borderColor: incBorder, borderWidth: 1, borderRadius: 2 },
-            { label: 'Despesas', data: expenses, backgroundColor: expColors, borderColor: expBorder, borderWidth: 1, borderRadius: 2 },
+            {
+              label: 'Receitas', data: incomes,
+              backgroundColor: incColors, borderColor: incBorder, borderWidth: 1, borderRadius: 2
+            },
+            {
+              label: 'Despesas', data: expenses,
+              backgroundColor: expColors, borderColor: expBorder, borderWidth: 1, borderRadius: 2
+            },
           ],
         },
         options: {
           responsive: true, maintainAspectRatio: false,
-          plugins: { legend: { labels: { color: '#8FA3B8', font: { size: 11 } } }, tooltip: { callbacks: { label: ctx => formatBRL(ctx.raw) } } },
+          plugins: {
+            legend: { labels: { color: '#8FA3B8', font: { size: 11 } } },
+            tooltip: { callbacks: { label: ctx => formatBRL(ctx.raw) } }
+          },
           scales: {
             x: { grid: { color: '#1E2D3D' }, ticks: { color: '#556070', font: { size: 10 } } },
-            y: { grid: { color: '#1E2D3D' }, ticks: { color: '#556070', font: { size: 10 }, callback: v => 'R$' + (v/1000).toFixed(0) + 'k' } },
+            y: { grid: { color: '#1E2D3D' }, ticks: { color: '#556070', font: { size: 10 }, callback: v => 'R$' + (v / 1000).toFixed(0) + 'k' } },
           },
         },
       });
-    } catch {}
+    } catch (err) {
+      console.error('[Dashboard] Erro em loadEvolution:', err);
+      const canvas = document.getElementById('evo-chart');
+      if (canvas) {
+        canvas.parentElement.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:220px;color:var(--text-3);font-size:0.8rem">Não foi possível carregar o gráfico de evolução.</div>`;
+      }
+    }
   }
 
+  // ── Categorias (Donut) ──────────────────────────────────────────────────────
   async function loadCategoryChart() {
     try {
       const data = await reportsApi.byCategory(year, month, 'expense');
-      if (!data.length) return;
+      if (!data.length) {
+        const canvas = document.getElementById('cat-chart');
+        if (canvas) {
+          canvas.parentElement.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:220px;color:var(--text-3);font-size:0.8rem">Sem despesas no mês.</div>`;
+        }
+        return;
+      }
 
       if (catChart) catChart.destroy();
       catChart = new Chart(document.getElementById('cat-chart'), {
@@ -322,15 +397,18 @@
           },
         },
       });
-    } catch {}
+    } catch (err) {
+      console.error('[Dashboard] Erro em loadCategoryChart:', err);
+    }
   }
 
+  // ── Últimas Transações ──────────────────────────────────────────────────────
   async function loadRecentTx() {
     const tbody = document.getElementById('recent-tbody');
     try {
       const res = await transactionsApi.list({ year, month, limit: 8 });
       if (!res.items.length) {
-        tbody.innerHTML = `<tr><td colspan="5" style="padding:32px;text-align:center;color:var(--text-3)">Sem transações neste mês.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" style="padding:32px;text-align:center;color:var(--text-3)">Sem transações neste mês. <a href="transactions.html" style="color:var(--em)">Adicionar transação →</a></td></tr>`;
         return;
       }
       tbody.innerHTML = res.items.map(t => `
@@ -339,48 +417,73 @@
           <td class="text-strong">${t.description}</td>
           <td class="text-muted">${getCatName(t.category_id)}</td>
           <td class="td-amount td-amount--${t.type} text-right">${t.type === 'income' ? '+' : '-'}${formatBRL(t.amount)}</td>
-          <td>${t.type === 'income' ? '<span class="badge badge--income">Receita</span>' : '<span class="badge badge--expense">Despesa</span>'}</td>
+          <td>${t.type === 'income'
+            ? '<span class="badge badge--income">Receita</span>'
+            : '<span class="badge badge--expense">Despesa</span>'}</td>
         </tr>`).join('');
-    } catch {
-      tbody.innerHTML = `<tr><td colspan="5" style="padding:24px;text-align:center;color:var(--red)">Erro ao carregar.</td></tr>`;
+    } catch (err) {
+      console.error('[Dashboard] Erro em loadRecentTx:', err);
+      tbody.innerHTML = `<tr><td colspan="5" style="padding:24px;text-align:center;color:var(--red)">${err.message}</td></tr>`;
     }
   }
 
+  // ── Cartões ─────────────────────────────────────────────────────────────────
   async function loadCards() {
     const tbody = document.getElementById('cards-tbody');
     try {
       const cards = await reportsApi.cardsUsage(year, month);
-      if (!cards || cards.length === 0) {
-        tbody.innerHTML = `<tr><td style="padding:24px;text-align:center;color:var(--text-3)">Nenhum cartão ativo.</td></tr>`;
+      if (!cards || !cards.length) {
+        tbody.innerHTML = `<tr><td style="padding:24px;text-align:center;color:var(--text-3)">Nenhum cartão cadastrado. <a href="settings.html" style="color:var(--em)">Adicionar →</a></td></tr>`;
         return;
       }
       tbody.innerHTML = cards.map(c => {
         const perc = c.limit > 0 ? Math.min(100, (c.spent / c.limit) * 100) : 0;
+        const barColor = perc > 85 ? 'var(--red)' : (c.color || 'var(--em)');
         return `
-        <tr style="border-bottom:1px solid var(--border-color)">
-          <td style="padding:12px 16px;">
-            <div style="display:flex;align-items:center;gap:12px;">
-              <div style="width:12px;height:12px;border-radius:50%;background:${c.color || '#556070'}"></div>
-              <div>
-                <div style="font-weight:600;color:var(--text-1)">${c.name} <span style="font-size:0.8rem;color:var(--text-3)">(${c.last4})</span></div>
-                <div style="font-size:0.85rem;color:var(--text-3)">${formatBRL(c.spent)} de ${formatBRL(c.limit)}</div>
+          <tr style="border-bottom:1px solid var(--border)">
+            <td style="padding:12px 16px;">
+              <div style="display:flex;align-items:center;gap:12px;">
+                <div style="width:12px;height:12px;border-radius:50%;background:${c.color || '#556070'};flex-shrink:0"></div>
+                <div style="flex:1;min-width:0">
+                  <div style="font-weight:600;color:var(--text);font-size:0.85rem">
+                    ${c.name}${c.last4 ? ` <span style="font-size:0.78rem;color:var(--text-3)">••${c.last4}</span>` : ''}
+                  </div>
+                  <div style="font-size:0.8rem;color:var(--text-3)">${formatBRL(c.spent)} de ${formatBRL(c.limit)}</div>
+                </div>
               </div>
-            </div>
-            <div style="margin-top:8px;height:4px;background:var(--bg-lighter);border-radius:2px;overflow:hidden;width:100%;">
-              <div style="height:100%;width:${perc}%;background:${perc > 85 ? 'var(--red)' : c.color};transition:width 0.5s ease;"></div>
-            </div>
-          </td>
-        </tr>`;
+              <div style="margin-top:8px;height:4px;background:var(--bg-3);border-radius:2px;overflow:hidden;">
+                <div style="height:100%;width:${perc}%;background:${barColor};transition:width 0.5s ease;"></div>
+              </div>
+            </td>
+          </tr>`;
       }).join('');
-    } catch {
-      tbody.innerHTML = `<tr><td style="padding:24px;text-align:center;color:var(--red)">Erro ao carregar cartões.</td></tr>`;
+    } catch (err) {
+      console.error('[Dashboard] Erro em loadCards:', err);
+      tbody.innerHTML = `<tr><td style="padding:16px;text-align:center;color:var(--red);font-size:0.8rem">${err.message}</td></tr>`;
     }
   }
 
+  // ── Carregar Tudo ───────────────────────────────────────────────────────────
   async function loadAll() {
     updateMonthLabel();
+
+    // Verificar conexão com backend antes de carregar
+    const healthy = await checkBackendHealth();
+    if (!healthy) {
+      showDashError(
+        'Backend inacessível. Certifique-se de que os containers estão rodando: docker compose up -d --build'
+      );
+    }
+
     await loadCategories();
-    await Promise.all([loadSummary(), loadSubs(), loadEvolution(), loadCategoryChart(), loadRecentTx(), loadCards()]);
+    await Promise.allSettled([
+      loadSummary(),
+      loadSubs(),
+      loadEvolution(),
+      loadCategoryChart(),
+      loadRecentTx(),
+      loadCards()
+    ]);
   }
 
   document.getElementById('prev-month').onclick = () => {

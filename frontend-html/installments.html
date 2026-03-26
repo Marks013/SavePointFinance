@@ -53,8 +53,7 @@
       <!-- All groups view -->
       <div id="view-groups">
         <div id="groups-container">
-          <div class="empty-state" id="groups-loading">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+          <div class="empty-state">
             <div class="empty-state-title">Carregando...</div>
           </div>
         </div>
@@ -65,12 +64,14 @@
         <div class="card">
           <div class="card-header">
             <div class="card-title" id="month-view-title">Parcelas do mês</div>
-            <div style="font-size:0.8rem;color:var(--text-3)">Total: <strong id="month-total" style="color:var(--red)">—</strong></div>
+            <div style="font-size:0.8rem;color:var(--text-3)">
+              Total: <strong id="month-total" style="color:var(--red)">—</strong>
+            </div>
           </div>
           <div class="table-wrapper" style="border:none">
             <table>
               <thead>
-                <tr><th>Data</th><th>Descrição</th><th>Parcela</th><th style="text-align:right">Valor da parcela</th></tr>
+                <tr><th>Data</th><th>Descrição</th><th>Parcela</th><th style="text-align:right">Valor</th></tr>
               </thead>
               <tbody id="month-tbody">
                 <tr><td colspan="4" style="padding:24px;text-align:center;color:var(--text-3)">Carregando...</td></tr>
@@ -101,78 +102,104 @@
   function setView(mode) {
     viewMode = mode;
     document.getElementById('view-groups').classList.toggle('hidden', mode !== 'groups');
-    document.getElementById('view-month').classList.toggle('hidden', mode !== 'month');
+    document.getElementById('view-month').classList.toggle('hidden',  mode !== 'month');
     if (mode === 'groups') loadGroups();
     else loadByMonth();
   }
 
-  document.getElementById('btn-show-all').onclick = () => setView('groups');
+  document.getElementById('btn-show-all').onclick   = () => setView('groups');
   document.getElementById('btn-show-month').onclick = () => setView('month');
 
   async function loadGroups() {
     const container = document.getElementById('groups-container');
-    container.innerHTML = `<div class="empty-state" id="groups-loading">
-      <div class="empty-state-title">Carregando...</div></div>`;
-
+    container.innerHTML = `<div class="empty-state"><div class="empty-state-title">Carregando...</div></div>`;
     const includeFinished = document.getElementById('show-finished').checked;
+
     try {
       const groups = await installmentsApi.list({ include_finished: includeFinished });
+      const today = new Date();
 
       let total = 0, paid = 0, remaining = 0;
       groups.forEach(g => { total += g.total_amount; paid += g.paid_amount; remaining += g.remaining_amount; });
 
-      document.getElementById('stat-total').textContent = formatBRL(total);
-      document.getElementById('stat-paid').textContent = formatBRL(paid);
+      document.getElementById('stat-total').textContent     = formatBRL(total);
+      document.getElementById('stat-paid').textContent      = formatBRL(paid);
       document.getElementById('stat-remaining').textContent = formatBRL(remaining);
-      document.getElementById('stat-groups').textContent = groups.filter(g => !g.is_finished).length;
+      document.getElementById('stat-groups').textContent    = groups.filter(g => !g.is_finished).length;
 
       if (!groups.length) {
         container.innerHTML = `<div class="empty-state">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
           <div class="empty-state-title">Nenhum parcelado encontrado</div>
-          <div class="empty-state-sub">Crie uma transação com mais de 1x em Transações</div></div>`;
+          <div class="empty-state-sub">Crie uma transação com mais de 1 parcela em
+            <a href="transactions.html" style="color:var(--em)">Transações</a>
+          </div>
+        </div>`;
         return;
       }
 
       container.innerHTML = groups.map(g => {
-        const pct = Math.round((g.installments_paid / g.installments_total) * 100);
+        const pct      = Math.round((g.installments_paid / g.installments_total) * 100);
         const nextDate = g.next_installment_date ? formatDate(g.next_installment_date) : 'Concluído';
+        const barColor = g.is_finished ? 'var(--em)' : 'var(--amber)';
         return `
           <div class="inst-card" style="margin-bottom:12px">
             <div class="inst-card-header">
               <div>
                 <div class="inst-card-title">${g.description}</div>
-                <div style="font-size:0.75rem;color:var(--text-3);margin-top:2px">Início: ${formatDate(g.start_date)}</div>
+                <div style="font-size:0.75rem;color:var(--text-3);margin-top:2px">
+                  Início: ${formatDate(g.start_date)}
+                </div>
               </div>
-              ${g.is_finished ? '<span class="badge badge--active">Concluído</span>' : '<span class="badge badge--warn">Em andamento</span>'}
+              ${g.is_finished
+                ? '<span class="badge badge--active">Concluído</span>'
+                : '<span class="badge badge--warn">Em andamento</span>'}
             </div>
             <div class="inst-meta-row">
-              <div class="inst-meta"><div class="inst-meta-label">Total</div><div class="inst-meta-value">${formatBRL(g.total_amount)}</div></div>
-              <div class="inst-meta"><div class="inst-meta-label">Pago</div><div class="inst-meta-value" style="color:var(--em)">${formatBRL(g.paid_amount)}</div></div>
-              <div class="inst-meta"><div class="inst-meta-label">Restante</div><div class="inst-meta-value" style="color:var(--red)">${formatBRL(g.remaining_amount)}</div></div>
-              <div class="inst-meta"><div class="inst-meta-label">Parcelas</div><div class="inst-meta-value">${g.installments_paid}/${g.installments_total}</div></div>
-              <div class="inst-meta"><div class="inst-meta-label">Próxima</div><div class="inst-meta-value" style="font-family:inherit;font-size:0.8rem">${nextDate}</div></div>
+              <div class="inst-meta">
+                <div class="inst-meta-label">Total</div>
+                <div class="inst-meta-value">${formatBRL(g.total_amount)}</div>
+              </div>
+              <div class="inst-meta">
+                <div class="inst-meta-label">Pago</div>
+                <div class="inst-meta-value" style="color:var(--em)">${formatBRL(g.paid_amount)}</div>
+              </div>
+              <div class="inst-meta">
+                <div class="inst-meta-label">Restante</div>
+                <div class="inst-meta-value" style="color:var(--red)">${formatBRL(g.remaining_amount)}</div>
+              </div>
+              <div class="inst-meta">
+                <div class="inst-meta-label">Parcelas</div>
+                <div class="inst-meta-value">${g.installments_paid}/${g.installments_total}</div>
+              </div>
+              <div class="inst-meta">
+                <div class="inst-meta-label">Próxima</div>
+                <div class="inst-meta-value" style="font-family:inherit;font-size:0.8rem">${nextDate}</div>
+              </div>
             </div>
             <div>
               <div style="display:flex;justify-content:space-between;font-size:0.72rem;color:var(--text-3);margin-bottom:6px">
                 <span>Progresso</span><span>${pct}%</span>
               </div>
               <div class="progress-bar">
-                <div class="progress-fill" style="width:${pct}%;background:${g.is_finished ? 'var(--em)' : 'var(--amber)'}"></div>
+                <div class="progress-fill" style="width:${pct}%;background:${barColor}"></div>
               </div>
             </div>
           </div>`;
       }).join('');
     } catch (err) {
-      container.innerHTML = `<div class="empty-state"><div class="empty-state-title" style="color:var(--red)">${err.message}</div></div>`;
+      console.error('[Parcelados] loadGroups:', err);
+      container.innerHTML = `<div class="empty-state">
+        <div class="empty-state-title" style="color:var(--red)">⚠️ ${err.message}</div>
+      </div>`;
+      toast('Erro ao carregar parcelados: ' + err.message, 'error');
     }
   }
 
   async function loadByMonth() {
     const tbody = document.getElementById('month-tbody');
     tbody.innerHTML = `<tr><td colspan="4" style="padding:24px;text-align:center;color:var(--text-3)">Carregando...</td></tr>`;
-    document.getElementById('month-view-title').textContent =
-      `Parcelas de ${formatMonth(year, month)}`;
+    document.getElementById('month-view-title').textContent = `Parcelas de ${formatMonth(year, month)}`;
+
     try {
       const res = await installmentsApi.byMonth(year, month);
       document.getElementById('month-total').textContent = formatBRL(res.total_amount);
@@ -188,7 +215,9 @@
           <td class="td-amount td-amount--expense text-right">${formatBRL(t.amount)}</td>
         </tr>`).join('');
     } catch (err) {
-      tbody.innerHTML = `<tr><td colspan="4" style="padding:24px;text-align:center;color:var(--red)">${err.message}</td></tr>`;
+      console.error('[Parcelados] loadByMonth:', err);
+      tbody.innerHTML = `<tr><td colspan="4" style="padding:24px;text-align:center;color:var(--red)">⚠️ ${err.message}</td></tr>`;
+      toast('Erro ao carregar parcelas do mês: ' + err.message, 'error');
     }
   }
 
