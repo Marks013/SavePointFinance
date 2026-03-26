@@ -165,7 +165,7 @@
 
 <script type="module">
   import { requireAuthAndRender } from './js/nav.js';
-  import { reportsApi, transactionsApi, subscriptionsApi, categoriesApi } from './js/api.js';
+  import { Auth, reportsApi, transactionsApi, subscriptionsApi, categoriesApi } from './js/api.js';
   import { formatBRL, formatDate, formatMonth, currentYearMonth, monthLabel } from './js/utils.js';
 
   if (!requireAuthAndRender('dashboard.html')) throw new Error('not auth');
