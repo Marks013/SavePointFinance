@@ -13,34 +13,21 @@
   <div id="sidebar-mount"></div>
 
   <div class="main-content">
-    <!-- Error Banner -->
-    <div id="dash-error-banner" class="hidden" style="
-      background: var(--red-bg);
-      border: 1px solid var(--red-border);
-      border-radius: var(--radius-lg);
-      margin: 16px 28px 0;
-      padding: 14px 18px;
-      color: var(--red);
-      font-size: 0.8125rem;
-      display: flex;
-      align-items: flex-start;
-      gap: 12px;
+
+    <!-- Banner de erro principal -->
+    <div id="main-error" style="
+      display:none;background:#1A0508;border-bottom:2px solid #FF4D65;
+      padding:12px 28px;color:#FF4D65;font-size:0.8125rem;
     ">
-      <span style="font-size:1.1rem;flex-shrink:0">⚠️</span>
-      <div style="flex:1">
-        <strong>Falha ao carregar dados</strong>
-        <div id="dash-error-msg" style="margin-top:4px;opacity:0.85"></div>
-        <div style="margin-top:6px;font-size:0.75rem;opacity:0.7">
-          Dica: verifique se o backend está rodando com <code style="background:rgba(255,77,101,0.15);padding:1px 5px;border-radius:3px">docker compose ps</code>
-          e se <code style="background:rgba(255,77,101,0.15);padding:1px 5px;border-radius:3px">ALLOWED_ORIGINS</code> no <code>.env</code> contém a URL que você está acessando.
-        </div>
-      </div>
-      <button onclick="document.getElementById('dash-error-banner').classList.add('hidden')" style="
-        background:none;border:none;color:var(--red);cursor:pointer;font-size:1rem;padding:0;flex-shrink:0
-      ">✕</button>
+      <strong>⚠ Falha ao carregar —</strong>
+      <span id="main-error-msg"></span>
+      &nbsp;·&nbsp;
+      <a href="/diagnostico.html" style="color:#FF4D65;text-decoration:underline">Abrir diagnóstico</a>
+      &nbsp;·&nbsp;
+      <a href="#" onclick="document.getElementById('main-error').style.display='none'" style="color:#FF4D65">✕</a>
     </div>
 
-    <div class="page-header" style="margin-top:16px">
+    <div class="page-header">
       <div style="display:flex;flex-direction:column;gap:2px">
         <div id="user-greeting" style="font-size:1rem;font-weight:600;color:var(--text)">Olá! 👋</div>
         <div class="page-title" id="dash-month-title">Dashboard</div>
@@ -60,8 +47,8 @@
     </div>
 
     <div class="page-body">
-      <!-- Stats row -->
-      <div class="stat-grid" id="stat-grid">
+      <!-- Stats -->
+      <div class="stat-grid">
         <div class="stat-card stat-card--income">
           <div class="stat-icon stat-icon--income">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
@@ -92,31 +79,29 @@
           </div>
           <div class="stat-label">Assinaturas ativas</div>
           <div class="stat-value" id="stat-subs" style="color:var(--amber)">—</div>
-          <div class="stat-sub" id="stat-subs-sub">recorrências</div>
+          <div class="stat-sub" id="stat-subs-sub">—</div>
         </div>
       </div>
 
-      <!-- Strategy row: Budget and Cards -->
+      <!-- Gauge + Cartões -->
       <div class="grid-2" style="margin-bottom:24px">
         <div class="card">
-          <div class="card-header">
-            <div class="card-title">Orçamento Total Planejado</div>
-          </div>
-          <div class="chart-area" style="height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;">
+          <div class="card-header"><div class="card-title">Orçamento Total Planejado</div></div>
+          <div id="gauge-wrap" class="chart-area" style="height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;">
             <canvas id="gauge-chart"></canvas>
             <div style="position:absolute;bottom:20px;text-align:center;">
               <div id="gauge-percent" style="font-size:1.8rem;font-weight:700;color:var(--text)">0%</div>
-              <div id="gauge-text" style="font-size:0.85rem;color:var(--text-3)">do limite gasto</div>
+              <div id="gauge-text" style="font-size:0.85rem;color:var(--text-3)">carregando...</div>
             </div>
           </div>
         </div>
         <div class="card">
           <div class="card-header">
-            <div class="card-title">Faturas Abertas (Cartão de Crédito)</div>
+            <div class="card-title">Faturas Abertas</div>
             <a href="settings.html" class="btn btn--ghost btn--sm">Gerenciar</a>
           </div>
           <div class="table-wrapper" style="border:none;max-height:220px;overflow-y:auto;margin:0">
-            <table style="width:100%;text-align:left;border-collapse:collapse;">
+            <table style="width:100%;border-collapse:collapse;">
               <tbody id="cards-tbody">
                 <tr><td style="padding:24px;text-align:center;color:var(--text-3)">Carregando...</td></tr>
               </tbody>
@@ -125,14 +110,14 @@
         </div>
       </div>
 
-      <!-- Charts row -->
+      <!-- Gráficos -->
       <div class="grid-2" style="margin-bottom:24px">
         <div class="card">
           <div class="card-header">
             <div class="card-title">Evolução mensal</div>
-            <div style="display:flex;gap:12px;align-items:center;">
+            <div style="display:flex;gap:8px">
               <select class="filter-control" id="evo-future">
-                <option value="0" selected>Sem previsão</option>
+                <option value="0">Sem previsão</option>
                 <option value="3">+3 meses proj.</option>
                 <option value="6">+6 meses proj.</option>
               </select>
@@ -143,21 +128,19 @@
               </select>
             </div>
           </div>
-          <div class="chart-area" style="height:220px">
+          <div id="evo-wrap" class="chart-area" style="height:220px">
             <canvas id="evo-chart"></canvas>
           </div>
         </div>
         <div class="card">
-          <div class="card-header">
-            <div class="card-title">Gastos por categoria</div>
-          </div>
-          <div class="chart-area" style="height:220px;display:flex;align-items:center;justify-content:center">
+          <div class="card-header"><div class="card-title">Gastos por categoria</div></div>
+          <div id="cat-wrap" class="chart-area" style="height:220px;display:flex;align-items:center;justify-content:center">
             <canvas id="cat-chart"></canvas>
           </div>
         </div>
       </div>
 
-      <!-- Recent transactions -->
+      <!-- Transações recentes -->
       <div class="card">
         <div class="card-header">
           <div class="card-title">Últimas transações</div>
@@ -167,248 +150,206 @@
           <table>
             <thead>
               <tr>
-                <th>Data</th>
-                <th>Descrição</th>
-                <th>Categoria</th>
-                <th style="text-align:right">Valor</th>
-                <th>Tipo</th>
+                <th>Data</th><th>Descrição</th><th>Categoria</th>
+                <th style="text-align:right">Valor</th><th>Tipo</th>
               </tr>
             </thead>
             <tbody id="recent-tbody">
-              <tr><td colspan="5" class="text-muted" style="padding:24px;text-align:center">Carregando...</td></tr>
+              <tr><td colspan="5" style="padding:24px;text-align:center;color:var(--text-3)">Carregando...</td></tr>
             </tbody>
           </table>
         </div>
       </div>
+
     </div>
   </div>
 </div>
 
+<!-- ================================================================
+  Script principal — usa fetch() direto para máxima visibilidade
+  de erros, sem depender do módulo api.js
+================================================================ -->
 <script type="module">
   import { requireAuthAndRender } from './js/nav.js';
-  import {
-    Auth, checkBackendHealth, showGlobalError, hideGlobalError,
-    reportsApi, transactionsApi, subscriptionsApi, categoriesApi
-  } from './js/api.js';
-  import { formatBRL, formatDate, formatMonth, currentYearMonth, monthLabel, toast } from './js/utils.js';
+  import { Auth } from './js/api.js';
+  import { formatBRL, formatDate, formatMonth, currentYearMonth, monthLabel } from './js/utils.js';
 
   if (!requireAuthAndRender('dashboard.html')) throw new Error('not auth');
 
+  // Saudação
+  try {
+    const u = Auth.getUser();
+    if (u) {
+      const n = (u.name || u.email || 'Usuário').split(' ')[0];
+      document.getElementById('user-greeting').innerHTML = `Olá, <strong>${n}</strong> 👋`;
+    }
+  } catch (_) {}
+
   let { year, month } = currentYearMonth();
-  let evoChart, catChart, gaugeChart;
+  let evoChart = null, catChart = null, gaugeChart = null;
   let categories = [];
 
-  // ── Saudação ────────────────────────────────────────────────────────────────
-  try {
-    const user = Auth.getUser();
-    if (user && user.name) {
-      const firstName = user.name.split(' ')[0];
-      document.getElementById('user-greeting').innerHTML = `Olá, <strong>${firstName}</strong> 👋`;
-    } else if (user && user.email) {
-      document.getElementById('user-greeting').innerHTML = `Olá, <strong>${user.email}</strong> 👋`;
+  // ── Helper: mostrar erro no banner ──────────────────────────────
+  function showErr(msg) {
+    document.getElementById('main-error-msg').textContent = msg;
+    document.getElementById('main-error').style.display = 'block';
+  }
+
+  // ── Helper: placeholder de erro em container ─────────────────────
+  function errBox(el, msg) {
+    el.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:100px;gap:6px;color:var(--red);font-size:0.8rem;text-align:center;padding:12px">
+      <span>⚠️ ${msg}</span>
+      <a href="/diagnostico.html" style="color:var(--em);font-size:0.72rem">→ diagnóstico</a>
+    </div>`;
+  }
+
+  // ── Fetch autenticado ────────────────────────────────────────────
+  async function api(path) {
+    const token = Auth.getToken();
+    if (!token) { window.location.href = '/login.html'; throw new Error('Sem token'); }
+
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    };
+
+    let res = await fetch(`/api/v1${path}`, { headers });
+
+    // Tentar refresh automático em 401
+    if (res.status === 401) {
+      const rt = Auth.getRefreshToken();
+      if (rt) {
+        try {
+          const rr = await fetch(`/api/v1/auth/refresh?refresh_token=${encodeURIComponent(rt)}`, { method: 'POST' });
+          if (rr.ok) {
+            const rd = await rr.json();
+            Auth.setTokens(rd.access_token, rd.refresh_token);
+            headers['Authorization'] = `Bearer ${rd.access_token}`;
+            res = await fetch(`/api/v1${path}`, { headers });
+          }
+        } catch (_) {}
+      }
+      if (res.status === 401) {
+        Auth.clear();
+        window.location.href = '/login.html';
+        throw new Error('Sessão expirada');
+      }
     }
-  } catch (e) {
-    console.error('Erro ao carregar saudação:', e);
-  }
 
-  // ── Mostrar erro no banner ──────────────────────────────────────────────────
-  function showDashError(msg) {
-    const banner = document.getElementById('dash-error-banner');
-    document.getElementById('dash-error-msg').textContent = msg;
-    banner.classList.remove('hidden');
-  }
-
-  // ── Categorias ──────────────────────────────────────────────────────────────
-  async function loadCategories() {
-    try {
-      categories = await categoriesApi.list();
-    } catch (err) {
-      console.error('[Dashboard] Erro ao carregar categorias:', err);
+    if (!res.ok) {
+      let detail = `HTTP ${res.status}`;
+      try { const j = await res.json(); detail = j.detail || detail; } catch (_) {}
+      throw new Error(detail);
     }
+
+    return res.json();
   }
 
-  function getCatName(id) {
-    const c = categories.find(x => x.id === id);
-    return c ? c.name : '—';
-  }
-
+  // ── Rótulo do mês ────────────────────────────────────────────────
   function updateMonthLabel() {
-    const label = formatMonth(year, month);
-    document.getElementById('month-label').textContent = label;
+    const lbl = formatMonth(year, month);
+    document.getElementById('month-label').textContent = lbl;
     document.getElementById('dash-month-title').textContent =
-      `Visão Geral — ${label.charAt(0).toUpperCase() + label.slice(1)}`;
+      `Visão Geral — ${lbl.charAt(0).toUpperCase() + lbl.slice(1)}`;
   }
 
-  // ── Resumo Financeiro ───────────────────────────────────────────────────────
+  // ── Resumo ───────────────────────────────────────────────────────
   async function loadSummary() {
     try {
-      const s = await reportsApi.summary(year, month);
-      hideGlobalError();
-      document.getElementById('dash-error-banner').classList.add('hidden');
+      const s = await api(`/reports/summary?year=${year}&month=${month}`);
 
-      document.getElementById('stat-income').textContent = formatBRL(s.income);
+      document.getElementById('stat-income').textContent  = formatBRL(s.income);
       document.getElementById('stat-expense').textContent = formatBRL(s.expenses);
       document.getElementById('stat-balance').textContent = formatBRL(s.balance);
       document.getElementById('stat-balance').className =
         'stat-value ' + (s.balance >= 0 ? 'stat-value--income' : 'stat-value--expense');
 
-      // Gauge
-      let percent = 0;
-      if (s.limit_planned > 0) {
-        percent = Math.min(100, Math.round((s.limit_used / s.limit_planned) * 100));
-      }
-      document.getElementById('gauge-percent').textContent = `${percent}%`;
-
-      let gaugeColor = '#00E57A';
-      if (percent > 75) gaugeColor = '#F59E0B';
-      if (percent >= 90) gaugeColor = '#FF4D65';
+      const pct   = s.limit_planned > 0 ? Math.min(100, Math.round((s.limit_used / s.limit_planned) * 100)) : 0;
+      const color = pct >= 90 ? '#FF4D65' : pct > 75 ? '#F59E0B' : '#00E57A';
+      document.getElementById('gauge-percent').textContent = `${pct}%`;
+      document.getElementById('gauge-text').textContent    =
+        s.limit_planned > 0 ? `de ${formatBRL(s.limit_planned)} (orçado)` : 'Defina limites nas categorias';
 
       if (gaugeChart) gaugeChart.destroy();
       gaugeChart = new Chart(document.getElementById('gauge-chart'), {
         type: 'doughnut',
-        data: {
-          labels: ['Usado', 'Disponível'],
-          datasets: [{
-            data: [s.limit_used, Math.max(0.001, s.limit_planned - s.limit_used)],
-            backgroundColor: [gaugeColor, '#1E2D3D'],
-            borderWidth: 0,
-            borderRadius: [4, 0]
-          }]
-        },
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          cutout: '80%', circumference: 180, rotation: -90,
-          plugins: {
-            legend: { display: false },
-            tooltip: { callbacks: { label: ctx => formatBRL(ctx.raw) } }
-          }
-        }
+        data: { labels: ['Usado','Disponível'], datasets: [{ data: [s.limit_used, Math.max(0.001, s.limit_planned - s.limit_used)], backgroundColor: [color,'#1E2D3D'], borderWidth: 0 }] },
+        options: { responsive: true, maintainAspectRatio: false, cutout: '80%', circumference: 180, rotation: -90, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => formatBRL(ctx.raw) } } } }
       });
-
-      if (s.limit_planned === 0) {
-        document.getElementById('gauge-text').textContent = 'Defina limites nas categorias';
-      } else {
-        document.getElementById('gauge-text').textContent = `de ${formatBRL(s.limit_planned)} (orçado)`;
-      }
     } catch (err) {
-      console.error('[Dashboard] Erro em loadSummary:', err);
-      showDashError(`Falha ao carregar resumo: ${err.message}`);
-      document.getElementById('stat-income').textContent = 'Erro';
-      document.getElementById('stat-expense').textContent = 'Erro';
-      document.getElementById('stat-balance').textContent = 'Erro';
+      showErr(`Resumo: ${err.message}`);
+      ['stat-income','stat-expense','stat-balance'].forEach(id => document.getElementById(id).textContent = 'Erro');
     }
   }
 
-  // ── Assinaturas ─────────────────────────────────────────────────────────────
+  // ── Assinaturas ──────────────────────────────────────────────────
   async function loadSubs() {
     try {
-      const subs = await subscriptionsApi.list({ active_only: true });
-      document.getElementById('stat-subs').textContent = subs.length;
-      const total = subs.reduce((a, s) => a + s.amount, 0);
-      document.getElementById('stat-subs-sub').textContent = `= ${formatBRL(total)}/mês`;
+      const subs = await api('/subscriptions/?active_only=true');
+      document.getElementById('stat-subs').textContent     = subs.length;
+      document.getElementById('stat-subs-sub').textContent = `= ${formatBRL(subs.reduce((a,s) => a + s.amount, 0))}/mês`;
     } catch (err) {
-      console.error('[Dashboard] Erro em loadSubs:', err);
-      document.getElementById('stat-subs').textContent = '—';
+      document.getElementById('stat-subs').textContent     = '—';
+      document.getElementById('stat-subs-sub').textContent = err.message;
     }
   }
 
-  // ── Evolução Mensal ─────────────────────────────────────────────────────────
+  // ── Evolução ─────────────────────────────────────────────────────
   async function loadEvolution() {
+    const wrap   = document.getElementById('evo-wrap');
     const months = +document.getElementById('evo-months').value;
     const future = +document.getElementById('evo-future').value;
     try {
-      const data = await reportsApi.monthlyEvolution(months, future);
-      const labels = data.map(d => monthLabel(d.period) + (d.projected ? '*' : ''));
-      const incomes = data.map(d => d.income);
-      const expenses = data.map(d => d.expenses);
-
+      const data = await api(`/reports/monthly-evolution?months=${months}&future_months=${future}`);
+      const labels    = data.map(d => monthLabel(d.period) + (d.projected ? '*' : ''));
       const incColors = data.map(d => d.projected ? 'rgba(0,229,122,0.2)' : 'rgba(0,229,122,0.6)');
       const expColors = data.map(d => d.projected ? 'rgba(255,77,101,0.2)' : 'rgba(255,77,101,0.5)');
-      const incBorder = data.map(d => d.projected ? '#00E57Aaa' : '#00E57A');
-      const expBorder = data.map(d => d.projected ? '#FF4D65aa' : '#FF4D65');
-
       if (evoChart) evoChart.destroy();
+      if (!document.getElementById('evo-chart')) wrap.innerHTML = '<canvas id="evo-chart"></canvas>';
       evoChart = new Chart(document.getElementById('evo-chart'), {
         type: 'bar',
         data: {
           labels,
           datasets: [
-            {
-              label: 'Receitas', data: incomes,
-              backgroundColor: incColors, borderColor: incBorder, borderWidth: 1, borderRadius: 2
-            },
-            {
-              label: 'Despesas', data: expenses,
-              backgroundColor: expColors, borderColor: expBorder, borderWidth: 1, borderRadius: 2
-            },
-          ],
+            { label:'Receitas', data: data.map(d => d.income), backgroundColor: incColors, borderColor: data.map(d => d.projected ? '#00E57Aaa' : '#00E57A'), borderWidth:1, borderRadius:2 },
+            { label:'Despesas', data: data.map(d => d.expenses), backgroundColor: expColors, borderColor: data.map(d => d.projected ? '#FF4D65aa' : '#FF4D65'), borderWidth:1, borderRadius:2 },
+          ]
         },
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          plugins: {
-            legend: { labels: { color: '#8FA3B8', font: { size: 11 } } },
-            tooltip: { callbacks: { label: ctx => formatBRL(ctx.raw) } }
-          },
-          scales: {
-            x: { grid: { color: '#1E2D3D' }, ticks: { color: '#556070', font: { size: 10 } } },
-            y: { grid: { color: '#1E2D3D' }, ticks: { color: '#556070', font: { size: 10 }, callback: v => 'R$' + (v / 1000).toFixed(0) + 'k' } },
-          },
-        },
+        options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ labels:{color:'#8FA3B8',font:{size:11}} }, tooltip:{callbacks:{label:ctx=>formatBRL(ctx.raw)}} }, scales:{ x:{grid:{color:'#1E2D3D'},ticks:{color:'#556070',font:{size:10}}}, y:{grid:{color:'#1E2D3D'},ticks:{color:'#556070',font:{size:10},callback:v=>'R$'+(v/1000).toFixed(0)+'k'}} } }
       });
-    } catch (err) {
-      console.error('[Dashboard] Erro em loadEvolution:', err);
-      const canvas = document.getElementById('evo-chart');
-      if (canvas) {
-        canvas.parentElement.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:220px;color:var(--text-3);font-size:0.8rem">Não foi possível carregar o gráfico de evolução.</div>`;
-      }
-    }
+    } catch (err) { errBox(wrap, err.message); }
   }
 
-  // ── Categorias (Donut) ──────────────────────────────────────────────────────
-  async function loadCategoryChart() {
-    try {
-      const data = await reportsApi.byCategory(year, month, 'expense');
-      if (!data.length) {
-        const canvas = document.getElementById('cat-chart');
-        if (canvas) {
-          canvas.parentElement.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:220px;color:var(--text-3);font-size:0.8rem">Sem despesas no mês.</div>`;
-        }
-        return;
-      }
+  // ── Categorias ───────────────────────────────────────────────────
+  async function loadCategories() {
+    try { categories = await api('/categories'); } catch (err) { console.error('cats:', err.message); }
+  }
 
+  function getCatName(id) { return categories.find(c => c.id === id)?.name || '—'; }
+
+  // ── Donut ────────────────────────────────────────────────────────
+  async function loadCategoryChart() {
+    const wrap = document.getElementById('cat-wrap');
+    try {
+      const data = await api(`/reports/by-category?year=${year}&month=${month}&type=expense`);
+      if (!data.length) { wrap.innerHTML = '<div style="color:var(--text-3);font-size:0.8rem">Sem despesas no mês.</div>'; return; }
       if (catChart) catChart.destroy();
+      if (!document.getElementById('cat-chart')) wrap.innerHTML = '<canvas id="cat-chart"></canvas>';
       catChart = new Chart(document.getElementById('cat-chart'), {
         type: 'doughnut',
-        data: {
-          labels: data.map(d => d.name),
-          datasets: [{
-            data: data.map(d => d.total),
-            backgroundColor: data.map(d => d.color + 'CC'),
-            borderColor: data.map(d => d.color),
-            borderWidth: 1,
-          }],
-        },
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          cutout: '68%',
-          plugins: {
-            legend: { position: 'right', labels: { color: '#8FA3B8', font: { size: 10 }, boxWidth: 12, padding: 8 } },
-            tooltip: { callbacks: { label: ctx => `${ctx.label}: ${formatBRL(ctx.raw)}` } },
-          },
-        },
+        data: { labels: data.map(d=>d.name), datasets: [{ data: data.map(d=>d.total), backgroundColor: data.map(d=>d.color+'CC'), borderColor: data.map(d=>d.color), borderWidth:1 }] },
+        options: { responsive:true, maintainAspectRatio:false, cutout:'68%', plugins:{ legend:{position:'right',labels:{color:'#8FA3B8',font:{size:10},boxWidth:12,padding:8}}, tooltip:{callbacks:{label:ctx=>`${ctx.label}: ${formatBRL(ctx.raw)}`}} } }
       });
-    } catch (err) {
-      console.error('[Dashboard] Erro em loadCategoryChart:', err);
-    }
+    } catch (err) { errBox(wrap, err.message); }
   }
 
-  // ── Últimas Transações ──────────────────────────────────────────────────────
+  // ── Transações recentes ──────────────────────────────────────────
   async function loadRecentTx() {
     const tbody = document.getElementById('recent-tbody');
     try {
-      const res = await transactionsApi.list({ year, month, limit: 8 });
+      const res = await api(`/transactions?year=${year}&month=${month}&limit=8`);
       if (!res.items.length) {
-        tbody.innerHTML = `<tr><td colspan="5" style="padding:32px;text-align:center;color:var(--text-3)">Sem transações neste mês. <a href="transactions.html" style="color:var(--em)">Adicionar transação →</a></td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" style="padding:32px;text-align:center;color:var(--text-3)">Sem transações neste mês. <a href="transactions.html" style="color:var(--em)">Adicionar →</a></td></tr>`;
         return;
       }
       tbody.innerHTML = res.items.map(t => `
@@ -416,84 +357,57 @@
           <td>${formatDate(t.date)}</td>
           <td class="text-strong">${t.description}</td>
           <td class="text-muted">${getCatName(t.category_id)}</td>
-          <td class="td-amount td-amount--${t.type} text-right">${t.type === 'income' ? '+' : '-'}${formatBRL(t.amount)}</td>
-          <td>${t.type === 'income'
-            ? '<span class="badge badge--income">Receita</span>'
-            : '<span class="badge badge--expense">Despesa</span>'}</td>
+          <td class="td-amount td-amount--${t.type} text-right">${t.type==='income'?'+':'-'}${formatBRL(t.amount)}</td>
+          <td>${t.type==='income'?'<span class="badge badge--income">Receita</span>':'<span class="badge badge--expense">Despesa</span>'}</td>
         </tr>`).join('');
     } catch (err) {
-      console.error('[Dashboard] Erro em loadRecentTx:', err);
-      tbody.innerHTML = `<tr><td colspan="5" style="padding:24px;text-align:center;color:var(--red)">${err.message}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--red)">⚠️ ${err.message} — <a href="/diagnostico.html" style="color:var(--em)">diagnóstico</a></td></tr>`;
     }
   }
 
-  // ── Cartões ─────────────────────────────────────────────────────────────────
+  // ── Cartões ──────────────────────────────────────────────────────
   async function loadCards() {
     const tbody = document.getElementById('cards-tbody');
     try {
-      const cards = await reportsApi.cardsUsage(year, month);
-      if (!cards || !cards.length) {
-        tbody.innerHTML = `<tr><td style="padding:24px;text-align:center;color:var(--text-3)">Nenhum cartão cadastrado. <a href="settings.html" style="color:var(--em)">Adicionar →</a></td></tr>`;
-        return;
-      }
+      const cards = await api(`/reports/cards-usage?year=${year}&month=${month}`);
+      if (!cards.length) { tbody.innerHTML = `<tr><td style="padding:20px;text-align:center;color:var(--text-3)">Nenhum cartão. <a href="settings.html" style="color:var(--em)">Adicionar →</a></td></tr>`; return; }
       tbody.innerHTML = cards.map(c => {
-        const perc = c.limit > 0 ? Math.min(100, (c.spent / c.limit) * 100) : 0;
-        const barColor = perc > 85 ? 'var(--red)' : (c.color || 'var(--em)');
-        return `
-          <tr style="border-bottom:1px solid var(--border)">
-            <td style="padding:12px 16px;">
-              <div style="display:flex;align-items:center;gap:12px;">
-                <div style="width:12px;height:12px;border-radius:50%;background:${c.color || '#556070'};flex-shrink:0"></div>
-                <div style="flex:1;min-width:0">
-                  <div style="font-weight:600;color:var(--text);font-size:0.85rem">
-                    ${c.name}${c.last4 ? ` <span style="font-size:0.78rem;color:var(--text-3)">••${c.last4}</span>` : ''}
-                  </div>
-                  <div style="font-size:0.8rem;color:var(--text-3)">${formatBRL(c.spent)} de ${formatBRL(c.limit)}</div>
-                </div>
+        const perc = c.limit > 0 ? Math.min(100, (c.spent/c.limit)*100) : 0;
+        const barColor = perc > 85 ? 'var(--red)' : (c.color||'var(--em)');
+        return `<tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:12px 16px">
+            <div style="display:flex;align-items:center;gap:10px">
+              <div style="width:10px;height:10px;border-radius:50%;background:${c.color||'#556070'};flex-shrink:0"></div>
+              <div style="flex:1">
+                <div style="font-weight:600;color:var(--text);font-size:0.85rem">${c.name}${c.last4?` <span style="color:var(--text-3);font-size:0.78rem">••${c.last4}</span>`:''}</div>
+                <div style="font-size:0.78rem;color:var(--text-3)">${formatBRL(c.spent)} de ${formatBRL(c.limit)}</div>
               </div>
-              <div style="margin-top:8px;height:4px;background:var(--bg-3);border-radius:2px;overflow:hidden;">
-                <div style="height:100%;width:${perc}%;background:${barColor};transition:width 0.5s ease;"></div>
-              </div>
-            </td>
-          </tr>`;
+            </div>
+            <div style="margin-top:6px;height:3px;background:var(--bg-3);border-radius:2px;overflow:hidden">
+              <div style="height:100%;width:${perc}%;background:${barColor}"></div>
+            </div>
+          </td>
+        </tr>`;
       }).join('');
     } catch (err) {
-      console.error('[Dashboard] Erro em loadCards:', err);
-      tbody.innerHTML = `<tr><td style="padding:16px;text-align:center;color:var(--red);font-size:0.8rem">${err.message}</td></tr>`;
+      tbody.innerHTML = `<tr><td style="padding:16px;text-align:center;color:var(--red);font-size:0.8rem">⚠️ ${err.message}</td></tr>`;
     }
   }
 
-  // ── Carregar Tudo ───────────────────────────────────────────────────────────
+  // ── Carregar tudo ────────────────────────────────────────────────
   async function loadAll() {
     updateMonthLabel();
-
-    // Verificar conexão com backend antes de carregar
-    const healthy = await checkBackendHealth();
-    if (!healthy) {
-      showDashError(
-        'Backend inacessível. Certifique-se de que os containers estão rodando: docker compose up -d --build'
-      );
-    }
-
     await loadCategories();
     await Promise.allSettled([
-      loadSummary(),
-      loadSubs(),
-      loadEvolution(),
-      loadCategoryChart(),
-      loadRecentTx(),
-      loadCards()
+      loadSummary(), loadSubs(), loadEvolution(),
+      loadCategoryChart(), loadRecentTx(), loadCards()
     ]);
   }
 
-  document.getElementById('prev-month').onclick = () => {
-    month--; if (month < 1) { month = 12; year--; } loadAll();
-  };
-  document.getElementById('next-month').onclick = () => {
-    month++; if (month > 12) { month = 1; year++; } loadAll();
-  };
+  document.getElementById('prev-month').onclick = () => { month--; if (month<1){month=12;year--;} loadAll(); };
+  document.getElementById('next-month').onclick = () => { month++; if (month>12){month=1;year++;} loadAll(); };
   document.getElementById('evo-months').onchange = loadEvolution;
-  document.getElementById('evo-future').onchange = loadEvolution;
+  document.getElementById('evo-future').onchange  = loadEvolution;
 
   loadAll();
 </script>

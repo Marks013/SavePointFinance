@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Diagnóstico — Save Point Finanças</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Courier New', monospace; background: #0A0E13; color: #E8EDF2; padding: 24px; font-size: 13px; }
+    h1 { color: #00E57A; font-size: 1.2rem; margin-bottom: 24px; }
+    h2 { color: #8FA3B8; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.1em; margin: 20px 0 8px; }
+    .card { background: #111720; border: 1px solid #1E2D3D; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
+    .row { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 6px; }
+    .label { color: #556070; min-width: 160px; flex-shrink: 0; }
+    .val { color: #E8EDF2; word-break: break-all; }
+    .ok    { color: #00E57A; font-weight: bold; }
+    .fail  { color: #FF4D65; font-weight: bold; }
+    .warn  { color: #F5A623; font-weight: bold; }
+    .info  { color: #3B9EE8; }
+    button {
+      background: #00E57A; color: #0A0E13; border: none; padding: 10px 20px;
+      border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 13px;
+      font-family: inherit; margin-right: 8px; margin-bottom: 8px;
+    }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    button.secondary { background: #1A2332; color: #8FA3B8; border: 1px solid #263748; }
+    #log { background: #050810; border: 1px solid #1E2D3D; border-radius: 6px; padding: 12px; max-height: 500px; overflow-y: auto; white-space: pre-wrap; line-height: 1.6; font-size: 12px; }
+    .log-ok   { color: #00E57A; }
+    .log-err  { color: #FF4D65; }
+    .log-warn { color: #F5A623; }
+    .log-info { color: #3B9EE8; }
+    .log-dim  { color: #556070; }
+    .section-divider { border-top: 1px solid #1E2D3D; margin: 20px 0; }
+    #fix-cors { display: none; background: #1A0A0D; border: 1px solid #FF4D65; border-radius: 8px; padding: 16px; margin-top: 12px; }
+    #fix-cors h3 { color: #FF4D65; margin-bottom: 8px; }
+    #fix-cors code { background: #0A0E13; padding: 2px 6px; border-radius: 3px; color: #F5A623; }
+    pre { background: #050810; padding: 12px; border-radius: 4px; overflow-x: auto; color: #00E57A; font-size: 12px; }
+  </style>
+</head>
+<body>
+
+<h1>🔬 Diagnóstico Save Point Finanças</h1>
+<p style="color:#8FA3B8;margin-bottom:20px">Esta página testa cada componente da aplicação e mostra exatamente onde está falhando.</p>
+
+<button id="btn-run" onclick="runAll()">▶ Executar diagnóstico completo</button>
+<button class="secondary" onclick="clearLog()">🗑 Limpar log</button>
+<button class="secondary" onclick="fixToken()">🔑 Forçar novo login</button>
+
+<div id="fix-cors">
+  <h3>⚠️ Problema de CORS detectado</h3>
+  <p style="margin-bottom:8px;color:#E8EDF2">
+    O backend está recusando requisições da sua origem. Atualize o <code>.env</code> no servidor:
+  </p>
+  <pre id="cors-fix-text"></pre>
+  <p style="margin-top:8px;color:#8FA3B8">Depois execute: <code>docker compose up -d --build backend</code></p>
+</div>
+
+<div class="section-divider"></div>
+
+<h2>Estado atual</h2>
+<div class="card" id="state-card">
+  <div class="row"><span class="label">URL atual:</span><span class="val" id="st-url">—</span></div>
+  <div class="row"><span class="label">Token salvo:</span><span class="val" id="st-token">—</span></div>
+  <div class="row"><span class="label">Usuário salvo:</span><span class="val" id="st-user">—</span></div>
+  <div class="row"><span class="label">Ano/Mês atual:</span><span class="val" id="st-date">—</span></div>
+</div>
+
+<h2>Log de diagnóstico</h2>
+<div id="log">Clique em "Executar diagnóstico completo" para começar...</div>
+
+<script>
+  const now = new Date();
+  document.getElementById('st-url').textContent  = window.location.href;
+  document.getElementById('st-date').textContent = `${now.getFullYear()}/${now.getMonth() + 1}`;
+
+  const token = localStorage.getItem('ff_access_token');
+  const user  = localStorage.getItem('ff_user');
+
+  document.getElementById('st-token').innerHTML = token
+    ? `<span class="ok">✓ Presente</span> — ${token.substring(0, 30)}...`
+    : `<span class="fail">✗ Ausente</span> — usuário não está logado`;
+
+  document.getElementById('st-user').innerHTML = user
+    ? `<span class="ok">✓ ${JSON.parse(user).name || JSON.parse(user).email}</span> (role: ${JSON.parse(user).role}, tenant: ${JSON.parse(user).tenant_id})`
+    : `<span class="fail">✗ Ausente</span>`;
+
+  const logEl = document.getElementById('log');
+
+  function clearLog() { logEl.textContent = ''; }
+
+  function log(msg, type = 'info') {
+    const span = document.createElement('span');
+    span.className = `log-${type}`;
+    span.textContent = msg + '\n';
+    logEl.appendChild(span);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function logDivider(title) {
+    log(`\n${'─'.repeat(60)}\n  ${title}\n${'─'.repeat(60)}`, 'dim');
+  }
+
+  function fixToken() {
+    localStorage.removeItem('ff_access_token');
+    localStorage.removeItem('ff_refresh_token');
+    localStorage.removeItem('ff_user');
+    window.location.href = '/login.html';
+  }
+
+  async function testEndpoint(label, url, headers = {}) {
+    try {
+      const t0 = Date.now();
+      const res = await fetch(url, { headers, signal: AbortSignal.timeout(8000) });
+      const ms  = Date.now() - t0;
+      const text = await res.text();
+      let parsed = null;
+      try { parsed = JSON.parse(text); } catch {}
+
+      if (res.ok) {
+        log(`  ✓ [${res.status}] ${label} (${ms}ms)`, 'ok');
+        if (parsed !== null) {
+          const preview = JSON.stringify(parsed).substring(0, 200);
+          log(`    → ${preview}${preview.length >= 200 ? '...' : ''}`, 'dim');
+        }
+        return { ok: true, status: res.status, data: parsed, ms };
+      } else {
+        log(`  ✗ [${res.status}] ${label} (${ms}ms)`, 'err');
+        log(`    → ${text.substring(0, 300)}`, 'warn');
+        return { ok: false, status: res.status, data: parsed, text, ms };
+      }
+    } catch (e) {
+      if (e.name === 'AbortError' || e.name === 'TimeoutError') {
+        log(`  ✗ [TIMEOUT] ${label} — sem resposta em 8s`, 'err');
+        return { ok: false, status: 0, error: 'timeout' };
+      }
+      // Likely CORS or network error
+      log(`  ✗ [NETWORK/CORS] ${label}`, 'err');
+      log(`    → ${e.message}`, 'warn');
+      return { ok: false, status: 0, error: e.message };
+    }
+  }
+
+  async function runAll() {
+    const btn = document.getElementById('btn-run');
+    btn.disabled = true;
+    clearLog();
+
+    const year  = now.getFullYear();
+    const month = now.getMonth() + 1;
+    const token = localStorage.getItem('ff_access_token');
+    const authH = token ? { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' } : {};
+    let corsProblems = false;
+    let authProblems = false;
+
+    // ── 1. Conectividade básica ────────────────────────────────────
+    logDivider('1. CONECTIVIDADE COM O BACKEND');
+
+    const health = await testEndpoint('GET /api/health (sem auth)', '/api/health');
+    if (!health.ok) {
+      if (health.status === 0) {
+        log('\n  ❌ BACKEND INACESSÍVEL ou CORS bloqueando\n', 'err');
+        log('  Possíveis causas:', 'warn');
+        log('  • O container savepoint_api não está rodando', 'warn');
+        log('  • ALLOWED_ORIGINS no .env não inclui sua URL atual', 'warn');
+        log('  • O Nginx não está redirecionando /api/ para o backend', 'warn');
+        corsProblems = true;
+      } else {
+        log(`  ⚠ Backend respondeu ${health.status} no health check`, 'warn');
+      }
+    }
+
+    // ── 2. Autenticação ────────────────────────────────────────────
+    logDivider('2. AUTENTICAÇÃO');
+
+    if (!token) {
+      log('  ✗ Sem token — faça login primeiro', 'err');
+      authProblems = true;
+    } else {
+      log(`  Token encontrado: ${token.substring(0, 40)}...`, 'info');
+
+      // Decode JWT payload
+      try {
+        const parts   = token.split('.');
+        const payload = JSON.parse(atob(parts[1]));
+        const expDate  = new Date(payload.exp * 1000);
+        const isExpired = expDate < now;
+        log(`  Expira: ${expDate.toLocaleString('pt-BR')} — ${isExpired ? '❌ EXPIRADO' : '✓ válido'}`, isExpired ? 'err' : 'ok');
+        log(`  sub: ${payload.sub}`, 'dim');
+        log(`  tenant_id: ${payload.tenant_id}`, 'dim');
+        if (isExpired) authProblems = true;
+      } catch (e) {
+        log('  ⚠ Não foi possível decodificar o token JWT: ' + e.message, 'warn');
+      }
+
+      const me = await testEndpoint('GET /api/v1/auth/me', '/api/v1/auth/me', authH);
+      if (!me.ok) {
+        if (me.status === 401) {
+          log('  ❌ Token inválido/expirado. Clique em "Forçar novo login"', 'err');
+          authProblems = true;
+        } else if (me.status === 0) {
+          corsProblems = true;
+        }
+      } else {
+        log(`  Logado como: ${me.data?.name} (${me.data?.email})`, 'ok');
+        log(`  Role: ${me.data?.role} | Tenant: ${me.data?.tenant_id}`, 'info');
+      }
+    }
+
+    // ── 3. Endpoints de dados ──────────────────────────────────────
+    logDivider('3. ENDPOINTS DE DADOS');
+
+    const endpoints = [
+      ['GET /api/v1/categories',                   `/api/v1/categories`],
+      ['GET /api/v1/accounts',                      `/api/v1/accounts`],
+      ['GET /api/v1/cards',                         `/api/v1/cards`],
+      ['GET /api/v1/reports/summary',               `/api/v1/reports/summary?year=${year}&month=${month}`],
+      ['GET /api/v1/reports/monthly-evolution',     `/api/v1/reports/monthly-evolution?months=12&future_months=0`],
+      ['GET /api/v1/reports/by-category',           `/api/v1/reports/by-category?year=${year}&month=${month}&type=expense`],
+      ['GET /api/v1/transactions',                  `/api/v1/transactions?year=${year}&month=${month}&limit=5`],
+      ['GET /api/v1/subscriptions/',                `/api/v1/subscriptions/?active_only=true`],
+      ['GET /api/v1/goals',                         `/api/v1/goals`],
+      ['GET /api/v1/installments',                  `/api/v1/installments`],
+      ['GET /api/v1/reports/cards-usage',           `/api/v1/reports/cards-usage?year=${year}&month=${month}`],
+    ];
+
+    let failCount = 0;
+    for (const [label, url] of endpoints) {
+      const r = await testEndpoint(label, url, authH);
+      if (!r.ok) {
+        failCount++;
+        if (r.status === 0) corsProblems = true;
+        if (r.status === 401) authProblems = true;
+      }
+    }
+
+    // ── 4. Diagnóstico final ───────────────────────────────────────
+    logDivider('4. DIAGNÓSTICO FINAL');
+
+    if (corsProblems) {
+      log('  🔴 PROBLEMA DE CORS / CONECTIVIDADE DETECTADO', 'err');
+      log('  O browser está bloqueando as requisições para o backend.', 'warn');
+      log('', 'dim');
+      log('  Causa mais comum: ALLOWED_ORIGINS no .env não inclui sua URL', 'warn');
+      log(`  Sua URL atual: ${window.location.origin}`, 'warn');
+
+      const corsDiv = document.getElementById('fix-cors');
+      corsDiv.style.display = 'block';
+      document.getElementById('cors-fix-text').textContent =
+        `# No arquivo .env do servidor, altere ALLOWED_ORIGINS para:\nALLOWED_ORIGINS=["${window.location.origin}"]\n\n# Depois reconstrua:\ndocker compose up -d --build backend`;
+    }
+
+    if (authProblems && !corsProblems) {
+      log('  🔴 PROBLEMA DE AUTENTICAÇÃO', 'err');
+      log('  Token expirado ou inválido. Clique em "Forçar novo login".', 'warn');
+    }
+
+    if (!corsProblems && !authProblems && failCount === 0) {
+      log('  🟢 Todos os endpoints responderam com sucesso!', 'ok');
+      log('  Se o dashboard ainda está vazio, o problema pode ser:', 'info');
+      log('  • Sem dados cadastrados para o mês atual', 'info');
+      log('  • Cache do browser — tente Ctrl+Shift+R', 'info');
+      log('  • Os arquivos HTML não foram atualizados no servidor', 'info');
+      log('', 'dim');
+      log(`  ✓ Verifique se existe data para ${month}/${year} no banco.`, 'ok');
+    } else if (!corsProblems && !authProblems && failCount > 0) {
+      log(`  🟡 ${failCount} endpoint(s) falharam mas não é CORS nem auth.`, 'warn');
+      log('  Verifique os logs do backend:', 'warn');
+      log('  docker logs savepoint_api --tail=50', 'info');
+    }
+
+    log('\n  ✅ Diagnóstico concluído.', 'ok');
+    btn.disabled = false;
+  }
+</script>
+</body>
+</html>
