@@ -5,10 +5,9 @@ FROM nginx:1.27-alpine
 # Remove default nginx page
 RUN rm -rf /usr/share/nginx/html/*
 
-COPY . /usr/share/nginx/html
+COPY index.html dashboard.html transactions.html reports.html settings.html subscriptions.html installments.html goals.html categories.html admin.html login.html register.html /usr/share/nginx/html/
+COPY js/ /usr/share/nginx/html/js/
+COPY css/ /usr/share/nginx/html/css/
 COPY nginx.conf /etc/nginx/conf.d/default.conf
-
-# Remove Dockerfile and nginx.conf from served files
-RUN rm -f /usr/share/nginx/html/Dockerfile /usr/share/nginx/html/nginx.conf
 
 EXPOSE 80
