@@ -67,7 +67,7 @@ async def update_account(account_id: uuid.UUID, body: AccountCreate, db: AsyncSe
     return account_to_dict(account)
 
 
-@accounts_router.delete("/{account_id}", status_code=204)
+@accounts_router.delete("/{account_id}")
 async def delete_account(account_id: uuid.UUID, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     result = await db.execute(select(Account).where(Account.id == account_id, Account.tenant_id == current_user.tenant_id))
     account = result.scalar_one_or_none()
@@ -75,6 +75,7 @@ async def delete_account(account_id: uuid.UUID, db: AsyncSession = Depends(get_d
         raise HTTPException(status_code=404, detail="Account not found")
     await db.delete(account)
     await db.commit()
+    return {"message": "Conta excluída com sucesso."}
 
 
 # ---- CARDS ----
@@ -133,7 +134,7 @@ async def update_card(card_id: uuid.UUID, body: CardCreate, db: AsyncSession = D
     return card_to_dict(card)
 
 
-@cards_router.delete("/{card_id}", status_code=204)
+@cards_router.delete("/{card_id}")
 async def delete_card(card_id: uuid.UUID, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     result = await db.execute(select(Card).where(Card.id == card_id, Card.tenant_id == current_user.tenant_id))
     card = result.scalar_one_or_none()
@@ -141,3 +142,4 @@ async def delete_card(card_id: uuid.UUID, db: AsyncSession = Depends(get_db), cu
         raise HTTPException(status_code=404, detail="Card not found")
     await db.delete(card)
     await db.commit()
+    return {"message": "Cartão excluído com sucesso."}

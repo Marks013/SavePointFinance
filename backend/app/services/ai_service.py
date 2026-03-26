@@ -39,9 +39,10 @@ Formato esperado de saída JSON:
   "category_id": "uuid-da-categoria-ou-null"
 }}
 """
-        if not anthropic_client:
-            return {"value": 0.0, "description": "Chave Anthropic ausente", "type": "expense", "category_id": None}
-            
+    if not anthropic_client:
+        return {"value": 0.0, "description": "Chave Anthropic ausente", "type": "expense", "category_id": None}
+    
+    try:
         response = await anthropic_client.messages.create(
             model="claude-3-5-haiku-20241022",
             max_tokens=256,
@@ -51,7 +52,6 @@ Formato esperado de saída JSON:
         return json.loads(response.content[0].text)
     except Exception as e:
         print(f"[AI Service Error] {str(e)}")
-        # Default fallback if parsing fails
         return {
             "value": 0.0,
             "description": "Erro na interpretação do texto",

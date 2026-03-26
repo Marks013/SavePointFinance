@@ -8,6 +8,11 @@ from sqlalchemy.dialects.postgresql import UUID
 from app.database import Base
 
 
+class SubscriptionType(str, Enum):
+    income = "income"
+    expense = "expense"
+
+
 class Subscription(Base):
     __tablename__ = "subscriptions"
 
@@ -19,6 +24,7 @@ class Subscription(Base):
     card_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("cards.id", ondelete="SET NULL"), nullable=True)
 
     name: Mapped[str] = mapped_column(String(100), nullable=False)
+    type: Mapped[SubscriptionType] = mapped_column(SAEnum(SubscriptionType), default=SubscriptionType.expense, nullable=False)
     amount: Mapped[Decimal] = mapped_column(Numeric(15, 2), nullable=False)
     billing_day: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)

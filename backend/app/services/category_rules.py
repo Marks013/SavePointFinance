@@ -5,12 +5,12 @@ from sqlalchemy import select
 from app.models.category import Category
 
 # Simple fast keyword lookup to save AI tokens for common Brazilian expenses
+# Map to category names from seed (categories.py _seed_defaults)
 KEYWORD_MAP = {
-    r"(?i)\b(ifood|mcdonalds|burger king|uber eats|rappi)\b": "Alimentação",
+    r"(?i)\b(ifood|mcdonalds|burger king|uber eats|rappi|mercado|supermercado|carrefour|extra|pao de acucar)\b": "Alimentação",
     r"(?i)\b(uber|99|pop|cabify|posto|ipiranga|shell)\b": "Transporte",
     r"(?i)\b(netflix|spotify|amazon prime|hbo|disney|apple)\b": "Assinaturas",
-    r"(?i)\b(mercado|supermercado|carrefour|extra|pao de acucar)\b": "Mercado",
-    r"(?i)\b(nubank|itau|inter|bradesco|fatura)\b": "Cartão",
+    r"(?i)\b(nubank|itau|inter|bradesco|fatura)\b": "Cartão de Crédito",
     r"(?i)\b(farmacia|drogaria|remedio|pague menos)\b": "Saúde",
 }
 

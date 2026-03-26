@@ -12,7 +12,7 @@ from app.auth import get_current_user
 from app.models.user import User
 from app.models.goal import Goal
 
-router = APIRouter(prefix="/goals", tags=["goals"])
+router = APIRouter(prefix="/api/v1/goals", tags=["goals"])
 
 # Schemas
 class GoalBase(BaseModel):

@@ -44,12 +44,21 @@ Escolha a categoria que MELHOR se aplica à transação. Sua resposta DEVE ser e
         )
         
         # Safely parse the returning JSON string
-        data = json.loads(response.content[0].text.strip())
+        try:
+            data = json.loads(response.content[0].text.strip())
+        except (json.JSONDecodeError, AttributeError) as e:
+            print(f"[AI Classifier] JSON parse error: {e}")
+            return None
+            
         cat_id_raw = data.get("category_id")
         
         if cat_id_raw and cat_id_raw != "null":
-            parsed_id = uuid.UUID(cat_id_raw)
-            return {"category_id": parsed_id, "confidence": float(data.get("confidence", 0.85))}
+            try:
+                parsed_id = uuid.UUID(cat_id_raw)
+                return {"category_id": parsed_id, "confidence": float(data.get("confidence", 0.85))}
+            except (ValueError, TypeError) as e:
+                print(f"[AI Classifier] Invalid UUID: {e}")
+                return None
             
     except json.JSONDecodeError:
         print("[AI Classifier] JSON Decode error.")

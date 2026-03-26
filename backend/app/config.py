@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     ALLOWED_ORIGINS: List[str] = ["http://localhost:3000"]
 
     DATABASE_URL: str = "postgresql+asyncpg://savepoint:changeme@localhost:5432/savepoint"
+    REDIS_PASSWORD: str = "changeme"
     REDIS_URL: str = "redis://localhost:6379/0"
 
     JWT_SECRET_KEY: str = "change_me_jwt"
