@@ -348,7 +348,12 @@
   document.getElementById('btn-new-tx').onclick = () => {
     editId = null;
     document.getElementById('tx-modal-title').textContent = 'Nova Transação';
-    document.getElementById('tx-date').value = new Date().toISOString().slice(0, 10);
+    
+    // Fix UTC timezone offset to get correct local date in input
+    const today = new Date();
+    const localDate = new Date(today.getTime() - (today.getTimezoneOffset() * 60000)).toISOString().slice(0, 10);
+    document.getElementById('tx-date').value = localDate;
+    
     document.getElementById('tx-desc').value = '';
     document.getElementById('tx-amount').value = '';
     document.getElementById('tx-payment').value = 'pix';

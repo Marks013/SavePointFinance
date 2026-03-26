@@ -174,14 +174,21 @@ async def create_transaction(
                 ai_classified = True
                 ai_confidence = ai_result["confidence"]
 
-    from dateutil.relativedelta import relativedelta
+    import calendar
+
+    def add_months(d: date, num_months: int) -> date:
+        month = d.month - 1 + num_months
+        year = d.year + month // 12
+        month = month % 12 + 1
+        day = min(d.day, calendar.monthrange(year, month)[1])
+        return date(year, month, day)
 
     parent_id = None
     first_transaction = None
     per_amount = body.amount / body.installments if body.installments > 1 else body.amount
 
     for i in range(body.installments):
-        current_date = body.date + relativedelta(months=i)
+        current_date = add_months(body.date, i)
         desc = (
             f"{body.description} ({i+1}/{body.installments})"
             if body.installments > 1
