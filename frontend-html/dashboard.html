@@ -16,15 +16,27 @@
 
     <!-- Banner de erro principal -->
     <div id="main-error" style="
-      display:none;background:#1A0508;border-bottom:2px solid #FF4D65;
-      padding:12px 28px;color:#FF4D65;font-size:0.8125rem;
+      display:none;
+      background:#1A0508;
+      border-bottom:2px solid #FF4D65;
+      padding:12px 28px;
+      color:#FF4D65;
+      font-size:0.8125rem;
+      display:none;
+      align-items:center;
+      gap:12px;
     ">
-      <strong>⚠ Falha ao carregar —</strong>
-      <span id="main-error-msg"></span>
-      &nbsp;·&nbsp;
-      <a href="/diagnostico.html" style="color:#FF4D65;text-decoration:underline">Abrir diagnóstico</a>
-      &nbsp;·&nbsp;
-      <a href="#" onclick="document.getElementById('main-error').style.display='none'" style="color:#FF4D65">✕</a>
+      <span style="font-size:1.1rem;flex-shrink:0">⚠️</span>
+      <div style="flex:1">
+        <strong>Falha ao carregar dados —</strong>
+        <span id="main-error-msg"></span>
+        <div style="margin-top:4px;font-size:0.75rem;opacity:0.8">
+          Verifique no console do browser (F12 → Console) para mais detalhes.
+          Confira também se o serviço backend está rodando no Coolify.
+        </div>
+      </div>
+      <button onclick="document.getElementById('main-error').style.display='none'"
+        style="background:none;border:none;color:#FF4D65;cursor:pointer;font-size:1rem;flex-shrink:0">✕</button>
     </div>
 
     <div class="page-header">
@@ -67,7 +79,7 @@
         </div>
         <div class="stat-card stat-card--balance">
           <div class="stat-icon stat-icon--balance">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 7H6"></path></svg>
           </div>
           <div class="stat-label">Saldo</div>
           <div class="stat-value stat-value--balance" id="stat-balance">—</div>
@@ -160,23 +172,18 @@
           </table>
         </div>
       </div>
-
     </div>
   </div>
 </div>
 
-<!-- ================================================================
-  Script principal — usa fetch() direto para máxima visibilidade
-  de erros, sem depender do módulo api.js
-================================================================ -->
 <script type="module">
   import { requireAuthAndRender } from './js/nav.js';
-  import { Auth } from './js/api.js';
+  import { Auth, reportsApi, transactionsApi, subscriptionsApi, categoriesApi } from './js/api.js';
   import { formatBRL, formatDate, formatMonth, currentYearMonth, monthLabel } from './js/utils.js';
 
   if (!requireAuthAndRender('dashboard.html')) throw new Error('not auth');
 
-  // Saudação
+  // ── Saudação ──────────────────────────────────────────────────────
   try {
     const u = Auth.getUser();
     if (u) {
@@ -189,63 +196,22 @@
   let evoChart = null, catChart = null, gaugeChart = null;
   let categories = [];
 
-  // ── Helper: mostrar erro no banner ──────────────────────────────
-  function showErr(msg) {
-    document.getElementById('main-error-msg').textContent = msg;
-    document.getElementById('main-error').style.display = 'block';
+  // ── Mostrar erro ──────────────────────────────────────────────────
+  function showErr(context, err) {
+    const banner = document.getElementById('main-error');
+    const msg    = document.getElementById('main-error-msg');
+    console.error(`[Dashboard][${context}]`, err);
+    msg.textContent = `${context}: ${err.message}`;
+    banner.style.display = 'flex';
   }
 
-  // ── Helper: placeholder de erro em container ─────────────────────
+  // ── Placeholder de erro em container ─────────────────────────────
   function errBox(el, msg) {
-    el.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:100px;gap:6px;color:var(--red);font-size:0.8rem;text-align:center;padding:12px">
+    el.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:80px;gap:4px;color:var(--red);font-size:0.8rem;text-align:center;padding:12px">
       <span>⚠️ ${msg}</span>
-      <a href="/diagnostico.html" style="color:var(--em);font-size:0.72rem">→ diagnóstico</a>
     </div>`;
   }
 
-  // ── Fetch autenticado ────────────────────────────────────────────
-  async function api(path) {
-    const token = Auth.getToken();
-    if (!token) { window.location.href = '/login.html'; throw new Error('Sem token'); }
-
-    const headers = {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    };
-
-    let res = await fetch(`/api/v1${path}`, { headers });
-
-    // Tentar refresh automático em 401
-    if (res.status === 401) {
-      const rt = Auth.getRefreshToken();
-      if (rt) {
-        try {
-          const rr = await fetch(`/api/v1/auth/refresh?refresh_token=${encodeURIComponent(rt)}`, { method: 'POST' });
-          if (rr.ok) {
-            const rd = await rr.json();
-            Auth.setTokens(rd.access_token, rd.refresh_token);
-            headers['Authorization'] = `Bearer ${rd.access_token}`;
-            res = await fetch(`/api/v1${path}`, { headers });
-          }
-        } catch (_) {}
-      }
-      if (res.status === 401) {
-        Auth.clear();
-        window.location.href = '/login.html';
-        throw new Error('Sessão expirada');
-      }
-    }
-
-    if (!res.ok) {
-      let detail = `HTTP ${res.status}`;
-      try { const j = await res.json(); detail = j.detail || detail; } catch (_) {}
-      throw new Error(detail);
-    }
-
-    return res.json();
-  }
-
-  // ── Rótulo do mês ────────────────────────────────────────────────
   function updateMonthLabel() {
     const lbl = formatMonth(year, month);
     document.getElementById('month-label').textContent = lbl;
@@ -253,10 +219,10 @@
       `Visão Geral — ${lbl.charAt(0).toUpperCase() + lbl.slice(1)}`;
   }
 
-  // ── Resumo ───────────────────────────────────────────────────────
+  // ── Resumo ────────────────────────────────────────────────────────
   async function loadSummary() {
     try {
-      const s = await api(`/reports/summary?year=${year}&month=${month}`);
+      const s = await reportsApi.summary(year, month);
 
       document.getElementById('stat-income').textContent  = formatBRL(s.income);
       document.getElementById('stat-expense').textContent = formatBRL(s.expenses);
@@ -267,7 +233,7 @@
       const pct   = s.limit_planned > 0 ? Math.min(100, Math.round((s.limit_used / s.limit_planned) * 100)) : 0;
       const color = pct >= 90 ? '#FF4D65' : pct > 75 ? '#F59E0B' : '#00E57A';
       document.getElementById('gauge-percent').textContent = `${pct}%`;
-      document.getElementById('gauge-text').textContent    =
+      document.getElementById('gauge-text').textContent =
         s.limit_planned > 0 ? `de ${formatBRL(s.limit_planned)} (orçado)` : 'Defina limites nas categorias';
 
       if (gaugeChart) gaugeChart.destroy();
@@ -277,62 +243,64 @@
         options: { responsive: true, maintainAspectRatio: false, cutout: '80%', circumference: 180, rotation: -90, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => formatBRL(ctx.raw) } } } }
       });
     } catch (err) {
-      showErr(`Resumo: ${err.message}`);
+      showErr('Resumo', err);
       ['stat-income','stat-expense','stat-balance'].forEach(id => document.getElementById(id).textContent = 'Erro');
     }
   }
 
-  // ── Assinaturas ──────────────────────────────────────────────────
+  // ── Assinaturas ───────────────────────────────────────────────────
   async function loadSubs() {
     try {
-      const subs = await api('/subscriptions/?active_only=true');
+      const subs = await subscriptionsApi.list({ active_only: true });
       document.getElementById('stat-subs').textContent     = subs.length;
       document.getElementById('stat-subs-sub').textContent = `= ${formatBRL(subs.reduce((a,s) => a + s.amount, 0))}/mês`;
     } catch (err) {
       document.getElementById('stat-subs').textContent     = '—';
       document.getElementById('stat-subs-sub').textContent = err.message;
+      console.error('[Dashboard][Assinaturas]', err.message);
     }
   }
 
-  // ── Evolução ─────────────────────────────────────────────────────
+  // ── Evolução ──────────────────────────────────────────────────────
   async function loadEvolution() {
     const wrap   = document.getElementById('evo-wrap');
     const months = +document.getElementById('evo-months').value;
     const future = +document.getElementById('evo-future').value;
     try {
-      const data = await api(`/reports/monthly-evolution?months=${months}&future_months=${future}`);
+      const data = await reportsApi.monthlyEvolution(months, future);
       const labels    = data.map(d => monthLabel(d.period) + (d.projected ? '*' : ''));
       const incColors = data.map(d => d.projected ? 'rgba(0,229,122,0.2)' : 'rgba(0,229,122,0.6)');
       const expColors = data.map(d => d.projected ? 'rgba(255,77,101,0.2)' : 'rgba(255,77,101,0.5)');
+
       if (evoChart) evoChart.destroy();
       if (!document.getElementById('evo-chart')) wrap.innerHTML = '<canvas id="evo-chart"></canvas>';
       evoChart = new Chart(document.getElementById('evo-chart'), {
         type: 'bar',
-        data: {
-          labels,
-          datasets: [
-            { label:'Receitas', data: data.map(d => d.income), backgroundColor: incColors, borderColor: data.map(d => d.projected ? '#00E57Aaa' : '#00E57A'), borderWidth:1, borderRadius:2 },
-            { label:'Despesas', data: data.map(d => d.expenses), backgroundColor: expColors, borderColor: data.map(d => d.projected ? '#FF4D65aa' : '#FF4D65'), borderWidth:1, borderRadius:2 },
-          ]
-        },
+        data: { labels, datasets: [
+          { label:'Receitas', data: data.map(d=>d.income), backgroundColor: incColors, borderColor: data.map(d=>d.projected?'#00E57Aaa':'#00E57A'), borderWidth:1, borderRadius:2 },
+          { label:'Despesas', data: data.map(d=>d.expenses), backgroundColor: expColors, borderColor: data.map(d=>d.projected?'#FF4D65aa':'#FF4D65'), borderWidth:1, borderRadius:2 },
+        ]},
         options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ labels:{color:'#8FA3B8',font:{size:11}} }, tooltip:{callbacks:{label:ctx=>formatBRL(ctx.raw)}} }, scales:{ x:{grid:{color:'#1E2D3D'},ticks:{color:'#556070',font:{size:10}}}, y:{grid:{color:'#1E2D3D'},ticks:{color:'#556070',font:{size:10},callback:v=>'R$'+(v/1000).toFixed(0)+'k'}} } }
       });
-    } catch (err) { errBox(wrap, err.message); }
+    } catch (err) {
+      errBox(wrap, err.message);
+      console.error('[Dashboard][Evolução]', err.message);
+    }
   }
 
-  // ── Categorias ───────────────────────────────────────────────────
+  // ── Categorias ────────────────────────────────────────────────────
   async function loadCategories() {
-    try { categories = await api('/categories'); } catch (err) { console.error('cats:', err.message); }
+    try { categories = await categoriesApi.list(); }
+    catch (err) { console.error('[Dashboard][Categorias]', err.message); }
   }
-
   function getCatName(id) { return categories.find(c => c.id === id)?.name || '—'; }
 
-  // ── Donut ────────────────────────────────────────────────────────
+  // ── Donut ─────────────────────────────────────────────────────────
   async function loadCategoryChart() {
     const wrap = document.getElementById('cat-wrap');
     try {
-      const data = await api(`/reports/by-category?year=${year}&month=${month}&type=expense`);
-      if (!data.length) { wrap.innerHTML = '<div style="color:var(--text-3);font-size:0.8rem">Sem despesas no mês.</div>'; return; }
+      const data = await reportsApi.byCategory(year, month, 'expense');
+      if (!data.length) { wrap.innerHTML = '<div style="color:var(--text-3);font-size:0.8rem;text-align:center">Sem despesas no mês.</div>'; return; }
       if (catChart) catChart.destroy();
       if (!document.getElementById('cat-chart')) wrap.innerHTML = '<canvas id="cat-chart"></canvas>';
       catChart = new Chart(document.getElementById('cat-chart'), {
@@ -340,16 +308,18 @@
         data: { labels: data.map(d=>d.name), datasets: [{ data: data.map(d=>d.total), backgroundColor: data.map(d=>d.color+'CC'), borderColor: data.map(d=>d.color), borderWidth:1 }] },
         options: { responsive:true, maintainAspectRatio:false, cutout:'68%', plugins:{ legend:{position:'right',labels:{color:'#8FA3B8',font:{size:10},boxWidth:12,padding:8}}, tooltip:{callbacks:{label:ctx=>`${ctx.label}: ${formatBRL(ctx.raw)}`}} } }
       });
-    } catch (err) { errBox(wrap, err.message); }
+    } catch (err) { errBox(wrap, err.message); console.error('[Dashboard][Categorias Chart]', err.message); }
   }
 
-  // ── Transações recentes ──────────────────────────────────────────
+  // ── Transações recentes ───────────────────────────────────────────
   async function loadRecentTx() {
     const tbody = document.getElementById('recent-tbody');
     try {
-      const res = await api(`/transactions?year=${year}&month=${month}&limit=8`);
+      const res = await transactionsApi.list({ year, month, limit: 8 });
       if (!res.items.length) {
-        tbody.innerHTML = `<tr><td colspan="5" style="padding:32px;text-align:center;color:var(--text-3)">Sem transações neste mês. <a href="transactions.html" style="color:var(--em)">Adicionar →</a></td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" style="padding:32px;text-align:center;color:var(--text-3)">
+          Sem transações neste mês. <a href="transactions.html" style="color:var(--em)">Adicionar →</a>
+        </td></tr>`;
         return;
       }
       tbody.innerHTML = res.items.map(t => `
@@ -361,19 +331,25 @@
           <td>${t.type==='income'?'<span class="badge badge--income">Receita</span>':'<span class="badge badge--expense">Despesa</span>'}</td>
         </tr>`).join('');
     } catch (err) {
-      tbody.innerHTML = `<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--red)">⚠️ ${err.message} — <a href="/diagnostico.html" style="color:var(--em)">diagnóstico</a></td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--red)">⚠️ ${err.message}</td></tr>`;
+      console.error('[Dashboard][Transações]', err.message);
     }
   }
 
-  // ── Cartões ──────────────────────────────────────────────────────
+  // ── Cartões ───────────────────────────────────────────────────────
   async function loadCards() {
     const tbody = document.getElementById('cards-tbody');
     try {
-      const cards = await api(`/reports/cards-usage?year=${year}&month=${month}`);
-      if (!cards.length) { tbody.innerHTML = `<tr><td style="padding:20px;text-align:center;color:var(--text-3)">Nenhum cartão. <a href="settings.html" style="color:var(--em)">Adicionar →</a></td></tr>`; return; }
+      const cards = await reportsApi.cardsUsage(year, month);
+      if (!cards.length) {
+        tbody.innerHTML = `<tr><td style="padding:20px;text-align:center;color:var(--text-3)">
+          Nenhum cartão. <a href="settings.html" style="color:var(--em)">Adicionar →</a>
+        </td></tr>`;
+        return;
+      }
       tbody.innerHTML = cards.map(c => {
-        const perc = c.limit > 0 ? Math.min(100, (c.spent/c.limit)*100) : 0;
-        const barColor = perc > 85 ? 'var(--red)' : (c.color||'var(--em)');
+        const perc = c.limit > 0 ? Math.min(100,(c.spent/c.limit)*100) : 0;
+        const barColor = perc > 85 ? 'var(--red)' : (c.color || 'var(--em)');
         return `<tr style="border-bottom:1px solid var(--border)">
           <td style="padding:12px 16px">
             <div style="display:flex;align-items:center;gap:10px">
@@ -391,10 +367,11 @@
       }).join('');
     } catch (err) {
       tbody.innerHTML = `<tr><td style="padding:16px;text-align:center;color:var(--red);font-size:0.8rem">⚠️ ${err.message}</td></tr>`;
+      console.error('[Dashboard][Cartões]', err.message);
     }
   }
 
-  // ── Carregar tudo ────────────────────────────────────────────────
+  // ── Carregar tudo ─────────────────────────────────────────────────
   async function loadAll() {
     updateMonthLabel();
     await loadCategories();
@@ -404,8 +381,8 @@
     ]);
   }
 
-  document.getElementById('prev-month').onclick = () => { month--; if (month<1){month=12;year--;} loadAll(); };
-  document.getElementById('next-month').onclick = () => { month++; if (month>12){month=1;year++;} loadAll(); };
+  document.getElementById('prev-month').onclick = () => { month--; if(month<1){month=12;year--;} loadAll(); };
+  document.getElementById('next-month').onclick = () => { month++; if(month>12){month=1;year++;} loadAll(); };
   document.getElementById('evo-months').onchange = loadEvolution;
   document.getElementById('evo-future').onchange  = loadEvolution;
 
