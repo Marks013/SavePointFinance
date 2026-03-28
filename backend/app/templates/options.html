@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Opções — Save Point Finanças{% endblock %}
+{% block content %}
+<div class="page-header"><div class="page-title">Opções</div></div>
+<div class="page-body">
+  <div style="max-width:480px">
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-header"><div class="card-title">✝️ Dízimo</div></div>
+      <div style="padding:0 20px 20px">
+        <p style="font-size:0.85rem;color:var(--text-2);margin-bottom:16px">
+          Quando ativado, aparece um checkbox no lançamento de receitas para calcular 10% de dízimo automaticamente.
+        </p>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;background:var(--bg-3);border-radius:var(--radius)">
+          <div>
+            <div style="font-weight:600;color:var(--text)">Calcular dízimo (10%)</div>
+            <div style="font-size:0.78rem;color:var(--text-3);margin-top:2px">1 lançamento por mês, acumulado</div>
+          </div>
+          <label style="position:relative;display:inline-block;width:52px;height:28px;cursor:pointer">
+            <input type="checkbox" id="tithe-toggle" style="opacity:0;width:0;height:0"
+                   {% if user.tithe_enabled %}checked{% endif %}
+                   onchange="toggleTithe(this.checked)">
+            <span id="tithe-track" style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;
+                  background:{% if user.tithe_enabled %}var(--em){% else %}var(--bg-2){% endif %};
+                  transition:0.3s;border-radius:28px;border:1px solid var(--border)">
+              <span id="tithe-thumb" style="position:absolute;height:22px;width:22px;
+                    left:{% if user.tithe_enabled %}26px{% else %}2px{% endif %};bottom:2px;
+                    background:{% if user.tithe_enabled %}#0A0E13{% else %}var(--text-3){% endif %};
+                    transition:0.3s;border-radius:50%"></span>
+            </span>
+          </label>
+        </div>
+      </div>
+    </div>
+    <div class="card" id="password-form">
+      <div class="card-header"><div class="card-title">🔐 Alterar senha</div></div>
+      <div style="padding:0 20px 20px;display:flex;flex-direction:column;gap:14px">
+        <div id="password-error"   class="auth-error" style="display:none"></div>
+        <div id="password-success" style="display:none;background:var(--em-bg);border:1px solid var(--em-border);border-radius:var(--radius);color:var(--em);font-size:0.8rem;padding:10px 12px">✓ Senha alterada!</div>
+        <form onsubmit="handlePasswordChange(event)" style="display:flex;flex-direction:column;gap:14px">
+          <div class="form-group"><label class="form-label">Senha atual</label>
+            <input type="password" name="current_password" class="form-control" required></div>
+          <div class="form-group"><label class="form-label">Nova senha</label>
+            <input type="password" name="new_password" class="form-control" required minlength="6"></div>
+          <button type="submit" class="btn btn--primary" style="align-self:flex-start">Alterar senha</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+function toggleTithe(enabled) {
+  fetch('/settings/toggle-tithe?enabled=' + enabled, { method:'POST', credentials:'include' })
+    .then(r => {
+      if (r.ok) {
+        const track = document.getElementById('tithe-track');
+        const thumb = document.getElementById('tithe-thumb');
+        if (enabled) { track.style.background='var(--em)'; thumb.style.left='26px'; thumb.style.background='#0A0E13'; }
+        else         { track.style.background='var(--bg-2)'; thumb.style.left='2px'; thumb.style.background='var(--text-3)'; }
+      }
+    });
+}
+function handlePasswordChange(e) {
+  e.preventDefault();
+  fetch('/settings/change-password', { method:'POST', body: new FormData(e.target), credentials:'include' })
+    .then(r => {
+      if (r.ok) {
+        document.getElementById('password-success').style.display='block';
+        document.getElementById('password-error').style.display='none';
+        e.target.reset();
+      } else r.json().then(d => {
+        document.getElementById('password-error').textContent = d.detail || 'Erro.';
+        document.getElementById('password-error').style.display='block';
+        document.getElementById('password-success').style.display='none';
+      });
+    });
+}
+</script>
+{% endblock %}

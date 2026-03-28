@@ -1,0 +1,56 @@
+# ═══════════════════════════════════════════════════════════════════
+# Save Point Finanças v3.1 — Dockerfile
+#
+# Multi-arch: ARM64 (Oracle Cloud Free Tier) + x86_64 (qualquer VPS)
+# O Coolify detecta a arquitetura automaticamente no build.
+#
+# IMPORTANTE: O app roda na porta 8000 internamente.
+# A porta 80/443 é gerenciada pelo Traefik do Coolify — NÃO exponha aqui.
+# ═══════════════════════════════════════════════════════════════════
+
+FROM python:3.12-slim
+
+# Metadados
+LABEL maintainer="Save Point Finanças"
+LABEL version="3.1.0"
+
+WORKDIR /app
+
+# ── Dependências de sistema ────────────────────────────────────────
+# libpq-dev + gcc: necessários para asyncpg compilar em ARM64
+# curl: usado pelo healthcheck do docker-compose
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq-dev \
+    gcc \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# ── Dependências Python ────────────────────────────────────────────
+# Copia só o requirements.txt primeiro para aproveitar cache do Docker
+# (camada só invalida se requirements.txt mudar)
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# ── Código da aplicação ────────────────────────────────────────────
+COPY . .
+
+# ── Porta interna ──────────────────────────────────────────────────
+# Apenas documenta — o Traefik do Coolify acessa esta porta via rede Docker
+EXPOSE 8000
+
+# ── Comando de produção ────────────────────────────────────────────
+# --workers 2       → Oracle Free Tier (1 OCPU, 1GB RAM)
+#                     Aumente para 4 em instâncias com 2+ OCPUs
+# --proxy-headers   → Lê X-Forwarded-For / X-Forwarded-Proto do Traefik
+# --forwarded-allow-ips='*' → Confia em qualquer proxy upstream (Traefik interno)
+# --access-log      → Loga requisições (útil para debug no Coolify)
+# --log-level info  → Nível de log adequado para produção
+CMD ["uvicorn", "app.main:app", \
+     "--host", "0.0.0.0", \
+     "--port", "8000", \
+     "--workers", "2", \
+     "--proxy-headers", \
+     "--forwarded-allow-ips=*", \
+     "--access-log", \
+     "--log-level", "info"]

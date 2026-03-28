@@ -1,0 +1,51 @@
+{% set current_path = request.url.path %}
+{% macro nav_link(href, icon_d, label) %}
+<a href="{{ href }}" class="nav-link {% if current_path.startswith(href) and href != '/' %}active{% endif %}">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">{{ icon_d|safe }}</svg>
+  {{ label }}
+</a>
+{% endmacro %}
+{% set _parts = (user.name or user.email).split(' ')[:2] %}
+{% set initials = (_parts[0][0] if _parts[0] else '') + (_parts[1][0] if _parts|length > 1 and _parts[1] else '') %}
+<nav class="sidebar">
+  <div class="sidebar-logo">
+    <div class="sidebar-logo-mark">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+      </svg>
+    </div>
+    <div class="sidebar-logo-text">Save Point <span>Finanças</span></div>
+  </div>
+  <div class="sidebar-nav">
+    <div class="nav-section-label">Principal</div>
+    {{ nav_link('/dashboard','<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline>','Dashboard') }}
+    {{ nav_link('/transactions','<line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line>','Transações') }}
+    {{ nav_link('/subscriptions','<polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>','Assinaturas & Fixas') }}
+    <div class="nav-section-label">Análise</div>
+    {{ nav_link('/reports','<line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line>','Relatórios') }}
+    {{ nav_link('/goals','<circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle>','Metas & Sonhos') }}
+    <div class="nav-section-label">Configurações</div>
+    {{ nav_link('/categories','<path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line>','Categorias') }}
+    {{ nav_link('/settings','<line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>','Contas & Config.') }}
+    {{ nav_link('/installments','<rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line>','Cartões & Parcelas') }}
+    {{ nav_link('/options','<circle cx="12" cy="12" r="3"></circle><path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path>','Opções') }}
+    {% if user.role == 'superadmin' %}
+    <div class="nav-section-label">Admin</div>
+    {{ nav_link('/admin','<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>','Painel Admin') }}
+    {% endif %}
+  </div>
+  <div class="sidebar-footer">
+    <div class="sidebar-user" title="{{ user.email }}">
+      <div class="user-avatar">{{ initials|upper }}</div>
+      <div class="user-info">
+        <div class="user-name">{{ user.name or 'Usuário' }}</div>
+        <div class="user-role">{{ user.role }}</div>
+      </div>
+      <a href="/logout" class="logout-btn" title="Sair">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line>
+        </svg>
+      </a>
+    </div>
+  </div>
+</nav>

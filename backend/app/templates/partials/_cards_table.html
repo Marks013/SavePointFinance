@@ -1,0 +1,27 @@
+<div class="table-wrapper">
+  <table>
+    <thead><tr><th style="width:10px"></th><th>Nome</th><th>Bandeira</th><th>Final</th><th style="text-align:right">Limite</th><th>Fechamento</th><th>Vencimento</th><th></th></tr></thead>
+    <tbody>
+      {% for card in cards %}
+      <tr>
+        <td><span class="color-dot" style="background:{{ card.color }}"></span></td>
+        <td class="text-strong">{{ card.name }}</td>
+        <td class="text-muted">{{ card.brand }}</td>
+        <td class="text-muted mono">{% if card.last4 %}•••• {{ card.last4 }}{% else %}—{% endif %}</td>
+        <td class="td-amount text-right">{{ fmt(card.limit_amount) }}</td>
+        <td class="text-muted">Dia {{ card.close_day }}</td>
+        <td class="text-muted">Dia {{ card.due_day }}</td>
+        <td class="td-actions">
+          <button hx-get="/settings/cards/{{ card.id }}/edit-form" hx-target="#modal-content" hx-swap="innerHTML"
+                  hx-on::after-request="openModal()" class="btn btn--ghost btn--sm">✎</button>
+          <button hx-delete="/settings/cards/{{ card.id }}" hx-target="#cards-panel"
+                  hx-confirm="Excluir cartão '{{ card.name }}'?"
+                  class="btn btn--ghost btn--sm" style="color:var(--red)">✕</button>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="8" style="padding:32px;text-align:center;color:var(--text-3)">Nenhum cartão cadastrado.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

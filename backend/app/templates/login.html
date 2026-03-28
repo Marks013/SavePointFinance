@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login — Save Point Finanças</title>
+  <link rel="stylesheet" href="/static/css/styles.css">
+  <script src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js" defer></script>
+</head>
+<body>
+<div class="auth-page" x-data="{ panel: 'login' }">
+  <div class="auth-left">
+    <div class="auth-brand">
+      <div class="auth-brand-mark">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+        </svg>
+      </div>
+      <div class="auth-brand-name">Save Point <span>Finanças</span></div>
+    </div>
+    <div class="auth-headline">Controle total<br>das suas finanças.</div>
+    <p class="auth-sub">Receitas, despesas, parcelados e assinaturas com inteligência.</p>
+    <div class="auth-features">
+      <div class="auth-feature"><div class="auth-feature-dot"></div>Dashboard com visão completa do mês</div>
+      <div class="auth-feature"><div class="auth-feature-dot"></div>Cartões: limite disponível e fatura</div>
+      <div class="auth-feature"><div class="auth-feature-dot"></div>Assinaturas e receitas fixas</div>
+      <div class="auth-feature"><div class="auth-feature-dot"></div>Classificação automática por IA (3 camadas)</div>
+    </div>
+  </div>
+  <div class="auth-right">
+    <div class="auth-form-box" x-show="panel === 'login'">
+      <div class="auth-form-title">Entrar</div>
+      <div class="auth-form-sub">Acesse sua conta</div>
+      {% if error %}<div class="auth-error">{{ error }}</div>{% endif %}
+      <form class="auth-form" method="POST" action="/login">
+        <div class="form-group">
+          <label class="form-label">E-mail</label>
+          <input name="email" type="email" class="form-control" placeholder="seu@email.com" required autocomplete="email">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Senha</label>
+          <input name="password" type="password" class="form-control" placeholder="••••••••" required>
+        </div>
+        <button type="submit" class="btn btn--primary btn--lg">Entrar</button>
+      </form>
+      <div class="auth-switch mt-8">Não tem conta? <a href="#" @click.prevent="panel = 'register'">Criar workspace</a></div>
+    </div>
+    <div class="auth-form-box" x-show="panel === 'register'" x-cloak>
+      <div class="auth-form-title">Criar conta</div>
+      <div class="auth-form-sub">Novo workspace — grátis para começar</div>
+      <form class="auth-form" method="POST" action="/register">
+        <div class="form-group"><label class="form-label">Nome do workspace</label>
+          <input name="workspace_name" type="text" class="form-control" placeholder="Ex: Família Silva" required></div>
+        <div class="form-group"><label class="form-label">Seu nome</label>
+          <input name="name" type="text" class="form-control" placeholder="João Silva" required></div>
+        <div class="form-group"><label class="form-label">E-mail</label>
+          <input name="email" type="email" class="form-control" placeholder="seu@email.com" required></div>
+        <div class="form-group"><label class="form-label">Senha (mín. 6 caracteres)</label>
+          <input name="password" type="password" class="form-control" placeholder="••••••••" required minlength="6"></div>
+        <button type="submit" class="btn btn--primary btn--lg">Criar conta grátis</button>
+      </form>
+      <div class="auth-switch mt-8">Já tem conta? <a href="#" @click.prevent="panel = 'login'">Entrar</a></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

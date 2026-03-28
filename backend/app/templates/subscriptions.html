@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}Assinaturas & Receitas Fixas — Save Point Finanças{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-title">🔄 Assinaturas & Receitas Fixas</div>
+  <div class="page-actions">
+    <button class="btn btn--primary"
+            hx-get="/subscriptions/new-form"
+            hx-target="#modal-content" hx-swap="innerHTML"
+            hx-on::after-request="openModal()">
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+      Nova assinatura / receita fixa
+    </button>
+  </div>
+</div>
+
+<div class="page-body">
+  <div class="stat-grid" style="margin-bottom:24px">
+    <div class="stat-card stat-card--expense">
+      <div class="stat-label">Assinaturas (despesas)</div>
+      <div class="stat-value stat-value--expense">{{ fmt(monthly_expense) }}</div>
+      <div class="stat-sub">{{ active_expense_count }} ativas · {{ fmt(monthly_expense * 12) }}/ano</div>
+    </div>
+    <div class="stat-card stat-card--income">
+      <div class="stat-label">Receitas fixas</div>
+      <div class="stat-value stat-value--income">{{ fmt(monthly_income) }}</div>
+      <div class="stat-sub">{{ active_income_count }} ativas/mês</div>
+    </div>
+    <div class="stat-card stat-card--balance">
+      <div class="stat-label">Saldo recorrente</div>
+      {% set rec_balance = monthly_income - monthly_expense %}
+      <div class="stat-value {% if rec_balance >= 0 %}stat-value--income{% else %}stat-value--expense{% endif %}">
+        {{ fmt(rec_balance) }}
+      </div>
+      <div class="stat-sub">receitas fixas − assinaturas</div>
+    </div>
+    <div class="stat-card stat-card--neutral">
+      <div class="stat-label">Próximo vencimento</div>
+      <div class="stat-value" style="font-size:1rem;color:var(--text)">
+        {% if next_due_name %}{{ next_due_name }}<br><span style="font-size:0.85rem;color:var(--text-3)">{{ next_due_date }}</span>{% else %}—{% endif %}
+      </div>
+    </div>
+  </div>
+
+  {# ── Assinaturas (despesas) ── #}
+  {% set expense_subs = subs | selectattr('type.value', 'equalto', 'expense') | list %}
+  {% if expense_subs %}
+  <div class="section-header" style="margin-bottom:14px">
+    <div class="section-title">💸 Assinaturas (despesas recorrentes)</div>
+  </div>
+  <div class="sub-cards" style="margin-bottom:28px">
+    {% for s in expense_subs %}
+    {% set cat = cats_map.get(s.category_id|string) if s.category_id else none %}
+    {% set crd = cards_map.get(s.card_id|string) if s.card_id else none %}
+    <div class="sub-card" style="border-top:3px solid {{ s.color or 'var(--red)' }};opacity:{{ '1' if s.is_active else '0.6' }}">
+      <div class="sub-card-header">
+        <div>
+          <div class="sub-card-name">{{ s.name }}
+            {% if not s.is_active %}<span class="badge badge--inactive" style="margin-left:6px">Inativa</span>{% endif %}
+          </div>
+          <div style="font-size:0.78rem;color:var(--text-3);margin-top:2px">💸 Despesa recorrente</div>
+        </div>
+        <div class="sub-card-amount" style="color:var(--red)">{{ fmt(s.amount) }}</div>
+      </div>
+      <div class="sub-card-meta">
+        {% if cat %}📂 {{ cat.name }}<br>{% endif %}
+        {% if crd %}💳 {{ crd.name }}<br>{% endif %}
+        📅 Todo dia {{ s.billing_day }} · próxima: <strong>{{ s.next_billing_date.strftime('%d/%m/%Y') }}</strong>
+        {% if s.days_until is defined and s.days_until is not none %}
+          {% if s.days_until <= 0 %}<span style="color:var(--red)"> (vence hoje!)</span>
+          {% elif s.days_until <= 3 %}<span style="color:var(--red)"> ({{ s.days_until }}d)</span>
+          {% elif s.days_until <= 7 %}<span style="color:var(--amber)"> ({{ s.days_until }}d)</span>
+          {% endif %}
+        {% endif %}
+      </div>
+      <div class="sub-card-actions">
+        <button hx-delete="/subscriptions/{{ s.id }}"
+                hx-confirm="Excluir assinatura '{{ s.name }}'?"
+                class="btn btn--ghost btn--sm" style="color:var(--red)">✕ Excluir</button>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {# ── Receitas Fixas (income) ── #}
+  {% set income_subs = subs | selectattr('type.value', 'equalto', 'income') | list %}
+  {% if income_subs %}
+  <div class="section-header" style="margin-bottom:14px">
+    <div class="section-title">💰 Receitas fixas mensais</div>
+  </div>
+  <div class="sub-cards">
+    {% for s in income_subs %}
+    {% set cat = cats_map.get(s.category_id|string) if s.category_id else none %}
+    <div class="sub-card" style="border-top:3px solid var(--em);opacity:{{ '1' if s.is_active else '0.6' }}">
+      <div class="sub-card-header">
+        <div>
+          <div class="sub-card-name">{{ s.name }}</div>
+          <div style="font-size:0.78rem;color:var(--em);margin-top:2px">💰 Receita recorrente</div>
+        </div>
+        <div class="sub-card-amount" style="color:var(--em)">{{ fmt(s.amount) }}</div>
+      </div>
+      <div class="sub-card-meta">
+        {% if cat %}📂 {{ cat.name }}<br>{% endif %}
+        📅 Todo dia {{ s.billing_day }} · próxima: <strong>{{ s.next_billing_date.strftime('%d/%m/%Y') }}</strong>
+      </div>
+      <div class="sub-card-actions">
+        <button hx-delete="/subscriptions/{{ s.id }}"
+                hx-confirm="Excluir receita fixa '{{ s.name }}'?"
+                class="btn btn--ghost btn--sm" style="color:var(--red)">✕ Excluir</button>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if not subs %}
+  <div style="text-align:center;padding:60px;color:var(--text-3)">
+    <div style="font-size:3rem;margin-bottom:16px">🔄</div>
+    <div style="font-size:1rem;color:var(--text-2);margin-bottom:8px">Nenhum registro ainda</div>
+    <p>Adicione Netflix, Spotify, salário fixo e outras cobranças/receitas recorrentes.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

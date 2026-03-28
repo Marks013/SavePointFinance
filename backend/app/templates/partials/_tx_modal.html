@@ -1,0 +1,301 @@
+{# _tx_modal.html — Modal de nova/editar transação #}
+{# Novidades v3.1:
+   - PIX obriga conta bancária
+   - Cartão crédito/débito obriga cartão
+   - Checkbox Dízimo (10%) para receitas
+   - Receita fixa vira Assinatura
+#}
+{% set is_edit = tx is not none %}
+{% set now_year  = today[:4] %}
+{% set now_month = today[5:7] %}
+
+<div class="modal-header">
+  <h3>{{ 'Editar Transação' if is_edit else 'Nova Transação' }}</h3>
+  <button type="button" class="btn btn--ghost btn--icon" onclick="document.getElementById('modal-overlay').classList.remove('modal--open')">✕</button>
+</div>
+
+{% if error %}
+<div style="background:var(--red-bg);border:1px solid var(--red-border);padding:12px 20px;color:var(--red);font-size:0.85rem;display:flex;gap:10px;align-items:center">
+  <span style="font-size:1.2rem">⚠️</span>
+  <div>
+    {{ error }}
+    {% if not has_accounts and error_field == 'account_id' %}
+    <a href="/settings" style="color:var(--em);font-weight:600;display:block;margin-top:4px">→ Cadastrar conta bancária</a>
+    {% endif %}
+    {% if not has_cards and error_field == 'card_id' %}
+    <a href="/installments" style="color:var(--em);font-weight:600;display:block;margin-top:4px">→ Cadastrar cartão</a>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+<form
+  {% if is_edit %}hx-put="/transactions/{{ tx.id }}"{% else %}hx-post="/transactions"{% endif %}
+  hx-target="#tx-panel"
+  hx-swap="innerHTML"
+  id="tx-form"
+  onsubmit="return validateTxForm(event)"
+>
+  <input type="hidden" name="year"  value="{{ now_year }}">
+  <input type="hidden" name="month" value="{{ now_month }}">
+  <input type="hidden" name="redirect_to" value="{{ redirect_to | default('') }}">
+
+  <div class="modal-body">
+    {# Tipo e Data #}
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Tipo *</label>
+        <select name="type" class="form-control" id="tx-type" onchange="onTypeChange(this.value)">
+          <option value="expense" {% if is_edit and tx.type.value == 'expense' %}selected{% endif %}>💸 Despesa</option>
+          <option value="income"  {% if is_edit and tx.type.value == 'income'  %}selected{% endif %}>💰 Receita</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Data *</label>
+        <input type="date" name="date" class="form-control" required
+               value="{{ tx.date.isoformat() if is_edit else today }}">
+      </div>
+    </div>
+
+    {# Descrição #}
+    <div class="form-group">
+      <label class="form-label">Descrição *</label>
+      <input type="text" name="description" class="form-control" required
+             placeholder="Ex: Supermercado Extra, Salário..."
+             value="{{ tx.description if is_edit else '' }}">
+    </div>
+
+    {# Valor e Forma de Pagamento #}
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Valor (R$) *</label>
+        <input type="number" name="amount" class="form-control" step="0.01" min="0.01" required
+               placeholder="0,00"
+               value="{{ tx.amount if is_edit else '' }}">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Forma de pagamento *</label>
+        <select name="payment_method" class="form-control" id="payment-method" onchange="onPaymentChange(this.value)">
+          {% for pm, label in [('pix','⚡ Pix'),('money','💵 Dinheiro'),('credit_card','💳 Cartão de Crédito'),('debit_card','💳 Cartão de Débito'),('transfer','🏦 TED/DOC')] %}
+          <option value="{{ pm }}" {% if is_edit and tx.payment_method.value == pm %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    {# Aviso PIX sem conta #}
+    <div id="pix-warning" style="display:none;background:var(--amber-bg);border:1px solid rgba(245,166,35,0.3);border-radius:var(--radius);padding:10px 14px;font-size:0.82rem;color:var(--amber)">
+      ⚡ PIX requer uma conta bancária. Selecione abaixo ou
+      <a href="/settings" style="color:var(--em);font-weight:700">cadastre uma conta →</a>
+    </div>
+
+    {# Aviso cartão sem cartão #}
+    <div id="card-warning" style="display:none;background:var(--amber-bg);border:1px solid rgba(245,166,35,0.3);border-radius:var(--radius);padding:10px 14px;font-size:0.82rem;color:var(--amber)">
+      💳 Selecione o cartão abaixo ou
+      <a href="/installments" style="color:var(--em);font-weight:700">cadastre um cartão →</a>
+    </div>
+
+    {# Conta + Cartão #}
+    <div class="form-row">
+      <div class="form-group" id="account-group">
+        <label class="form-label" id="account-label">Conta</label>
+        <select name="account_id" class="form-control" id="account-select">
+          <option value="">— Selecione —</option>
+          {% for acc in accounts %}
+          <option value="{{ acc.id }}" {% if is_edit and tx.account_id and tx.account_id|string == acc.id|string %}selected{% endif %}>
+            {{ acc.name }}
+          </option>
+          {% endfor %}
+        </select>
+        {% if not has_accounts %}
+        <div style="font-size:0.75rem;color:var(--amber);margin-top:4px">
+          Nenhuma conta. <a href="/settings" style="color:var(--em)">Cadastrar →</a>
+        </div>
+        {% endif %}
+      </div>
+      <div class="form-group" id="card-group">
+        <label class="form-label" id="card-label">Cartão</label>
+        <select name="card_id" class="form-control" id="card-select">
+          <option value="">— Nenhum —</option>
+          {% for card in cards %}
+          <option value="{{ card.id }}" {% if is_edit and tx.card_id and tx.card_id|string == card.id|string %}selected{% endif %}>
+            {{ card.name }}{% if card.last4 %} ••{{ card.last4 }}{% endif %}
+          </option>
+          {% endfor %}
+        </select>
+        {% if not has_cards %}
+        <div style="font-size:0.75rem;color:var(--amber);margin-top:4px">
+          Nenhum cartão. <a href="/installments" style="color:var(--em)">Cadastrar →</a>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    {# Categoria + Parcelamento (visível para despesas) #}
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Categoria</label>
+        <select name="category_id" class="form-control">
+          <option value="">— Nenhuma (IA classifica) —</option>
+          {% set expense_cats = cats | selectattr('type.value', 'equalto', 'expense') | list %}
+          {% set income_cats  = cats | selectattr('type.value', 'equalto', 'income')  | list %}
+          <optgroup label="Despesas">
+            {% for cat in expense_cats %}
+            <option value="{{ cat.id }}" {% if is_edit and tx.category_id and tx.category_id|string == cat.id|string %}selected{% endif %}>
+              {{ cat.name }}
+            </option>
+            {% endfor %}
+          </optgroup>
+          <optgroup label="Receitas">
+            {% for cat in income_cats %}
+            <option value="{{ cat.id }}" {% if is_edit and tx.category_id and tx.category_id|string == cat.id|string %}selected{% endif %}>
+              {{ cat.name }}
+            </option>
+            {% endfor %}
+          </optgroup>
+        </select>
+      </div>
+      {% if not is_edit %}
+      <div class="form-group" id="installments-group">
+        <label class="form-label">Parcelamento</label>
+        <select name="installments" class="form-control">
+          {% for n in [1,2,3,4,5,6,8,10,12,18,24] %}
+          <option value="{{ n }}">{{ 'À vista' if n == 1 else n|string + 'x' }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+    </div>
+
+    {# Observações #}
+    <div class="form-group">
+      <label class="form-label">Observações</label>
+      <input type="text" name="notes" class="form-control" placeholder="Opcional"
+             value="{{ tx.notes or '' if is_edit else '' }}">
+    </div>
+
+    {# ── Opções específicas para RECEITA ── #}
+    <div id="income-options" style="display:none">
+
+      {# Dízimo (10%) — visível se tithe_enabled #}
+      {% if tithe_enabled %}
+      <div style="background:linear-gradient(135deg,rgba(139,92,246,0.08),rgba(139,92,246,0.03));border:1px solid rgba(139,92,246,0.2);border-radius:var(--radius-lg);padding:14px 16px">
+        <label style="display:flex;align-items:center;gap:12px;cursor:pointer">
+          <input type="checkbox" name="apply_tithe" id="apply-tithe" value="true" checked
+                 style="width:18px;height:18px;accent-color:#8B5CF6;cursor:pointer">
+          <div>
+            <div style="font-weight:600;color:var(--text);font-size:0.875rem">✝️ Calcular Dízimo (10%)</div>
+            <div style="font-size:0.75rem;color:var(--text-3);margin-top:2px">
+              Lança automaticamente 10% como despesa de Dízimo (1 lançamento por mês, acumulado)
+            </div>
+          </div>
+        </label>
+      </div>
+      {% endif %}
+
+      {# Receita fixa recorrente #}
+      {% if not is_edit %}
+      <div style="background:rgba(0,229,122,0.05);border:1px solid rgba(0,229,122,0.15);border-radius:var(--radius-lg);padding:14px 16px">
+        <label style="display:flex;align-items:center;gap:12px;cursor:pointer">
+          <input type="checkbox" name="is_recurring" id="is-recurring" value="true"
+                 style="width:18px;height:18px;accent-color:var(--em);cursor:pointer">
+          <div>
+            <div style="font-weight:600;color:var(--text);font-size:0.875rem">📅 Receita fixa mensal</div>
+            <div style="font-size:0.75rem;color:var(--text-3);margin-top:2px">
+              Cria como assinatura recorrente (aparece em Assinaturas como receita fixa)
+            </div>
+          </div>
+        </label>
+      </div>
+      {% endif %}
+    </div>
+
+  </div>{# /modal-body #}
+
+  <div class="modal-footer">
+    <button type="button" class="btn btn--ghost" onclick="document.getElementById('modal-overlay').classList.remove('modal--open')">Cancelar</button>
+    <button type="submit" class="btn btn--primary">
+      {{ 'Salvar alterações' if is_edit else 'Criar transação' }}
+    </button>
+  </div>
+</form>
+
+<script>
+// Estado inicial
+(function() {
+  const typeSelect = document.getElementById('tx-type');
+  if (typeSelect) onTypeChange(typeSelect.value);
+  const pmSelect = document.getElementById('payment-method');
+  if (pmSelect) onPaymentChange(pmSelect.value);
+})();
+
+function onTypeChange(type) {
+  const installmentsGroup = document.getElementById('installments-group');
+  const incomeOptions     = document.getElementById('income-options');
+  if (type === 'income') {
+    if (installmentsGroup) installmentsGroup.style.display = 'none';
+    if (incomeOptions)     incomeOptions.style.display = 'block';
+  } else {
+    if (installmentsGroup) installmentsGroup.style.display = 'block';
+    if (incomeOptions)     incomeOptions.style.display = 'none';
+  }
+}
+
+function onPaymentChange(pm) {
+  const pixWarn  = document.getElementById('pix-warning');
+  const cardWarn = document.getElementById('card-warning');
+  const accSel   = document.getElementById('account-select');
+  const cardSel  = document.getElementById('card-select');
+  const accLabel = document.getElementById('account-label');
+  const cardLabel= document.getElementById('card-label');
+
+  // Reset
+  if (pixWarn)  pixWarn.style.display  = 'none';
+  if (cardWarn) cardWarn.style.display = 'none';
+
+  if (pm === 'pix') {
+    if (pixWarn) pixWarn.style.display = 'block';
+    if (accLabel) accLabel.textContent = 'Conta PIX *';
+    if (cardLabel) cardLabel.textContent = 'Cartão';
+  } else if (pm === 'credit_card') {
+    if (cardWarn && (!cardSel || cardSel.value === '')) cardWarn.style.display = 'block';
+    if (cardLabel) cardLabel.textContent = 'Cartão de crédito *';
+    if (accLabel) accLabel.textContent = 'Conta';
+  } else if (pm === 'debit_card') {
+    if (cardWarn && (!cardSel || cardSel.value === '')) cardWarn.style.display = 'block';
+    if (cardLabel) cardLabel.textContent = 'Cartão de débito *';
+    if (accLabel) accLabel.textContent = 'Conta';
+  } else if (pm === 'transfer') {
+    if (accLabel) accLabel.textContent = 'Conta de origem';
+    if (cardLabel) cardLabel.textContent = 'Cartão';
+  } else {
+    if (accLabel) accLabel.textContent = 'Conta';
+    if (cardLabel) cardLabel.textContent = 'Cartão';
+  }
+}
+
+function validateTxForm(e) {
+  const pm      = document.getElementById('payment-method').value;
+  const accSel  = document.getElementById('account-select');
+  const cardSel = document.getElementById('card-select');
+
+  // PIX exige conta
+  if (pm === 'pix' && accSel && !accSel.value) {
+    accSel.style.borderColor = 'var(--red)';
+    accSel.focus();
+    const warn = document.getElementById('pix-warning');
+    if (warn) warn.style.display = 'block';
+    return false;
+  }
+
+  // Cartão exige cartão selecionado
+  if ((pm === 'credit_card' || pm === 'debit_card') && cardSel && !cardSel.value) {
+    cardSel.style.borderColor = 'var(--red)';
+    cardSel.focus();
+    const warn = document.getElementById('card-warning');
+    if (warn) warn.style.display = 'block';
+    return false;
+  }
+  return true;
+}
+</script>

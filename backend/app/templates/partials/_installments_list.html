@@ -1,0 +1,43 @@
+{% if installments_by_card %}
+{% for card_id, card_txs in installments_by_card.items() %}
+{% set card = cards_map.get(card_id) %}
+<div class="card" style="margin-bottom:20px;overflow:hidden">
+  <div class="card-header" style="background:{{ card.color or 'var(--bg-2)' }};color:white">
+    <div class="card-title">{{ card.name if card else 'Cartão' }}</div>
+    {% if card %}<div style="font-size:0.8rem;opacity:0.9">Vencimento: {{ card.due_day }} · Fechamento: {{ card.close_day }}</div>{% endif %}
+  </div>
+  <div style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Descrição</th><th>Parcela</th><th>Valor</th><th>Vencimento</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        {% for t in card_txs %}
+        {% set close_day = card.close_day if card else 28 %}
+        {% set is_paid = (t.date.year, t.date.month) < (current_year, current_month) or (t.date.year == current_year and t.date.month == current_month and close_day < today) %}
+        <tr style="{% if is_paid %}opacity:0.6{% endif %}">
+          <td>{{ t.description[:40] }}{% if t.description|length > 40 %}...{% endif %}</td>
+          <td><span class="badge {% if t.installment_number == t.installments_total %}badge--inactive{% endif %}">{{ t.installment_number }}/{{ t.installments_total }}</span></td>
+          <td style="text-align:right;font-weight:500">{{ fmt(t.amount) }}</td>
+          <td>{{ t.date.strftime('%d/%m/%Y') }}</td>
+          <td>{% if is_paid %}<span style="color:var(--em)">✓ Pago</span>{% else %}<span style="color:var(--amber)">⏳ Pendente</span>{% endif %}</td>
+          <td style="white-space:nowrap">
+            <button class="btn btn--ghost btn--sm"
+                    hx-get="/transactions/{{ t.id }}/edit?redirect_to=%2Finstallments"
+                    hx-target="#modal-content" hx-swap="innerHTML" hx-on::after-request="openModal()">✏️</button>
+            {% if t.group_id %}
+            <button type="button" class="btn btn--ghost btn--sm"
+                    onclick="if(confirm('Excluir todas as {{ t.installments_total }} parcelas?')) { fetch('/transactions/{{ t.id }}?delete_all=true', {method:'DELETE',credentials:'include'}).then(()=>location.reload()) }">✕</button>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endfor %}
+{% else %}
+<div style="text-align:center;padding:60px;color:var(--text-3)">
+  <div style="font-size:3rem;margin-bottom:16px">💳</div>
+  <div style="font-size:1rem;color:var(--text-2);margin-bottom:8px">Nenhuma compra parcelada</div>
+</div>
+{% endif %}

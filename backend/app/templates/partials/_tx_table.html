@@ -1,0 +1,45 @@
+<div style="display:flex;gap:12px;margin-bottom:16px;font-size:0.8rem;flex-wrap:wrap">
+  <div style="background:var(--em-bg);border:1px solid var(--em-border);border-radius:4px;padding:5px 12px;color:var(--em)">Receitas: <strong>{{ fmt(page_income) }}</strong></div>
+  <div style="background:var(--red-bg);border:1px solid var(--red-border);border-radius:4px;padding:5px 12px;color:var(--red)">Despesas: <strong>{{ fmt(page_expense) }}</strong></div>
+  <div style="background:var(--bg-3);border:1px solid var(--border);border-radius:4px;padding:5px 12px;color:var(--text-2)">Saldo: <strong style="color:{% if page_income - page_expense >= 0 %}var(--em){% else %}var(--red){% endif %}">{{ fmt(page_income - page_expense) }}</strong></div>
+  <div style="margin-left:auto;color:var(--text-3);align-self:center">{{ total }} transações</div>
+</div>
+<div class="table-wrapper">
+  <table>
+    <thead>
+      <tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Pagamento</th><th>Parc.</th><th style="text-align:right">Valor</th><th>Tipo</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for t in txs %}
+      {% set cat = cats_map.get(t.category_id|string) %}
+      <tr>
+        <td class="text-muted">{{ t.date.strftime('%d/%m/%Y') }}</td>
+        <td class="text-strong">{{ t.description }}</td>
+        <td>{% if cat %}<span class="color-dot" style="background:{{ cat.color }};margin-right:6px"></span>{{ cat.name }}{% else %}<span style="color:var(--text-3)">Outros</span>{% endif %}</td>
+        <td class="text-muted">{% set pm_labels = {'credit_card':'Crédito','debit_card':'Débito','pix':'Pix','money':'Dinheiro','transfer':'TED/DOC'} %}{{ pm_labels.get(t.payment_method.value, t.payment_method.value) }}</td>
+        <td>{% if t.installments_total > 1 %}<span class="badge badge--info">{{ t.installment_number }}/{{ t.installments_total }}</span>{% else %}—{% endif %}</td>
+        <td class="td-amount td-amount--{{ t.type.value }} text-right">{{ '+' if t.type.value == 'income' else '-' }}{{ fmt(t.amount) }}</td>
+        <td>{% if t.type.value == 'income' %}<span class="badge badge--income">Receita</span>{% else %}<span class="badge badge--expense">Despesa</span>{% endif %}</td>
+        <td class="td-actions">
+          <a hx-get="/transactions/{{ t.id }}/edit" hx-target="#modal-content" hx-swap="innerHTML"
+             hx-on::after-request="openModal()" class="btn btn--ghost btn--sm">✎</a>
+          <button hx-delete="/transactions/{{ t.id }}?year={{ year }}&month={{ month }}"
+                  hx-target="#tx-panel" hx-confirm="Excluir esta transação?"
+                  class="btn btn--ghost btn--sm" style="color:var(--red)">✕</button>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="8" style="padding:40px;text-align:center;color:var(--text-3)">Nenhuma transação encontrada.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% if total > limit %}
+<div class="pagination">
+  <span>{{ skip + 1 }}–{{ [skip + txs|length, total]|min }} de {{ total }}</span>
+  <div class="pagination-btns">
+    {% if skip > 0 %}<a hx-get="/transactions?year={{ year }}&month={{ month }}&skip={{ skip - limit }}&limit={{ limit }}" hx-target="#tx-panel" class="btn btn--ghost btn--sm">Anterior</a>{% endif %}
+    {% if skip + limit < total %}<a hx-get="/transactions?year={{ year }}&month={{ month }}&skip={{ skip + limit }}&limit={{ limit }}" hx-target="#tx-panel" class="btn btn--ghost btn--sm">Próximo</a>{% endif %}
+  </div>
+</div>
+{% endif %}

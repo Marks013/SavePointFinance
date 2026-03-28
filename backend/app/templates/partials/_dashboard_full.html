@@ -1,0 +1,28 @@
+{% set month_names = ['','Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'] %}
+{% set prev_month = month - 1 if month > 1 else 12 %}
+{% set prev_year  = year if month > 1 else year - 1 %}
+{% set next_month = month + 1 if month < 12 else 1 %}
+{% set next_year  = year if month < 12 else year + 1 %}
+<div id="dash-full">
+  <div class="page-header">
+    <div style="display:flex;flex-direction:column;gap:2px">
+      <div style="font-size:0.9rem;font-weight:500;color:var(--text-2)">Olá, <strong style="color:var(--text)">{{ user.name.split(' ')[0] }}</strong> 👋</div>
+      <div class="page-title">{{ month_names[month] }} {{ year }}</div>
+    </div>
+    <div class="page-actions">
+      <div class="month-nav">
+        <a href="/dashboard?year={{ prev_year }}&month={{ prev_month }}" class="btn btn--ghost btn--sm"
+           hx-get="/dashboard?year={{ prev_year }}&month={{ prev_month }}" hx-target="#dash-full" hx-swap="outerHTML">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        </a>
+        <div class="month-nav-label">{{ month_names[month] }} {{ year }}</div>
+        <a href="/dashboard?year={{ next_year }}&month={{ next_month }}" class="btn btn--ghost btn--sm"
+           hx-get="/dashboard?year={{ next_year }}&month={{ next_month }}" hx-target="#dash-full" hx-swap="outerHTML">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+        </a>
+      </div>
+      <a href="#" hx-get="/transactions/new" hx-target="#modal-content" hx-swap="innerHTML" class="btn btn--primary">+ Nova Transação</a>
+    </div>
+  </div>
+  <div class="page-body" id="dash-body">{% include "partials/_dashboard_body.html" %}</div>
+</div>

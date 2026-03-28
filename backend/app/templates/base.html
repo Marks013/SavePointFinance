@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Save Point Finanças{% endblock %}</title>
+  <link rel="stylesheet" href="/static/css/styles.css">
+  <style>[x-cloak] { display: none !important; }</style>
+  <script src="https://unpkg.com/htmx.org@2.0.3/dist/htmx.min.js"></script>
+  {% block head %}{% endblock %}
+</head>
+<body>
+<div class="app-shell">
+  {% include "partials/_sidebar.html" %}
+  <div class="main-content">{% block content %}{% endblock %}</div>
+</div>
+
+<div id="modal-overlay" class="modal">
+  <div id="modal-content" class="modal-box"></div>
+</div>
+
+<script>
+const modalOverlay = document.getElementById('modal-overlay');
+window.addEventListener('sp:openModal',  () => modalOverlay.classList.add('modal--open'));
+window.addEventListener('sp:closeModal', () => modalOverlay.classList.remove('modal--open'));
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && modalOverlay.classList.contains('modal--open'))
+    modalOverlay.classList.remove('modal--open');
+});
+function openModal() { window.dispatchEvent(new CustomEvent('sp:openModal')); }
+
+document.body.addEventListener('htmx:afterSwap', e => {
+  if (e.target && e.target.id === 'modal-content')
+    window.dispatchEvent(new CustomEvent('sp:openModal'));
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.body.addEventListener('htmx:afterRequest', e => {
+    const raw = e.detail.xhr?.getResponseHeader('HX-Trigger-After-Swap');
+    if (raw) {
+      try {
+        const events = JSON.parse(raw);
+        for (const [name, detail] of Object.entries(events))
+          window.dispatchEvent(new CustomEvent(name, { detail }));
+      } catch {}
+    }
+  });
+});
+
+// Toast manager
+const toastContainer = document.querySelector('.toast-container');
+function addToast({ message, kind = 'success' }) {
+  const icons = { success: '✓', error: '✕', warning: '⚠', info: 'ℹ' };
+  const toast = document.createElement('div');
+  toast.className = `toast toast--${kind}`;
+  toast.innerHTML = `<span class="toast-icon">${icons[kind] || 'ℹ'}</span><span>${message}</span>`;
+  toastContainer.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add('toast--show'));
+  setTimeout(() => { toast.classList.remove('toast--show'); setTimeout(() => toast.remove(), 400); }, 4000);
+}
+document.body.addEventListener('htmx:afterRequest', e => {
+  const raw = e.detail.xhr?.getResponseHeader('HX-Trigger');
+  if (!raw) return;
+  try {
+    const t = JSON.parse(raw);
+    if (t['sp:toast'])     addToast(t['sp:toast']);
+    if (t['sp:closeModal']) window.dispatchEvent(new CustomEvent('sp:closeModal'));
+  } catch {}
+});
+</script>
+
+<div class="toast-container" aria-live="polite"></div>
+{% block scripts %}{% endblock %}
+</body>
+</html>

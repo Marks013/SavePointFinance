@@ -1,0 +1,244 @@
+{# _dashboard_body.html — Dashboard com cartões melhorados + bloco de Dízimo #}
+
+{% macro brl(v) %}{{ fmt(v) }}{% endmacro %}
+
+{# ── Stats ── #}
+<div class="stat-grid">
+  <div class="stat-card stat-card--income">
+    <div class="stat-icon stat-icon--income">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
+    </div>
+    <div class="stat-label">Receitas</div>
+    <div class="stat-value stat-value--income">{{ fmt(income) }}</div>
+    <div class="stat-sub">do mês</div>
+  </div>
+
+  <div class="stat-card stat-card--expense">
+    <div class="stat-icon stat-icon--expense">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline><polyline points="17 18 23 18 23 12"></polyline></svg>
+    </div>
+    <div class="stat-label">Despesas</div>
+    <div class="stat-value stat-value--expense">{{ fmt(expenses) }}</div>
+    <div class="stat-sub">do mês</div>
+  </div>
+
+  <div class="stat-card stat-card--balance">
+    <div class="stat-icon stat-icon--balance">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+    </div>
+    <div class="stat-label">Saldo</div>
+    <div class="stat-value {% if balance >= 0 %}stat-value--income{% else %}stat-value--expense{% endif %}">{{ fmt(balance) }}</div>
+    <div class="stat-sub">receitas − despesas</div>
+  </div>
+
+  <div class="stat-card stat-card--neutral">
+    <div class="stat-icon stat-icon--neutral">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><path d="M1 20l4.64-4.36A9 9 0 0 0 20.49 15"></path></svg>
+    </div>
+    <div class="stat-label">Assinaturas ativas</div>
+    <div class="stat-value" style="color:var(--amber)">{{ active_subs_count }}</div>
+    <div class="stat-sub">{{ fmt(active_subs_monthly) }}/mês</div>
+  </div>
+</div>
+
+{# ── Bloco Dízimo (visível apenas se tithe_enabled e houver receita) ── #}
+{% if user.tithe_enabled and tithe_suggested > 0 %}
+<div style="background:linear-gradient(135deg,rgba(139,92,246,0.1),rgba(139,92,246,0.03));border:1px solid rgba(139,92,246,0.25);border-radius:var(--radius-lg);padding:18px 24px;margin-bottom:24px;display:flex;align-items:center;gap:20px;flex-wrap:wrap">
+  <div style="font-size:2rem">✝️</div>
+  <div style="flex:1">
+    <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:rgba(139,92,246,0.8);margin-bottom:6px">Dízimo do Mês (10% das receitas)</div>
+    <div style="display:flex;gap:32px;flex-wrap:wrap">
+      <div>
+        <div style="font-size:0.75rem;color:var(--text-3)">Sugerido</div>
+        <div style="font-size:1.2rem;font-weight:700;color:#8B5CF6">{{ fmt(tithe_suggested) }}</div>
+      </div>
+      <div>
+        <div style="font-size:0.75rem;color:var(--text-3)">Lançado</div>
+        <div style="font-size:1.2rem;font-weight:700;color:var(--em)">{{ fmt(tithe_paid) }}</div>
+      </div>
+      <div>
+        <div style="font-size:0.75rem;color:var(--text-3)">Pendente</div>
+        <div style="font-size:1.2rem;font-weight:700;color:{% if tithe_pending > 0 %}var(--amber){% else %}var(--em){% endif %}">
+          {{ fmt(tithe_pending) if tithe_pending > 0 else '✓ Quitado' }}
+        </div>
+      </div>
+    </div>
+    {% set tithe_pct = [(tithe_paid / tithe_suggested * 100), 100]|min|int if tithe_suggested > 0 else 0 %}
+    <div style="height:4px;background:rgba(139,92,246,0.2);border-radius:2px;margin-top:10px">
+      <div style="height:100%;width:{{ tithe_pct }}%;background:#8B5CF6;border-radius:2px;transition:width 0.5s"></div>
+    </div>
+  </div>
+  {% if tithe_pending > 0 %}
+  <a href="#" hx-get="/transactions/new" hx-target="#modal-content" hx-swap="innerHTML"
+     class="btn btn--sm" style="background:rgba(139,92,246,0.15);color:#8B5CF6;border-color:rgba(139,92,246,0.3);white-space:nowrap">
+    Lançar dízimo
+  </a>
+  {% endif %}
+</div>
+{% endif %}
+
+{# ── Gauge + Cartões ── #}
+<div class="grid-2" style="margin-bottom:24px">
+  {# Gauge Orçamento #}
+  <div class="card">
+    <div class="card-header"><div class="card-title">Orçamento planejado</div></div>
+    <div class="chart-area" style="height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative">
+      <canvas id="gauge-chart"></canvas>
+      <div style="position:absolute;bottom:20px;text-align:center">
+        <div style="font-size:1.8rem;font-weight:700;color:{% if gauge_pct >= 90 %}var(--red){% elif gauge_pct >= 75 %}var(--amber){% else %}var(--text){% endif %}">{{ gauge_pct }}%</div>
+        <div style="font-size:0.85rem;color:var(--text-3)">
+          {% if limit_planned > 0 %}de {{ fmt(limit_planned) }} orçados{% else %}Defina limites nas categorias{% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# Cartões — Limite disponível + Fatura do mês #}
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">💳 Cartões de Crédito</div>
+      <a href="/installments" class="btn btn--ghost btn--sm">Gerenciar</a>
+    </div>
+    {% if cards_usage %}
+    <div style="display:flex;flex-direction:column;gap:0">
+      {% for c in cards_usage %}
+      <div style="padding:12px 4px;border-bottom:1px solid var(--border)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="width:10px;height:10px;border-radius:50%;background:{{ c.color }};display:inline-block"></span>
+            <span style="font-weight:600;font-size:0.875rem;color:var(--text)">
+              {{ c.name }}{% if c.last4 %} <span style="color:var(--text-3);font-size:0.75rem">••{{ c.last4 }}</span>{% endif %}
+            </span>
+          </div>
+          {% if c.limit > 0 %}
+          <span style="font-size:0.75rem;font-weight:700;color:{% if c.limit_used_pct >= 90 %}var(--red){% elif c.limit_used_pct >= 70 %}var(--amber){% else %}var(--em){% endif %}">
+            {{ c.limit_used_pct }}% usado
+          </span>
+          {% endif %}
+        </div>
+
+        {# Barra de uso do limite #}
+        {% if c.limit > 0 %}
+        <div style="height:4px;background:var(--bg-3);border-radius:2px;margin-bottom:8px">
+          <div style="height:100%;width:{{ c.limit_used_pct }}%;background:{% if c.limit_used_pct >= 90 %}var(--red){% elif c.limit_used_pct >= 70 %}var(--amber){% else %}{{ c.color }}{% endif %};border-radius:2px;transition:width 0.4s"></div>
+        </div>
+        {% endif %}
+
+        {# 3 métricas do cartão #}
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px">
+          <div style="background:var(--bg-3);border-radius:4px;padding:6px 8px;text-align:center">
+            <div style="font-size:0.65rem;color:var(--text-3);margin-bottom:2px">Fatura/mês</div>
+            <div style="font-size:0.8rem;font-weight:700;color:var(--red);font-family:monospace">{{ fmt(c.invoice_month) }}</div>
+          </div>
+          <div style="background:var(--bg-3);border-radius:4px;padding:6px 8px;text-align:center">
+            <div style="font-size:0.65rem;color:var(--text-3);margin-bottom:2px">Comprometido</div>
+            <div style="font-size:0.8rem;font-weight:700;color:var(--amber);font-family:monospace">{{ fmt(c.total_compromised) }}</div>
+          </div>
+          <div style="background:var(--em-bg);border:1px solid var(--em-border);border-radius:4px;padding:6px 8px;text-align:center">
+            <div style="font-size:0.65rem;color:var(--em);margin-bottom:2px">Disponível</div>
+            <div style="font-size:0.8rem;font-weight:700;color:var(--em);font-family:monospace">{{ fmt(c.available_limit) }}</div>
+          </div>
+        </div>
+        {% if c.due_day %}
+        <div style="font-size:0.7rem;color:var(--text-3);margin-top:5px;text-align:right">Vence dia {{ c.due_day }}</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div style="padding:32px;text-align:center;color:var(--text-3);font-size:0.85rem">
+      Nenhum cartão. <a href="/settings?tab=cards" style="color:var(--em)">Adicionar →</a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{# ── Charts Evolução + Categoria ── #}
+<div class="grid-2" style="margin-bottom:24px">
+  <div class="card">
+    <div class="card-header"><div class="card-title">Evolução mensal</div></div>
+    <div class="chart-area" style="height:220px"><canvas id="evo-chart"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-title">Gastos por categoria</div></div>
+    <div class="chart-area" style="height:220px;display:flex;align-items:center;justify-content:center">
+      {% if cat_donut_json != '[]' %}
+      <canvas id="cat-chart"></canvas>
+      {% else %}
+      <span style="color:var(--text-3);font-size:0.85rem">Sem despesas no mês.</span>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{# ── Transações recentes ── #}
+<div class="card">
+  <div class="card-header">
+    <div class="card-title">Últimas transações</div>
+    <a href="/transactions?year={{ year }}&month={{ month }}" class="btn btn--ghost btn--sm">Ver todas →</a>
+  </div>
+  <div class="table-wrapper" style="border:none">
+    <table>
+      <thead>
+        <tr><th>Data</th><th>Descrição</th><th>Categoria</th><th style="text-align:right">Valor</th><th>Tipo</th></tr>
+      </thead>
+      <tbody>
+        {% for t in recent_txs %}
+        {% set cat = cats_map.get(t.category_id|string) %}
+        <tr>
+          <td class="text-muted">{{ t.date.strftime('%d/%m/%Y') }}</td>
+          <td class="text-strong">{{ t.description }}</td>
+          <td class="text-muted">{{ cat.name if cat else 'Outros' }}</td>
+          <td class="td-amount td-amount--{{ t.type.value }} text-right">
+            {{ '+' if t.type.value == 'income' else '-' }}{{ fmt(t.amount) }}
+          </td>
+          <td>{% if t.type.value == 'income' %}<span class="badge badge--income">Receita</span>{% else %}<span class="badge badge--expense">Despesa</span>{% endif %}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" style="padding:32px;text-align:center;color:var(--text-3)">
+          Sem transações neste mês.
+          <a href="#" hx-get="/transactions/new" hx-target="#modal-content" hx-swap="innerHTML"
+             hx-on::after-request="openModal()" style="color:var(--em)">Adicionar →</a>
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+(function() {
+  const GRID = '#1E2D3D', TICK = '#556070';
+  const pct = {{ gauge_pct }};
+  const gaugeColor = pct >= 90 ? '#FF4D65' : pct >= 75 ? '#F59E0B' : '#00E57A';
+  const gaugeEl = document.getElementById('gauge-chart');
+  if (gaugeEl) new Chart(gaugeEl, {
+    type: 'doughnut',
+    data: { datasets: [{ data: [{{ limit_used }}, {{ [limit_planned - limit_used, 0.001]|max }}], backgroundColor: [gaugeColor, '#1E2D3D'], borderWidth: 0 }] },
+    options: { responsive: true, maintainAspectRatio: false, cutout: '80%', circumference: 180, rotation: -90, plugins: { legend: { display: false } } }
+  });
+
+  const evoData   = {{ evo_data_json|safe }};
+  const evoLabels = {{ evo_labels_json|safe }};
+  const evoEl = document.getElementById('evo-chart');
+  if (evoEl && evoData.length) new Chart(evoEl, {
+    type: 'bar',
+    data: {
+      labels: evoLabels.map(k => { const [y,m] = k.split('-'); return new Date(+y,+m-1,1).toLocaleDateString('pt-BR',{month:'short',year:'2-digit'}); }),
+      datasets: [
+        { label:'Receitas',  data: evoData.map(d=>d.income),   backgroundColor:'rgba(0,229,122,0.6)',  borderColor:'#00E57A', borderWidth:1, borderRadius:2 },
+        { label:'Despesas',  data: evoData.map(d=>d.expenses), backgroundColor:'rgba(255,77,101,0.5)', borderColor:'#FF4D65', borderWidth:1, borderRadius:2 },
+      ]
+    },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{labels:{color:'#8FA3B8',font:{size:11}}}, tooltip:{callbacks:{label:c=>'R$ '+c.raw.toLocaleString('pt-BR',{minimumFractionDigits:2})}} }, scales:{ x:{grid:{color:GRID},ticks:{color:TICK,font:{size:10}}}, y:{grid:{color:GRID},ticks:{color:TICK,font:{size:10},callback:v=>'R$'+(v/1000).toFixed(0)+'k'}} } }
+  });
+
+  const catData = {{ cat_donut_json|safe }};
+  const catEl = document.getElementById('cat-chart');
+  if (catEl && catData.length) new Chart(catEl, {
+    type: 'doughnut',
+    data: { labels: catData.map(d=>d.name), datasets: [{ data: catData.map(d=>d.total), backgroundColor: catData.map(d=>d.color+'CC'), borderColor: catData.map(d=>d.color), borderWidth:1 }] },
+    options: { responsive:true, maintainAspectRatio:false, cutout:'68%', plugins:{ legend:{position:'right',labels:{color:'#8FA3B8',font:{size:10},boxWidth:12,padding:8}}, tooltip:{callbacks:{label:c=>c.label+': R$ '+c.raw.toLocaleString('pt-BR',{minimumFractionDigits:2})}} } }
+  });
+})();
+</script>

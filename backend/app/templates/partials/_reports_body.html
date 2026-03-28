@@ -1,0 +1,247 @@
+{# _reports_body.html — Relatórios avançados com comparativo, por cartão, conta, print #}
+
+{# ── Resumo do Mês com Comparativo ── #}
+<div class="stat-grid" style="margin-bottom:24px">
+  <div class="stat-card stat-card--income">
+    <div class="stat-label">Receitas</div>
+    <div class="stat-value stat-value--income">{{ fmt(income) }}</div>
+    {% if income_change is not none %}
+    <div class="stat-sub" style="color:{% if income_change >= 0 %}var(--em){% else %}var(--red){% endif %}">
+      {{ '▲' if income_change >= 0 else '▼' }} {{ income_change|abs }}% vs mês anterior
+    </div>
+    {% endif %}
+    <div class="stat-sub">Mês ant.: {{ fmt(prev_income) }}</div>
+  </div>
+  <div class="stat-card stat-card--expense">
+    <div class="stat-label">Despesas</div>
+    <div class="stat-value stat-value--expense">{{ fmt(expenses) }}</div>
+    {% if expense_change is not none %}
+    <div class="stat-sub" style="color:{% if expense_change <= 0 %}var(--em){% else %}var(--red){% endif %}">
+      {{ '▲' if expense_change >= 0 else '▼' }} {{ expense_change|abs }}% vs mês anterior
+    </div>
+    {% endif %}
+    <div class="stat-sub">Mês ant.: {{ fmt(prev_expenses) }}</div>
+  </div>
+  <div class="stat-card stat-card--balance">
+    <div class="stat-label">Saldo</div>
+    <div class="stat-value {% if balance >= 0 %}stat-value--income{% else %}stat-value--expense{% endif %}">{{ fmt(balance) }}</div>
+    <div class="stat-sub">Mês ant.: {{ fmt(prev_income - prev_expenses) }}</div>
+  </div>
+  {% if tithe_paid > 0 %}
+  <div class="stat-card" style="border-top:3px solid #8B5CF6">
+    <div class="stat-label" style="color:#8B5CF6">Dízimo do mês</div>
+    <div class="stat-value" style="color:#8B5CF6">{{ fmt(tithe_paid) }}</div>
+    <div class="stat-sub">Sugerido: {{ fmt(tithe_suggested) }}</div>
+  </div>
+  {% endif %}
+</div>
+
+{# ── Gráficos: Evolução + Categoria ── #}
+<div class="grid-2" style="margin-bottom:20px">
+  <div class="card">
+    <div class="card-header"><div class="card-title">📈 Evolução — 12 meses</div></div>
+    <div class="chart-area" style="height:240px"><canvas id="evo-chart"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-title">🍩 Despesas por categoria</div></div>
+    <div class="chart-area" style="height:240px;display:flex;align-items:center;justify-content:center">
+      {% if cat_breakdown %}<canvas id="cat-chart"></canvas>
+      {% else %}<span style="color:var(--text-3);font-size:0.85rem">Sem despesas no mês.</span>{% endif %}
+    </div>
+  </div>
+</div>
+
+{# ── Ranking de Categorias com comparativo ── #}
+<div class="card" style="margin-bottom:20px">
+  <div class="card-header"><div class="card-title">📊 Ranking por categoria</div></div>
+  <div style="padding:0 4px">
+    {% set total_exp = cat_breakdown | sum(attribute='total') %}
+    {% for c in cat_breakdown %}
+    {% set pct = ((c.total / total_exp) * 100)|int if total_exp > 0 else 0 %}
+    <div style="padding:12px 0;border-bottom:1px solid var(--border)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="color-dot" style="background:{{ c.color }};width:12px;height:12px"></span>
+          <span style="font-weight:600;color:var(--text);font-size:0.875rem">{{ c.name }}</span>
+          <span class="badge badge--info" style="font-size:0.65rem">{{ c.cnt }} transação{% if c.cnt != 1 %}ões{% endif %}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:16px">
+          {% if c.change is not none %}
+          <span style="font-size:0.75rem;color:{% if c.change <= 0 %}var(--em){% else %}var(--red){% endif %}">
+            {{ '▼' if c.change <= 0 else '▲' }} {{ c.change|abs }}%
+          </span>
+          {% elif c.prev_total > 0 %}
+          <span style="font-size:0.75rem;color:var(--text-3)">novo</span>
+          {% endif %}
+          <span class="mono" style="font-weight:700;color:var(--text)">{{ fmt(c.total) }}</span>
+          <span style="font-size:0.7rem;color:var(--text-3)">{{ pct }}%</span>
+        </div>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill" style="width:{{ pct }}%;background:{{ c.color }}"></div>
+      </div>
+      {% if c.prev_total > 0 %}
+      <div style="font-size:0.72rem;color:var(--text-3);margin-top:4px">
+        Mês anterior: {{ fmt(c.prev_total) }}
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+{# ── Por Cartão ── #}
+{% if card_spending %}
+<div class="card" style="margin-bottom:20px">
+  <div class="card-header"><div class="card-title">💳 Gastos por cartão</div></div>
+  {% set total_card = card_spending | sum(attribute='amount') %}
+  <div style="padding:4px 0">
+    {% for c in card_spending %}
+    {% set pct = ((c.amount / total_card) * 100)|int if total_card > 0 else 0 %}
+    <div style="padding:12px 4px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px">
+      <span style="width:12px;height:12px;border-radius:50%;background:{{ c.color }};flex-shrink:0"></span>
+      <div style="flex:1">
+        <div style="display:flex;justify-content:space-between;margin-bottom:5px">
+          <span style="font-weight:600;color:var(--text)">
+            {{ c.name }}{% if c.last4 %} <span style="color:var(--text-3);font-size:0.78rem">••{{ c.last4 }}</span>{% endif %}
+          </span>
+          <span class="mono" style="font-weight:700;color:var(--red)">{{ fmt(c.amount) }}</span>
+        </div>
+        <div style="height:4px;background:var(--bg-3);border-radius:2px">
+          <div style="height:100%;width:{{ pct }}%;background:{{ c.color }};border-radius:2px"></div>
+        </div>
+        {% if c.limit > 0 %}
+        <div style="display:flex;justify-content:space-between;font-size:0.72rem;margin-top:4px">
+          <span style="color:var(--text-3)">{{ c.pct }}% do limite {{ fmt(c.limit) }}</span>
+          <span style="color:var(--em)">Disponível: {{ fmt([c.limit - c.amount, 0]|max) }}</span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{# ── Por Conta Bancária ── #}
+{% if account_spending %}
+<div class="card" style="margin-bottom:20px">
+  <div class="card-header"><div class="card-title">🏦 Movimentação por conta</div></div>
+  <div class="table-wrapper" style="border:none">
+    <table>
+      <thead>
+        <tr>
+          <th></th><th>Conta</th>
+          <th style="text-align:right;color:var(--em)">Receitas</th>
+          <th style="text-align:right;color:var(--red)">Despesas</th>
+          <th style="text-align:right">Saldo</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in account_spending %}
+        <tr>
+          <td><span class="color-dot" style="background:{{ a.color }}"></span></td>
+          <td class="text-strong">{{ a.name }}</td>
+          <td class="mono text-right" style="color:var(--em)">{{ fmt(a.earned) }}</td>
+          <td class="mono text-right" style="color:var(--red)">{{ fmt(a.spent) }}</td>
+          <td class="mono text-right" style="font-weight:700;color:{% if a.balance >= 0 %}var(--em){% else %}var(--red){% endif %}">
+            {{ fmt(a.balance) }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{# ── Top 10 Despesas ── #}
+<div class="grid-2">
+  <div class="card">
+    <div class="card-header"><div class="card-title">🔴 Maiores despesas do mês</div></div>
+    <div class="table-wrapper" style="border:none">
+      <table>
+        <thead><tr><th>#</th><th>Descrição</th><th style="text-align:right">Valor</th></tr></thead>
+        <tbody>
+          {% for t in top_txs %}
+          <tr>
+            <td style="color:var(--text-3);font-weight:700">{{ loop.index }}</td>
+            <td class="text-strong">{{ t.description[:35] }}</td>
+            <td class="td-amount td-amount--expense text-right">{{ fmt(t.amount) }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="3" style="padding:20px;text-align:center;color:var(--text-3)">Sem despesas.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {# Comparativo mês atual vs anterior #}
+  <div class="card">
+    <div class="card-header"><div class="card-title">📅 Comparativo mensal</div></div>
+    <div style="padding:4px 0">
+      {% set compare = [
+        ('Receitas', income, prev_income, 'income'),
+        ('Despesas', expenses, prev_expenses, 'expense'),
+        ('Saldo',    income - expenses, prev_income - prev_expenses, 'balance'),
+      ] %}
+      {% for label, curr, prev, kind in compare %}
+      {% set diff = curr - prev %}
+      {% set diff_pct = ((diff / prev) * 100)|round(1) if prev != 0 else none %}
+      <div style="padding:12px 4px;border-bottom:1px solid var(--border)">
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+          <span style="font-weight:600;color:var(--text)">{{ label }}</span>
+          <div style="text-align:right">
+            <div class="mono" style="font-weight:700;color:{% if kind == 'income' %}var(--em){% elif kind == 'expense' %}var(--red){% elif curr >= 0 %}var(--blue){% else %}var(--red){% endif %}">
+              {{ fmt(curr) }}
+            </div>
+            <div style="font-size:0.72rem;color:var(--text-3)">ant: {{ fmt(prev) }}</div>
+          </div>
+        </div>
+        {% if diff_pct is not none %}
+        <div style="font-size:0.78rem;padding:4px 8px;border-radius:var(--radius);display:inline-block;
+            background:{% if (kind=='expense' and diff<=0) or (kind!='expense' and diff>=0) %}var(--em-bg){% else %}var(--red-bg){% endif %};
+            color:{% if (kind=='expense' and diff<=0) or (kind!='expense' and diff>=0) %}var(--em){% else %}var(--red){% endif %}">
+          {{ '▼' if diff < 0 else '▲' }} {{ diff_pct|abs }}% vs mês anterior
+        </div>
+        {% else %}
+        <div style="font-size:0.72rem;color:var(--text-3)">Sem dado do mês anterior</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const GRID = '#1E2D3D', TICK = '#556070';
+  const evoData   = {{ evo_data_json|safe }};
+  const evoLabels = {{ evo_labels_json|safe }};
+  const evoEl = document.getElementById('evo-chart');
+  if (evoEl && evoData.length) new Chart(evoEl, {
+    type: 'line',
+    data: { labels: evoLabels.map(k=>{ const [y,m]=k.split('-'); return new Date(+y,+m-1,1).toLocaleDateString('pt-BR',{month:'short',year:'2-digit'}); }),
+      datasets: [
+        { label:'Receitas',  data: evoData.map(d=>d.income),   borderColor:'#00E57A', backgroundColor:'rgba(0,229,122,0.08)',  borderWidth:2, pointRadius:3, tension:0.3, fill:true },
+        { label:'Despesas',  data: evoData.map(d=>d.expenses), borderColor:'#FF4D65', backgroundColor:'rgba(255,77,101,0.07)', borderWidth:2, pointRadius:3, tension:0.3, fill:true },
+      ]
+    },
+    options: { responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{labels:{color:'#8FA3B8',font:{size:11}}}, tooltip:{callbacks:{label:c=>c.dataset.label+': R$ '+c.raw.toLocaleString('pt-BR',{minimumFractionDigits:2})}} },
+      scales:{ x:{grid:{color:GRID},ticks:{color:TICK,font:{size:10}}}, y:{grid:{color:GRID},ticks:{color:TICK,font:{size:10},callback:v=>'R$'+(v/1000).toFixed(0)+'k'}} }
+    }
+  });
+
+  const catData = {{ cat_json|safe }};
+  const catEl = document.getElementById('cat-chart');
+  if (catEl && catData.length) new Chart(catEl, {
+    type: 'doughnut',
+    data: { labels: catData.map(d=>d.name), datasets:[{ data: catData.map(d=>d.total), backgroundColor: catData.map(d=>d.color+'CC'), borderColor: catData.map(d=>d.color), borderWidth:1 }] },
+    options: { responsive:true, maintainAspectRatio:false, cutout:'65%',
+      plugins:{ legend:{position:'right',labels:{color:'#8FA3B8',font:{size:10},boxWidth:12,padding:8}}, tooltip:{callbacks:{label:c=>c.label+': R$ '+c.raw.toLocaleString('pt-BR',{minimumFractionDigits:2})}} }
+    }
+  });
+})();
+</script>

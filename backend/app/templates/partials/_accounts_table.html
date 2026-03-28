@@ -1,0 +1,26 @@
+{% set type_labels = {'checking':'Corrente','savings':'Poupança','investment':'Investimento','wallet':'Carteira'} %}
+<div class="table-wrapper">
+  <table>
+    <thead><tr><th style="width:10px"></th><th>Nome</th><th>Tipo</th><th style="text-align:right">Saldo</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+      {% for acc in accounts %}
+      <tr>
+        <td><span class="color-dot" style="background:{{ acc.color }}"></span></td>
+        <td class="text-strong">{{ acc.name }}</td>
+        <td>{{ type_labels.get(acc.type.value, acc.type.value) }}</td>
+        <td class="td-amount text-right">{{ fmt(acc.balance) }}</td>
+        <td>{% if acc.is_active %}<span class="badge badge--active">Ativa</span>{% else %}<span class="badge badge--inactive">Inativa</span>{% endif %}</td>
+        <td class="td-actions">
+          <button hx-get="/settings/accounts/{{ acc.id }}/edit-form" hx-target="#modal-content" hx-swap="innerHTML"
+                  hx-on::after-request="openModal()" class="btn btn--ghost btn--sm">✎</button>
+          <button hx-delete="/settings/accounts/{{ acc.id }}" hx-target="#accounts-panel"
+                  hx-confirm="Excluir conta '{{ acc.name }}'?"
+                  class="btn btn--ghost btn--sm" style="color:var(--red)">✕</button>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" style="padding:32px;text-align:center;color:var(--text-3)">Nenhuma conta cadastrada.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

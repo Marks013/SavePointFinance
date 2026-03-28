@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Admin — Save Point Finanças{% endblock %}
+{% block content %}
+<div class="page-header"><div class="page-title"><span style="color:var(--amber)">⬡</span> Painel Superadmin</div></div>
+<div class="page-body">
+  <div class="stat-grid" style="margin-bottom:24px">
+    <div class="stat-card stat-card--income"><div class="stat-label">Workspaces ativos</div><div class="stat-value stat-value--income">{{ active_tenants }}</div></div>
+    <div class="stat-card stat-card--balance"><div class="stat-label">Total usuários</div><div class="stat-value stat-value--balance">{{ total_users }}</div></div>
+    <div class="stat-card stat-card--neutral"><div class="stat-label">Total transações</div><div class="stat-value" style="color:var(--amber)">{{ total_tx }}</div></div>
+    <div class="stat-card stat-card--expense"><div class="stat-label">Total workspaces</div><div class="stat-value stat-value--expense">{{ total_tenants }}</div></div>
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-title">Workspaces (últimos 50)</div></div>
+    <div class="table-wrapper" style="border:none">
+      <table>
+        <thead><tr><th>Nome</th><th>Plano</th><th>Status</th><th>Expira</th><th>Criado</th><th></th></tr></thead>
+        <tbody>
+          {% for t in tenants %}
+          <tr x-data="{ editing: false }">
+            <td class="text-strong">{{ t.name }} <span style="color:var(--text-3);font-size:0.75rem">/{{ t.slug }}</span></td>
+            <td><span class="badge badge--info">{{ t.plan or 'free' }}</span></td>
+            <td>{% if t.is_active %}<span class="badge badge--active">Ativo</span>{% else %}<span class="badge badge--inactive">Suspenso</span>{% endif %}</td>
+            <td class="text-muted">{{ t.expires_at.strftime('%d/%m/%Y') if t.expires_at else '—' }}</td>
+            <td class="text-muted">{{ t.created_at.strftime('%d/%m/%Y') }}</td>
+            <td><button class="btn btn--ghost btn--sm" @click="editing = !editing">✎</button></td>
+          </tr>
+          <tr x-show="editing" x-cloak>
+            <td colspan="6">
+              <form hx-patch="/admin/tenants/{{ t.id }}" style="display:flex;gap:10px;flex-wrap:wrap;padding:8px 0;align-items:flex-end">
+                <div class="form-group"><label class="form-label">Plano</label>
+                  <select name="plan" class="filter-control">{% for p in ['free','basic','pro','enterprise'] %}<option {% if t.plan == p %}selected{% endif %}>{{ p }}</option>{% endfor %}</select></div>
+                <div class="form-group"><label class="form-label">Máx. usuários</label>
+                  <input type="number" name="max_users" class="filter-control" value="{{ t.max_users }}" min="1" style="width:80px"></div>
+                <div class="form-group"><label class="form-label">Status</label>
+                  <select name="is_active" class="filter-control">
+                    <option value="true" {% if t.is_active %}selected{% endif %}>Ativo</option>
+                    <option value="false" {% if not t.is_active %}selected{% endif %}>Suspenso</option>
+                  </select></div>
+                <div class="form-group"><label class="form-label">Expira (UTC)</label>
+                  <input type="datetime-local" name="expires_at" class="filter-control" value="{{ t.expires_at.strftime('%Y-%m-%dT%H:%M') if t.expires_at else '' }}"></div>
+                <button type="submit" class="btn btn--primary btn--sm">Salvar</button>
+              </form>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6" style="padding:24px;text-align:center;color:var(--text-3)">Nenhum workspace.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

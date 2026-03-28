@@ -1,0 +1,96 @@
+{# _sub_modal.html — Modal de nova assinatura/receita fixa #}
+<div class="modal-header">
+  <h3>Nova Assinatura / Receita Fixa</h3>
+  <button class="btn btn--ghost btn--icon" onclick="document.getElementById('modal-overlay').classList.remove('modal--open')">✕</button>
+</div>
+<form hx-post="/subscriptions">
+  <div class="modal-body">
+
+    {# Tipo: Despesa (assinatura) ou Receita (receita fixa) #}
+    <div class="form-group">
+      <label class="form-label">Tipo *</label>
+      <div style="display:flex;gap:8px">
+        <label style="flex:1;cursor:pointer">
+          <input type="radio" name="type" value="expense" checked style="display:none" id="type-expense">
+          <div id="type-expense-btn" onclick="setSubType('expense')"
+               style="padding:10px;border-radius:var(--radius);border:2px solid var(--em);background:var(--em-bg);text-align:center">
+            <div style="font-size:1.1rem">💸</div>
+            <div style="font-size:0.8rem;font-weight:600;color:var(--em)">Assinatura (despesa)</div>
+          </div>
+        </label>
+        <label style="flex:1;cursor:pointer">
+          <input type="radio" name="type" value="income" style="display:none" id="type-income">
+          <div id="type-income-btn" onclick="setSubType('income')"
+               style="padding:10px;border-radius:var(--radius);border:2px solid var(--border);background:var(--bg-3);text-align:center">
+            <div style="font-size:1.1rem">💰</div>
+            <div style="font-size:0.8rem;font-weight:600;color:var(--text-3)">Receita fixa</div>
+          </div>
+        </label>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Nome *</label>
+      <input type="text" name="name" class="form-control" required placeholder="Netflix, Salário, Aluguel recebido...">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Valor (R$) *</label>
+        <input type="number" name="amount" class="form-control" step="0.01" min="0.01" required placeholder="0,00">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Dia de cobrança/recebimento *</label>
+        <input type="number" name="billing_day" class="form-control" min="1" max="31" required placeholder="1–31">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Próxima data *</label>
+      <input type="date" name="next_billing_date" class="form-control" required value="{{ today }}">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Categoria</label>
+        <select name="category_id" class="form-control">
+          <option value="">— Nenhuma —</option>
+          {% for cat in cats %}
+          <option value="{{ cat.id }}">{{ cat.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group" id="card-field">
+        <label class="form-label">Cartão</label>
+        <select name="card_id" class="form-control">
+          <option value="">— Nenhum —</option>
+          {% for card in cards %}
+          <option value="{{ card.id }}">{{ card.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button type="button" class="btn btn--ghost" onclick="document.getElementById('modal-overlay').classList.remove('modal--open')">Cancelar</button>
+    <button type="submit" class="btn btn--primary">Salvar</button>
+  </div>
+</form>
+<script>
+function setSubType(type) {
+  document.getElementById('type-expense').checked = type === 'expense';
+  document.getElementById('type-income').checked  = type === 'income';
+  const expBtn = document.getElementById('type-expense-btn');
+  const incBtn = document.getElementById('type-income-btn');
+  if (type === 'expense') {
+    expBtn.style.borderColor = 'var(--em)'; expBtn.style.background = 'var(--em-bg)';
+    expBtn.querySelector('div:last-child').style.color = 'var(--em)';
+    incBtn.style.borderColor = 'var(--border)'; incBtn.style.background = 'var(--bg-3)';
+    incBtn.querySelector('div:last-child').style.color = 'var(--text-3)';
+    document.getElementById('card-field').style.display = 'block';
+  } else {
+    incBtn.style.borderColor = 'var(--em)'; incBtn.style.background = 'var(--em-bg)';
+    incBtn.querySelector('div:last-child').style.color = 'var(--em)';
+    expBtn.style.borderColor = 'var(--border)'; expBtn.style.background = 'var(--bg-3)';
+    expBtn.querySelector('div:last-child').style.color = 'var(--text-3)';
+    document.getElementById('card-field').style.display = 'none';
+  }
+}
+</script>

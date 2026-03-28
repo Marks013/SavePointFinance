@@ -1,0 +1,28 @@
+{% set filtered = cats | selectattr('type.value', 'equalto', tab) | list %}
+<div class="table-wrapper">
+  <table>
+    <thead><tr><th style="width:36px"></th><th>Nome</th><th>Tipo</th><th>Palavras-chave</th><th>Padrão</th><th></th></tr></thead>
+    <tbody>
+      {% for cat in filtered %}
+      <tr>
+        <td><span class="color-dot" style="background:{{ cat.color }}"></span></td>
+        <td class="text-strong">{{ cat.name }}</td>
+        <td>{% if cat.type.value == 'expense' %}<span class="badge badge--expense">Despesa</span>{% else %}<span class="badge badge--income">Receita</span>{% endif %}</td>
+        <td class="text-muted text-sm">{{ (cat.keywords or [])[:5] | join(', ') or '—' }}</td>
+        <td>{% if cat.is_default %}<span class="badge badge--info">Padrão</span>{% else %}—{% endif %}</td>
+        <td class="td-actions">
+          <a hx-get="/categories/{{ cat.id }}/edit" hx-target="#modal-content" hx-swap="innerHTML"
+             hx-on::after-request="openModal()" class="btn btn--ghost btn--sm">✎</a>
+          {% if not cat.is_default %}
+          <button hx-delete="/categories/{{ cat.id }}" hx-target="#cat-panel"
+                  hx-confirm="Excluir categoria '{{ cat.name }}'?"
+                  class="btn btn--ghost btn--sm" style="color:var(--red)">✕</button>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" style="padding:40px;text-align:center;color:var(--text-3)">Nenhuma categoria de {{ 'despesa' if tab == 'expense' else 'receita' }}.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

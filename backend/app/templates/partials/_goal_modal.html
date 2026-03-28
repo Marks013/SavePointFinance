@@ -1,0 +1,59 @@
+{% set is_edit = goal is not none %}
+{% set ICONS = ['🎯','🏠','🚗','✈️','🎓','💻','📱','💍','🏖️','🛍️','🎸','🏋️','🚀','💪','🎁','🏦','📚','💎','🏆','🌍'] %}
+{% set COLORS = ['#10B981','#3B82F6','#8B5CF6','#F59E0B','#EF4444','#EC4899','#06B6D4','#84CC16','#F97316','#6366F1'] %}
+<div class="modal-header">
+  <h3>{{ '✏️ Editar Meta' if is_edit else '🎯 Nova Meta' }}</h3>
+  <button class="btn btn--ghost btn--icon" onclick="document.getElementById('modal-overlay').classList.remove('modal--open')">✕</button>
+</div>
+<form {% if is_edit %}hx-put="/goals/{{ goal.id }}"{% else %}hx-post="/goals"{% endif %}
+      x-data="{ icon: '{{ goal.icon or '🎯' }}', color: '{{ goal.color or '#10B981' }}' }">
+  <div class="modal-body">
+    <div class="form-group"><label class="form-label">Nome *</label>
+      <input type="text" name="name" class="form-control" required placeholder="Ex: Viagem para Europa" value="{{ goal.name if is_edit else '' }}" maxlength="100"></div>
+    <div class="form-group"><label class="form-label">Ícone</label>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        {% for em in ICONS %}
+        <label style="cursor:pointer">
+          <input type="radio" name="icon" value="{{ em }}" style="display:none"
+                 {% if (is_edit and goal.icon == em) or (not is_edit and em == '🎯') %}checked{% endif %}
+                 @change="icon = '{{ em }}'">
+          <div :style="icon === '{{ em }}' ? 'border:2px solid var(--em);background:var(--em-bg)' : 'border:2px solid transparent'"
+               style="width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.1rem">{{ em }}</div>
+        </label>
+        {% endfor %}
+      </div></div>
+    <div class="form-group"><label class="form-label">Cor</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        {% for c in COLORS %}
+        <label style="cursor:pointer">
+          <input type="radio" name="color" value="{{ c }}" style="display:none"
+                 {% if (is_edit and goal.color == c) or (not is_edit and c == '#10B981') %}checked{% endif %}
+                 @change="color = '{{ c }}'">
+          <div :style="color === '{{ c }}' ? 'border:3px solid white' : 'border:3px solid transparent'"
+               style="width:28px;height:28px;border-radius:50%;background:{{ c }}"></div>
+        </label>
+        {% endfor %}
+      </div></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Valor alvo (R$) *</label>
+        <input type="number" name="target_amount" class="form-control" step="0.01" min="0.01" required placeholder="0,00" value="{{ goal.target_amount if is_edit else '' }}"></div>
+      <div class="form-group"><label class="form-label">Já guardei (R$)</label>
+        <input type="number" name="current_amount" class="form-control" step="0.01" min="0" value="{{ goal.current_amount if is_edit else '0' }}"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Conta associada</label>
+        <select name="account_id" class="form-control">
+          <option value="">Nenhuma (cofre virtual)</option>
+          {% for acc in accounts %}
+          <option value="{{ acc.id }}" {% if is_edit and goal.account_id and goal.account_id|string == acc.id|string %}selected{% endif %}>{{ acc.name }}</option>
+          {% endfor %}
+        </select></div>
+      <div class="form-group"><label class="form-label">Prazo (opcional)</label>
+        <input type="date" name="deadline" class="form-control" value="{{ goal.deadline.isoformat() if is_edit and goal.deadline else '' }}"></div>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button type="button" class="btn btn--ghost" onclick="document.getElementById('modal-overlay').classList.remove('modal--open')">Cancelar</button>
+    <button type="submit" class="btn btn--primary">Salvar Meta</button>
+  </div>
+</form>

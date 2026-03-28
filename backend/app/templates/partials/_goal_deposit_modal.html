@@ -1,0 +1,28 @@
+<div class="modal-header">
+  <h3>💰 Atualizar Valor Guardado</h3>
+  <button class="btn btn--ghost btn--icon" onclick="document.getElementById('modal-overlay').classList.remove('modal--open')">✕</button>
+</div>
+{% if goal %}
+<form hx-put="/goals/{{ goal.id }}">
+  <input type="hidden" name="name"          value="{{ goal.name }}">
+  <input type="hidden" name="target_amount" value="{{ goal.target_amount }}">
+  <input type="hidden" name="account_id"    value="{{ goal.account_id or '' }}">
+  <input type="hidden" name="deadline"      value="{{ goal.deadline.isoformat() if goal.deadline else '' }}">
+  <input type="hidden" name="color"         value="{{ goal.color or '#10B981' }}">
+  <input type="hidden" name="icon"          value="{{ goal.icon or '🎯' }}">
+  <div class="modal-body">
+    <div style="display:flex;align-items:center;gap:16px;background:var(--bg-3);border-radius:12px;padding:16px;margin-bottom:4px">
+      <div style="font-size:2rem">{{ goal.icon or '🎯' }}</div>
+      <div><div style="font-weight:600;color:var(--text)">{{ goal.name }}</div>
+        <div style="font-size:0.85rem;color:var(--text-3)">Meta: R$ {{ "%.2f"|format(goal.target_amount|float) }}</div></div>
+    </div>
+    <div class="form-group"><label class="form-label">Novo total guardado (R$)</label>
+      <input type="number" name="current_amount" class="form-control" step="0.01" min="0"
+             value="{{ goal.current_amount }}" style="font-size:1.4rem;text-align:center"></div>
+  </div>
+  <div class="modal-footer">
+    <button type="button" class="btn btn--ghost" onclick="document.getElementById('modal-overlay').classList.remove('modal--open')">Cancelar</button>
+    <button type="submit" class="btn btn--primary">Salvar</button>
+  </div>
+</form>
+{% endif %}

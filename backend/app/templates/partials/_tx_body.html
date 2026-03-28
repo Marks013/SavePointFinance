@@ -1,0 +1,29 @@
+{% set month_names = ['','Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'] %}
+{% set prev_month = month - 1 if month > 1 else 12 %}
+{% set prev_year  = year if month > 1 else year - 1 %}
+{% set next_month = month + 1 if month < 12 else 1 %}
+{% set next_year  = year if month < 12 else year + 1 %}
+<div id="tx-body">
+  <form hx-get="/transactions" hx-target="#tx-panel" hx-trigger="change, input delay:400ms"
+        hx-push-url="true" class="filters-bar">
+    <input type="hidden" name="year" value="{{ year }}"><input type="hidden" name="month" value="{{ month }}">
+    <div class="month-nav">
+      <a href="/transactions?year={{ prev_year }}&month={{ prev_month }}" class="btn btn--ghost btn--sm"
+         hx-get="/transactions?year={{ prev_year }}&month={{ prev_month }}" hx-target="#tx-body" hx-push-url="true">‹</a>
+      <div class="month-nav-label">{{ month_names[month] }} {{ year }}</div>
+      <a href="/transactions?year={{ next_year }}&month={{ next_month }}" class="btn btn--ghost btn--sm"
+         hx-get="/transactions?year={{ next_year }}&month={{ next_month }}" hx-target="#tx-body" hx-push-url="true">›</a>
+    </div>
+    <input type="text" name="search" value="{{ search }}" class="search-input" placeholder="Buscar...">
+    <select name="type" class="filter-control">
+      <option value="">Todos os tipos</option>
+      <option value="income"  {% if type_f == 'income' %}selected{% endif %}>Receitas</option>
+      <option value="expense" {% if type_f == 'expense' %}selected{% endif %}>Despesas</option>
+    </select>
+    <select name="category_id" class="filter-control">
+      <option value="">Todas as categorias</option>
+      {% for cat in cats %}<option value="{{ cat.id }}" {% if cat_f == cat.id|string %}selected{% endif %}>{{ cat.name }}</option>{% endfor %}
+    </select>
+  </form>
+  <div id="tx-panel">{% include "partials/_tx_table.html" %}</div>
+</div>

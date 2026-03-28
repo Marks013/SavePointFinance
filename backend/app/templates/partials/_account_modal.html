@@ -1,0 +1,28 @@
+{% set is_edit = acc is defined and acc is not none %}
+<div class="modal-header">
+  <h3>{{ 'Editar Conta' if is_edit else 'Nova Conta' }}</h3>
+  <button class="btn btn--ghost btn--icon" onclick="document.getElementById('modal-overlay').classList.remove('modal--open')">✕</button>
+</div>
+<form {% if is_edit %}hx-put="/settings/accounts/{{ acc.id }}"{% else %}hx-post="/settings/accounts"{% endif %}
+      hx-target="#accounts-panel" hx-swap="innerHTML">
+  <div class="modal-body">
+    <div class="form-group"><label class="form-label">Nome *</label>
+      <input type="text" name="name" class="form-control" required placeholder="Ex: Nubank Conta" value="{{ acc.name if is_edit else '' }}"></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Tipo</label>
+        <select name="type" class="form-control">
+          {% for val, label in [('checking','Conta corrente'),('savings','Poupança'),('investment','Investimento'),('wallet','Carteira')] %}
+          <option value="{{ val }}" {% if is_edit and acc.type.value == val %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select></div>
+      <div class="form-group"><label class="form-label">Saldo inicial (R$)</label>
+        <input type="number" name="balance" class="form-control" step="0.01" value="{{ acc.balance if is_edit else '0' }}"></div>
+    </div>
+    <div class="form-group"><label class="form-label">Cor</label>
+      <input type="color" name="color" class="form-control" style="height:36px;width:60px;padding:2px" value="{{ acc.color if is_edit else '#10B981' }}"></div>
+  </div>
+  <div class="modal-footer">
+    <button type="button" class="btn btn--ghost" onclick="document.getElementById('modal-overlay').classList.remove('modal--open')">Cancelar</button>
+    <button type="submit" class="btn btn--primary">Salvar</button>
+  </div>
+</form>

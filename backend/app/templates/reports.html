@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Relatórios — Save Point Finanças{% endblock %}
+{% block head %}<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>{% endblock %}
+
+{% block content %}
+{% set prev_month = month - 1 if month > 1 else 12 %}
+{% set prev_year  = year if month > 1 else year - 1 %}
+{% set next_month = month + 1 if month < 12 else 1 %}
+{% set next_year  = year if month < 12 else year + 1 %}
+{% set month_names = ['','Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'] %}
+{% set month_names_full = ['','Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'] %}
+
+<div class="page-header">
+  <div>
+    <div class="page-title">📊 Relatórios</div>
+    <div style="font-size:0.8rem;color:var(--text-3);margin-top:2px">{{ month_names_full[month] }} {{ year }}</div>
+  </div>
+  <div class="page-actions">
+    <div class="month-nav">
+      <a href="/reports?year={{ prev_year }}&month={{ prev_month }}" class="btn btn--ghost btn--sm"
+         hx-get="/reports?year={{ prev_year }}&month={{ prev_month }}" hx-target="#rep-body" hx-push-url="true">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </a>
+      <div class="month-nav-label">{{ month_names[month] }} {{ year }}</div>
+      <a href="/reports?year={{ next_year }}&month={{ next_month }}" class="btn btn--ghost btn--sm"
+         hx-get="/reports?year={{ next_year }}&month={{ next_month }}" hx-target="#rep-body" hx-push-url="true">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      </a>
+    </div>
+    <button onclick="window.print()" class="btn btn--secondary btn--sm">
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+      Imprimir
+    </button>
+  </div>
+</div>
+
+<div class="page-body" id="rep-body">
+  {% include "partials/_reports_body.html" %}
+</div>
+
+<style>
+@media print {
+  .sidebar, .page-header .page-actions, .btn { display: none !important; }
+  .app-shell { grid-template-columns: 1fr !important; }
+  .main-content { overflow: visible !important; }
+  .page-body { padding: 0 !important; }
+  .card { border: 1px solid #ccc !important; break-inside: avoid; }
+  body { background: white !important; color: black !important; }
+  .stat-value, .stat-value--income, .stat-value--expense { color: black !important; }
+  canvas { max-width: 100% !important; }
+  .grid-2 { display: block !important; }
+  .grid-2 > * { margin-bottom: 16px !important; }
+  @page { margin: 1.5cm; }
+}
+</style>
+{% endblock %}

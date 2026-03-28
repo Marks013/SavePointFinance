@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Cartões & Parcelas — Save Point Finanças{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div class="page-title">Cartões & Parcelas</div>
+  <div class="page-actions">
+    <button class="btn btn--primary" hx-get="/transactions/new?redirect_to=%2Finstallments"
+            hx-target="#modal-content" hx-swap="innerHTML" hx-on::after-request="openModal()">
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+      Nova compra parcelada
+    </button>
+    <button class="btn btn--secondary" hx-get="/settings/cards/new-form" hx-target="#modal-content" hx-swap="innerHTML" hx-on::after-request="openModal()">
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+      Novo cartão
+    </button>
+  </div>
+</div>
+<div class="page-body">
+  {% if cards %}
+  <div class="section-header" style="margin-bottom:14px"><div class="section-title">Meus cartões</div></div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;margin-bottom:32px">
+    {% for card in cards %}
+    <div class="card" style="border-top:4px solid {{ card.color or 'var(--em)' }}">
+      <div class="card-header">
+        <div class="card-title">{{ card.name }}{% if card.last4 %} <span style="color:var(--text-3);font-size:0.78rem">••{{ card.last4 }}</span>{% endif %}</div>
+        <span class="badge {% if card.is_active %}badge--active{% else %}badge--inactive{% endif %}">{{ 'Ativo' if card.is_active else 'Inativo' }}</span>
+      </div>
+      <div style="padding:12px 16px;font-size:0.85rem;color:var(--text-2)">
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span>Vencimento</span><strong>Dia {{ card.due_day }}</strong></div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span>Fechamento</span><strong>Dia {{ card.close_day }}</strong></div>
+        <div style="display:flex;justify-content:space-between"><span>Limite</span><strong style="color:var(--em)">{{ fmt(card.limit_amount) }}</strong></div>
+      </div>
+      <div style="padding:0 16px 14px;display:flex;gap:8px">
+        <button class="btn btn--ghost btn--sm" hx-get="/settings/cards/{{ card.id }}/edit-form" hx-target="#modal-content" hx-swap="innerHTML" hx-on::after-request="openModal()">✏️ Editar</button>
+        <button class="btn btn--ghost btn--sm" style="color:var(--red)" hx-delete="/settings/cards/{{ card.id }}" hx-confirm="Excluir '{{ card.name }}'?">✕ Excluir</button>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div id="installments-list">
+    {% if installments_by_card %}
+    <div class="section-header" style="margin-bottom:14px"><div class="section-title">Parcelas por cartão</div></div>
+    {% include "partials/_installments_list.html" %}
+    {% else %}
+    <div style="text-align:center;padding:60px;color:var(--text-3)">
+      <div style="font-size:3rem;margin-bottom:16px">💳</div>
+      <div style="font-size:1rem;color:var(--text-2);margin-bottom:8px">Nenhuma compra parcelada</div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
