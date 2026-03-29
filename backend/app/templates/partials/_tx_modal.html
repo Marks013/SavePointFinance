@@ -31,14 +31,15 @@
 
 <form
   {% if is_edit %}hx-put="/transactions/{{ tx.id }}"{% else %}hx-post="/transactions"{% endif %}
-  hx-target="#tx-panel"
-  hx-swap="innerHTML"
+  hx-target="body"
+  hx-swap="outerHTML"
   id="tx-form"
   onsubmit="return validateTxForm(event)"
 >
   <input type="hidden" name="year"  value="{{ now_year }}">
   <input type="hidden" name="month" value="{{ now_month }}">
   <input type="hidden" name="redirect_to" value="{{ redirect_to | default('') }}">
+  <input type="hidden" name="from_page" id="from-page" value="transactions">
 
   <div class="modal-body">
     {# Tipo e Data #}
@@ -227,6 +228,12 @@
   if (typeSelect) onTypeChange(typeSelect.value);
   const pmSelect = document.getElementById('payment-method');
   if (pmSelect) onPaymentChange(pmSelect.value);
+  
+  // Detectar se estamos na página de transações
+  const fromPage = document.getElementById('from-page');
+  if (fromPage && !document.getElementById('tx-panel')) {
+    fromPage.value = 'modal';
+  }
 })();
 
 function onTypeChange(type) {
@@ -285,6 +292,18 @@ function validateTxForm(e) {
     accSel.focus();
     const warn = document.getElementById('pix-warning');
     if (warn) warn.style.display = 'block';
+    return false;
+  }
+
+  // TED/DOC (transfer) exige conta
+  if (pm === 'transfer' && accSel && !accSel.value) {
+    accSel.style.borderColor = 'var(--red)';
+    accSel.focus();
+    const warn = document.getElementById('pix-warning');
+    if (warn) {
+      warn.textContent = 'Pix/TED/DOC requer conta bancária.';
+      warn.style.display = 'block';
+    }
     return false;
   }
 

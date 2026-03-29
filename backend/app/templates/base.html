@@ -12,7 +12,7 @@
 <body>
 <div class="app-shell">
   {% include "partials/_sidebar.html" %}
-  <div class="main-content">{% block content %}{% endblock %}</div>
+  <div id="main-content" class="main-content">{% block content %}{% endblock %}</div>
 </div>
 
 <div id="modal-overlay" class="modal">
@@ -35,16 +35,38 @@ document.body.addEventListener('htmx:afterSwap', e => {
 });
 
 document.addEventListener('DOMContentLoaded', () => {
-  document.body.addEventListener('htmx:afterRequest', e => {
-    const raw = e.detail.xhr?.getResponseHeader('HX-Trigger-After-Swap');
-    if (raw) {
-      try {
-        const events = JSON.parse(raw);
-        for (const [name, detail] of Object.entries(events))
-          window.dispatchEvent(new CustomEvent(name, { detail }));
-      } catch {}
-    }
-  });
+document.body.addEventListener('htmx:afterRequest', e => {
+  const raw = e.detail.xhr?.getResponseHeader('HX-Trigger-After-Swap');
+  if (raw) {
+    try {
+      const events = JSON.parse(raw);
+      for (const [name, detail] of Object.entries(events))
+        window.dispatchEvent(new CustomEvent(name, { detail }));
+    } catch {}
+  }
+  
+  const rawTrigger = e.detail.xhr?.getResponseHeader('HX-Trigger');
+  if (rawTrigger) {
+    try {
+      const t = JSON.parse(rawTrigger);
+      if (t['sp:toast'])     addToast(t['sp:toast']);
+      if (t['sp:closeModal']) window.dispatchEvent(new CustomEvent('sp:closeModal'));
+      if (t['sp:openModal'])  window.dispatchEvent(new CustomEvent('sp:openModal'));
+    } catch {}
+  }
+});
+
+// Toast manager
+const toastContainer = document.querySelector('.toast-container');
+function addToast({ message, kind = 'success' }) {
+  const icons = { success: '✓', error: '✕', warning: '⚠', info: 'ℹ' };
+  const toast = document.createElement('div');
+  toast.className = `toast toast--${kind}`;
+  toast.innerHTML = `<span class="toast-icon">${icons[kind] || 'ℹ'}</span><span>${message}</span>`;
+  toastContainer.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add('toast--show'));
+  setTimeout(() => { toast.classList.remove('toast--show'); setTimeout(() => toast.remove(), 400); }, 4000);
+}
 });
 
 // Toast manager
@@ -65,7 +87,31 @@ document.body.addEventListener('htmx:afterRequest', e => {
     const t = JSON.parse(raw);
     if (t['sp:toast'])     addToast(t['sp:toast']);
     if (t['sp:closeModal']) window.dispatchEvent(new CustomEvent('sp:closeModal'));
+    if (t['sp:openModal'])  window.dispatchEvent(new CustomEvent('sp:openModal'));
   } catch {}
+});
+
+document.body.addEventListener('htmx:beforeSwap', e => {
+  if (e.detail.xhr.status >= 400) {
+    e.detail.shouldSwap = true;
+    e.detail.target = document.getElementById('modal-content');
+  }
+});
+
+document.body.addEventListener('htmx:responseError', e => {
+  const raw = e.detail.xhr?.getResponseHeader('HX-Trigger');
+  if (raw) {
+    try {
+      const t = JSON.parse(raw);
+      if (t['sp:openModal']) window.dispatchEvent(new CustomEvent('sp:openModal'));
+    } catch {}
+  }
+});
+
+window.addEventListener('sp:refreshDashboard', () => {
+  if (window.location.pathname === '/dashboard') {
+    htmx.ajax('GET', '/dashboard', { target: '#main-content', swap: 'outerHTML' });
+  }
 });
 </script>
 

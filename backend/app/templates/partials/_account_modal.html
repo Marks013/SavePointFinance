@@ -4,7 +4,7 @@
   <button class="btn btn--ghost btn--icon" onclick="document.getElementById('modal-overlay').classList.remove('modal--open')">✕</button>
 </div>
 <form {% if is_edit %}hx-put="/settings/accounts/{{ acc.id }}"{% else %}hx-post="/settings/accounts"{% endif %}
-      hx-target="#accounts-panel" hx-swap="innerHTML">
+      hx-target="body" hx-swap="outerHTML">
   <div class="modal-body">
     <div class="form-group"><label class="form-label">Nome *</label>
       <input type="text" name="name" class="form-control" required placeholder="Ex: Nubank Conta" value="{{ acc.name if is_edit else '' }}"></div>

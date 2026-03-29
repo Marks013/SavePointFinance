@@ -1,0 +1,383 @@
+{% extends "base.html" %}
+{% block title %}Admin — Save Point Finanças{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-title"><span style="color:var(--amber)">⬡</span> Painel Administrativo</div>
+  <div style="display:flex;gap:8px">
+    <a href="/admin" class="btn btn--ghost">Legacy</a>
+    <button class="btn btn--primary" onclick="document.getElementById('createModal').showModal()">+ Novo</button>
+  </div>
+</div>
+
+<!-- Stats Dashboard -->
+{% if tab == 'dashboard' %}
+<div class="stat-grid" style="margin-bottom:24px">
+  <div class="stat-card stat-card--income">
+    <div class="stat-label">Workspaces Ativos</div>
+    <div class="stat-value stat-value--income">{{ stats.active_tenants }}</div>
+  </div>
+  <div class="stat-card stat-card--balance">
+    <div class="stat-label">Total Usuários</div>
+    <div class="stat-value stat-value--balance">{{ stats.total_users }}</div>
+  </div>
+  <div class="stat-card stat-card--neutral">
+    <div class="stat-label">Transações</div>
+    <div class="stat-value" style="color:var(--amber)">{{ stats.total_tx }}</div>
+  </div>
+  <div class="stat-card stat-card--expense">
+    <div class="stat-label">Receita Total</div>
+    <div class="stat-value stat-value--expense">R$ {{ "%.2f"|format(stats.revenue_total|float) }}</div>
+  </div>
+</div>
+
+<div class="grid grid--2col" style="gap:24px;margin-bottom:24px">
+  <div class="card">
+    <div class="card-header"><div class="card-title">Distribuição por Plano</div></div>
+    <div style="padding:16px">
+      {% for plan, count in stats.plans_dist.items() %}
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+        <span>{{ plan|upper }}</span>
+        <span class="badge badge--info">{{ count }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-title">Atividade Recente</div></div>
+    <div style="padding:16px;max-height:200px;overflow-y:auto">
+      {% for tx in recent_transactions[:5] %}
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+        <span>{{ tx.description[:30] }}...</span>
+        <span style="color:{% if tx.type.value == 'income' %}var(--green){% else %}var(--red){% endif %}">
+          {% if tx.type.value == 'income' %}+{% else %}-{% endif %}R$ {{ "%.2f"|format(tx.amount|float) }}
+        </span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Tabs -->
+<div class="tabs" style="margin-bottom:20px">
+  <a href="/admin2?tab=dashboard" class="tab {% if tab == 'dashboard' %}tab--active{% endif %}">📊 Dashboard</a>
+  <a href="/admin2?tab=tenants" class="tab {% if tab == 'tenants' %}tab--active{% endif %}">🏢 Workspaces</a>
+  <a href="/admin2?tab=users" class="tab {% if tab == 'users' %}tab--active{% endif %}">👥 Usuários</a>
+  <a href="/admin2?tab=transactions" class="tab {% if tab == 'transactions' %}tab--active{% endif %}">💸 Transações</a>
+  <a href="/admin2?tab=categories" class="tab {% if tab == 'categories' %}tab--active{% endif %}">🏷️ Categorias</a>
+  <a href="/admin2?tab=accounts" class="tab {% if tab == 'accounts' %}tab--active{% endif %}">🏦 Contas</a>
+  <a href="/admin2?tab=cards" class="tab {% if tab == 'cards' %}tab--active{% endif %}">💳 Cartões</a>
+  <a href="/admin2/plans" class="tab">📦 Planos</a>
+  <a href="/admin2/subscriptions" class="tab">💳 Assinaturas</a>
+  <a href="/admin2/logs" class="tab">📋 Logs</a>
+</div>
+
+<!-- Filters -->
+<form method="get" style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap">
+  <input type="hidden" name="tab" value="{{ tab }}">
+  <input type="text" name="search" placeholder="Buscar..." value="{{ search }}" class="filter-control" style="width:200px">
+  <select name="tenant_filter" class="filter-control" style="width:200px">
+    <option value="">Todos os workspaces</option>
+    {% for t in all_tenants %}
+    <option value="{{ t.id }}" {% if tenant_filter == t.id|string %}selected{% endif %}>{{ t.name }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit" class="btn btn--primary btn--sm">Filtrar</button>
+  {% if search or tenant_filter %}
+  <a href="/admin2?tab={{ tab }}" class="btn btn--ghost btn--sm">Limpar</a>
+  {% endif %}
+</form>
+
+<!-- Results Count -->
+<div style="margin-bottom:12px;color:var(--text-3);font-size:0.875rem">
+  {{ total_count }} resultado(s) — Página {{ page }} de {{ total_pages }}
+</div>
+
+<!-- TENANTS TABLE -->
+{% if tab == 'tenants' %}
+<div class="card">
+  <div class="table-wrapper" style="border:none">
+    <table>
+      <thead><tr><th>Nome</th><th>Slug</th><th>Plano</th><th>Usuários</th><th>Status</th><th>Expira</th><th>Criado</th><th>Ações</th></tr></thead>
+      <tbody>
+        {% for t in items %}
+        <tr>
+          <td class="text-strong"><a href="/admin2/tenant/{{ t.id }}">{{ t.name }}</a></td>
+          <td class="text-muted">/{{ t.slug }}</td>
+          <td><span class="badge badge--info">{{ t.plan or 'free' }}</span></td>
+          <td>{{ t.max_users }}</td>
+          <td>{% if t.is_active %}<span class="badge badge--active">Ativo</span>{% else %}<span class="badge badge--inactive">Suspenso</span>{% endif %}</td>
+          <td class="text-muted">{{ t.expires_at.strftime('%d/%m/%Y') if t.expires_at else '—' }}</td>
+          <td class="text-muted">{{ t.created_at.strftime('%d/%m/%Y') }}</td>
+          <td>
+            <a href="/admin2/tenant/{{ t.id }}" class="btn btn--ghost btn--sm">✎</a>
+            <button class="btn btn--ghost btn--sm" style="color:var(--red)" hx-delete="/admin2/tenants/{{ t.id }}" hx-confirm="Excluir workspace '{{ t.name }}'?">🗑</button>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" style="padding:24px;text-align:center;color:var(--text-3)">Nenhum workspace encontrado.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- USERS TABLE -->
+{% if tab == 'users' %}
+<div class="card">
+  <div class="table-wrapper" style="border:none">
+    <table>
+      <thead><tr><th>Nome</th><th>Email</th><th>Workspace</th><th>Role</th><th>Status</th><th>Criado</th><th>Ações</th></tr></thead>
+      <tbody>
+        {% for u, t in items %}
+        <tr>
+          <td class="text-strong">{{ u.name }}</td>
+          <td>{{ u.email }}</td>
+          <td><a href="/admin2/tenant/{{ t.id }}">{{ t.name }}</a></td>
+          <td><span class="badge {% if u.role.value == 'superadmin' %}badge--active{% elif u.role.value == 'admin' %}badge--info{% else %}badge--neutral{% endif %}">{{ u.role.value }}</span></td>
+          <td>{% if u.is_active %}<span class="badge badge--active">Ativo</span>{% else %}<span class="badge badge--inactive">Inativo</span>{% endif %}</td>
+          <td class="text-muted">{{ u.created_at.strftime('%d/%m/%Y') }}</td>
+          <td>
+            <button class="btn btn--ghost btn--sm" style="color:var(--red)" hx-delete="/admin2/users/{{ u.id }}" hx-confirm="Excluir usuário '{{ u.name }}'?">🗑</button>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" style="padding:24px;text-align:center;color:var(--text-3)">Nenhum usuário encontrado.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- TRANSACTIONS TABLE -->
+{% if tab == 'transactions' %}
+<div class="card">
+  <div class="table-wrapper" style="border:none">
+    <table>
+      <thead><tr><th>Data</th><th>Descrição</th><th>Workspace</th><th>Tipo</th><th>Valor</th><th>Categoria</th><th>Conta</th><th>Criado</th><th>Ações</th></tr></thead>
+      <tbody>
+        {% for tx, user, tenant, cat, acc in items %}
+        <tr>
+          <td class="text-muted">{{ tx.date.strftime('%d/%m/%Y') }}</td>
+          <td class="text-strong">{{ tx.description[:40] }}...</td>
+          <td><a href="/admin2/tenant/{{ tenant.id }}">{{ tenant.name }}</a></td>
+          <td><span class="badge {% if tx.type.value == 'income' %}badge--active{% else %}badge--expense{% endif %}">{{ tx.type.value }}</span></td>
+          <td style="color:{% if tx.type.value == 'income' %}var(--green){% else %}var(--red){% endif %}">
+            {% if tx.type.value == 'income' %}+{% else %}-{% endif %}R$ {{ "%.2f"|format(tx.amount|float) }}
+          </td>
+          <td>{{ cat.name if cat else '—' }}</td>
+          <td>{{ acc.name if acc else '—' }}</td>
+          <td class="text-muted">{{ tx.created_at.strftime('%d/%m %H:%M') }}</td>
+          <td>
+            <button class="btn btn--ghost btn--sm" style="color:var(--red)" hx-delete="/admin2/transactions/{{ tx.id }}" hx-confirm="Excluir transação?">🗑</button>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="9" style="padding:24px;text-align:center;color:var(--text-3)">Nenhuma transação encontrada.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- CATEGORIES TABLE -->
+{% if tab == 'categories' %}
+<div class="card">
+  <div class="table-wrapper" style="border:none">
+    <table>
+      <thead><tr><th>Nome</th><th>Ícone</th><th>Tipo</th><th>Workspace</th><th>Criado</th><th>Ações</th></tr></thead>
+      <tbody>
+        {% for c, t in items %}
+        <tr>
+          <td class="text-strong">{{ c.icon }} {{ c.name }}</td>
+          <td>{{ c.icon }}</td>
+          <td><span class="badge {% if c.type.value == 'income' %}badge--active{% else %}badge--expense{% endif %}">{{ c.type.value }}</span></td>
+          <td><a href="/admin2/tenant/{{ t.id }}">{{ t.name }}</a></td>
+          <td class="text-muted">{{ c.created_at.strftime('%d/%m/%Y') }}</td>
+          <td>
+            <button class="btn btn--ghost btn--sm" style="color:var(--red)" hx-delete="/admin2/categories/{{ c.id }}" hx-confirm="Excluir categoria '{{ c.name }}'?">🗑</button>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" style="padding:24px;text-align:center;color:var(--text-3)">Nenhuma categoria encontrada.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- ACCOUNTS TABLE -->
+{% if tab == 'accounts' %}
+<div class="card">
+  <div class="table-wrapper" style="border:none">
+    <table>
+      <thead><tr><th>Nome</th><th>Tipo</th><th>Saldo</th><th>Workspace</th><th>Status</th><th>Criado</th><th>Ações</th></tr></thead>
+      <tbody>
+        {% for a, t in items %}
+        <tr>
+          <td class="text-strong">{{ a.name }}</td>
+          <td><span class="badge badge--info">{{ a.type.value }}</span></td>
+          <td style="color:{% if a.balance|float >= 0 %}var(--green){% else %}var(--red){% endif %}">R$ {{ "%.2f"|format(a.balance|float) }}</td>
+          <td><a href="/admin2/tenant/{{ t.id }}">{{ t.name }}</a></td>
+          <td>{% if a.is_active %}<span class="badge badge--active">Ativa</span>{% else %}<span class="badge badge--inactive">Inativa</span>{% endif %}</td>
+          <td class="text-muted">{{ a.created_at.strftime('%d/%m/%Y') }}</td>
+          <td>
+            <button class="btn btn--ghost btn--sm" style="color:var(--red)" hx-delete="/admin2/accounts/{{ a.id }}" hx-confirm="Excluir conta '{{ a.name }}'?">🗑</button>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" style="padding:24px;text-align:center;color:var(--text-3)">Nenhuma conta encontrada.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- CARDS TABLE -->
+{% if tab == 'cards' %}
+<div class="card">
+  <div class="table-wrapper" style="border:none">
+    <table>
+      <thead><tr><th>Nome</th><th>Tipo</th><th>Últimos Dígitos</th><th>Limite</th><th>Workspace</th><th>Status</th><th>Ações</th></tr></thead>
+      <tbody>
+        {% for c, t in items %}
+        <tr>
+          <td class="text-strong">{{ c.name }}</td>
+          <td><span class="badge badge--info">{{ c.card_type.value if c.card_type else 'credit' }}</span></td>
+          <td class="text-muted">**** {{ c.last_digits or '****' }}</td>
+          <td>R$ {{ "%.2f"|format(c.limit|float) if c.limit else '0.00' }}</td>
+          <td><a href="/admin2/tenant/{{ t.id }}">{{ t.name }}</a></td>
+          <td>{% if c.is_active %}<span class="badge badge--active">Ativo</span>{% else %}<span class="badge badge--inactive">Inativo</span>{% endif %}</td>
+          <td>
+            <button class="btn btn--ghost btn--sm" style="color:var(--red)" hx-delete="/admin2/cards/{{ c.id }}" hx-confirm="Excluir cartão '{{ c.name }}'?">🗑</button>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" style="padding:24px;text-align:center;color:var(--text-3)">Nenhum cartão encontrado.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- Pagination -->
+{% if total_pages > 1 %}
+<div style="display:flex;justify-content:center;gap:8px;margin-top:20px">
+  {% if page > 1 %}
+  <a href="?tab={{ tab }}&page={{ page-1 }}&search={{ search }}&tenant_filter={{ tenant_filter }}" class="btn btn--ghost btn--sm">← Anterior</a>
+  {% endif %}
+  {% for p in range(1, total_pages + 1) %}
+    {% if p >= page - 2 and p <= page + 2 %}
+    <a href="?tab={{ tab }}&page={{ p }}&search={{ search }}&tenant_filter={{ tenant_filter }}" class="btn btn--{% if p == page %}primary{% else %}ghost{% endif %} btn--sm">{{ p }}</a>
+    {% endif %}
+  {% endfor %}
+  {% if page < total_pages %}
+  <a href="?tab={{ tab }}&page={{ page+1 }}&search={{ search }}&tenant_filter={{ tenant_filter }}" class="btn btn--ghost btn--sm">Próxima →</a>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- Create Modal -->
+<dialog id="createModal" style="border:none;border-radius:12px;padding:24px;max-width:500px;width:90%">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+    <h3 style="margin:0">Criar Novo</h3>
+    <button onclick="document.getElementById('createModal').close()" class="btn btn--ghost">✕</button>
+  </div>
+  
+  {% if tab == 'tenants' or tab == 'dashboard' %}
+  <form method="post" action="/admin2/tenants">
+    <div class="form-group">
+      <label class="form-label">Nome do Workspace</label>
+      <input type="text" name="name" required class="form-control" placeholder="Ex: Empresa XYZ">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Slug (URL)</label>
+      <input type="text" name="slug" required class="form-control" placeholder="Ex: empresa-xyz">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Plano</label>
+      <select name="plan" class="form-control">
+        <option value="free">Free</option>
+        <option value="basic">Basic</option>
+        <option value="pro">Pro</option>
+        <option value="enterprise">Enterprise</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Máx. Usuários</label>
+      <input type="number" name="max_users" value="3" min="1" class="form-control">
+    </div>
+    <button type="submit" class="btn btn--primary" style="width:100%">Criar Workspace</button>
+  </form>
+  {% endif %}
+  
+  {% if tab == 'users' %}
+  <form method="post" action="/admin2/users">
+    <div class="form-group">
+      <label class="form-label">Nome</label>
+      <input type="text" name="name" required class="form-control">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Email</label>
+      <input type="email" name="email" required class="form-control">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Senha</label>
+      <input type="password" name="password" required class="form-control">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Workspace</label>
+      <select name="tenant_id" required class="form-control">
+        {% for t in all_tenants %}
+        <option value="{{ t.id }}">{{ t.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Role</label>
+      <select name="role" class="form-control">
+        <option value="member">Membro</option>
+        <option value="admin">Admin</option>
+      </select>
+    </div>
+    <button type="submit" class="btn btn--primary" style="width:100%">Criar Usuário</button>
+  </form>
+  {% endif %}
+  
+  {% if tab not in ['tenants', 'users', 'dashboard'] %}
+  <p style="text-align:center;color:var(--text-3)">Selecione uma aba para criar registros.</p>
+  {% endif %}
+</dialog>
+
+<style>
+.tab {
+  padding: 10px 16px;
+  color: var(--text-2);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+.tab:hover {
+  color: var(--text);
+}
+.tab--active {
+  color: var(--amber);
+  border-bottom-color: var(--amber);
+}
+.tabs {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0;
+}
+</style>
+{% endblock %}

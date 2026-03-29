@@ -6,6 +6,9 @@ from app.models.card import Card
 from app.models.transaction import Transaction, TransactionType, TransactionSource, PaymentMethod
 from app.models.subscription import Subscription, SubscriptionType
 from app.models.goal import Goal
+from app.models.plan import Plan, TenantPlan
+from app.models.whatsapp import WhatsAppUser, WhatsAppCommand, WhatsAppSession
+from app.models.audit import AuditLog
 
 __all__ = [
     "Tenant", "User", "UserRole",
@@ -15,4 +18,7 @@ __all__ = [
     "Transaction", "TransactionType", "TransactionSource", "PaymentMethod",
     "Subscription", "SubscriptionType",
     "Goal",
+    "Plan", "TenantPlan",
+    "WhatsAppUser", "WhatsAppCommand", "WhatsAppSession",
+    "AuditLog",
 ]

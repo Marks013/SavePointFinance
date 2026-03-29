@@ -4,7 +4,7 @@
   <button type="button" class="btn btn--ghost btn--icon" onclick="document.getElementById('modal-overlay').classList.remove('modal--open')">✕</button>
 </div>
 {% if error %}<div style="background:var(--red-bg);border:1px solid var(--red-border);padding:10px 20px;color:var(--red);font-size:0.8rem">⚠ {{ error }}</div>{% endif %}
-<form {% if is_edit %}hx-put="/categories/{{ cat.id }}"{% else %}hx-post="/categories"{% endif %} hx-target="#cat-panel" hx-swap="innerHTML">
+<form {% if is_edit %}hx-put="/categories/{{ cat.id }}"{% else %}hx-post="/categories"{% endif %} hx-target="body" hx-swap="outerHTML">
   <div class="modal-body">
     <div class="form-group"><label class="form-label">Nome *</label>
       <input type="text" name="name" class="form-control" required placeholder="Ex: Alimentação" value="{{ cat.name if is_edit else '' }}"></div>

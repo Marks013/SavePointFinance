@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block title %}Importar Dados — Save Point{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-title"><span style="color:var(--amber)">⬡</span> Importar Dados</div>
+</div>
+
+<div class="grid grid--2col" style="gap:24px">
+  <!-- Importar Transações -->
+  <div class="card">
+    <div class="card-header"><div class="card-title">💸 Transações</div></div>
+    <div style="padding:16px">
+      <p style="color:var(--text-2);margin-bottom:16px">
+        Importe transações de um arquivo CSV. O sistema tentará identificar categorias automaticamente.
+      </p>
+      
+      <form method="post" action="/import/transactions" enctype="multipart/form-data" hx-boost="true">
+        <div class="form-group">
+          <label class="form-label">Arquivo CSV</label>
+          <input type="file" name="file" accept=".csv" required class="form-control">
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">Conta Padrão</label>
+          <select name="account_id" class="form-control">
+            <option value="">Selecione...</option>
+            {% for a in accounts %}
+            <option value="{{ a.id }}">{{ a.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">Categoria Padrão (opcional)</label>
+          <select name="category_id" class="form-control">
+            <option value="">Selecione...</option>
+            {% for c in categories %}
+            <option value="{{ c.id }}">{{ c.icon }} {{ c.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        
+        <button type="submit" class="btn btn--primary" style="margin-top:16px">
+          📥 Importar Transações
+        </button>
+      </form>
+      
+      <div style="margin-top:16px;padding:12px;background:var(--surface-2);border-radius:8px;font-size:0.875rem">
+        <strong>Formato esperado:</strong><br>
+        Data | Tipo | Descrição | Valor | Categoria | Conta | Método Pagamento
+      </div>
+    </div>
+  </div>
+
+  <!-- Importar Categorias -->
+  <div class="card">
+    <div class="card-header"><div class="card-title">🏷️ Categorias</div></div>
+    <div style="padding:16px">
+      <p style="color:var(--text-2);margin-bottom:16px">
+        Importe categorias de um arquivo CSV.
+      </p>
+      
+      <form method="post" action="/import/categories" enctype="multipart/form-data" hx-boost="true">
+        <div class="form-group">
+          <label class="form-label">Arquivo CSV</label>
+          <input type="file" name="file" accept=".csv" required class="form-control">
+        </div>
+        
+        <button type="submit" class="btn btn--primary" style="margin-top:16px">
+          📥 Importar Categorias
+        </button>
+      </form>
+      
+      <div style="margin-top:16px;padding:12px;background:var(--surface-2);border-radius:8px;font-size:0.875rem">
+        <strong>Formato:</strong><br>
+        Nome | Ícone | Cor | Tipo
+      </div>
+    </div>
+  </div>
+
+  <!-- Importar Contas -->
+  <div class="card">
+    <div class="card-header"><div class="card-title">🏦 Contas</div></div>
+    <div style="padding:16px">
+      <p style="color:var(--text-2);margin-bottom:16px">
+        Importe contas de um arquivo CSV.
+      </p>
+      
+      <form method="post" action="/import/accounts" enctype="multipart/form-data" hx-boost="true">
+        <div class="form-group">
+          <label class="form-label">Arquivo CSV</label>
+          <input type="file" name="file" accept=".csv" required class="form-control">
+        </div>
+        
+        <button type="submit" class="btn btn--primary" style="margin-top:16px">
+          📥 Importar Contas
+        </button>
+      </form>
+      
+      <div style="margin-top:16px;padding:12px;background:var(--surface-2);border-radius:8px;font-size:0.875rem">
+        <strong>Formato:</strong><br>
+        Nome | Tipo | Saldo | Cor
+      </div>
+    </div>
+  </div>
+
+  <!-- Modelo de Arquivo -->
+  <div class="card">
+    <div class="card-header"><div class="card-title">📋 Modelos</div></div>
+    <div style="padding:16px">
+      <p style="color:var(--text-2);margin-bottom:16px">
+        Baixe os modelos de CSV para preencher.
+      </p>
+      
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <a href="/export/transactions?format=csv" download="transacoes_modelo.csv" class="btn btn--ghost btn--sm" style="text-align:left">
+          📥 Baixar Modelo Transações
+        </a>
+        <a href="/export/categories" download="categorias_modelo.csv" class="btn btn--ghost btn--sm" style="text-align:left">
+          📥 Baixar Modelo Categorias
+        </a>
+        <a href="/export/accounts" download="contas_modelo.csv" class="btn btn--ghost btn--sm" style="text-align:left">
+          📥 Baixar Modelo Contas
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Dicas -->
+<div class="card" style="margin-top:24px">
+  <div class="card-header"><div class="card-title">💡 Dicas para Importação</div></div>
+  <div style="padding:16px">
+    <ul style="margin:0;padding-left:20px;color:var(--text-2)">
+      <li style="margin-bottom:8px">O arquivo deve estar em formato UTF-8 ou Latin-1</li>
+      <li style="margin-bottom:8px">A primeira linha deve conter os nomes das colunas</li>
+      <li style="margin-bottom:8px">Para transações, o sistema tentará identificar categorias automaticamente</li>
+      <li style="margin-bottom:8px">Categorias e contas existentes não serão duplicadas</li>
+      <li style="margin-bottom:8px">Datas aceitas: YYYY-MM-DD ou DD/MM/AAAA</li>
+      <li>Valores decimais podem usar ponto ou vírgula</li>
+    </ul>
+  </div>
+</div>
+
+<!-- Links -->
+<div style="margin-top:24px">
+  <a href="/export" class="btn btn--ghost">📤 Exportar Dados</a>
+</div>
+{% endblock %}

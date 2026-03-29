@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+{% block title %}Workspace {{ tenant.name }} — Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-title">
+    <a href="/admin2?tab=tenants" class="btn btn--ghost btn--sm" style="margin-right:12px">←</a>
+    <span style="color:var(--amber)">⬡</span> {{ tenant.name }}
+  </div>
+  <div style="display:flex;gap:8px">
+    <a href="/admin2/tenant/{{ tenant.id }}" class="btn btn--ghost">🔄</a>
+  </div>
+</div>
+
+<!-- Tenant Info -->
+<div class="grid grid--2col" style="gap:24px;margin-bottom:24px">
+  <div class="card">
+    <div class="card-header"><div class="card-title">📋 Informações do Workspace</div></div>
+    <div style="padding:16px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <div class="text-muted" style="font-size:0.75rem">Slug</div>
+          <div class="text-strong">/{{ tenant.slug }}</div>
+        </div>
+        <div>
+          <div class="text-muted" style="font-size:0.75rem">Plano</div>
+          <span class="badge badge--info">{{ tenant.plan or 'free' }}</span>
+        </div>
+        <div>
+          <div class="text-muted" style="font-size:0.75rem">Máx. Usuários</div>
+          <div class="text-strong">{{ tenant.max_users }}</div>
+        </div>
+        <div>
+          <div class="text-muted" style="font-size:0.75rem">Status</div>
+          {% if tenant.is_active %}
+          <span class="badge badge--active">Ativo</span>
+          {% else %}
+          <span class="badge badge--inactive">Suspenso</span>
+          {% endif %}
+        </div>
+        <div>
+          <div class="text-muted" style="font-size:0.75rem">Expira em</div>
+          <div class="text-strong">{{ tenant.expires_at.strftime('%d/%m/%Y') if tenant.expires_at else 'Nunca' }}</div>
+        </div>
+        <div>
+          <div class="text-muted" style="font-size:0.75rem">Criado em</div>
+          <div class="text-strong">{{ tenant.created_at.strftime('%d/%m/%Y') }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="card">
+    <div class="card-header"><div class="card-title">📊 Estatísticas</div></div>
+    <div style="padding:16px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <div class="text-muted" style="font-size:0.75rem">Transações</div>
+          <div class="stat-value" style="font-size:1.5rem">{{ stats.tx_count }}</div>
+        </div>
+        <div>
+          <div class="text-muted" style="font-size:0.75rem">Receita Total</div>
+          <div class="stat-value stat-value--income" style="font-size:1.5rem">R$ {{ "%.2f"|format(stats.tx_sum|float) }}</div>
+        </div>
+        <div>
+          <div class="text-muted" style="font-size:0.75rem">Usuários</div>
+          <div class="stat-value" style="font-size:1.5rem">{{ users|length }}</div>
+        </div>
+        <div>
+          <div class="text-muted" style="font-size:0.75rem">Categorias</div>
+          <div class="stat-value" style="font-size:1.5rem">{{ categories|length }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Users -->
+<div class="card" style="margin-bottom:24px">
+  <div class="card-header">
+    <div class="card-title">👥 Usuários ({{ users|length }})</div>
+  </div>
+  <div class="table-wrapper" style="border:none">
+    <table>
+      <thead><tr><th>Nome</th><th>Email</th><th>Role</th><th>WhatsApp</th><th>Status</th><th>Criado</th></tr></thead>
+      <tbody>
+        {% for u in users %}
+        <tr>
+          <td class="text-strong">{{ u.name }}</td>
+          <td>{{ u.email }}</td>
+          <td><span class="badge {% if u.role.value == 'superadmin' %}badge--active{% elif u.role.value == 'admin' %}badge--info{% else %}badge--neutral{% endif %}">{{ u.role.value }}</span></td>
+          <td>{{ u.whatsapp_number or '—' }}</td>
+          <td>{% if u.is_active %}<span class="badge badge--active">Ativo</span>{% else %}<span class="badge badge--inactive">Inativo</span>{% endif %}</td>
+          <td class="text-muted">{{ u.created_at.strftime('%d/%m/%Y') }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Categories -->
+<div class="grid grid--2col" style="gap:24px;margin-bottom:24px">
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">🏷️ Categorias ({{ categories|length }})</div>
+    </div>
+    <div style="padding:16px;max-height:300px;overflow-y:auto">
+      {% for c in categories %}
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+        <span>{{ c.icon }} {{ c.name }}</span>
+        <span class="badge {% if c.type.value == 'income' %}badge--active{% else %}badge--expense{% endif %}">{{ c.type.value }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">🏦 Contas ({{ accounts|length }})</div>
+    </div>
+    <div style="padding:16px;max-height:300px;overflow-y:auto">
+      {% for a in accounts %}
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+        <span>{{ a.name }}</span>
+        <span style="color:{% if a.balance|float >= 0 %}var(--green){% else %}var(--red){% endif %}">
+          R$ {{ "%.2f"|format(a.balance|float) }}
+        </span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- Cards -->
+{% if cards %}
+<div class="card">
+  <div class="card-header">
+    <div class="card-title">💳 Cartões ({{ cards|length }})</div>
+  </div>
+  <div class="table-wrapper" style="border:none">
+    <table>
+      <thead><tr><th>Nome</th><th>Tipo</th><th>Últimos Dígitos</th><th>Limite</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for c in cards %}
+        <tr>
+          <td class="text-strong">{{ c.name }}</td>
+          <td><span class="badge badge--info">{{ c.card_type.value if c.card_type else 'credit' }}</span></td>
+          <td class="text-muted">**** {{ c.last_digits or '****' }}</td>
+          <td>R$ {{ "%.2f"|format(c.limit|float) if c.limit else '0.00' }}</td>
+          <td>{% if c.is_active %}<span class="badge badge--active">Ativo</span>{% else %}<span class="badge badge--inactive">Inativo</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- Actions -->
+<div style="margin-top:24px;display:flex;gap:12px">
+  <form method="post" action="/admin/tenants/{{ tenant.id }}" style="display:flex;gap:12px;flex-wrap:wrap">
+    <input type="hidden" name="plan" value="{{ tenant.plan or 'free' }}">
+    <input type="hidden" name="max_users" value="{{ tenant.max_users }}">
+    <input type="hidden" name="is_active" value="{{ 'true' if tenant.is_active else 'false' }}">
+    <input type="hidden" name="expires_at" value="{{ tenant.expires_at.strftime('%Y-%m-%dT%H:%M') if tenant.expires_at else '' }}">
+    <button type="submit" class="btn btn--primary">✎ Editar Workspace</button>
+  </form>
+  <button class="btn btn--ghost" style="color:var(--red)" hx-delete="/admin2/tenants/{{ tenant.id }}" hx-confirm="Excluir definitivamente este workspace e TODOS os seus dados?">🗑 Excluir Workspace</button>
+</div>
+{% endblock %}

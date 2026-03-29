@@ -32,7 +32,7 @@
       </div>
       <div style="padding:0 16px 14px;display:flex;gap:8px">
         <button class="btn btn--ghost btn--sm" hx-get="/settings/cards/{{ card.id }}/edit-form" hx-target="#modal-content" hx-swap="innerHTML" hx-on::after-request="openModal()">✏️ Editar</button>
-        <button class="btn btn--ghost btn--sm" style="color:var(--red)" hx-delete="/settings/cards/{{ card.id }}" hx-confirm="Excluir '{{ card.name }}'?">✕ Excluir</button>
+        <button class="btn btn--ghost btn--sm" style="color:var(--red)" hx-delete="/settings/cards/{{ card.id }}" hx-target="body" hx-swap="outerHTML" hx-confirm="Excluir '{{ card.name }}'?">✕ Excluir</button>
       </div>
     </div>
     {% endfor %}

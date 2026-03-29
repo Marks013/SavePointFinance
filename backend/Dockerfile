@@ -1,4 +1,4 @@
-# ═══════════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════════
 # Save Point Finanças v3.1 — Dockerfile
 #
 # Multi-arch: ARM64 (Oracle Cloud Free Tier) + x86_64 (qualquer VPS)
@@ -6,7 +6,7 @@
 #
 # IMPORTANTE: O app roda na porta 8000 internamente.
 # A porta 80/443 é gerenciada pelo Traefik do Coolify — NÃO exponha aqui.
-# ═══════════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════════
 
 FROM python:3.12-slim
 
@@ -40,17 +40,22 @@ COPY . .
 EXPOSE 8000
 
 # ── Comando de produção ────────────────────────────────────────────
-# --workers 2       → Oracle Free Tier (1 OCPU, 1GB RAM)
-#                     Aumente para 4 em instâncias com 2+ OCPUs
+# Configuração otimizada para Oracle Cloud (3 CPU, 24GB RAM):
+# --workers 6       → 2x CPU = 6 workers (balance ideal)
 # --proxy-headers   → Lê X-Forwarded-For / X-Forwarded-Proto do Traefik
-# --forwarded-allow-ips='*' → Confia em qualquer proxy upstream (Traefik interno)
-# --access-log      → Loga requisições (útil para debug no Coolify)
+# --forwarded-allow-ips='*' → Confia em qualquer proxy upstream
+# --access-log      → Loga requisições (útil para debug)
 # --log-level info  → Nível de log adequado para produção
+# --limit-concurrency 100   → Max 100 requisições simultâneas por worker
+# --limit-max-connections 1000 → Max conexões simultâneas total
+# --timeout-keep-alive 60   → Keep-alive para conexões persistentes
 CMD ["uvicorn", "app.main:app", \
      "--host", "0.0.0.0", \
      "--port", "8000", \
-     "--workers", "2", \
+     "--workers", "6", \
      "--proxy-headers", \
      "--forwarded-allow-ips=*", \
      "--access-log", \
-     "--log-level", "info"]
+     "--log-level", "info", \
+     "--limit-concurrency", "100", \
+     "--timeout-keep-alive", "60"]

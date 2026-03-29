@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}Exportar Dados — Save Point{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-title"><span style="color:var(--amber)">⬡</span> Exportar Dados</div>
+</div>
+
+<div class="grid grid--2col" style="gap:24px">
+  <!-- Exportar Transações -->
+  <div class="card">
+    <div class="card-header"><div class="card-title">💸 Transações</div></div>
+    <div style="padding:16px">
+      <p style="color:var(--text-2);margin-bottom:16px">Exporte suas transações para CSV ou JSON.</p>
+      
+      <form method="get" action="/export/transactions" target="_blank">
+        <div class="grid grid--2col" style="gap:12px;margin-bottom:12px">
+          <div class="form-group">
+            <label class="form-label">Data Inicial</label>
+            <input type="date" name="start_date" class="form-control">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Data Final</label>
+            <input type="date" name="end_date" class="form-control">
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">Tipo</label>
+          <select name="tx_type" class="form-control">
+            <option value="">Todos</option>
+            <option value="expense">Despesas</option>
+            <option value="income">Receitas</option>
+          </select>
+        </div>
+        
+        <div style="display:flex;gap:8px;margin-top:16px">
+          <button type="submit" name="format" value="csv" class="btn btn--primary">📊 CSV</button>
+          <button type="submit" name="format" value="json" class="btn btn--ghost">📄 JSON</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Exportar Tudo -->
+  <div class="card">
+    <div class="card-header"><div class="card-title">💾 Backup Completo</div></div>
+    <div style="padding:16px">
+      <p style="color:var(--text-2);margin-bottom:16px">Exporte todas as suas categorias, contas, cartões e transações em um único arquivo JSON.</p>
+      
+      <a href="/export/backup" target="_blank" class="btn btn--primary" style="display:inline-block;margin-top:16px">
+        📥 Baixar Backup
+      </a>
+    </div>
+  </div>
+
+  <!-- Exportar Categorias -->
+  <div class="card">
+    <div class="card-header"><div class="card-title">🏷️ Categorias</div></div>
+    <div style="padding:16px">
+      <p style="color:var(--text-2);margin-bottom:16px">Exporte suas categorias para CSV.</p>
+      
+      <a href="/export/categories" target="_blank" class="btn btn--primary" style="display:inline-block">
+        📊 Exportar CSV
+      </a>
+    </div>
+  </div>
+
+  <!-- Exportar Contas -->
+  <div class="card">
+    <div class="card-header"><div class="card-title">🏦 Contas</div></div>
+    <div style="padding:16px">
+      <p style="color:var(--text-2);margin-bottom:16px">Exporte suas contas para CSV.</p>
+      
+      <a href="/export/accounts" target="_blank" class="btn btn--primary" style="display:inline-block">
+        📊 Exportar CSV
+      </a>
+    </div>
+  </div>
+
+  <!-- Exportar Cartões -->
+  <div class="card">
+    <div class="card-header"><div class="card-title">💳 Cartões</div></div>
+    <div style="padding:16px">
+      <p style="color:var(--text-2);margin-bottom:16px">Exporte seus cartões para CSV.</p>
+      
+      <a href="/export/cards" target="_blank" class="btn btn--primary" style="display:inline-block">
+        📊 Exportar CSV
+      </a>
+    </div>
+  </div>
+
+  <!-- Modelo CSV -->
+  <div class="card">
+    <div class="card-header"><div class="card-title">📋 Modelos CSV</div></div>
+    <div style="padding:16px">
+      <p style="color:var(--text-2);margin-bottom:16px">Baixe modelos para importação.</p>
+      
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <a href="data:text/csv;charset=utf-8,Data%2CTipo%2CDescri%C3%A7%C3%A3o%2CValor%2CCategoria%2CConta%2CM%C3%A9todo%20de%20Pagamento%2CNotas" download="modelo_transacoes.csv" class="btn btn--ghost btn--sm" style="text-align:left">
+          📥 Modelo Transações
+        </a>
+        <a href="data:text/csv;charset=utf-8,Nome%2C%C3%8Dcone%2CCor%2CTipo" download="modelo_categorias.csv" class="btn btn--ghost btn--sm" style="text-align:left">
+          📥 Modelo Categorias
+        </a>
+        <a href="data:text/csv;charset=utf-8,Nome%2CTipo%2CSaldo%2CCor" download="modelo_contas.csv" class="btn btn--ghost btn--sm" style="text-align:left">
+          📥 Modelo Contas
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Links rápidos -->
+<div style="margin-top:24px;display:flex;gap:12px">
+  <a href="/import" class="btn btn--primary">📤 Importar Dados</a>
+</div>
+{% endblock %}

@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+{% block title %}Planos — Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-title"><span style="color:var(--amber)">⬡</span> Planos de Assinatura</div>
+  <div style="display:flex;gap:8px">
+    <form method="post" action="/admin2/plans/init">
+      <button type="submit" class="btn btn--ghost">⚡ Inicializar Planos Padrão</button>
+    </form>
+    <button class="btn btn--primary" onclick="document.getElementById('createPlanModal').showModal()">+ Novo Plano</button>
+  </div>
+</div>
+
+<!-- Stats -->
+<div class="stat-grid" style="margin-bottom:24px">
+  <div class="stat-card stat-card--income">
+    <div class="stat-label">Planos Ativos</div>
+    <div class="stat-value stat-value--income">{{ plans|length }}</div>
+  </div>
+  <div class="stat-card stat-card--balance">
+    <div class="stat-label">Assinaturas Ativas</div>
+    <div class="stat-value stat-value--balance">{{ active_subs }}</div>
+  </div>
+  <div class="stat-card stat-card--neutral">
+    <div class="stat-label">Em Trial</div>
+    <div class="stat-value" style="color:var(--amber)">{{ trial_subs }}</div>
+  </div>
+  <div class="stat-card stat-card--expense">
+    <div class="stat-label">Total Assinaturas</div>
+    <div class="stat-value stat-value--expense">{{ subscription_count }}</div>
+  </div>
+</div>
+
+<!-- Planos Distribution -->
+{% if plan_counts %}
+<div class="card" style="margin-bottom:24px">
+  <div class="card-header"><div class="card-title">Assinaturas por Plano</div></div>
+  <div style="padding:16px;display:flex;gap:16px;flex-wrap:wrap">
+    {% for plan_name, count in plan_counts.items() %}
+    <div style="padding:12px;background:var(--surface-2);border-radius:8px;min-width:120px">
+      <div style="font-size:1.5rem;font-weight:bold">{{ count }}</div>
+      <div style="color:var(--text-2);font-size:0.875rem">{{ plan_name }}</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- Planos Table -->
+<div class="card">
+  <div class="card-header"><div class="card-title">Planos Disponíveis</div></div>
+  <div class="table-wrapper" style="border:none">
+    <table>
+      <thead>
+        <tr>
+          <th>Plano</th>
+          <th>Descrição</th>
+          <th>Preço Mês</th>
+          <th>Preço Ano</th>
+          <th>Usuários</th>
+          <th>Transações</th>
+          <th>Features</th>
+          <th>Status</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in plans %}
+        <tr>
+          <td class="text-strong">
+            {% if p.is_popular %}<span class="badge badge--active" style="margin-right:4px">POPULAR</span>{% endif %}
+            {{ p.name }}
+          </td>
+          <td class="text-muted">{{ p.description or '—' }}</td>
+          <td>R$ {{ "%.2f"|format(p.price_monthly|float) }}</td>
+          <td>R$ {{ "%.2f"|format(p.price_yearly|float) }}</td>
+          <td>{% if p.max_users == -1 %}∞{% else %}{{ p.max_users }}{% endif %}</td>
+          <td>{% if p.max_transactions == -1 %}∞{% else %}{{ p.max_transactions }}{% endif %}</td>
+          <td>
+            <div style="display:flex;gap:4px;flex-wrap:wrap">
+              {% if p.feature_whatsapp %}<span class="badge badge--info">WA</span>{% endif %}
+              {% if p.feature_export_pdf %}<span class="badge badge--info">PDF</span>{% endif %}
+              {% if p.feature_goals %}<span class="badge badge--info">Metas</span>{% endif %}
+              {% if p.feature_budget %}<span class="badge badge--info">Orçamento</span>{% endif %}
+              {% if p.feature_api_access %}<span class="badge badge--info">API</span>{% endif %}
+            </div>
+          </td>
+          <td>{% if p.is_active %}<span class="badge badge--active">Ativo</span>{% else %}<span class="badge badge--inactive">Inativo</span>{% endif %}</td>
+          <td>
+            <button class="btn btn--ghost btn--sm" style="color:var(--red)" hx-delete="/admin2/plans/{{ p.id }}" hx-confirm="Excluir plano '{{ p.name }}'?">🗑</button>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="9" style="padding:24px;text-align:center;color:var(--text-3)">Nenhum plano criado. Clique em "Inicializar Planos Padrão" para criar os planos básicos.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Create Plan Modal -->
+<dialog id="createPlanModal" style="border:none;border-radius:12px;padding:24px;max-width:600px;width:95%;max-height:90vh;overflow-y:auto">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+    <h3 style="margin:0">Criar Novo Plano</h3>
+    <button onclick="document.getElementById('createPlanModal').close()" class="btn btn--ghost">✕</button>
+  </div>
+  
+  <form method="post" action="/admin2/plans">
+    <div class="grid grid--2col" style="gap:12px">
+      <div class="form-group">
+        <label class="form-label">Nome</label>
+        <input type="text" name="name" required class="form-control" placeholder="Ex: Premium">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Slug (URL)</label>
+        <input type="text" name="slug" required class="form-control" placeholder="Ex: premium">
+      </div>
+    </div>
+    
+    <div class="form-group">
+      <label class="form-label">Descrição</label>
+      <input type="text" name="description" class="form-control" placeholder="Descrição curta">
+    </div>
+    
+    <div class="grid grid--2col" style="gap:12px">
+      <div class="form-group">
+        <label class="form-label">Preço Mensal (R$)</label>
+        <input type="number" name="price_monthly" step="0.01" min="0" value="0" class="form-control">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Preço Anual (R$)</label>
+        <input type="number" name="price_yearly" step="0.01" min="0" value="0" class="form-control">
+      </div>
+    </div>
+    
+    <div class="grid grid--2col" style="gap:12px">
+      <div class="form-group">
+        <label class="form-label">Máx. Usuários (-1=ilimitado)</label>
+        <input type="number" name="max_users" value="1" class="form-control">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Máx. Transações</label>
+        <input type="number" name="max_transactions" value="-1" class="form-control">
+      </div>
+    </div>
+    
+    <div class="grid grid--2col" style="gap:12px">
+      <div class="form-group">
+        <label class="form-label">Máx. Contas</label>
+        <input type="number" name="max_accounts" value="-1" class="form-control">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Máx. Cartões</label>
+        <input type="number" name="max_cards" value="-1" class="form-control">
+      </div>
+    </div>
+    
+    <div class="grid grid--2col" style="gap:12px">
+      <div class="form-group">
+        <label class="form-label">Máx. Categorias</label>
+        <input type="number" name="max_categories" value="-1" class="form-control">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Máx. Metas</label>
+        <input type="number" name="max_goals" value="0" class="form-control">
+      </div>
+    </div>
+    
+    <div class="form-group">
+      <label class="form-label">Dias de Trial</label>
+      <input type="number" name="trial_days" value="0" min="0" class="form-control">
+    </div>
+    
+    <fieldset style="border:1px solid var(--border);border-radius:8px;padding:12px;margin:12px 0">
+      <legend style="padding:0 8px;font-weight:600">Features</legend>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">
+        <label><input type="checkbox" name="feature_ai_classification" checked> 🤖 Classificação IA</label>
+        <label><input type="checkbox" name="feature_whatsapp"> 💬 WhatsApp</label>
+        <label><input type="checkbox" name="feature_export_csv"> 📊 Exportar CSV</label>
+        <label><input type="checkbox" name="feature_export_pdf"> 📄 Exportar PDF</label>
+        <label><input type="checkbox" name="feature_import_csv"> 📥 Importar CSV</label>
+        <label><input type="checkbox" name="feature_recurring"> 🔄 Recorrências</label>
+        <label><input type="checkbox" name="feature_goals"> 🎯 Metas</label>
+        <label><input type="checkbox" name="feature_budget"> 💰 Orçamentos</label>
+        <label><input type="checkbox" name="feature_api_access"> 🔌 API</label>
+        <label><input type="checkbox" name="feature_priority_support"> ⭐ Suporte Prioritário</label>
+      </div>
+    </fieldset>
+    
+    <div style="display:flex;gap:12px;margin-top:16px">
+      <label><input type="checkbox" name="is_active" checked> Plano Ativo</label>
+      <label><input type="checkbox" name="is_popular"> Plano Popular</label>
+    </div>
+    
+    <button type="submit" class="btn btn--primary" style="width:100%;margin-top:16px">Criar Plano</button>
+  </form>
+</dialog>
+{% endblock %}

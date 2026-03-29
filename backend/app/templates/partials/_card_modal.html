@@ -4,7 +4,7 @@
   <button class="btn btn--ghost btn--icon" onclick="document.getElementById('modal-overlay').classList.remove('modal--open')">✕</button>
 </div>
 <form {% if is_edit %}hx-put="/settings/cards/{{ card.id }}"{% else %}hx-post="/settings/cards"{% endif %}
-      hx-target="#cards-panel" hx-swap="innerHTML">
+      hx-target="#modal-content" hx-swap="innerHTML">
   <div class="modal-body">
     <div class="form-row">
       <div class="form-group"><label class="form-label">Nome *</label>
@@ -16,13 +16,22 @@
           {% endfor %}
         </select></div>
     </div>
+    <div class="form-group">
+      <label class="form-label">Tipo de cartão</label>
+      <select name="card_type" class="form-control" id="card-type" onchange="toggleCardFields()" autocomplete="off">
+        <option value="" disabled selected>Selecione...</option>
+        <option value="credit">💳 Cartão de Crédito</option>
+        <option value="debit">💳 Cartão de Débito</option>
+        <option value="both">💳 Ambos</option>
+      </select>
+    </div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">Últimos 4 dígitos</label>
         <input type="text" name="last4" class="form-control" maxlength="4" placeholder="1234" value="{{ card.last4 or '' if is_edit else '' }}"></div>
-      <div class="form-group"><label class="form-label">Limite (R$)</label>
+      <div class="form-group credit-field"><label class="form-label">Limite (R$)</label>
         <input type="number" name="limit_amount" class="form-control" step="0.01" value="{{ card.limit_amount if is_edit else '0' }}"></div>
     </div>
-    <div class="form-row">
+    <div class="form-row credit-field">
       <div class="form-group"><label class="form-label">Dia fechamento</label>
         <input type="number" name="close_day" class="form-control" min="1" max="31" value="{{ card.close_day if is_edit else '3' }}"></div>
       <div class="form-group"><label class="form-label">Dia vencimento</label>
@@ -36,3 +45,13 @@
     <button type="submit" class="btn btn--primary">Salvar</button>
   </div>
 </form>
+<script>
+function toggleCardFields() {
+  const type = document.getElementById('card-type').value;
+  const creditFields = document.querySelectorAll('.credit-field');
+  creditFields.forEach(el => {
+    el.style.display = (type === 'debit') ? 'none' : 'block';
+  });
+}
+(function() { toggleCardFields(); })();
+</script>

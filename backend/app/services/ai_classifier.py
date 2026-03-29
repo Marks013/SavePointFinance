@@ -67,7 +67,14 @@ Responda APENAS com JSON válido, sem texto extra:
             messages=[{"role": "user", "content": prompt}],
         )
 
-        text = response.content[0].text.strip()
+        # Extrai texto da resposta do Anthropic
+        text = ""
+        if response.content:
+            first_content = response.content[0]
+            if hasattr(first_content, 'text'):
+                text = first_content.text.strip()
+            elif hasattr(first_content, 'type'):
+                text = str(first_content).strip()
         # Remove possíveis backticks
         if text.startswith("```"):
             text = text.split("\n", 1)[-1].rsplit("```", 1)[0].strip()

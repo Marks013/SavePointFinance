@@ -102,7 +102,7 @@ class Settings(BaseSettings):
     # ── WhatsApp (Meta Cloud API) ─────────────────────────────────────
     META_TOKEN:        str = ""
     META_PHONE_ID:     str = ""
-    META_VERIFY_TOKEN: str = "SavePoint_Verify_2024"
+    WHATSAPP_VERIFY_TOKEN: str = "savepoint_whatsapp_verify"
 
     # ── Backup Backblaze B2 ───────────────────────────────────────────
     B2_APPLICATION_KEY_ID: str = ""

@@ -1,19 +1,10 @@
 {% extends "base.html" %}
-{% block title %}Configurações — Save Point Finanças{% endblock %}
+{% block title %}Contas — Save Point Finanças{% endblock %}
 
 {% block content %}
 <div class="page-header">
-  <div class="page-title">Configurações</div>
-  <div class="page-actions">
-    <div class="tabs" style="margin-bottom:0;border:none">
-      <a href="/settings?tab=accounts" class="tab {% if tab == 'accounts' %}active{% endif %}"
-         hx-get="/settings?tab=accounts" hx-target="#settings-body" hx-push-url="true">Contas</a>
-      <a href="/settings?tab=cards" class="tab {% if tab == 'cards' %}active{% endif %}"
-         hx-get="/settings?tab=cards" hx-target="#settings-body" hx-push-url="true">Cartões</a>
-      <a href="/settings?tab=preferences" class="tab {% if tab == 'preferences' %}active{% endif %}"
-         hx-get="/settings?tab=preferences" hx-target="#settings-body" hx-push-url="true">Preferências</a>
-    </div>
-  </div>
+  <div class="page-title">Contas</div>
+  
 </div>
 
 <div class="page-body" id="settings-body">
@@ -35,136 +26,5 @@
   </div>
   {% endif %}
 
-  {# ── Aba Cartões ── #}
-  {% if tab == 'cards' %}
-  <div class="section-header">
-    <div class="section-title">Cartões de crédito e débito</div>
-    <button class="btn btn--primary"
-            hx-get="/settings/cards/new-form"
-            hx-target="#modal-content" hx-swap="innerHTML"
-            hx-on::after-request="openModal()">
-      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-      Novo cartão
-    </button>
-  </div>
-  <div id="cards-panel">
-    {% include "partials/_cards_table.html" %}
-  </div>
-  {% endif %}
-
-  {# ── Aba Preferências ── #}
-  {% if tab == 'preferences' %}
-  <div style="max-width:520px;display:flex;flex-direction:column;gap:20px">
-
-    {# Dízimo #}
-    <div class="card">
-      <div class="card-header">
-        <div class="card-title">✝️ Dízimo</div>
-        <span class="badge {% if user.tithe_enabled %}badge--active{% else %}badge--inactive{% endif %}">
-          {{ 'Ativado' if user.tithe_enabled else 'Desativado' }}
-        </span>
-      </div>
-      <div style="padding:0 20px 20px">
-        <p style="font-size:0.85rem;color:var(--text-2);margin-bottom:16px">
-          Quando ativado, aparece um checkbox no lançamento de receitas para calcular 10% de dízimo automaticamente.
-          O dízimo é lançado como uma única transação por mês (acumulada a cada receita).
-        </p>
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:14px;background:var(--bg-3);border-radius:var(--radius);border:1px solid var(--border)">
-          <div>
-            <div style="font-weight:600;color:var(--text)">Calcular dízimo (10%)</div>
-            <div style="font-size:0.78rem;color:var(--text-3);margin-top:2px">
-              Incide sobre receitas com a opção marcada
-            </div>
-          </div>
-          <label style="position:relative;display:inline-block;width:52px;height:28px;cursor:pointer">
-            <input type="checkbox" id="tithe-toggle"
-                   style="opacity:0;width:0;height:0"
-                   {% if user.tithe_enabled %}checked{% endif %}
-                   onchange="toggleTithe(this.checked)">
-            <span id="tithe-track" style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;
-                  background:{% if user.tithe_enabled %}var(--em){% else %}var(--bg-2){% endif %};
-                  transition:0.3s;border-radius:28px;border:1px solid var(--border)">
-              <span id="tithe-thumb" style="position:absolute;height:22px;width:22px;
-                    left:{% if user.tithe_enabled %}26px{% else %}2px{% endif %};
-                    bottom:2px;background:{% if user.tithe_enabled %}#0A0E13{% else %}var(--text-3){% endif %};
-                    transition:0.3s;border-radius:50%"></span>
-            </span>
-          </label>
-        </div>
-      </div>
-    </div>
-
-    {# Alterar Senha #}
-    <div class="card" id="password-form">
-      <div class="card-header"><div class="card-title">🔐 Alterar senha</div></div>
-      <div style="padding:0 20px 20px;display:flex;flex-direction:column;gap:14px">
-        <div id="password-error"   class="auth-error" style="display:none"></div>
-        <div id="password-success" style="display:none;background:var(--em-bg);border:1px solid var(--em-border);border-radius:var(--radius);color:var(--em);font-size:0.8rem;padding:10px 12px">
-          ✓ Senha alterada com sucesso!
-        </div>
-        <form onsubmit="handlePasswordChange(event)" style="display:flex;flex-direction:column;gap:14px">
-          <div class="form-group">
-            <label class="form-label">Senha atual</label>
-            <input type="password" name="current_password" class="form-control" required>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Nova senha (mín. 6 caracteres)</label>
-            <input type="password" name="new_password" class="form-control" required minlength="6">
-          </div>
-          <button type="submit" class="btn btn--primary" style="align-self:flex-start">Alterar senha</button>
-        </form>
-      </div>
-    </div>
-
-  </div>
-  {% endif %}
-
 </div>{# /page-body #}
-
-<script>
-function toggleTithe(enabled) {
-  fetch('/settings/toggle-tithe?enabled=' + enabled, {
-    method: 'POST',
-    credentials: 'include'
-  }).then(r => {
-    if (r.ok) {
-      const track = document.getElementById('tithe-track');
-      const thumb = document.getElementById('tithe-thumb');
-      const badge = document.querySelector('.card-header .badge');
-      if (enabled) {
-        track.style.background = 'var(--em)';
-        thumb.style.left = '26px';
-        thumb.style.background = '#0A0E13';
-        if (badge) { badge.textContent = 'Ativado'; badge.className = 'badge badge--active'; }
-      } else {
-        track.style.background = 'var(--bg-2)';
-        thumb.style.left = '2px';
-        thumb.style.background = 'var(--text-3)';
-        if (badge) { badge.textContent = 'Desativado'; badge.className = 'badge badge--inactive'; }
-      }
-    }
-  });
-}
-
-function handlePasswordChange(e) {
-  e.preventDefault();
-  const form = e.target;
-  const data = new FormData(form);
-  fetch('/settings/change-password', {
-    method: 'POST', body: data, credentials: 'include'
-  }).then(r => {
-    if (r.ok) {
-      document.getElementById('password-success').style.display = 'block';
-      document.getElementById('password-error').style.display = 'none';
-      form.reset();
-    } else {
-      r.json().then(d => {
-        document.getElementById('password-error').textContent = d.detail || 'Erro.';
-        document.getElementById('password-error').style.display = 'block';
-        document.getElementById('password-success').style.display = 'none';
-      });
-    }
-  });
-}
-</script>
 {% endblock %}

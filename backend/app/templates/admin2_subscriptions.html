@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% block title %}Assinaturas — Admin{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-title"><span style="color:var(--amber)">⬡</span> Gestão de Assinaturas</div>
+</div>
+
+<!-- Tabs -->
+<div class="tabs" style="margin-bottom:20px">
+  <a href="/admin2?tab=dashboard" class="tab">📊 Dashboard</a>
+  <a href="/admin2?tab=tenants" class="tab">🏢 Workspaces</a>
+  <a href="/admin2?tab=users" class="tab">👥 Usuários</a>
+  <a href="/admin2?tab=transactions" class="tab">💸 Transações</a>
+  <a href="/admin2/plans" class="tab">📦 Planos</a>
+  <a href="/admin2/subscriptions" class="tab tab--active">💳 Assinaturas</a>
+  <a href="/admin2/logs" class="tab">📋 Logs</a>
+</div>
+
+<!-- Stats -->
+<div class="stat-grid" style="margin-bottom:24px">
+  <div class="stat-card stat-card--income">
+    <div class="stat-label">Assinaturas Ativas</div>
+    <div class="stat-value stat-value--income">{{ active_count }}</div>
+  </div>
+  <div class="stat-card stat-card--neutral">
+    <div class="stat-label">Em Período Trial</div>
+    <div class="stat-value" style="color:var(--amber)">{{ trial_count }}</div>
+  </div>
+  <div class="stat-card stat-card--balance">
+    <div class="stat-label">Total Registros</div>
+    <div class="stat-value stat-value--balance">{{ total_count }}</div>
+  </div>
+</div>
+
+<!-- Filters -->
+<form method="get" style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap">
+  <input type="text" name="search" placeholder="Buscar workspace..." value="{{ search }}" class="filter-control" style="width:200px">
+  
+  <select name="status_filter" class="filter-control" style="width:150px">
+    <option value="">Todos status</option>
+    <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Ativa</option>
+    <option value="trial" {% if status_filter == 'trial' %}selected{% endif %}>Trial</option>
+    <option value="expired" {% if status_filter == 'expired' %}selected{% endif %}>Expirada</option>
+  </select>
+  
+  <button type="submit" class="btn btn--primary btn--sm">Filtrar</button>
+  {% if search or status_filter %}
+  <a href="/admin2/subscriptions" class="btn btn--ghost btn--sm">Limpar</a>
+  {% endif %}
+</form>
+
+<!-- Results Count -->
+<div style="margin-bottom:12px;color:var(--text-3);font-size:0.875rem">
+  {{ total_count }} resultado(s) — Página {{ page }} de {{ total_pages }}
+</div>
+
+<!-- Subscriptions Table -->
+<div class="card">
+  <div class="table-wrapper" style="border:none">
+    <table>
+      <thead>
+        <tr>
+          <th>Workspace</th>
+          <th>Plano</th>
+          <th>Status</th>
+          <th>Início</th>
+          <th>Expira</th>
+          <th>Pagamento</th>
+          <th>Último Pagamento</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for sub, tenant, plan in subscriptions %}
+        <tr>
+          <td class="text-strong"><a href="/admin2/tenant/{{ tenant.id }}">{{ tenant.name }}</a></td>
+          <td>
+            <span class="badge badge--info">{{ plan.name }}</span>
+          </td>
+          <td>
+            {% if sub.is_trial %}
+            <span class="badge" style="background:var(--amber);color:#000">Trial</span>
+            {% elif sub.is_active %}
+            <span class="badge badge--active">Ativa</span>
+            {% else %}
+            <span class="badge badge--inactive">Inativa</span>
+            {% endif %}
+          </td>
+          <td class="text-muted">{{ sub.started_at.strftime('%d/%m/%Y') if sub.started_at else '—' }}</td>
+          <td class="text-muted">{{ sub.expires_at.strftime('%d/%m/%Y') if sub.expires_at else '—' }}</td>
+          <td>{{ sub.payment_method or '—' }}</td>
+          <td class="text-muted">{{ sub.last_payment_at.strftime('%d/%m/%Y') if sub.last_payment_at else '—' }}</td>
+          <td>
+            <div style="display:flex;gap:4px">
+              <button class="btn btn--ghost btn--sm" onclick="document.getElementById('activateModal-{{ tenant.id }}').showModal()">✏️</button>
+              {% if sub.is_active %}
+              <button class="btn btn--ghost btn--sm" style="color:var(--red)" hx-post="/admin2/subscriptions/{{ tenant.id }}/cancel" hx-confirm="Cancelar assinatura de {{ tenant.name }}?">🛑</button>
+              {% endif %}
+            </div>
+            
+            <!-- Activate Modal -->
+            <dialog id="activateModal-{{ tenant.id }}" style="border:none;border-radius:12px;padding:24px;max-width:400px">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+                <h3 style="margin:0">Alterar Plano</h3>
+                <button onclick="document.getElementById('activateModal-{{ tenant.id }}').close()" class="btn btn--ghost">✕</button>
+              </div>
+              <p>Workspace: <strong>{{ tenant.name }}</strong></p>
+              <p>Plano atual: <span class="badge badge--info">{{ plan.name }}</span></p>
+              
+              <!-- Simple plan list - in real app would fetch from /admin2/plans -->
+              <form method="post" action="/admin2/subscriptions/{{ tenant.id }}/activate">
+                <div class="form-group">
+                  <label class="form-label">Novo Plano</label>
+                  <select name="plan_id" class="form-control">
+                    <option value="">Selecione...</option>
+                    <!-- Would be populated dynamically -->
+                  </select>
+                </div>
+                <button type="submit" class="btn btn--primary" style="width:100%">Ativar Plano</button>
+              </form>
+            </dialog>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8" style="padding:24px;text-align:center;color:var(--text-3)">Nenhuma assinatura encontrada.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Pagination -->
+{% if total_pages > 1 %}
+<div style="display:flex;justify-content:center;gap:8px;margin-top:20px">
+  {% if page > 1 %}
+  <a href="?page={{ page-1 }}&search={{ search }}&status_filter={{ status_filter }}" class="btn btn--ghost btn--sm">← Anterior</a>
+  {% endif %}
+  {% for p in range(1, total_pages + 1) %}
+    {% if p >= page - 2 and p <= page + 2 %}
+    <a href="?page={{ p }}&search={{ search }}&status_filter={{ status_filter }}" class="btn btn--{% if p == page %}primary{% else %}ghost{% endif %} btn--sm">{{ p }}</a>
+    {% endif %}
+  {% endfor %}
+  {% if page < total_pages %}
+  <a href="?page={{ page+1 }}&search={{ search }}&status_filter={{ status_filter }}" class="btn btn--ghost btn--sm">Próxima →</a>
+  {% endif %}
+</div>
+{% endif %}
+
+<style>
+.tab { padding: 10px 16px; color: var(--text-2); text-decoration: none; border-bottom: 2px solid transparent; font-weight: 500; }
+.tab:hover { color: var(--text); }
+.tab--active { color: var(--amber); border-bottom-color: var(--amber); }
+.tabs { display: flex; gap: 4px; overflow-x: auto; border-bottom: 1px solid var(--border); }
+</style>
+{% endblock %}

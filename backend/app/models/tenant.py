@@ -24,3 +24,6 @@ class Tenant(Base):
     transactions: Mapped[list["Transaction"]] = relationship("Transaction", back_populates="tenant", cascade="all, delete-orphan")
     subscriptions: Mapped[list["Subscription"]] = relationship("Subscription", back_populates="tenant", cascade="all, delete-orphan")
     goals: Mapped[list["Goal"]] = relationship("Goal", back_populates="tenant", cascade="all, delete-orphan")
+    whatsapp_users: Mapped[list["WhatsAppUser"]] = relationship("WhatsAppUser", back_populates="tenant", cascade="all, delete-orphan")
+    subscription: Mapped["TenantPlan"] = relationship("TenantPlan", back_populates="tenant", cascade="all, delete-orphan", uselist=False)
+    audit_logs: Mapped[list["AuditLog"]] = relationship("AuditLog", back_populates="tenant", cascade="all, delete-orphan")

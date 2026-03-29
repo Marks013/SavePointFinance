@@ -66,6 +66,7 @@ async def card_edit_form(request: Request, card_id: uuid.UUID,
 @router.put("/settings/cards/{card_id}", response_class=HTMLResponse)
 async def card_update_form(request: Request, card_id: uuid.UUID,
                             name: str = Form(...), brand: str = Form(default="Visa"),
+                            card_type: str = Form(default="credit"),
                             last4: Optional[str] = Form(default=None),
                             limit_amount: float = Form(default=0),
                             due_day: int = Form(default=10), close_day: int = Form(default=3),
@@ -73,16 +74,54 @@ async def card_update_form(request: Request, card_id: uuid.UUID,
                             current_user: User = Depends(get_current_user_cookie),
                             db: AsyncSession = Depends(get_db)):
     from decimal import Decimal
+    from datetime import date
+    from app.models.card import CardType
+    from sqlalchemy import select
+    from app.models.transaction import Transaction, TransactionType
     q = await db.execute(select(Card).where(Card.id == card_id, Card.tenant_id == current_user.tenant_id))
     card = q.scalar_one_or_none()
     if card:
         card.name = name; card.brand = brand; card.last4 = last4 or None
+        card.card_type = CardType(card_type)
         card.limit_amount = Decimal(str(limit_amount))
         card.due_day = due_day; card.close_day = close_day; card.color = color
         await db.commit()
-    cards_q = await db.execute(select(Card).where(Card.tenant_id == current_user.tenant_id).order_by(Card.name))
-    ctx = {"request": request, "cards": cards_q.scalars().all(), "fmt": _fmt_brl}
-    response = tmpl(request).TemplateResponse("partials/_cards_table.html", ctx)
+    today = date.today()
+    cards_q = await db.execute(select(Card).where(Card.tenant_id == current_user.tenant_id))
+    cards = cards_q.scalars().all()
+    cards_map = {str(c.id): c for c in cards}
+    txs_q = await db.execute(
+        select(Transaction).where(
+            Transaction.tenant_id == current_user.tenant_id,
+            Transaction.installments_total > 1
+        ).order_by(Transaction.date.desc())
+    )
+    txs = txs_q.scalars().all()
+    recurring_q = await db.execute(
+        select(Transaction).where(
+            Transaction.tenant_id == current_user.tenant_id,
+            Transaction.is_recurring == True,
+            Transaction.type == TransactionType.income,
+        ).order_by(Transaction.date.desc())
+    )
+    recurring_income = recurring_q.scalars().all()
+    installments_by_card = {}
+    for t in txs:
+        if t.card_id:
+            if t.card_id not in installments_by_card:
+                installments_by_card[t.card_id] = []
+            installments_by_card[t.card_id].append(t)
+    for card_id in installments_by_card:
+        installments_by_card[card_id].sort(key=lambda x: x.installment_number)
+    ctx = {
+        "request": request, "user": current_user,
+        "cards": cards, "cards_map": cards_map,
+        "txs": txs, "installments_by_card": installments_by_card,
+        "recurring_income": recurring_income,
+        "current_month": today.month, "current_year": today.year, "today": today.day,
+        "fmt": _fmt_brl,
+    }
+    response = tmpl(request).TemplateResponse("installments.html", ctx)
     response.headers.update(_toast_headers("Cartão atualizado"))
     response.headers["HX-Trigger-After-Swap"] = '{"sp:closeModal": true}'
     return response

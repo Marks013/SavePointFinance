@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, date
+from datetime import datetime, date as date_type
 from decimal import Decimal
 from enum import Enum
 from sqlalchemy import String, DateTime, Date, ForeignKey, Numeric, Integer, func, Boolean, Enum as SAEnum
@@ -24,11 +24,11 @@ class Subscription(Base):
     amount: Mapped[Decimal] = mapped_column(Numeric(15, 2), nullable=False)
     billing_day: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    next_billing_date: Mapped[date] = mapped_column(Date, nullable=False)
+    next_billing_date: Mapped[date_type] = mapped_column(Date, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    tenant: Mapped["Tenant"] = relationship("Tenant", back_populates="subscriptions")
-    user: Mapped["User | None"] = relationship("User")
-    category: Mapped["Category | None"] = relationship("Category")
-    account: Mapped["Account | None"] = relationship("Account")
-    card: Mapped["Card | None"] = relationship("Card")
+    tenant: Mapped["Tenant"] = relationship("Tenant", back_populates="subscriptions", lazy="joined")
+    user: Mapped["User"] = relationship("User", lazy="joined")
+    category: Mapped["Category"] = relationship("Category", lazy="joined")
+    account: Mapped["Account"] = relationship("Account", lazy="joined")
+    card: Mapped["Card"] = relationship("Card", lazy="joined")

@@ -29,3 +29,5 @@ class User(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     tenant: Mapped["Tenant"] = relationship("Tenant", back_populates="users")
     transactions: Mapped[list["Transaction"]] = relationship("Transaction", back_populates="user")
+    whatsapp_accounts: Mapped[list["WhatsAppUser"]] = relationship("WhatsAppUser", back_populates="user", cascade="all, delete-orphan")
+    audit_logs: Mapped[list["AuditLog"]] = relationship("AuditLog", back_populates="user")

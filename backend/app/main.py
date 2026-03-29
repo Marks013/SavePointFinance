@@ -24,6 +24,7 @@ from app.database import engine, Base
 # ── Routers ───────────────────────────────────────────────────────────────────
 from app.routers.views          import router as views_router
 from app.routers.views_settings import router as views_settings_router
+from app.routers.views_whatsapp import router as views_whatsapp_router
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -138,6 +139,7 @@ app.state.templates = Jinja2Templates(directory=BASE_DIR / "templates")
 # ── Routers ───────────────────────────────────────────────────────────────────
 app.include_router(views_router)
 app.include_router(views_settings_router)
+app.include_router(views_whatsapp_router)
 
 
 # ── Health check ──────────────────────────────────────────────────────────────

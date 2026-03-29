@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, date
+from datetime import datetime, date as date_type
 from decimal import Decimal
 from enum import Enum
 from sqlalchemy import String, DateTime, Date, ForeignKey, Numeric, Text, func, Enum as SAEnum, Boolean, Integer
@@ -33,7 +33,7 @@ class Transaction(Base):
     category_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("categories.id", ondelete="SET NULL"), nullable=True)
     account_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True)
     card_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("cards.id", ondelete="SET NULL"), nullable=True)
-    date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    date: Mapped[date_type] = mapped_column(Date, nullable=False, index=True)
     amount: Mapped[Decimal] = mapped_column(Numeric(15, 2), nullable=False)
     description: Mapped[str] = mapped_column(String(500), nullable=False)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -49,8 +49,8 @@ class Transaction(Base):
     ai_confidence: Mapped[float | None] = mapped_column(Numeric(3, 2), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    tenant: Mapped["Tenant"] = relationship("Tenant", back_populates="transactions")
-    user: Mapped["User | None"] = relationship("User", back_populates="transactions")
-    category: Mapped["Category | None"] = relationship("Category", back_populates="transactions")
-    account: Mapped["Account | None"] = relationship("Account", back_populates="transactions")
-    card: Mapped["Card | None"] = relationship("Card", back_populates="transactions")
+    tenant: Mapped["Tenant"] = relationship("Tenant", back_populates="transactions", lazy="joined")
+    user: Mapped["User"] = relationship("User", back_populates="transactions", lazy="joined")
+    category: Mapped["Category"] = relationship("Category", back_populates="transactions", lazy="joined")
+    account: Mapped["Account"] = relationship("Account", back_populates="transactions", lazy="joined")
+    card: Mapped["Card"] = relationship("Card", back_populates="transactions", lazy="joined")

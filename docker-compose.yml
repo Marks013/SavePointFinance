@@ -1,7 +1,7 @@
-# ═══════════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════════════════════════
 # Save Point Finanças v3 — docker-compose.yml
 #
-# Deployment: Coolify + Oracle Cloud Free Tier (ARM64 / x86_64)
+# Deployment: Coolify + Oracle Cloud (3 CPU, 24GB RAM)
 #
 # ┌─────────────────────────────────────────────────────────────────┐
 # │ COMO O COOLIFY FUNCIONA COM PORTAS                              │
@@ -11,7 +11,7 @@
 # │  ✅ O app NUNCA expõe 80 ou 443 — o Traefik do Coolify faz isso│
 # │  ✅ Apenas `expose: 8000` — visível só dentro do Docker         │
 # │  ✅ Postgres e Redis ficam SOMENTE na rede interna              │
-# │  ✅ Coolify injeta COOLIFY_FQDN e gerencia o certificado SSL    │
+# │  ✅ Coolify injeta COOLIFY_FQDN e gerencia o SSL               │
 # └─────────────────────────────────────────────────────────────────┘
 #
 # Redes:
@@ -28,6 +28,7 @@
 services:
 
   # ── PostgreSQL 16 ─────────────────────────────────────────────────
+  # Otimizado para 24GB RAM: shared_buffers=4GB, effective_cache=16GB
   postgres:
     image: postgres:16-alpine
     container_name: savepoint_db
@@ -37,6 +38,16 @@ services:
       POSTGRES_USER:     ${POSTGRES_USER:-savepoint}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-U35mOyNY}
       PGDATA:            /var/lib/postgresql/data/pgdata
+    command:
+      - postgres
+      - -cshared_buffers=4GB
+      - -ceffective_cache_size=16GB
+      - -cmax_connections=200
+      - -cwork_mem=64MB
+      - -cwal_buffers=64MB
+      - -ccheckpoint_completion_target=0.9
+      - -cmin_wal_size=1GB
+      - -cmax_wal_size=4GB
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -47,9 +58,15 @@ services:
       start_period: 15s
     networks:
       - internal
-    # Postgres NUNCA entra na rede pública — apenas internal
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+        reservations:
+          memory: 4G
 
   # ── Redis 7 ───────────────────────────────────────────────────────
+  # Aumentado para 2GB RAM com persistência
   redis:
     image: redis:7-alpine
     container_name: savepoint_redis
@@ -57,10 +74,13 @@ services:
     command: >
       redis-server
       --requirepass ${REDIS_PASSWORD:-U35mOyNY}
-      --maxmemory 128mb
+      --maxmemory 2gb
       --maxmemory-policy allkeys-lru
       --save 900 1
       --save 300 10
+      --save 60 10000
+      --appendonly yes
+      --appendfsync everysec
     volumes:
       - redis_data:/data
     healthcheck:
@@ -71,7 +91,10 @@ services:
       start_period: 10s
     networks:
       - internal
-    # Redis NUNCA entra na rede pública — apenas internal
+    deploy:
+      resources:
+        limits:
+          memory: 2G
 
   # ── App FastAPI (Monolith) ─────────────────────────────────────────
   app:
@@ -83,25 +106,8 @@ services:
 
     # ✅ expose: torna a porta visível dentro do Docker, mas NÃO publica no host
     # O Traefik do Coolify acessa via rede "coolify" + porta 8000
-    expose:
-      - "8000"
-
-    # ── Labels para o Traefik do Coolify ──────────────────────────────
-    # O Coolify lê esses labels e configura o roteamento + SSL automaticamente.
-    # Você NÃO precisa editar esses labels — o Coolify injeta COOLIFY_FQDN.
-    labels:
-      # Informa ao Coolify qual porta o app usa internamente
-      - "coolify.managed=true"
-      - "coolify.port=8000"
-
-      # Labels Traefik (Coolify configura automaticamente com base no domínio)
-      # Se precisar configurar manualmente, descomente e ajuste:
-      # - "traefik.enable=true"
-      # - "traefik.http.routers.savepoint.rule=Host(`${COOLIFY_FQDN}`)"
-      # - "traefik.http.routers.savepoint.entrypoints=https"
-      # - "traefik.http.routers.savepoint.tls=true"
-      # - "traefik.http.routers.savepoint.tls.certresolver=letsencrypt"
-      # - "traefik.http.services.savepoint.loadbalancer.server.port=8000"
+    ports:
+      - "8000:8000"
 
     env_file: .env
     environment:
@@ -113,7 +119,6 @@ services:
       APP_ENV: production
 
       # Cookies seguros SOMENTE se HTTPS (o Coolify sempre usa HTTPS)
-      # O app lê essa var para definir secure=True nos cookies
       SECURE_COOKIES: "true"
 
     depends_on:
@@ -124,7 +129,6 @@ services:
 
     networks:
       - internal   # Acessa Postgres e Redis
-      - coolify    # Traefik do Coolify roteia o tráfego externo aqui
 
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8000/health || exit 1"]
@@ -133,10 +137,12 @@ services:
       retries: 3
       start_period: 30s
 
-    # Mapeamento de volumes para hot-reload em dev (comentado em produção)
-    # volumes:
-    #   - ./backend/app/templates:/app/app/templates
-    #   - ./backend/app/static:/app/app/static
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+        reservations:
+          memory: 2G
 
   # ── Backup automático → Backblaze B2 ──────────────────────────────
   backup:
@@ -156,21 +162,16 @@ services:
         condition: service_healthy
     networks:
       - internal  # Apenas acessa o Postgres — sem saída pública necessária
+    deploy:
+      resources:
+        limits:
+          memory: 512M
 
 # ── Redes ──────────────────────────────────────────────────────────
 networks:
-  # Rede do Coolify/Traefik — já existente, gerenciada pelo Coolify
-  # O nome padrão é "coolify" — confirme no painel do Coolify em
-  # Settings → Network se o nome for diferente no seu ambiente
-  coolify:
-    external: true
-    name: coolify
-
   # Rede interna — isolada, só containers deste compose se enxergam
   internal:
     driver: bridge
-    internal: true   # ← garante que NENHUM container desta rede
-                     #   acessa a internet diretamente (segurança extra)
 
 # ── Volumes persistentes ────────────────────────────────────────────
 volumes:
