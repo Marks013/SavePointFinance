@@ -1,0 +1,174 @@
+# SavePoint Finance - Deploy na Oracle Cloud
+
+## 1. Conectar ao Servidor via SSH
+
+```bash
+ssh -i sua_chave.pem usuario@ip_do_servidor
+```
+
+Exemplo:
+```bash
+ssh -i ~/.ssh/chave_oracle.pem ubuntu@123.45.67.89
+```
+
+---
+
+## 2. Excluir Pasta Antiga
+
+```bash
+rm -rf ~/SavePointFinance
+```
+
+---
+
+## 3. Clonar o Projeto do GitHub
+
+```bash
+cd ~
+git clone https://github.com/Marks013/SavePointFinance.git
+cd SavePointFinance
+```
+
+---
+
+## 4. Criar o Arquivo .env
+
+```bash
+cd SavePointFinance/backend
+
+cat > .env << 'EOF'
+# ============================================
+# CONFIGURAÇÃO - SAVEPOINT FINANCE
+# ============================================
+
+# App
+APP_NAME=SavePoint Finance
+APP_ENV=production
+APP_SECRET=gere_uma_chave_segura_aqui
+
+# Database (ajuste conforme seu PostgreSQL)
+DATABASE_URL=postgresql+asyncpg://postgres:SUA_SENHA@localhost:5432/savepoint
+
+# JWT (gere chaves diferentes para cada ambiente)
+JWT_SECRET=gere_uma_chave_jwt_segura_aqui
+JWT_ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=60
+
+# CORS (SUBSTITUA pelo IP ou domínio do seu servidor)
+ALLOWED_ORIGINS=["http://SEU_IP_AQUI"]
+
+# OpenAI (opicional - para IA Classifier)
+OPENAI_API_KEY=
+
+# WhatsApp (opicional - para alertas)
+WHATSAPP_API_URL=
+WHATSAPP_API_TOKEN=
+WHATSAPP_PHONE_ID=
+EOF
+```
+
+**IMPORTANTE:** Substitua:
+- `SUA_SENHA` pela senha do seu PostgreSQL
+- `SEU_IP_AQUI` pelo IP público do seu servidor Oracle
+- Gere novas chaves com: `openssl rand -hex 32`
+
+---
+
+## 5. Configurar PostgreSQL (se não tiver)
+
+```bash
+# Instalar PostgreSQL
+sudo apt update
+sudo apt install postgresql postgresql-contrib
+
+# Criar banco de dados
+sudo -u postgres psql
+CREATE DATABASE savepoint;
+ALTER USER postgres WITH PASSWORD 'sua_senha';
+\q
+```
+
+---
+
+## 6. Iniciar com Docker (Recomendado)
+
+```bash
+cd SavePointFinance
+
+# Editar docker-compose.yml se necessário
+nano docker-compose.yml
+
+# Iniciar serviços
+docker compose up -d
+
+# Ver logs
+docker logs -f savepoint_backend
+```
+
+---
+
+## 7. Ou Iniciar Manualmente (sem Docker)
+
+```bash
+cd SavePointFinance/backend
+
+# Criar ambiente virtual
+python3 -m venv venv
+source venv/bin/activate  # Linux/Mac
+# ou: venv\Scripts\activate  # Windows
+
+# Instalar dependências
+pip install -r requirements.txt
+
+# Iniciar servidor
+uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+---
+
+## 8. Verificar se está funcionando
+
+```bash
+# Testar health check
+curl http://localhost:8000/api/health
+
+# Ver logs
+docker logs savepoint_backend  # se usar docker
+```
+
+---
+
+## Comandos Úteis
+
+```bash
+# Parar serviços
+docker compose down
+
+# Reiniciar
+docker compose restart
+
+# Atualizar código
+cd SavePointFinance
+git pull origin master
+docker compose down
+docker compose up -d --build
+```
+
+---
+
+## Problemas Comuns
+
+### CORS erro
+- Verifique se o IP está no ALLOWED_ORIGINS no .env
+
+### Banco não conecta
+- Verifique DATABASE_URL no .env
+- Confirme que PostgreSQL está rodando
+
+### Token expirado
+- Gere novas chaves JWT_SECRET
+
+---
+
+Versão: 2.0.0
+GitHub: https://github.com/Marks013/SavePointFinance
