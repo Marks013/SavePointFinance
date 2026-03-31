@@ -1,250 +1,59 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Categorias — Save Point Finanças</title>
-  <link rel="stylesheet" href="css/styles.css">
-</head>
-<body>
+{% extends "base.html" %}
+{% block title %}Categorias — SavePoint Finance{% endblock %}
+{% block breadcrumb %}Categorias{% endblock %}
 
-<div class="app-shell">
-  <div id="sidebar-mount"></div>
-  <div class="main-content">
-    <div class="page-header">
-      <div class="page-title">Categorias</div>
-      <div class="page-actions">
-        <div class="tabs" style="margin-bottom:0;border:none">
-          <div class="tab active" id="tab-expense" data-tab="expense">Despesas</div>
-          <div class="tab" id="tab-income" data-tab="income">Receitas</div>
-        </div>
-        <button class="btn btn--primary" id="btn-new-cat">
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-          Nova categoria
-        </button>
-      </div>
-    </div>
-
-    <div class="page-body">
-      <!-- Error banner -->
-      <div id="cat-error" class="hidden" style="
-        background:var(--red-bg);border:1px solid var(--red-border);
-        border-radius:var(--radius-lg);padding:12px 16px;margin-bottom:16px;
-        color:var(--red);font-size:0.8rem;display:flex;align-items:center;gap:8px
-      ">
-        <span>⚠️</span><span id="cat-error-msg"></span>
-      </div>
-
-      <div class="table-wrapper">
-        <table>
-          <thead>
-            <tr>
-              <th style="width:36px"></th>
-              <th>Nome</th>
-              <th>Tipo</th>
-              <th>Palavras-chave (auto-classificação)</th>
-              <th>Padrão</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="cat-tbody">
-            <tr><td colspan="6" style="padding:24px;text-align:center;color:var(--text-3)">Carregando...</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
+{% block content %}
+<div class="page-header">
+  <div class="page-header__meta">
+    <h1>Categorias</h1>
+    <p>Organize suas finanças por categoria</p>
+  </div>
+  <div class="page-header__actions">
+    <button
+      class="btn btn--primary"
+      hx-get="/categories/new"
+      hx-target="#modal-content"
+      hx-swap="innerHTML"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Nova Categoria
+    </button>
   </div>
 </div>
 
-<!-- Modal -->
-<div class="modal" id="cat-modal">
-  <div class="modal-box">
-    <div class="modal-header">
-      <h3 id="cat-modal-title">Nova Categoria</h3>
-      <button class="btn btn--ghost btn--icon" data-close-modal>✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="form-group">
-        <label class="form-label">Nome *</label>
-        <input type="text" id="cat-name" class="form-control" placeholder="Ex: Alimentação">
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Tipo *</label>
-          <select id="cat-type" class="form-control">
-            <option value="expense">Despesa</option>
-            <option value="income">Receita</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Ícone</label>
-          <input type="text" id="cat-icon" class="form-control" placeholder="tag">
-          <div class="form-hint">Nome Feather icon (tag, home, car...)</div>
-        </div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Cor</label>
-        <div style="display:flex;gap:8px;align-items:center">
-          <input type="color" id="cat-color" value="#10B981"
-            style="height:36px;width:48px;border:1px solid var(--border-2);border-radius:4px;background:transparent;cursor:pointer">
-          <input type="text" id="cat-color-hex" class="form-control" placeholder="#10B981"
-            style="font-family:monospace">
-        </div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Palavras-chave para auto-classificação</label>
-        <input type="text" id="cat-keywords" class="form-control"
-          placeholder="ifood, mercado, restaurante (separadas por vírgula)">
-        <div class="form-hint">Usadas para classificar novas transações automaticamente.</div>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn--ghost" data-close-modal>Cancelar</button>
-      <button class="btn btn--primary" id="cat-save-btn">Salvar</button>
-    </div>
-  </div>
+<!-- Type Tab Toggle -->
+<div class="tab-list mb-6">
+  <button class="tab-btn {{ 'active' if not active_tab or active_tab == 'expense' }}" onclick="switchTab('expense', this)">Despesas</button>
+  <button class="tab-btn {{ 'active' if active_tab == 'income' }}" onclick="switchTab('income', this)">Receitas</button>
 </div>
 
-<script type="module">
-  import { requireAuthAndRender } from './js/nav.js';
-  import { categoriesApi } from './js/api.js';
-  import { toast, confirm, openModal, closeModal, setupModalClose } from './js/utils.js';
+<!-- Expense Categories -->
+<div id="tab-expense" class="cat-tab {{ '' if not active_tab or active_tab == 'expense' else '' }}" style="display: {{ 'grid' if not active_tab or active_tab == 'expense' else 'none' }}; grid-template-columns: repeat(3, 1fr); gap: 16px;">
+  {% include "partials/_cat_table.html" with context %}
+</div>
 
-  if (!requireAuthAndRender('categories.html')) throw new Error('not auth');
+<!-- Income Categories (loaded dynamically or server-side) -->
+<div id="tab-income" style="display: {{ 'grid' if active_tab == 'income' else 'none' }}; grid-template-columns: repeat(3, 1fr); gap: 16px;">
+  {% for cat in income_categories %}
+    {% set loop_cat = cat %}
+    {% include "partials/_cat_card.html" %}
+  {% else %}
+  <div class="empty-state" style="grid-column:1/-1;">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
+      <line x1="7" y1="7" x2="7.01" y2="7"/>
+    </svg>
+    <p>Nenhuma categoria de receita criada</p>
+  </div>
+  {% endfor %}
+</div>
 
-  let editId = null;
-  let activeTab = 'expense';
-  let allCats = [];
-
-  function showError(msg) {
-    document.getElementById('cat-error-msg').textContent = msg;
-    document.getElementById('cat-error').classList.remove('hidden');
-  }
-
-  async function loadCats() {
-    const tbody = document.getElementById('cat-tbody');
-    try {
-      allCats = await categoriesApi.list();
-      document.getElementById('cat-error').classList.add('hidden');
-      renderTable();
-    } catch (err) {
-      console.error('[Categorias] loadCats:', err);
-      showError('Erro ao carregar categorias: ' + err.message);
-      tbody.innerHTML = `<tr><td colspan="6" style="padding:24px;text-align:center;color:var(--red)">⚠️ ${err.message}</td></tr>`;
-    }
-  }
-
-  function renderTable() {
-    const tbody = document.getElementById('cat-tbody');
-    const filtered = allCats.filter(c => c.type === activeTab);
-    if (!filtered.length) {
-      tbody.innerHTML = `<tr><td colspan="6" style="padding:40px;text-align:center;color:var(--text-3)">
-        Nenhuma categoria de ${activeTab === 'expense' ? 'despesa' : 'receita'} cadastrada.
-      </td></tr>`;
-      return;
-    }
-    tbody.innerHTML = filtered.map(c => `
-      <tr>
-        <td><span class="color-dot" style="background:${c.color}"></span></td>
-        <td class="text-strong">${c.name}</td>
-        <td>${c.type === 'expense'
-          ? '<span class="badge badge--expense">Despesa</span>'
-          : '<span class="badge badge--income">Receita</span>'}</td>
-        <td class="text-muted text-sm">${(c.keywords || []).slice(0, 6).join(', ') || '—'}</td>
-        <td>${c.is_default ? '<span class="badge badge--info">Padrão</span>' : '—'}</td>
-        <td class="td-actions">
-          <button class="btn btn--ghost btn--sm" onclick="editCat('${c.id}')">✎</button>
-          ${!c.is_default
-            ? `<button class="btn btn--ghost btn--sm" style="color:var(--red)"
-                onclick="deleteCat('${c.id}','${c.name.replace(/'/g, "\\'")}')">✕</button>`
-            : ''}
-        </td>
-      </tr>`).join('');
-  }
-
-  window.editCat = (id) => {
-    const c = allCats.find(x => x.id === id);
-    if (!c) return;
-    editId = id;
-    document.getElementById('cat-modal-title').textContent = 'Editar Categoria';
-    document.getElementById('cat-name').value     = c.name;
-    document.getElementById('cat-type').value     = c.type;
-    document.getElementById('cat-icon').value     = c.icon;
-    document.getElementById('cat-color').value    = c.color;
-    document.getElementById('cat-color-hex').value = c.color;
-    document.getElementById('cat-keywords').value = (c.keywords || []).join(', ');
-    openModal('cat-modal');
-  };
-
-  window.deleteCat = async (id, name) => {
-    if (!await confirm(`Excluir categoria "${name}"? Só é possível se nenhuma transação a usa.`)) return;
-    try {
-      await categoriesApi.delete(id);
-      toast('Categoria excluída.', 'success');
-      loadCats();
-    } catch (err) { toast(err.message, 'error'); }
-  };
-
-  document.getElementById('btn-new-cat').onclick = () => {
-    editId = null;
-    document.getElementById('cat-modal-title').textContent = 'Nova Categoria';
-    document.getElementById('cat-name').value      = '';
-    document.getElementById('cat-type').value      = activeTab;
-    document.getElementById('cat-icon').value      = 'tag';
-    document.getElementById('cat-color').value     = '#10B981';
-    document.getElementById('cat-color-hex').value = '#10B981';
-    document.getElementById('cat-keywords').value  = '';
-    openModal('cat-modal');
-  };
-
-  // Color sync
-  document.getElementById('cat-color').oninput = (e) => {
-    document.getElementById('cat-color-hex').value = e.target.value;
-  };
-  document.getElementById('cat-color-hex').oninput = (e) => {
-    if (/^#[0-9A-Fa-f]{6}$/.test(e.target.value))
-      document.getElementById('cat-color').value = e.target.value;
-  };
-
-  document.getElementById('cat-save-btn').onclick = async () => {
-    const btn = document.getElementById('cat-save-btn');
-    const name = document.getElementById('cat-name').value.trim();
-    if (!name) { toast('Informe um nome para a categoria.', 'warning'); return; }
-    btn.disabled = true;
-    try {
-      const kw = document.getElementById('cat-keywords').value
-        .split(',').map(s => s.trim()).filter(Boolean);
-      const body = {
-        name,
-        type:     document.getElementById('cat-type').value,
-        icon:     document.getElementById('cat-icon').value || 'tag',
-        color:    document.getElementById('cat-color-hex').value || '#6B7280',
-        keywords: kw,
-      };
-      if (editId) {
-        await categoriesApi.update(editId, body);
-        toast('Categoria atualizada.', 'success');
-      } else {
-        await categoriesApi.create(body);
-        toast('Categoria criada.', 'success');
-      }
-      closeModal('cat-modal');
-      loadCats();
-    } catch (err) { toast(err.message, 'error'); }
-    finally { btn.disabled = false; }
-  };
-
-  // Tabs
-  document.querySelectorAll('[data-tab]').forEach(tab => {
-    tab.onclick = () => {
-      activeTab = tab.dataset.tab;
-      document.querySelectorAll('[data-tab]').forEach(t => t.classList.toggle('active', t === tab));
-      renderTable();
-    };
-  });
-
-  setupModalClose('cat-modal');
-  loadCats();
+<script>
+function switchTab(tab, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-expense').style.display = tab === 'expense' ? 'grid' : 'none';
+  document.getElementById('tab-income').style.display  = tab === 'income'  ? 'grid' : 'none';
+}
 </script>
-</body>
-</html>
+{% endblock %}

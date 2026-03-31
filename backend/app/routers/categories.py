@@ -8,6 +8,7 @@ from app.database import get_db
 from app.auth import get_current_user
 from app.models.user import User
 from app.models.category import Category, CategoryType
+from app.services.plan_limits import check_limit
 
 router = APIRouter(prefix="/api/v1/categories", tags=["categories"])
 
@@ -66,6 +67,10 @@ async def create_category(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    allowed, error = await check_limit(current_user.tenant_id, "categories", db)
+    if not allowed:
+        raise HTTPException(status_code=403, detail=error)
+    
     name_clean = body.name.strip()
 
     # FIX: Prevent duplicate category names in the same tenant (case-insensitive)

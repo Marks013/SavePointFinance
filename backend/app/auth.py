@@ -98,3 +98,7 @@ async def require_superadmin(current_user: User = Depends(get_current_user)) -> 
     if current_user.role != UserRole.superadmin:
         raise HTTPException(status_code=403, detail="Acesso restrito ao super-administrador")
     return current_user
+
+
+# Alias for get_current_user - any authenticated user
+require_user = get_current_user

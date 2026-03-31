@@ -5,12 +5,12 @@ Frontend: admin.html (separate page, not linked in the user navbar).
 """
 import uuid
 import secrets
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, validator
 
 from app.database import get_db
 from app.auth import require_superadmin, hash_password
@@ -18,6 +18,34 @@ from app.models.user import User, UserRole
 from app.models.tenant import Tenant
 
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
+
+# ── Plan constants ────────────────────────────────────────────────────────────────
+PLAN_FEATURES = {
+    "free": {
+        "name": "Free",
+        "price": 0,
+        "max_users": 1,
+        "max_accounts": 3,
+        "max_categories": 10,
+        "features": ["3 contas", "100 transações/mês", "Relatórios básicos"],
+    },
+    "pro": {
+        "name": "Pro",
+        "price": 19.90,
+        "max_users": 5,
+        "max_accounts": 999,
+        "max_categories": 999,
+        "features": ["Contas ilimitadas", "Transações ilimitadas", "Relatórios avançados", "Exportação", "IA classifier"],
+    },
+    "enterprise": {
+        "name": "Enterprise",
+        "price": 49.90,
+        "max_users": 999,
+        "max_accounts": 999,
+        "max_categories": 999,
+        "features": ["Tudo no Pro", "Multi-usuários", "API acesso", "Suporte prioritário", "Whatsapp bot"],
+    },
+}
 
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
@@ -43,6 +71,122 @@ class CreateSuperadminRequest(BaseModel):
     email: EmailStr
     password: str
     secret_key: str
+
+
+class PlanChangeRequest(BaseModel):
+    plan: str
+    expires_at: Optional[datetime] = None
+    
+    @validator("plan")
+    def validate_plan(cls, v):
+        if v not in PLAN_FEATURES:
+            raise ValueError(f"Plano inválido. Opções: {', '.join(PLAN_FEATURES.keys())}")
+        return v
+
+
+class PlanResponse(BaseModel):
+    id: str
+    name: str
+    price: float
+    max_users: int
+    max_accounts: int
+    max_categories: int
+    features: List[str]
+
+
+# ── Plan endpoints ───────────────────────────────────────────────────────────────
+
+@router.get("/plans", response_model=List[PlanResponse])
+async def list_plans(
+    _: User = Depends(require_superadmin),
+):
+    """List all available plans with their features."""
+    return [
+        PlanResponse(id=plan_id, **features)
+        for plan_id, features in PLAN_FEATURES.items()
+    ]
+
+
+@router.post("/tenants/{tenant_id}/plan")
+async def change_tenant_plan(
+    tenant_id: uuid.UUID,
+    body: PlanChangeRequest,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_superadmin),
+):
+    """Change tenant plan with proper validation and limits."""
+    result = await db.execute(select(Tenant).where(Tenant.id == tenant_id))
+    tenant = result.scalar_one_or_none()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Workspace não encontrado")
+    
+    old_plan = tenant.plan
+    new_plan = body.plan
+    
+    plan_info = PLAN_FEATURES[new_plan]
+    
+    # Check user count vs new plan limit
+    user_count_result = await db.execute(
+        select(func.count(User.id)).where(
+            User.tenant_id == tenant_id, User.is_active == True
+        )
+    )
+    user_count = user_count_result.scalar() or 0
+    
+    if user_count > plan_info["max_users"]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Este plano suporta até {plan_info['max_users']} usuário(s), mas o workspace tem {user_count} usuário(s) ativo(s). Upgrade primeiro os usuários para um plano superior."
+        )
+    
+    # Check account count vs new plan limit
+    from app.models.account import Account
+    acc_count_result = await db.execute(
+        select(func.count(Account.id)).where(Account.tenant_id == tenant_id)
+    )
+    account_count = acc_count_result.scalar() or 0
+    
+    if account_count > plan_info["max_accounts"]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Este plano suporta até {plan_info['max_accounts']} conta(s), mas o workspace tem {account_count} conta(s). Remova contas primeiro para fazer o downgrade."
+        )
+    
+    # Check category count vs new plan limit
+    from app.models.category import Category
+    cat_count_result = await db.execute(
+        select(func.count(Category.id)).where(Category.tenant_id == tenant_id)
+    )
+    category_count = cat_count_result.scalar() or 0
+    
+    if category_count > plan_info["max_categories"]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Este plano suporta até {plan_info['max_categories']} categoria(s), mas o workspace tem {category_count} categoria(s). Remova categorias primeiro para fazer o downgrade."
+        )
+    
+    # Apply plan change
+    tenant.plan = new_plan
+    tenant.max_users = plan_info["max_users"]
+    
+    # Handle expiration
+    if body.expires_at:
+        tenant.expires_at = body.expires_at
+    elif body.expires_at is None and old_plan == "free" and new_plan != "free":
+        # First paid plan: set expiration to 30 days from now
+        tenant.expires_at = datetime.now(timezone.utc) + timedelta(days=30)
+    
+    await db.commit()
+    await db.refresh(tenant)
+    
+    return {
+        "id": str(tenant.id),
+        "name": tenant.name,
+        "plan": tenant.plan,
+        "max_users": tenant.max_users,
+        "expires_at": tenant.expires_at.isoformat() if tenant.expires_at else None,
+        "message": f"Plano alterado de '{old_plan}' para '{new_plan}' com sucesso.",
+    }
 
 
 # ── Tenant endpoints ──────────────────────────────────────────────────────────
@@ -105,6 +249,19 @@ async def get_tenant(
     )
     users = users_result.scalars().all()
 
+    from app.models.account import Account
+    from app.models.category import Category
+    
+    user_count = await db.execute(
+        select(func.count(User.id)).where(User.tenant_id == tenant_id, User.is_active == True)
+    )
+    acc_count = await db.execute(
+        select(func.count(Account.id)).where(Account.tenant_id == tenant_id)
+    )
+    cat_count = await db.execute(
+        select(func.count(Category.id)).where(Category.tenant_id == tenant_id)
+    )
+
     return {
         "id": str(tenant.id),
         "name": tenant.name,
@@ -114,6 +271,12 @@ async def get_tenant(
         "is_active": tenant.is_active,
         "expires_at": tenant.expires_at.isoformat() if tenant.expires_at else None,
         "created_at": tenant.created_at.isoformat(),
+        "user_count": user_count.scalar() or 0,
+        "account_count": acc_count.scalar() or 0,
+        "category_count": cat_count.scalar() or 0,
+        "available_plans": [
+            {"id": pid, **features} for pid, features in PLAN_FEATURES.items()
+        ],
         "users": [
             {
                 "id": str(u.id),
@@ -205,6 +368,8 @@ async def list_all_users(
                 "tenant_id": str(u.tenant_id),
                 "is_active": u.is_active,
                 "created_at": u.created_at.isoformat(),
+                "last_login": u.last_login.isoformat() if u.last_login else None,
+                "login_count": u.login_count or 0,
             }
             for u in users
         ],
@@ -325,6 +490,16 @@ async def platform_stats(
         "total_transactions": total_tx,
         "expiring_soon_30d": expiring_soon,
         "expired_tenants": expired,
+        "plans_breakdown": {
+            "free": (await db.execute(select(func.count()).select_from(Tenant).where(Tenant.plan == "free"))).scalar() or 0,
+            "pro": (await db.execute(select(func.count()).select_from(Tenant).where(Tenant.plan == "pro"))).scalar() or 0,
+            "enterprise": (await db.execute(select(func.count()).select_from(Tenant).where(Tenant.plan == "enterprise"))).scalar() or 0,
+        },
+        "roles_breakdown": {
+            "superadmin": (await db.execute(select(func.count()).select_from(User).where(User.role == UserRole.superadmin))).scalar() or 0,
+            "admin": (await db.execute(select(func.count()).select_from(User).where(User.role == UserRole.admin))).scalar() or 0,
+            "member": (await db.execute(select(func.count()).select_from(User).where(User.role == UserRole.member))).scalar() or 0,
+        },
     }
 
 

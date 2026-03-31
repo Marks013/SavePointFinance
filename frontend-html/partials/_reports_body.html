@@ -1,0 +1,116 @@
+<!-- _reports_body.html -->
+
+<!-- Category Summary Cards -->
+<div class="card p-5 mb-6">
+  <h3 style="font-size:0.875rem; font-weight:600; margin-bottom:16px;">Resumo por Categoria</h3>
+  {% if expense_breakdown %}
+  <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:12px;">
+    {% for item in expense_breakdown %}
+    <div style="padding:16px; border-radius:10px; background:var(--secondary);">
+      <div style="width:24px; height:4px; border-radius:99px; background:{{ item.color }}; margin-bottom:8px;"></div>
+      <div style="font-size:0.75rem; color:var(--text-dim); margin-bottom:4px;">{{ item.name }}</div>
+      <div class="mono fw-700" style="font-size:1.125rem;">{{ item.value_fmt or ('R$ ' + '%.2f'|format(item.value)) }}</div>
+      {% if item.pct %}
+      <div style="font-size:0.7rem; color:var(--text-dim); margin-top:2px;">{{ item.pct }}% do total</div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state" style="padding:40px;">
+    <p>Sem dados de categorias para este período</p>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Account / Card Breakdown -->
+{% if account_summary %}
+<div class="two-col mb-6">
+  <div class="card p-5">
+    <h3 style="font-size:0.875rem; font-weight:600; margin-bottom:16px;">Por Conta</h3>
+    <div class="data-table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Conta</th>
+            <th style="text-align:right;">Receitas</th>
+            <th style="text-align:right;">Despesas</th>
+            <th style="text-align:right;">Saldo</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for acc in account_summary %}
+          <tr>
+            <td style="font-weight:500;">{{ acc.name }}</td>
+            <td style="text-align:right;" class="text-income mono">{{ acc.income_fmt }}</td>
+            <td style="text-align:right;" class="text-expense mono">{{ acc.expense_fmt }}</td>
+            <td style="text-align:right;" class="mono fw-600 {{ 'text-income' if acc.balance >= 0 else 'text-expense' }}">{{ acc.balance_fmt }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% if card_summary %}
+  <div class="card p-5">
+    <h3 style="font-size:0.875rem; font-weight:600; margin-bottom:16px;">Por Cartão</h3>
+    <div class="data-table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Cartão</th>
+            <th style="text-align:right;">Gasto</th>
+            <th style="text-align:right;">Limite</th>
+            <th style="text-align:right;">Disponível</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for card in card_summary %}
+          <tr>
+            <td style="font-weight:500;">{{ card.name }}</td>
+            <td style="text-align:right;" class="text-expense mono">{{ card.spent_fmt }}</td>
+            <td style="text-align:right; color:var(--text-dim);" class="mono">{{ card.limit_fmt }}</td>
+            <td style="text-align:right;" class="mono {{ 'text-income' if card.available >= 0 else 'text-expense' }}">{{ card.available_fmt }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- Comparative Month Table -->
+{% if comparison_data %}
+<div class="card p-5">
+  <h3 style="font-size:0.875rem; font-weight:600; margin-bottom:16px;">Comparativo Mensal</h3>
+  <div class="data-table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Mês</th>
+          <th style="text-align:right;">Receitas</th>
+          <th style="text-align:right;">Despesas</th>
+          <th style="text-align:right;">Saldo</th>
+          <th style="text-align:right;">Poupança %</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in comparison_data %}
+        <tr>
+          <td style="font-weight:500;">{{ row.label }}</td>
+          <td style="text-align:right;" class="text-income mono">{{ row.income_fmt }}</td>
+          <td style="text-align:right;" class="text-expense mono">{{ row.expense_fmt }}</td>
+          <td style="text-align:right;" class="mono fw-600 {{ 'text-income' if row.balance >= 0 else 'text-expense' }}">{{ row.balance_fmt }}</td>
+          <td style="text-align:right;">
+            <span class="badge {{ 'badge--income' if row.savings_rate >= 20 else 'badge--expense' }}">{{ row.savings_rate|round(1) }}%</span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}

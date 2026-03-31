@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="SavePoint Finance - Controle suas finanças pessoais">
+  <meta name="theme-color" content="#10B981">
+  <title>{% block title %}SavePoint Finance{% endblock %}</title>
+  
+  <!-- Preconnect para performance -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="dns-prefetch" href="https://fonts.googleapis.com">
+  
+  <!-- CSS crítico inline para first paint -->
+  <style>
+    :root {--accent: #10B981; --bg: #0f0f0f; --card: #1a1a1a; --border: #2a2a2a; --text: #f5f5f5; --text-dim: #888;}
+    body {margin:0; font-family:Inter,sans-serif; background:var(--bg); color:var(--text);}
+    .app-shell {display:flex; min-height:100vh;}
+    .main-content {flex:1; margin-left:260px; padding:20px; transition:margin 0.2s;}
+    @media (max-width:768px) {.main-content {margin-left:0;}}
+    .toast-container {position:fixed; top:20px; right:20px; z-index:9999; display:flex; flex-direction:column; gap:8px;}
+  </style>
+  
+  <!-- Fontes com display swap para performance -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap"></noscript>
+  
+  <!-- CSS principal -->
+  <link rel="stylesheet" href="/static/css/styles.css">
+  
+  <style>[x-cloak] { display: none !important; }</style>
+  
+  <!-- HTMX com defer -->
+  <script src="https://unpkg.com/htmx.org@2.0.3/dist/htmx.min.js" defer></script>
+  
+  {% block head %}{% endblock %}
+</head>
+<body>
+
+<!-- Mobile sidebar overlay -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+<div class="app-shell">
+  {% include "partials/_sidebar.html" %}
+
+  <div class="main-content">
+    <!-- Top Header -->
+    <header class="top-header">
+      <div class="header-left">
+        <button class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Toggle menu">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
+        <span class="header-breadcrumb">{% block breadcrumb %}{% endblock %}</span>
+      </div>
+      <div class="header-right">
+        <button class="icon-btn" title="Notificações" aria-label="Notificações">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+          </svg>
+          <span class="notif-dot"></span>
+        </button>
+        <a href="/options" class="icon-btn" title="Configurações" aria-label="Configurações">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/>
+          </svg>
+        </a>
+      </div>
+    </header>
+
+    <!-- Page Content -->
+    <main class="page-body" id="main-content">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+
+<!-- Global Modal -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal-box" id="modal-content"></div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" aria-live="polite"></div>
+
+<script>
+/* ── Sidebar toggle (mobile) ────────────────────────────────────────── */
+function toggleSidebar() {
+  const sidebar = document.getElementById('appSidebar');
+  const overlay = document.getElementById('sidebarOverlay');
+  sidebar.classList.toggle('open');
+  overlay.classList.toggle('open');
+}
+
+function closeSidebar() {
+  document.getElementById('appSidebar').classList.remove('open');
+  document.getElementById('sidebarOverlay').classList.remove('open');
+}
+
+/* ── Modal system ───────────────────────────────────────────────────── */
+const modalOverlay = document.getElementById('modal-overlay');
+
+function openModal()  { modalOverlay.classList.add('modal--open'); }
+function closeModal() { modalOverlay.classList.remove('modal--open'); }
+
+window.addEventListener('sp:openModal',  openModal);
+window.addEventListener('sp:closeModal', closeModal);
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && modalOverlay.classList.contains('modal--open')) closeModal();
+});
+
+/* ── HTMX modal integration ─────────────────────────────────────────── */
+document.body.addEventListener('htmx:afterSwap', e => {
+  if (e.target && e.target.id === 'modal-content') openModal();
+});
+
+/* ── Toast system ───────────────────────────────────────────────────── */
+const toastContainer = document.querySelector('.toast-container');
+
+function addToast({ message, kind = 'success', duration = 4000 }) {
+  const icons = {
+    success: '✓',
+    error: '✕',
+    warning: '⚠',
+    info: 'ℹ'
+  };
+  const toast = document.createElement('div');
+  toast.className = `toast toast--${kind}`;
+  toast.innerHTML = `
+    <span class="toast-icon">${icons[kind] || 'ℹ'}</span>
+    <span class="toast-message">${message}</span>
+  `;
+  toastContainer.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add('toast--show'));
+  setTimeout(() => {
+    toast.classList.remove('toast--show');
+    setTimeout(() => toast.remove(), 400);
+  }, duration);
+}
+
+// Função global para exibir erros de API
+window.showApiError = function(error, defaultMsg = 'Ocorreu um erro') {
+  let message = defaultMsg;
+  let kind = 'error';
+  
+  if (error?.message) {
+    // Erro da API
+    message = error.message;
+    // Detectar tipo de erro pelo código
+    if (error.status === 401) {
+      message = 'Sua sessão expirou. Faça login novamente.';
+      kind = 'warning';
+    } else if (error.status === 403) {
+      message = 'Você não tem permissão para esta ação.';
+    } else if (error.status === 404) {
+      message = 'Item não encontrado.';
+    } else if (error.status === 400) {
+      message = error.message;
+      kind = 'warning';
+    } else if (error.status >= 500) {
+      message = 'Erro no servidor. Tente novamente mais tarde.';
+    }
+  } else if (typeof error === 'string') {
+    message = error;
+  }
+  
+  addToast({ message, kind });
+};
+
+/* ── HTMX response handling ─────────────────────────────────────────── */
+document.body.addEventListener('htmx:afterRequest', e => {
+  const raw = e.detail.xhr?.getResponseHeader('HX-Trigger');
+  if (!raw) return;
+  try {
+    const t = JSON.parse(raw);
+    if (t['sp:toast'])      addToast(t['sp:toast']);
+    if (t['sp:closeModal']) closeModal();
+    if (t['sp:openModal'])  openModal();
+  } catch {}
+});
+
+document.body.addEventListener('htmx:afterSwap', e => {
+  const raw = e.detail.xhr?.getResponseHeader('HX-Trigger-After-Swap');
+  if (!raw) return;
+  try {
+    const events = JSON.parse(raw);
+    for (const [name, detail] of Object.entries(events))
+      window.dispatchEvent(new CustomEvent(name, { detail }));
+  } catch {}
+});
+
+document.body.addEventListener('htmx:beforeSwap', e => {
+  if (e.detail.xhr.status >= 400) {
+    e.detail.shouldSwap = true;
+    e.detail.target = document.getElementById('modal-content');
+  }
+});
+
+document.body.addEventListener('htmx:responseError', e => {
+  const status = e.detail.xhr?.status;
+  let message = 'Ocorreu um erro';
+  
+  try {
+    const response = JSON.parse(e.detail.xhr.responseText);
+    message = response.detail || response.message || message;
+  } catch {}
+  
+  if (status === 401) {
+    message = 'Sua sessão expirou. Faça login novamente.';
+    Auth.clear();
+    window.location.href = '/login';
+  } else if (status === 403) {
+    message = 'Você não tem permissão para esta ação.';
+  } else if (status === 404) {
+    message = 'Item não encontrado.';
+  } else if (status >= 500) {
+    message = 'Erro no servidor. Tente novamente mais tarde.';
+  }
+  
+  addToast({ message, kind: 'error' });
+});
+
+/* ── Dashboard refresh ──────────────────────────────────────────────── */
+window.addEventListener('sp:refreshDashboard', () => {
+  if (window.location.pathname === '/dashboard')
+    htmx.ajax('GET', '/dashboard', { target: '#main-content', swap: 'innerHTML' });
+});
+
+/* ── Toggle switch ──────────────────────────────────────────────────── */
+function toggleSwitch(el) {
+  el.classList.toggle('on');
+  const input = el.previousElementSibling;
+  if (input) input.value = el.classList.contains('on') ? '1' : '0';
+}
+
+/* ── Month navigation ───────────────────────────────────────────────── */
+function changeMonth(delta) {
+  const url = new URL(window.location);
+  let m = parseInt(url.searchParams.get('month') || '{{ now.month if now else "1" }}');
+  let y = parseInt(url.searchParams.get('year')  || '{{ now.year  if now else "2026" }}');
+  m += delta;
+  if (m < 1) { m = 12; y--; }
+  if (m > 12) { m = 1;  y++; }
+  url.searchParams.set('month', m);
+  url.searchParams.set('year',  y);
+  window.location = url.toString();
+}
+</script>
+
+{% block scripts %}{% endblock %}
+</body>
+</html>

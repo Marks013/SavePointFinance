@@ -4,7 +4,7 @@
  *
  * BUGFIX: Auto-refresh on 401 agora verifica se existe refresh token ANTES
  * de tentar o refresh. Sem isso, o login com credenciais erradas entrava em
- * loop: 401 → tryRefresh falha → Auth.clear() → redirect /login.html → reload.
+   * loop: 401 → tryRefresh falha → Auth.clear() → redirect /login → reload.
  */
 
 const API_BASE = '/api/v1';
@@ -30,16 +30,20 @@ export const Auth = {
   },
   isLoggedIn() { return !!this.getToken(); },
   isSuperadmin() { return this.getUser()?.role === 'superadmin'; },
+  isAdmin() { 
+    const role = this.getUser()?.role;
+    return role === 'superadmin' || role === 'admin';
+  },
   requireAuth() {
     if (!this.isLoggedIn()) {
-      window.location.href = '/login.html';
+      window.location.href = '/login';
       return false;
     }
     return true;
   },
   requireSuperadmin() {
     if (!this.isLoggedIn() || !this.isSuperadmin()) {
-      window.location.href = '/dashboard.html';
+      window.location.href = '/dashboard';
       return false;
     }
     return true;
@@ -101,31 +105,22 @@ async function request(method, path, body = null, options = {}) {
   try {
     let res = await fetch(`${API_BASE}${path}`, config);
 
-    // ── BUGFIX: Auto-refresh on 401 ──────────────────────────────────────────
-    // Verifica se existe refresh token ANTES de tentar o refresh.
-    // Sem esta checagem, o login com senha errada causava loop infinito:
-    //   401 → tryRefresh() (sem token) → false → Auth.clear()
-    //   → redirect /login.html → página recarrega → formulário limpo → loop.
+    // ── Auto-refresh on 401 ───────────────────────────────────────────────────
     if (res.status === 401 && !options.skipRefresh) {
       const rt = Auth.getRefreshToken();
       if (rt) {
-        // Tem refresh token: tenta renovar a sessão
         const refreshed = await tryRefresh();
         if (refreshed) {
           headers['Authorization'] = `Bearer ${Auth.getToken()}`;
           res = await fetch(`${API_BASE}${path}`, { ...config, headers });
         } else {
-          // Refresh falhou (token expirado/inválido) → força novo login
           Auth.clear();
-          window.location.href = '/login.html';
+          window.location.href = '/login';
           return null;
         }
       }
-      // Sem refresh token (usuário não logado / na tela de login):
-      // NÃO redireciona. Cai no tratamento de erro abaixo para exibir
-      // a mensagem correta ao usuário (ex: "E-mail ou senha incorretos").
     }
-    // ── fim BUGFIX ───────────────────────────────────────────────────────────
+    // ── fim auto-refresh ───────────────────────────────────────────────────────
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({ detail: `Erro HTTP ${res.status}` }));
@@ -138,7 +133,7 @@ async function request(method, path, body = null, options = {}) {
     if (e instanceof ApiError) throw e;
     // Network / CORS error
     throw new ApiError(
-      'Sem conexão com o servidor. Verifique se o backend está rodando e se o ALLOWED_ORIGINS do .env está correto.',
+      'Sem conexão com o servidor. Verifique sua internet.',
       0
     );
   }
@@ -167,10 +162,25 @@ export class ApiError extends Error {
   }
 }
 
+// Wrapper para tratar erros automaticamente com toasts
+async function requestWithToast(method, path, body = null, options = {}) {
+  try {
+    return await request(method, path, body, options);
+  } catch (e) {
+    if (window.showApiError) {
+      window.showApiError(e);
+    } else {
+      console.error('API Error:', e);
+    }
+    throw e;
+  }
+}
+
 const get = (path, params = {}) => {
-  const qs = new URLSearchParams(
-    Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== ''))
-  ).toString();
+  const filteredParams = Object.fromEntries(
+    Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== '')
+  );
+  const qs = new URLSearchParams(filteredParams).toString();
   return request('GET', qs ? `${path}?${qs}` : path);
 };
 const post = (path, body) => request('POST', path, body);
@@ -182,13 +192,19 @@ const del = (path) => request('DELETE', path);
 
 export const authApi = {
   login: (email, password) => post('/auth/login', { email, password }),
-  register: (workspace_name, name, email, password) =>
-    post('/auth/register', { workspace_name, name, email, password }),
+  register: (workspace_name, name, email, password, confirm_password) =>
+    post('/auth/register', { workspace_name, name, email, password, confirm_password }),
   me: () => get('/auth/me'),
   forgotPassword: (email) => post('/auth/forgot-password', { email }),
   resetPassword: (token, new_password) => post('/auth/reset-password', { token, new_password }),
   changePassword: (current_password, new_password) =>
     post('/auth/change-password', { current_password, new_password }),
+  listUsers: () => get('/auth/users'),
+  updateRole: (userId, role) => patch(`/auth/users/${userId}/role`, { role }),
+  toggleActive: (userId, isActive) => patch(`/auth/users/${userId}/active`, { is_active: isActive }),
+  createInvite: (email) => post('/auth/invite', { email }),
+  listInvites: () => get('/auth/invites'),
+  revokeInvite: (id) => del(`/auth/invites/${id}`),
 };
 
 // ── Transactions ─────────────────────────────────────────────────────────────
@@ -277,4 +293,43 @@ export const goalsApi = {
   create: (body) => post('/goals', body),
   update: (id, body) => put(`/goals/${id}`, body),
   delete: (id) => del(`/goals/${id}`),
+  deposit: (id, amount, description) => post(`/goals/${id}/deposit`, { amount, description }),
+};
+
+// ── Data Export/Import ───────────────────────────────────────────────────────
+
+export const dataApi = {
+  export: (params = {}) => get('/data/export', params),
+  import: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return fetch(`${API_BASE}/data/import`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${Auth.getToken()}` },
+      body: formData,
+    }).then(res => res.json());
+  },
+  getTemplate: () => get('/data/import/template'),
+};
+
+// ── Tenant Users (Admin) ───────────────────────────────────────────────────────
+
+export const tenantApi = {
+  listUsers: () => get('/auth/users'),
+  updateRole: (userId, role) => patch(`/auth/users/${userId}/role`, { role }),
+  toggleActive: (userId, isActive) => patch(`/auth/users/${userId}/active`, { is_active: isActive }),
+};
+
+// ── Invites (Admin) ────────────────────────────────────────────────────────────
+
+export const inviteApi = {
+  create: (email) => post('/auth/invite', { email }),
+  list: () => get('/auth/invites'),
+  revoke: (id) => del(`/auth/invites/${id}`),
+};
+
+// ── Plans ───────────────────────────────────────────────────────────────────────
+
+export const plansApi = {
+  list: () => get('/admin/plans'),
 };

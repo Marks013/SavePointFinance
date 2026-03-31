@@ -1,11 +1,8 @@
+<!-- _dashboard_full.html: used for HTMX full-page refresh of dashboard -->
 {% extends "base.html" %}
 {% block title %}Dashboard — SavePoint Finance{% endblock %}
 {% block breadcrumb %}Dashboard{% endblock %}
-
-{% block head %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-{% endblock %}
-
+{% block head %}<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>{% endblock %}
 {% block content %}
 {% include "partials/_dashboard_body.html" %}
 {% endblock %}

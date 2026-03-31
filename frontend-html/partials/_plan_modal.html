@@ -1,0 +1,179 @@
+<!-- _plan_modal.html -->
+<div class="modal-header">
+  <span class="modal-title">Alterar Plano — {{ tenant_name }}</span>
+  <button class="modal-close" onclick="closeModal()">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+    </svg>
+  </button>
+</div>
+
+<div class="modal-body" style="max-height:70vh; overflow-y:auto;">
+  {% if error %}
+  <div class="badge badge--expense" style="width:100%; margin-bottom:16px; padding:12px; border-radius:8px;">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;flex-shrink:0">
+      <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+    </svg>
+    {{ error }}
+  </div>
+  {% endif %}
+
+  <div style="margin-bottom:20px; padding:16px; background:var(--secondary); border-radius:10px;">
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; text-align:center;">
+      <div>
+        <div class="mono text-xs text-muted">Usuários</div>
+        <div class="mono fw-700" style="font-size:1.25rem;">{{ user_count }} / {{ max_users }}</div>
+      </div>
+      <div>
+        <div class="mono text-xs text-muted">Contas</div>
+        <div class="mono fw-700" style="font-size:1.25rem;">{{ account_count }}</div>
+      </div>
+      <div>
+        <div class="mono text-xs text-muted">Categorias</div>
+        <div class="mono fw-700" style="font-size:1.25rem;">{{ category_count }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:20px;">
+    {% for p in available_plans %}
+    <div 
+      class="plan-select-card {% if p.id == current_plan %}plan-select-card--active{% endif %}"
+      data-plan="{{ p.id }}"
+      onclick="selectPlan('{{ p.id }}')"
+    >
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+        <span style="font-weight:600; font-size:0.9375rem;">{{ p.name }}</span>
+        <span class="badge {% if p.id == 'enterprise' %}badge--income{% elif p.id == 'pro' %}badge--info{% else %}badge--neutral{% endif %}" 
+          style="{% if p.id == 'enterprise' %}background:rgba(0,229,122,0.1);color:var(--accent);{% elif p.id == 'pro' %}background:rgba(59,158,255,0.1);color:var(--info);{% endif %}">
+          {{ p.id }}
+        </span>
+      </div>
+      <div style="font-size:1.25rem; font-weight:700; margin-bottom:8px;">
+        R$ {{ "%.2f"|format(p.price) }}{% if p.price > 0 %}<span style="font-size:0.75rem; font-weight:400; color:var(--text-dim);">/mês</span>{% endif %}
+      </div>
+      <ul style="font-size:0.75rem; color:var(--text-dim); padding-left:16px; margin:0;">
+        {% for f in p.features %}
+        <li style="margin-bottom:2px;">{{ f }}</li>
+        {% endfor %}
+      </ul>
+      {% if p.id == current_plan %}
+      <div style="margin-top:12px; padding:6px; background:var(--accent-bg); border-radius:6px; text-align:center; font-size:0.75rem; color:var(--accent); font-weight:600;">
+        Plano atual
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+
+  <form id="planChangeForm" method="POST" action="/admin/tenants/{{ tenant_id }}/plan">
+    <input type="hidden" name="plan" id="selectedPlanInput" value="{{ current_plan }}">
+    
+    <div class="form-group">
+      <label class="form-label" for="expiresAt">Data de expiração (opcional)</label>
+      <input type="date" id="expiresAt" name="expires_at" class="form-input" 
+        value="{{ expires_at or '' }}">
+      <div class="text-xs text-muted" style="margin-top:4px;">
+        Deixe vazio para expiração automática do plano pago (30 dias)
+      </div>
+    </div>
+  </form>
+</div>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn--outline" onclick="closeModal()">Cancelar</button>
+  <button type="submit" class="btn btn--primary" form="planChangeForm" onclick="submitPlanChange()">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+      <polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>
+    </svg>
+    Alterar Plano
+  </button>
+</div>
+
+<style>
+.plan-select-card {
+  padding:16px;
+  border:1px solid var(--border);
+  border-radius:10px;
+  cursor:pointer;
+  transition:all 0.15s ease;
+}
+.plan-select-card:hover {
+  border-color:var(--border-hover);
+  background:var(--card-hover);
+}
+.plan-select-card--active {
+  border-color:var(--accent);
+  background:var(--accent-bg);
+}
+</style>
+
+<script>
+const currentPlan = "{{ current_plan }}";
+const userCount = {{ user_count }};
+const accountCount = {{ account_count }};
+const categoryCount = {{ category_count }};
+
+const planLimits = {
+  free: { max_users: 1, max_accounts: 3, max_categories: 10 },
+  pro: { max_users: 5, max_accounts: 999, max_categories: 999 },
+  enterprise: { max_users: 999, max_accounts: 999, max_categories: 999 },
+};
+
+function selectPlan(planId) {
+  document.getElementById('selectedPlanInput').value = planId;
+  document.querySelectorAll('.plan-select-card').forEach(el => {
+    el.classList.toggle('plan-select-card--active', el.dataset.plan === planId);
+  });
+}
+
+async function submitPlanChange() {
+  const form = document.getElementById('planChangeForm');
+  const formData = new FormData(form);
+  
+  const newPlan = formData.get('plan');
+  const limits = planLimits[newPlan];
+  
+  // Client-side validation
+  if (userCount > limits.max_users) {
+    addToast({ message: `Este plano suporta até ${limits.max_users} usuário(s).`, kind: 'error' });
+    return;
+  }
+  if (accountCount > limits.max_accounts) {
+    addToast({ message: `Este plano suporta até ${limits.max_accounts} conta(s). Remova contas primeiro.`, kind: 'error' });
+    return;
+  }
+  if (categoryCount > limits.max_categories) {
+    addToast({ message: `Este plano suporta até ${limits.max_categories} categoria(s). Remova categorias primeiro.`, kind: 'error' });
+    return;
+  }
+  
+  try {
+    const res = await fetch(form.action, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        plan: newPlan,
+        expires_at: formData.get('expires_at') || null
+      })
+    });
+    
+    const data = await res.json();
+    
+    if (!res.ok) {
+      addToast({ message: data.detail || 'Erro ao alterar plano', kind: 'error' });
+      return;
+    }
+    
+    addToast({ message: data.message || 'Plano alterado com sucesso', kind: 'success' });
+    closeModal();
+    location.reload();
+  } catch (e) {
+    addToast({ message: 'Erro de conexão', kind: 'error' });
+  }
+}
+
+// Init - select current plan visually
+selectPlan(currentPlan);
+</script>

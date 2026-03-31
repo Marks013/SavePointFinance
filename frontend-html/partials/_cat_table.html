@@ -1,0 +1,64 @@
+<!-- _cat_table.html: Grid of expense category cards -->
+{% for cat in expense_categories %}
+<div class="card-hover" style="padding:20px;" id="cat-{{ cat.id }}">
+  <!-- Header -->
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <div style="width:40px; height:40px; border-radius:10px; background:{{ cat.color }}18; display:flex; align-items:center; justify-content:center; font-size:1.25rem; flex-shrink:0;">
+        {{ cat.icon or '📦' }}
+      </div>
+      <div>
+        <div style="font-weight:600; font-size:0.9375rem;">{{ cat.name }}</div>
+        <div style="font-size:0.75rem; color:var(--text-dim); margin-top:2px;">
+          {% if cat.budget %}
+            {{ cat.spent_fmt or '0' }} / {{ cat.budget_fmt or '0' }}
+          {% else %}
+            {{ cat.spent_fmt or '0' }} total
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    <div style="display:flex; gap:4px;">
+      <button
+        class="icon-btn"
+        title="Editar"
+        hx-get="/categories/{{ cat.id }}/edit"
+        hx-target="#modal-content"
+        hx-swap="innerHTML"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  {% if cat.budget %}
+  <!-- Progress Bar -->
+  {% set pct = [(cat.spent / cat.budget * 100), 100]|min %}
+  <div class="progress-track">
+    <div
+      class="progress-bar {{ 'progress-bar--warning' if pct > 80 else ('progress-bar--danger' if pct >= 100 else '') }}"
+      style="width:{{ pct }}%; background:{{ cat.color }};"
+    ></div>
+  </div>
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-top:6px;">
+    <span style="font-size:0.7rem; color:var(--text-dim);">{{ pct|round(1) }}% utilizado</span>
+    {% if pct >= 100 %}
+    <span class="badge badge--expense" style="font-size:0.6rem;">Excedeu</span>
+    {% elif pct > 80 %}
+    <span class="badge badge--warning" style="font-size:0.6rem;">Atenção</span>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% else %}
+<div class="empty-state" style="grid-column:1/-1;">
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
+    <line x1="7" y1="7" x2="7.01" y2="7"/>
+  </svg>
+  <p>Nenhuma categoria de despesa criada</p>
+</div>
+{% endfor %}

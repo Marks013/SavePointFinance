@@ -11,6 +11,7 @@ from app.database import get_db
 from app.auth import get_current_user
 from app.models.user import User
 from app.models.goal import Goal
+from app.services.goal_service import add_to_goal, check_goal_notifications
 
 router = APIRouter(prefix="/api/v1/goals", tags=["goals"])
 
@@ -25,7 +26,11 @@ class GoalBase(BaseModel):
     icon: str | None = None
 
 class GoalCreate(GoalBase):
-    pass
+    notify_on_complete: bool = True
+    notify_on_milestone_25: bool = False
+    notify_on_milestone_50: bool = False
+    notify_on_milestone_75: bool = False
+    notify_on_deadline: bool = True
 
 class GoalUpdate(BaseModel):
     name: str | None = Field(default=None, max_length=100)
@@ -35,9 +40,25 @@ class GoalUpdate(BaseModel):
     deadline: date | None = None
     color: str | None = Field(default=None, max_length=7)
     icon: str | None = None
+    notify_on_complete: bool | None = None
+    notify_on_milestone_25: bool | None = None
+    notify_on_milestone_50: bool | None = None
+    notify_on_milestone_75: bool | None = None
+    notify_on_deadline: bool | None = None
+
+class GoalDeposit(BaseModel):
+    amount: Decimal = Field(..., gt=0)
+    description: str | None = None
 
 class GoalResponse(GoalBase):
     id: UUID
+    notify_on_complete: bool = True
+    notify_on_milestone_25: bool = False
+    notify_on_milestone_50: bool = False
+    notify_on_milestone_75: bool = False
+    notify_on_deadline: bool = True
+    is_completed: bool = False
+    completed_at: date | None = None
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -62,6 +83,7 @@ async def create_goal(
 ):
     goal = Goal(
         tenant_id=current_user.tenant_id,
+        user_id=current_user.id,
         **goal_in.model_dump()
     )
     db.add(goal)
@@ -84,12 +106,51 @@ async def update_goal(
     if not goal:
         raise HTTPException(status_code=404, detail="Goal not found")
 
+    old_amount = goal.current_amount
     update_data = goal_in.model_dump(exclude_unset=True)
+    
+    # Track if current_amount is being updated
+    new_amount = update_data.get('current_amount')
+    
     for key, value in update_data.items():
         setattr(goal, key, value)
 
     await db.commit()
     await db.refresh(goal)
+    
+    # Check notifications if amount changed
+    if new_amount is not None and new_amount != old_amount:
+        await check_goal_notifications(goal, old_amount, new_amount, db)
+    
+    return goal
+
+
+@router.post("/{goal_id}/deposit", response_model=GoalResponse)
+async def deposit_to_goal(
+    goal_id: UUID,
+    deposit: GoalDeposit,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Deposit money to a goal."""
+    result = await db.execute(
+        select(Goal).where(Goal.id == goal_id, Goal.tenant_id == current_user.tenant_id)
+    )
+    goal = result.scalar_one_or_none()
+    if not goal:
+        raise HTTPException(status_code=404, detail="Meta não encontrada")
+    
+    if goal.is_completed:
+        raise HTTPException(status_code=400, detail="Meta já foi completada")
+    
+    old_amount = goal.current_amount
+    goal.current_amount += deposit.amount
+    
+    await db.commit()
+    await db.refresh(goal)
+    
+    await check_goal_notifications(goal, old_amount, goal.current_amount, db)
+    
     return goal
 
 

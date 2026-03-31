@@ -1,0 +1,65 @@
+<!-- _cards_table.html -->
+{% if cards %}
+<div style="display:grid; grid-template-columns:repeat(3,1fr); gap:16px;">
+  {% for card in cards %}
+  {% set used_pct = [(card.used / card.limit * 100), 100]|min if card.limit else 0 %}
+  <div class="card-hover" style="padding:20px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <div style="width:42px; height:42px; border-radius:11px; background:{{ card.color or '#3B9EFF' }}18; display:flex; align-items:center; justify-content:center;">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="{{ card.color or '#3B9EFF' }}" stroke-width="2" style="width:18px;height:18px;">
+            <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/>
+          </svg>
+        </div>
+        <div>
+          <div style="font-weight:600;">{{ card.name }}</div>
+          <div style="font-size:0.75rem; color:var(--text-dim); margin-top:2px;">
+            {{ card.type }} · **** {{ card.last_four or '0000' }}
+          </div>
+        </div>
+      </div>
+      <button
+        class="icon-btn"
+        hx-get="/settings/cards/{{ card.id }}/edit"
+        hx-target="#modal-content"
+        hx-swap="innerHTML"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+        </svg>
+      </button>
+    </div>
+
+    {% if card.limit %}
+    <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+      <span style="font-size:0.75rem; color:var(--text-dim);">Fatura do mês</span>
+      <span class="mono" style="font-size:0.8125rem; font-weight:600; color:var(--expense);">
+        {{ card.used_fmt or ('R$ ' + '%.2f'|format(card.used or 0)) }}
+      </span>
+    </div>
+    <div class="progress-track" style="margin-bottom:6px;">
+      <div class="progress-bar {{ 'progress-bar--warning' if used_pct > 70 else ('progress-bar--danger' if used_pct > 90 else '') }}"
+        style="width:{{ used_pct }}%; background:{{ card.color or '#3B9EFF' }};"></div>
+    </div>
+    <div style="display:flex; justify-content:space-between;">
+      <span style="font-size:0.7rem; color:var(--text-dim);">Disponível: {{ card.available_fmt or ('R$ ' + '%.2f'|format((card.limit or 0) - (card.used or 0))) }}</span>
+      <span style="font-size:0.7rem; color:var(--text-dim);">Limite: {{ card.limit_fmt or ('R$ ' + '%.2f'|format(card.limit)) }}</span>
+    </div>
+    {% endif %}
+
+    {% if card.due_day %}
+    <div style="margin-top:10px; font-size:0.75rem; color:var(--text-dim);">
+      Vencimento: dia {{ card.due_day }}
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card">
+  <div class="empty-state">
+    <p>Nenhum cartão cadastrado</p>
+  </div>
+</div>
+{% endif %}

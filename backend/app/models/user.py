@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Optional
 from enum import Enum
-from sqlalchemy import String, DateTime, ForeignKey, Boolean, func, Enum as SAEnum
+from sqlalchemy import String, DateTime, ForeignKey, Boolean, func, Enum as SAEnum, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 from app.database import Base
@@ -28,6 +28,10 @@ class User(Base):
     role: Mapped[UserRole] = mapped_column(SAEnum(UserRole), default=UserRole.member, nullable=False)
     whatsapp_number: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+    # Login tracking
+    last_login: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    login_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     # Password recovery fields
     reset_token: Mapped[Optional[str]] = mapped_column(String(128), nullable=True, index=True)

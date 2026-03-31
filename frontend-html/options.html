@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+{% block title %}Opções — SavePoint Finance{% endblock %}
+{% block breadcrumb %}Opções{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header__meta">
+    <h1>Opções</h1>
+    <p>Preferências e configurações da sua conta</p>
+  </div>
+</div>
+
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+
+  <!-- ── Profile ─────────────────────────────────────────────────── -->
+  <div class="card settings-section">
+    <div class="settings-section__header">
+      <div class="settings-section__icon">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/>
+        </svg>
+      </div>
+      <h3 class="settings-section__title">Perfil</h3>
+    </div>
+    <form method="POST" action="/options/profile" class="form-stack">
+      <div class="form-group">
+        <label class="form-label" for="optName">Nome completo</label>
+        <input type="text" id="optName" name="name" class="form-input"
+          value="{{ user.name or '' }}" placeholder="Seu nome">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="optEmail">E-mail</label>
+        <input type="email" id="optEmail" name="email" class="form-input"
+          value="{{ user.email or '' }}" placeholder="seu@email.com">
+      </div>
+      <button type="submit" class="btn btn--primary btn--sm">Salvar alterações</button>
+    </form>
+  </div>
+
+  <!-- ── Security ────────────────────────────────────────────────── -->
+  <div class="card settings-section">
+    <div class="settings-section__header">
+      <div class="settings-section__icon">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        </svg>
+      </div>
+      <h3 class="settings-section__title">Segurança</h3>
+    </div>
+    <form method="POST" action="/options/password" class="form-stack">
+      <div class="form-group">
+        <label class="form-label" for="optCurrentPw">Senha atual</label>
+        <input type="password" id="optCurrentPw" name="current_password"
+          class="form-input" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="optNewPw">Nova senha</label>
+        <input type="password" id="optNewPw" name="new_password"
+          class="form-input" placeholder="Mínimo 8 caracteres" autocomplete="new-password">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="optConfirmPw">Confirmar nova senha</label>
+        <input type="password" id="optConfirmPw" name="confirm_password"
+          class="form-input" placeholder="Repita a nova senha" autocomplete="new-password">
+      </div>
+      <button type="submit" class="btn btn--primary btn--sm">Alterar senha</button>
+    </form>
+  </div>
+
+  <!-- ── Notifications ───────────────────────────────────────────── -->
+  <div class="card settings-section">
+    <div class="settings-section__header">
+      <div class="settings-section__icon">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+        </svg>
+      </div>
+      <h3 class="settings-section__title">Notificações</h3>
+    </div>
+    <form method="POST" action="/options/notifications">
+      <div class="toggle-row">
+        <span class="toggle-row__label">Notificações por e-mail</span>
+        <input type="hidden" name="email_notif" id="emailNotifVal"
+          value="{{ '1' if prefs and prefs.email_notifications else '0' }}">
+        <div class="toggle {{ 'on' if not prefs or prefs.email_notifications }}"
+          onclick="this.classList.toggle('on'); document.getElementById('emailNotifVal').value = this.classList.contains('on') ? '1' : '0';">
+        </div>
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-row__label">Relatórios mensais</span>
+        <input type="hidden" name="monthly_report" id="monthlyReportVal"
+          value="{{ '1' if prefs and prefs.monthly_reports else '0' }}">
+        <div class="toggle {{ 'on' if not prefs or prefs.monthly_reports }}"
+          onclick="this.classList.toggle('on'); document.getElementById('monthlyReportVal').value = this.classList.contains('on') ? '1' : '0';">
+        </div>
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-row__label">Alertas de orçamento</span>
+        <input type="hidden" name="budget_alerts" id="budgetAlertsVal"
+          value="{{ '1' if prefs and prefs.budget_alerts else '1' }}">
+        <div class="toggle {{ 'on' if not prefs or prefs.budget_alerts }}"
+          onclick="this.classList.toggle('on'); document.getElementById('budgetAlertsVal').value = this.classList.contains('on') ? '1' : '0';">
+        </div>
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-row__label">Lembretes de vencimento</span>
+        <input type="hidden" name="due_reminders" id="dueRemindersVal"
+          value="{{ '1' if prefs and prefs.due_reminders else '0' }}">
+        <div class="toggle {{ 'on' if prefs and prefs.due_reminders }}"
+          onclick="this.classList.toggle('on'); document.getElementById('dueRemindersVal').value = this.classList.contains('on') ? '1' : '0';">
+        </div>
+      </div>
+      <div style="margin-top:16px;">
+        <button type="submit" class="btn btn--primary btn--sm">Salvar preferências</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- ── Preferences ─────────────────────────────────────────────── -->
+  <div class="card settings-section">
+    <div class="settings-section__header">
+      <div class="settings-section__icon">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+        </svg>
+      </div>
+      <h3 class="settings-section__title">Preferências</h3>
+    </div>
+    <form method="POST" action="/options/preferences" class="form-stack">
+      <div class="form-group">
+        <label class="form-label" for="optCurrency">Moeda</label>
+        <select id="optCurrency" name="currency" class="form-select">
+          <option value="BRL" {% if not prefs or prefs.currency == 'BRL' %}selected{% endif %}>R$ — Real Brasileiro</option>
+          <option value="USD" {% if prefs and prefs.currency == 'USD' %}selected{% endif %}>$ — Dólar Americano</option>
+          <option value="EUR" {% if prefs and prefs.currency == 'EUR' %}selected{% endif %}>€ — Euro</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="optLang">Idioma</label>
+        <select id="optLang" name="language" class="form-select">
+          <option value="pt-BR" {% if not prefs or prefs.language == 'pt-BR' %}selected{% endif %}>Português (BR)</option>
+          <option value="en"    {% if prefs and prefs.language == 'en'    %}selected{% endif %}>English</option>
+          <option value="es"    {% if prefs and prefs.language == 'es'    %}selected{% endif %}>Español</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="optFirstDay">Primeiro dia da semana</label>
+        <select id="optFirstDay" name="first_day" class="form-select">
+          <option value="monday" {% if not prefs or prefs.first_day == 'monday' %}selected{% endif %}>Segunda-feira</option>
+          <option value="sunday" {% if prefs and prefs.first_day == 'sunday' %}selected{% endif %}>Domingo</option>
+        </select>
+      </div>
+      <button type="submit" class="btn btn--primary btn--sm">Salvar preferências</button>
+    </form>
+  </div>
+
+  <!-- ── Workspace ───────────────────────────────────────────────── -->
+  <div class="card settings-section" style="grid-column: 1 / -1;">
+    <div class="settings-section__header">
+      <div class="settings-section__icon">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+          <polyline points="9 22 9 12 15 12 15 22"/>
+        </svg>
+      </div>
+      <h3 class="settings-section__title">Workspace</h3>
+    </div>
+    <form method="POST" action="/options/workspace" class="form-stack" style="max-width:480px;">
+      <div class="form-group">
+        <label class="form-label" for="optWorkspace">Nome do workspace</label>
+        <input type="text" id="optWorkspace" name="workspace_name" class="form-input"
+          value="{{ tenant.name if tenant else '' }}" placeholder="Ex.: Finanças Pessoais">
+      </div>
+      <button type="submit" class="btn btn--primary btn--sm">Salvar</button>
+    </form>
+
+    <hr class="divider" style="margin: 20px 0;">
+
+    <div style="display:flex; align-items:center; justify-content:space-between; padding:14px; background:rgba(255,77,106,0.06); border:1px solid rgba(255,77,106,0.15); border-radius:10px;">
+      <div>
+        <div style="font-weight:600; font-size:0.875rem; color:var(--expense);">Zona de Perigo</div>
+        <div style="font-size:0.75rem; color:var(--text-dim); margin-top:2px;">
+          Apagar todos os dados ou excluir a conta é irreversível.
+        </div>
+      </div>
+      <button
+        type="button"
+        class="btn btn--danger"
+        onclick="confirm('Tem certeza? Esta ação não pode ser desfeita.') && (window.location='/options/delete-account')"
+      >Excluir conta</button>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

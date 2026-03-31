@@ -1,290 +1,124 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Assinaturas — Save Point Finanças</title>
-  <link rel="stylesheet" href="css/styles.css">
-</head>
-<body>
+{% extends "base.html" %}
+{% block title %}Assinaturas — SavePoint Finance{% endblock %}
+{% block breadcrumb %}Assinaturas{% endblock %}
 
-<div class="app-shell">
-  <div id="sidebar-mount"></div>
-  <div class="main-content">
-    <div class="page-header">
-      <div class="page-title">Assinaturas</div>
-      <div class="page-actions">
-        <label style="display:flex;align-items:center;gap:8px;font-size:0.8rem;color:var(--text-2);cursor:pointer">
-          <input type="checkbox" id="active-only" style="accent-color:var(--em)"> Somente ativas
-        </label>
-        <button class="btn btn--primary" id="btn-new-sub">
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-          Nova assinatura
+{% block content %}
+<div class="page-header">
+  <div class="page-header__meta">
+    <h1>Assinaturas & Fixas</h1>
+    <p>Gerencie seus pagamentos recorrentes</p>
+  </div>
+  <div class="page-header__actions">
+    <button
+      class="btn btn--primary"
+      hx-get="/subscriptions/new"
+      hx-target="#modal-content"
+      hx-swap="innerHTML"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Nova Assinatura
+    </button>
+  </div>
+</div>
+
+<!-- Summary Stats -->
+<div class="three-col mb-6">
+  <div class="stat-card stat-card--balance">
+    <div class="stat-card__header">
+      <span class="stat-card__title">Total Mensal</span>
+      <div class="stat-card__icon">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+        </svg>
+      </div>
+    </div>
+    <div class="stat-card__value">{{ monthly_total_fmt or 'R$ 0,00' }}</div>
+  </div>
+
+  <div class="stat-card stat-card--income">
+    <div class="stat-card__header">
+      <span class="stat-card__title">Ativas</span>
+      <div class="stat-card__icon">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+      </div>
+    </div>
+    <div class="stat-card__value">{{ active_count or 0 }}</div>
+  </div>
+
+  <div class="stat-card stat-card--neutral">
+    <div class="stat-card__header">
+      <span class="stat-card__title">Estimativa Anual</span>
+      <div class="stat-card__icon">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
+        </svg>
+      </div>
+    </div>
+    <div class="stat-card__value">{{ yearly_total_fmt or 'R$ 0,00' }}</div>
+  </div>
+</div>
+
+<!-- Cards Grid -->
+{% if subscriptions %}
+<div style="display:grid; grid-template-columns:repeat(3,1fr); gap:16px;">
+  {% for sub in subscriptions %}
+  <div class="card-hover sub-card {{ 'opacity-50' if not sub.active }}">
+    <div class="sub-card__header">
+      <div class="sub-card__info">
+        <div class="icon-box icon-box--accent">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="23 4 23 10 17 10"/>
+            <polyline points="1 20 1 14 7 14"/>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+          </svg>
+        </div>
+        <div>
+          <div class="sub-card__name">{{ sub.name }}</div>
+          <div class="sub-card__cat">{{ sub.category.name if sub.category else sub.type }}</div>
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:4px;">
+        <span class="badge {{ 'badge--active' if sub.active else 'badge--inactive' }}">
+          {{ 'Ativa' if sub.active else 'Pausada' }}
+        </span>
+        <button
+          class="icon-btn"
+          title="Editar"
+          hx-get="/subscriptions/{{ sub.id }}/edit"
+          hx-target="#modal-content"
+          hx-swap="innerHTML"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+          </svg>
         </button>
       </div>
     </div>
 
-    <div class="page-body">
-      <!-- Summary -->
-      <div class="stat-grid" style="margin-bottom:20px">
-        <div class="stat-card stat-card--expense">
-          <div class="stat-label">Total mensal</div>
-          <div class="stat-value stat-value--expense" id="stat-total-monthly">—</div>
-        </div>
-        <div class="stat-card stat-card--neutral">
-          <div class="stat-label">Total anual estimado</div>
-          <div class="stat-value" style="color:var(--amber)" id="stat-total-annual">—</div>
-        </div>
-        <div class="stat-card stat-card--balance">
-          <div class="stat-label">Ativas</div>
-          <div class="stat-value stat-value--balance" id="stat-active">—</div>
-        </div>
-        <div class="stat-card stat-card--income">
-          <div class="stat-label">Próximo vencimento</div>
-          <div class="stat-value" style="font-size:1rem;color:var(--text)" id="stat-next-due">—</div>
-        </div>
-      </div>
-
-      <!-- Cards grid -->
-      <div class="sub-cards" id="subs-container">
-        <div class="empty-state" style="grid-column:1/-1">
-          <div class="empty-state-title">Carregando...</div>
-        </div>
+    <div class="sub-card__footer">
+      <span class="sub-card__amount mono">{{ sub.amount_fmt or sub.amount }}</span>
+      <div style="text-align:right;">
+        <div class="sub-card__next">{{ sub.frequency }}</div>
+        {% if sub.next_date %}
+        <div class="sub-card__next">Próx: {{ sub.next_date.strftime('%d/%m/%Y') if sub.next_date else '' }}</div>
+        {% endif %}
       </div>
     </div>
   </div>
+  {% endfor %}
 </div>
-
-<!-- MODAL -->
-<div class="modal" id="sub-modal">
-  <div class="modal-box">
-    <div class="modal-header">
-      <h3 id="sub-modal-title">Nova Assinatura</h3>
-      <button class="btn btn--ghost btn--icon" data-close-modal>✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="form-group">
-        <label class="form-label">Nome *</label>
-        <input type="text" id="sub-name" class="form-control" placeholder="Netflix, Spotify...">
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Valor (R$) *</label>
-          <input type="number" id="sub-amount" class="form-control" step="0.01" min="0.01" placeholder="0,00">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Dia de cobrança *</label>
-          <input type="number" id="sub-day" class="form-control" min="1" max="31" placeholder="1-31">
-        </div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Próxima cobrança *</label>
-        <input type="date" id="sub-next-date" class="form-control">
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Categoria</label>
-          <select id="sub-category" class="form-control"><option value="">— Nenhuma —</option></select>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Cartão</label>
-          <select id="sub-card" class="form-control"><option value="">— Nenhum —</option></select>
-        </div>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn--ghost" data-close-modal>Cancelar</button>
-      <button class="btn btn--primary" id="sub-save-btn">Salvar</button>
-    </div>
+{% else %}
+<div class="card">
+  <div class="empty-state">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+    </svg>
+    <p>Nenhuma assinatura cadastrada</p>
   </div>
 </div>
-
-<script type="module">
-  import { requireAuthAndRender } from './js/nav.js';
-  import { subscriptionsApi, categoriesApi, cardsApi } from './js/api.js';
-  import {
-    formatBRL, formatDate, toast, confirm,
-    openModal, closeModal, setupModalClose, fillSelect
-  } from './js/utils.js';
-  import { brandAvatar, getBrand } from './js/brands.js';
-
-  if (!requireAuthAndRender('subscriptions.html')) throw new Error('not auth');
-
-  let editId = null;
-  let allSubs = [];
-  let categories = [], cards = [];
-
-  async function loadRefs() {
-    try {
-      [categories, cards] = await Promise.all([
-        categoriesApi.list().catch(() => []),
-        cardsApi.list().catch(() => []),
-      ]);
-      fillSelect(document.getElementById('sub-category'), categories, 'id', 'name', '— Nenhuma —');
-      fillSelect(document.getElementById('sub-card'), cards, 'id', 'name', '— Nenhum —');
-    } catch (err) {
-      console.error('[Assinaturas] loadRefs:', err);
-      toast('Erro ao carregar referências: ' + err.message, 'error');
-    }
-  }
-
-  function catName(id) { return categories.find(c => c.id === id)?.name || null; }
-  function cardName(id) { return cards.find(c => c.id === id)?.name || null; }
-
-  async function loadSubs() {
-    const container = document.getElementById('subs-container');
-    container.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="empty-state-title">Carregando...</div></div>`;
-    const activeOnly = document.getElementById('active-only').checked;
-
-    try {
-      allSubs = await subscriptionsApi.list({ active_only: activeOnly });
-
-      const activeSubs = allSubs.filter(s => s.is_active);
-      const monthly = activeSubs.reduce((a, s) => a + s.amount, 0);
-      document.getElementById('stat-total-monthly').textContent = formatBRL(monthly);
-      document.getElementById('stat-total-annual').textContent  = formatBRL(monthly * 12);
-      document.getElementById('stat-active').textContent = activeSubs.length;
-
-      const upcoming = [...activeSubs].sort((a, b) =>
-        new Date(a.next_billing_date) - new Date(b.next_billing_date));
-      document.getElementById('stat-next-due').textContent =
-        upcoming.length ? `${upcoming[0].name} — ${formatDate(upcoming[0].next_billing_date)}` : '—';
-
-      if (!allSubs.length) {
-        container.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
-          <div class="empty-state-title">Nenhuma assinatura cadastrada</div>
-          <div class="empty-state-sub">Adicione suas assinaturas recorrentes aqui</div>
-        </div>`;
-        return;
-      }
-
-      container.innerHTML = allSubs.map(s => {
-        const cat  = catName(s.category_id);
-        const card = cardName(s.card_id);
-        const brand  = getBrand(s.name, s.color || '#10B981');
-        const avatar = brandAvatar(s.name, s.color || '#10B981', 44);
-        const daysToNext = Math.ceil((new Date(s.next_billing_date) - new Date()) / 86400000);
-        const urgency = daysToNext <= 3 ? 'var(--red)' : daysToNext <= 7 ? 'var(--amber)' : 'var(--text-3)';
-        return `
-          <div class="sub-card" style="border-top:3px solid ${brand.color};opacity:${s.is_active ? 1 : 0.6}">
-            <div class="sub-card-header" style="display:flex;align-items:center;gap:12px">
-              ${avatar}
-              <div style="flex:1;min-width:0">
-                <div class="sub-card-name">
-                  ${brand.emoji} ${s.name}
-                  ${!s.is_active ? '<span class="badge badge--inactive" style="margin-left:4px">Inativa</span>' : ''}
-                </div>
-                <div style="font-size:0.85rem;color:var(--text-3)">${s.type === 'income' ? '📈 Receita' : '📤 Despesa'}</div>
-              </div>
-              <div class="sub-card-amount" style="color:${brand.color}">−${formatBRL(s.amount)}</div>
-            </div>
-            <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
-              ${cat  ? `<div class="sub-card-meta">📂 ${cat}</div>` : ''}
-              ${card ? `<div class="sub-card-meta">💳 ${card}</div>` : ''}
-              <div class="sub-card-meta" style="color:${urgency}">
-                📅 Todo dia ${s.billing_day} · próxima: <strong>${formatDate(s.next_billing_date)}</strong>
-                ${daysToNext <= 7 && s.is_active
-                  ? ` <span>(${daysToNext <= 0 ? 'hoje/vencida' : daysToNext + 'd'})</span>`
-                  : ''}
-              </div>
-            </div>
-            <div class="sub-card-actions">
-              ${s.is_active
-                ? `<button class="btn btn--secondary btn--sm" onclick="generateTx('${s.id}','${s.name}')">▶ Gerar tx</button>`
-                : ''}
-              <button class="btn btn--ghost btn--sm" onclick="editSub('${s.id}')">✎ Editar</button>
-              <button class="btn btn--ghost btn--sm" style="color:var(--red)" onclick="deleteSub('${s.id}','${s.name}')">✕</button>
-            </div>
-          </div>`;
-      }).join('');
-    } catch (err) {
-      console.error('[Assinaturas] loadSubs:', err);
-      container.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
-        <div class="empty-state-title" style="color:var(--red)">⚠️ ${err.message}</div>
-      </div>`;
-      toast('Erro ao carregar assinaturas: ' + err.message, 'error');
-    }
-  }
-
-  window.editSub = (id) => {
-    const s = allSubs.find(x => x.id === id);
-    if (!s) return;
-    editId = id;
-    document.getElementById('sub-modal-title').textContent = 'Editar Assinatura';
-    document.getElementById('sub-name').value      = s.name;
-    document.getElementById('sub-amount').value    = s.amount;
-    document.getElementById('sub-day').value       = s.billing_day;
-    document.getElementById('sub-next-date').value = s.next_billing_date;
-    document.getElementById('sub-category').value  = s.category_id || '';
-    document.getElementById('sub-card').value      = s.card_id || '';
-    openModal('sub-modal');
-  };
-
-  window.deleteSub = async (id, name) => {
-    if (!await confirm(`Excluir assinatura "${name}"?`)) return;
-    try {
-      await subscriptionsApi.delete(id);
-      toast('Assinatura excluída.', 'success');
-      loadSubs();
-    } catch (err) { toast('Erro ao excluir: ' + err.message, 'error'); }
-  };
-
-  window.generateTx = async (id, name) => {
-    if (!await confirm(`Gerar transação de cobrança para "${name}"?`)) return;
-    try {
-      const res = await subscriptionsApi.generateTransaction(id);
-      toast(`Transação gerada! Próxima: ${res.next_billing_date}`, 'success');
-      loadSubs();
-    } catch (err) { toast('Erro ao gerar: ' + err.message, 'error'); }
-  };
-
-  document.getElementById('btn-new-sub').onclick = () => {
-    editId = null;
-    document.getElementById('sub-modal-title').textContent = 'Nova Assinatura';
-    ['sub-name','sub-amount','sub-day','sub-next-date'].forEach(id =>
-      document.getElementById(id).value = '');
-    document.getElementById('sub-category').value = '';
-    document.getElementById('sub-card').value = '';
-    openModal('sub-modal');
-  };
-
-  document.getElementById('sub-save-btn').onclick = async () => {
-    const btn = document.getElementById('sub-save-btn');
-    const name   = document.getElementById('sub-name').value.trim();
-    const amount = parseFloat(document.getElementById('sub-amount').value);
-    const day    = parseInt(document.getElementById('sub-day').value);
-    const date   = document.getElementById('sub-next-date').value;
-
-    if (!name || !amount || !day || !date) {
-      toast('Preencha todos os campos obrigatórios.', 'warning');
-      return;
-    }
-
-    btn.disabled = true;
-    try {
-      const body = {
-        name, amount, billing_day: day, next_billing_date: date,
-        category_id: document.getElementById('sub-category').value || null,
-        card_id:     document.getElementById('sub-card').value     || null,
-      };
-      if (editId) {
-        await subscriptionsApi.update(editId, body);
-        toast('Assinatura atualizada.', 'success');
-      } else {
-        await subscriptionsApi.create(body);
-        toast('Assinatura criada.', 'success');
-      }
-      closeModal('sub-modal');
-      loadSubs();
-    } catch (err) { toast('Erro ao salvar: ' + err.message, 'error'); }
-    finally { btn.disabled = false; }
-  };
-
-  document.getElementById('active-only').onchange = loadSubs;
-  setupModalClose('sub-modal');
-
-  await loadRefs();
-  loadSubs();
-</script>
-</body>
-</html>
+{% endif %}
+{% endblock %}

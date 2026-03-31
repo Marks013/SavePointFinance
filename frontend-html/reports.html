@@ -1,279 +1,151 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Relatórios — Save Point Finanças</title>
-  <link rel="stylesheet" href="css/styles.css">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-</head>
-<body>
+{% extends "base.html" %}
+{% block title %}Relatórios — SavePoint Finance{% endblock %}
+{% block breadcrumb %}Relatórios{% endblock %}
 
-<div class="app-shell">
-  <div id="sidebar-mount"></div>
-  <div class="main-content">
-    <div class="page-header">
-      <div class="page-title">Relatórios</div>
-      <div class="page-actions">
-        <div class="month-nav">
-          <button class="btn btn--ghost btn--sm" id="prev-month">‹</button>
-          <div class="month-nav-label" id="month-label">—</div>
-          <button class="btn btn--ghost btn--sm" id="next-month">›</button>
-        </div>
-      </div>
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header__meta">
+    <h1>Relatórios</h1>
+    <p>Análises e insights financeiros</p>
+  </div>
+  <div class="page-header__actions">
+    <div class="month-nav">
+      <button class="month-nav__btn" onclick="changeMonth(-1)">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <span class="month-nav__label">{{ month_label or 'Mar 2026' }}</span>
+      <button class="month-nav__btn" onclick="changeMonth(1)">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
     </div>
+    <button class="btn btn--outline" onclick="window.print()">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+        <rect x="6" y="14" width="12" height="8"/>
+      </svg>
+      Imprimir
+    </button>
+  </div>
+</div>
 
-    <div class="page-body">
-      <!-- Error banner -->
-      <div id="rep-error" class="hidden" style="
-        background:var(--red-bg);border:1px solid var(--red-border);
-        border-radius:var(--radius-lg);padding:12px 16px;margin-bottom:16px;
-        color:var(--red);font-size:0.8rem;display:flex;align-items:center;gap:8px
-      ">
-        <span>⚠️</span>
-        <span id="rep-error-msg"></span>
+<!-- Charts Row -->
+<div class="two-col mb-6">
+  <!-- Donut: Expense Breakdown -->
+  <div class="card p-5">
+    <h3 style="font-size:0.875rem; font-weight:600; margin-bottom:16px;">Composição de Despesas</h3>
+    <div style="height:280px; position:relative;">
+      <canvas id="pieChart"></canvas>
+    </div>
+    <!-- Legend -->
+    <div style="display:flex; flex-wrap:wrap; gap:10px; margin-top:16px;">
+      {% for item in expense_breakdown %}
+      <div style="display:flex; align-items:center; gap:6px; font-size:0.75rem; color:var(--text-dim);">
+        <span style="width:8px; height:8px; border-radius:50%; background:{{ item.color }}; flex-shrink:0;"></span>
+        {{ item.name }}
       </div>
+      {% endfor %}
+    </div>
+  </div>
 
-      <!-- Summary row -->
-      <div class="stat-grid" style="margin-bottom:24px">
-        <div class="stat-card stat-card--income">
-          <div class="stat-label">Receitas</div>
-          <div class="stat-value stat-value--income" id="rep-income">—</div>
-        </div>
-        <div class="stat-card stat-card--expense">
-          <div class="stat-label">Despesas</div>
-          <div class="stat-value stat-value--expense" id="rep-expense">—</div>
-        </div>
-        <div class="stat-card stat-card--balance">
-          <div class="stat-label">Saldo</div>
-          <div class="stat-value" id="rep-balance">—</div>
-        </div>
-      </div>
-
-      <!-- Row 1: Evo + Donut -->
-      <div class="grid-2" style="margin-bottom:20px">
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title">Evolução — últimos 12 meses</div>
-          </div>
-          <div class="chart-area" style="height:240px">
-            <canvas id="evo-chart"></canvas>
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title">Por categoria</div>
-            <select id="cat-type-filter" class="filter-control">
-              <option value="expense">Despesas</option>
-              <option value="income">Receitas</option>
-            </select>
-          </div>
-          <div class="chart-area" style="height:240px;display:flex;align-items:center;justify-content:center">
-            <canvas id="cat-chart"></canvas>
-          </div>
-        </div>
-      </div>
-
-      <!-- Row 2: Top transactions + category ranking -->
-      <div class="grid-2">
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title">Maiores despesas do mês</div>
-          </div>
-          <div class="table-wrapper" style="border:none">
-            <table>
-              <thead>
-                <tr><th>#</th><th>Descrição</th><th style="text-align:right">Valor</th></tr>
-              </thead>
-              <tbody id="top-tbody">
-                <tr><td colspan="3" style="padding:20px;text-align:center;color:var(--text-3)">Carregando...</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title">Ranking por categoria</div>
-          </div>
-          <div id="cat-ranking" style="display:flex;flex-direction:column;gap:10px;padding:0 4px">
-            <div style="color:var(--text-3);font-size:0.8rem;text-align:center;padding:20px">Carregando...</div>
-          </div>
-        </div>
-      </div>
+  <!-- Bar: 6-Month Trend -->
+  <div class="card p-5">
+    <h3 style="font-size:0.875rem; font-weight:600; margin-bottom:16px;">Tendência 6 Meses</h3>
+    <div style="height:280px; position:relative;">
+      <canvas id="trendChart"></canvas>
     </div>
   </div>
 </div>
 
-<script type="module">
-  import { requireAuthAndRender } from './js/nav.js';
-  import { reportsApi } from './js/api.js';
-  import { formatBRL, formatMonth, currentYearMonth, monthLabel, toast } from './js/utils.js';
+<!-- Reports body partial (full width, card-by-card) -->
+{% include "partials/_reports_body.html" %}
+{% endblock %}
 
-  if (!requireAuthAndRender('reports.html')) throw new Error('not auth');
+{% block scripts %}
+<script>
+Chart.defaults.color = '#8B9BB4';
+Chart.defaults.font.family = 'Inter';
+Chart.defaults.font.size = 12;
 
-  let { year, month } = currentYearMonth();
-  let evoChart, catChart;
+/* ── Donut Chart ─────────────────────────────────────── */
+const expenseData = {{ expense_breakdown | tojson | default('[]') }};
 
-  function showError(msg) {
-    document.getElementById('rep-error-msg').textContent = msg;
-    document.getElementById('rep-error').classList.remove('hidden');
-  }
-
-  function updateMonthLabel() {
-    const lbl = formatMonth(year, month);
-    document.getElementById('month-label').textContent = lbl.charAt(0).toUpperCase() + lbl.slice(1);
-  }
-
-  async function loadSummary() {
-    try {
-      const s = await reportsApi.summary(year, month);
-      document.getElementById('rep-income').textContent  = formatBRL(s.income);
-      document.getElementById('rep-expense').textContent = formatBRL(s.expenses);
-      const balEl = document.getElementById('rep-balance');
-      balEl.textContent = formatBRL(s.balance);
-      balEl.className = 'stat-value ' + (s.balance >= 0 ? 'stat-value--income' : 'stat-value--expense');
-    } catch (err) {
-      console.error('[Relatórios] loadSummary:', err);
-      showError('Falha ao carregar resumo: ' + err.message);
-    }
-  }
-
-  async function loadEvolution() {
-    try {
-      const data = await reportsApi.monthlyEvolution(12);
-      const labels = data.map(d => monthLabel(d.period));
-      if (evoChart) evoChart.destroy();
-      evoChart = new Chart(document.getElementById('evo-chart'), {
-        type: 'line',
-        data: {
-          labels,
-          datasets: [
-            {
-              label: 'Receitas', data: data.map(d => d.income),
-              borderColor: '#00E57A', backgroundColor: 'rgba(0,229,122,0.08)',
-              borderWidth: 2, pointRadius: 3, tension: 0.3, fill: true,
-            },
-            {
-              label: 'Despesas', data: data.map(d => d.expenses),
-              borderColor: '#FF4D65', backgroundColor: 'rgba(255,77,101,0.07)',
-              borderWidth: 2, pointRadius: 3, tension: 0.3, fill: true,
-            },
-          ],
+new Chart(document.getElementById('pieChart').getContext('2d'), {
+  type: 'doughnut',
+  data: {
+    labels: expenseData.map(d => d.name),
+    datasets: [{
+      data:            expenseData.map(d => d.value),
+      backgroundColor: expenseData.map(d => d.color),
+      borderWidth: 2,
+      borderColor: '#0F1419',
+      hoverOffset: 6,
+    }],
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    cutout: '65%',
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#0F1419',
+        borderColor: 'rgba(255,255,255,0.1)',
+        borderWidth: 1,
+        padding: 12,
+        callbacks: {
+          label: ctx => ` ${ctx.label}: R$ ${ctx.raw.toLocaleString('pt-BR', {minimumFractionDigits:2})}`,
         },
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          plugins: {
-            legend: { labels: { color: '#8FA3B8', font: { size: 11 } } },
-            tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${formatBRL(ctx.raw)}` } },
-          },
-          scales: {
-            x: { grid: { color: '#1E2D3D' }, ticks: { color: '#556070', font: { size: 10 } } },
-            y: {
-              grid: { color: '#1E2D3D' },
-              ticks: { color: '#556070', font: { size: 10 }, callback: v => 'R$' + (v / 1000).toFixed(0) + 'k' }
-            },
-          },
+      },
+    },
+  },
+});
+
+/* ── Bar Trend Chart ─────────────────────────────────── */
+const monthlyLabels  = {{ monthly_labels  | tojson | default('[]') }};
+const monthlyIncome  = {{ monthly_income  | tojson | default('[]') }};
+const monthlyExpense = {{ monthly_expense | tojson | default('[]') }};
+
+new Chart(document.getElementById('trendChart').getContext('2d'), {
+  type: 'bar',
+  data: {
+    labels: monthlyLabels,
+    datasets: [
+      { label:'Receitas',  data: monthlyIncome,  backgroundColor:'rgba(0,229,122,0.75)', borderRadius:4, borderSkipped:false },
+      { label:'Despesas',  data: monthlyExpense, backgroundColor:'rgba(255,77,106,0.7)', borderRadius:4, borderSkipped:false },
+    ],
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode:'index', intersect:false },
+    plugins: {
+      legend: {
+        position: 'top',
+        labels: { color:'#8B9BB4', font:{ size:11 }, usePointStyle:true, pointStyleWidth:8, boxHeight:8 },
+      },
+      tooltip: {
+        backgroundColor:'#0F1419',
+        borderColor:'rgba(255,255,255,0.1)',
+        borderWidth:1,
+        padding:12,
+        callbacks: {
+          label: ctx => ` ${ctx.dataset.label}: R$ ${ctx.raw.toLocaleString('pt-BR', {minimumFractionDigits:2})}`,
         },
-      });
-    } catch (err) {
-      console.error('[Relatórios] loadEvolution:', err);
-      document.getElementById('evo-chart').parentElement.innerHTML =
-        `<div style="display:flex;align-items:center;justify-content:center;height:240px;color:var(--text-3);font-size:0.8rem">Erro: ${err.message}</div>`;
-    }
-  }
-
-  async function loadCategoryChart() {
-    if (catChart) catChart.destroy();
-    const type = document.getElementById('cat-type-filter').value;
-    try {
-      const data = await reportsApi.byCategory(year, month, type);
-      if (!data.length) {
-        document.getElementById('cat-chart').parentElement.innerHTML =
-          `<div style="display:flex;align-items:center;justify-content:center;height:240px;color:var(--text-3);font-size:0.8rem">Sem dados no mês.</div>`;
-        document.getElementById('cat-ranking').innerHTML =
-          `<div style="color:var(--text-3);font-size:0.8rem;text-align:center;padding:20px">Sem dados.</div>`;
-        return;
-      }
-
-      catChart = new Chart(document.getElementById('cat-chart'), {
-        type: 'doughnut',
-        data: {
-          labels: data.map(d => d.name),
-          datasets: [{
-            data: data.map(d => d.total),
-            backgroundColor: data.map(d => d.color + 'CC'),
-            borderColor: data.map(d => d.color),
-            borderWidth: 1,
-          }],
-        },
-        options: {
-          responsive: true, maintainAspectRatio: false, cutout: '65%',
-          plugins: {
-            legend: { position: 'right', labels: { color: '#8FA3B8', font: { size: 10 }, boxWidth: 12, padding: 8 } },
-            tooltip: { callbacks: { label: ctx => `${ctx.label}: ${formatBRL(ctx.raw)}` } },
-          },
-        },
-      });
-
-      const total = data.reduce((a, d) => a + d.total, 0);
-      document.getElementById('cat-ranking').innerHTML = data.slice(0, 10).map(d => {
-        const pct = total > 0 ? Math.round((d.total / total) * 100) : 0;
-        return `
-          <div>
-            <div style="display:flex;justify-content:space-between;font-size:0.8rem;margin-bottom:4px">
-              <div style="display:flex;align-items:center;gap:6px">
-                <span class="color-dot" style="background:${d.color}"></span>
-                <span style="color:var(--text)">${d.name}</span>
-                <span class="text-muted">(${d.count})</span>
-              </div>
-              <span class="mono" style="color:var(--text)">${formatBRL(d.total)}</span>
-            </div>
-            <div class="progress-bar">
-              <div class="progress-fill" style="width:${pct}%;background:${d.color}"></div>
-            </div>
-          </div>`;
-      }).join('');
-    } catch (err) {
-      console.error('[Relatórios] loadCategoryChart:', err);
-      showError('Erro ao carregar categorias: ' + err.message);
-    }
-  }
-
-  async function loadTopTransactions() {
-    const tbody = document.getElementById('top-tbody');
-    try {
-      const data = await reportsApi.topTransactions(year, month, 10);
-      if (!data.length) {
-        tbody.innerHTML = `<tr><td colspan="3" style="padding:20px;text-align:center;color:var(--text-3)">Sem despesas neste mês.</td></tr>`;
-        return;
-      }
-      tbody.innerHTML = data.map((t, i) => `
-        <tr>
-          <td style="color:var(--text-3);font-weight:700">${i + 1}</td>
-          <td class="text-strong">${t.description}</td>
-          <td class="td-amount td-amount--expense text-right">${formatBRL(t.amount)}</td>
-        </tr>`).join('');
-    } catch (err) {
-      console.error('[Relatórios] loadTopTransactions:', err);
-      tbody.innerHTML = `<tr><td colspan="3" style="padding:20px;text-align:center;color:var(--red)">${err.message}</td></tr>`;
-    }
-  }
-
-  async function loadAll() {
-    updateMonthLabel();
-    await Promise.allSettled([
-      loadSummary(),
-      loadEvolution(),
-      loadCategoryChart(),
-      loadTopTransactions()
-    ]);
-  }
-
-  document.getElementById('prev-month').onclick = () => { month--; if (month < 1) { month = 12; year--; } loadAll(); };
-  document.getElementById('next-month').onclick = () => { month++; if (month > 12) { month = 1; year++; } loadAll(); };
-  document.getElementById('cat-type-filter').onchange = loadCategoryChart;
-
-  loadAll();
+      },
+    },
+    scales: {
+      x: { grid:{ display:false }, ticks:{ color:'#8B9BB4', font:{size:11} }, border:{display:false} },
+      y: {
+        grid: { color:'rgba(255,255,255,0.04)', drawBorder:false },
+        ticks: { color:'#8B9BB4', font:{size:11}, callback: v => `R$${(v/1000).toFixed(0)}k` },
+        border: { display:false },
+      },
+    },
+  },
+});
 </script>
-</body>
-</html>
+{% endblock %}

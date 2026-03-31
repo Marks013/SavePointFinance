@@ -1,0 +1,59 @@
+<!-- _goal_modal.html -->
+<div class="modal-header">
+  <span class="modal-title">{{ 'Editar Meta' if goal else 'Nova Meta' }}</span>
+  <button class="modal-close" onclick="closeModal()">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+    </svg>
+  </button>
+</div>
+
+<form
+  method="POST"
+  action="{{ '/goals/' + goal.id|string + '/edit' if goal else '/goals/new' }}"
+  hx-post="{{ '/goals/' + goal.id|string + '/edit' if goal else '/goals/new' }}"
+  hx-target="body"
+  hx-swap="none"
+  class="modal-body"
+>
+  <div class="form-stack">
+    <div class="form-group">
+      <label class="form-label" for="goalName">Nome da meta</label>
+      <input type="text" id="goalName" name="name" class="form-input" placeholder="Ex.: Fundo de emergência" value="{{ goal.name if goal else '' }}" required>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+      <div class="form-group">
+        <label class="form-label" for="goalTarget">Valor alvo (R$)</label>
+        <input type="number" id="goalTarget" name="target" class="form-input mono" placeholder="0,00" step="0.01" min="1" value="{{ goal.target if goal else '' }}" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="goalCurrent">Valor atual (R$)</label>
+        <input type="number" id="goalCurrent" name="current" class="form-input mono" placeholder="0,00" step="0.01" min="0" value="{{ goal.current if goal else '0' }}">
+      </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+      <div class="form-group">
+        <label class="form-label" for="goalDeadline">Prazo</label>
+        <input type="date" id="goalDeadline" name="deadline" class="form-input" value="{{ goal.deadline.strftime('%Y-%m-%d') if goal and goal.deadline else '' }}">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="goalColor">Cor</label>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <input type="color" id="goalColor" name="color" value="{{ goal.color if goal else '#00E57A' }}" style="width:42px; height:42px; border:none; background:none; cursor:pointer; border-radius:6px;">
+          <input type="text" value="{{ goal.color if goal else '#00E57A' }}" class="form-input mono" style="flex:1;" oninput="document.getElementById('goalColor').value=this.value">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-footer">
+    {% if goal %}
+    <button type="button" class="btn btn--danger" style="margin-right:auto;"
+      onclick="confirmDelete('/goals/{{ goal.id }}/delete', 'Excluir meta?')">Excluir</button>
+    {% endif %}
+    <button type="button" class="btn btn--outline" onclick="closeModal()">Cancelar</button>
+    <button type="submit" class="btn btn--primary">{{ 'Salvar' if goal else 'Criar meta' }}</button>
+  </div>
+</form>

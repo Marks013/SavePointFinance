@@ -47,12 +47,21 @@ class Transaction(Base):
     source: Mapped[TransactionSource] = mapped_column(SAEnum(TransactionSource), default=TransactionSource.manual, nullable=False)
     payment_method: Mapped[PaymentMethod] = mapped_column(SAEnum(PaymentMethod), default=PaymentMethod.money, nullable=False)
     
-    installments_total: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    installments_total: Mapped[int] = mapped_column(Integer, default=1, nullable=False, index=True)
     installment_number: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
-    parent_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("transactions.id", ondelete="CASCADE"), nullable=True)
+    parent_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("transactions.id", ondelete="CASCADE"), nullable=True, index=True)
+
+    # Index composto para consultas comuns
+    __table_args__ = (
+        # Transactions por tenant + data (dashboard, relatórios)
+        {"mysql_where": None},
+    )
 
     ai_classified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     ai_confidence: Mapped[float | None] = mapped_column(Numeric(3, 2), nullable=True)
+    
+    tithe_amount: Mapped[Decimal | None] = mapped_column(Numeric(15, 2), nullable=True)
+    tithe_category_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("categories.id", ondelete="SET NULL"), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

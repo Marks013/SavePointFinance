@@ -3,7 +3,7 @@ from datetime import date
 from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, extract
+from sqlalchemy import select, func, and_, text
 from app.database import get_db
 from app.auth import get_current_user
 from app.models.user import User
@@ -20,27 +20,57 @@ async def get_summary(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Monthly summary: total income, expenses, balance."""
+    """Monthly summary: total income, expenses, balance - OTIMIZADO com uma query"""
     start = date(year, month, 1)
-    end = date(year, month + 1 if month < 12 else 1, 1) if month < 12 else date(year + 1, 1, 1)
+    if month < 12:
+        end = date(year, month + 1, 1)
+    else:
+        end = date(year + 1, 1, 1)
 
-    base = [Transaction.tenant_id == current_user.tenant_id, Transaction.date >= start, Transaction.date < end]
+    tenant_id = current_user.tenant_id
 
-    income_q = await db.execute(select(func.sum(Transaction.amount)).where(*base, Transaction.type == TransactionType.income))
-    expense_q = await db.execute(select(func.sum(Transaction.amount)).where(*base, Transaction.type == TransactionType.expense))
+    # Query única para income e expenses
+    result = await db.execute(
+        select(
+            Transaction.type,
+            func.coalesce(func.sum(Transaction.amount), 0).label('total')
+        ).where(
+            Transaction.tenant_id == tenant_id,
+            Transaction.date >= start,
+            Transaction.date < end,
+        ).group_by(Transaction.type)
+    )
+    
+    income = 0.0
+    expenses = 0.0
+    for row in result:
+        if row.type == TransactionType.income:
+            income = float(row.total)
+        elif row.type == TransactionType.expense:
+            expenses = float(row.total)
 
-    income = float(income_q.scalar() or 0)
-    expenses = float(expense_q.scalar() or 0)
-
-    # Budget Gauge (Nível de Atenção)
-    cats_q = await db.execute(select(Category).where(Category.tenant_id == current_user.tenant_id, Category.monthly_limit > 0))
-    limit_cats = cats_q.scalars().all()
+    # Budget Gauge
+    limit_cats = await db.execute(
+        select(Category).where(
+            Category.tenant_id == tenant_id,
+            Category.monthly_limit > 0
+        )
+    )
+    limit_cats = limit_cats.scalars().all()
     limit_planned = sum(float(c.monthly_limit) for c in limit_cats)
     
     limit_used = 0.0
     if limit_cats:
         cat_ids = [c.id for c in limit_cats]
-        used_q = await db.execute(select(func.sum(Transaction.amount)).where(*base, Transaction.type == TransactionType.expense, Transaction.category_id.in_(cat_ids)))
+        used_q = await db.execute(
+            select(func.coalesce(func.sum(Transaction.amount), 0)).where(
+                Transaction.tenant_id == tenant_id,
+                Transaction.date >= start,
+                Transaction.date < end,
+                Transaction.type == TransactionType.expense,
+                Transaction.category_id.in_(cat_ids)
+            )
+        )
         limit_used = float(used_q.scalar() or 0)
 
     return {

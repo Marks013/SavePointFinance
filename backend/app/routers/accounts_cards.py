@@ -10,6 +10,7 @@ from app.auth import get_current_user
 from app.models.user import User
 from app.models.account import Account, AccountType
 from app.models.card import Card
+from app.services.plan_limits import check_limit, check_feature
 
 accounts_router = APIRouter(prefix="/api/v1/accounts", tags=["accounts"])
 cards_router = APIRouter(prefix="/api/v1/cards", tags=["cards"])
@@ -47,6 +48,10 @@ async def list_accounts(db: AsyncSession = Depends(get_db), current_user: User =
 
 @accounts_router.post("", status_code=201)
 async def create_account(body: AccountCreate, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    allowed, error = await check_limit(current_user.tenant_id, "accounts", db)
+    if not allowed:
+        raise HTTPException(status_code=403, detail=error)
+    
     account = Account(**body.model_dump(), tenant_id=current_user.tenant_id)
     db.add(account)
     await db.commit()
@@ -114,6 +119,10 @@ async def list_cards(db: AsyncSession = Depends(get_db), current_user: User = De
 
 @cards_router.post("", status_code=201)
 async def create_card(body: CardCreate, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    allowed, error = await check_limit(current_user.tenant_id, "cards", db)
+    if not allowed:
+        raise HTTPException(status_code=403, detail=error)
+    
     card = Card(**body.model_dump(), tenant_id=current_user.tenant_id)
     db.add(card)
     await db.commit()

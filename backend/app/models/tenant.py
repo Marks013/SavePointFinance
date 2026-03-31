@@ -15,7 +15,7 @@ class Tenant(Base):
     slug: Mapped[str] = mapped_column(String(60), unique=True, nullable=False, index=True)
 
     # --- Subscription / Plan control (admin sets these) ---
-    plan: Mapped[str] = mapped_column(String(30), default="trial", nullable=False)
+    plan: Mapped[str] = mapped_column(String(30), default="free", nullable=False)
     max_users: Mapped[int] = mapped_column(Integer, default=3, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     # None = never expires (lifetime deal). Otherwise admin sets the expiry date.

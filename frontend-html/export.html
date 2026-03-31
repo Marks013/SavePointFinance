@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% block title %}Exportar — SavePoint Finance{% endblock %}
+{% block breadcrumb %}Exportar dados{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header__meta">
+    <h1>Exportar Dados</h1>
+    <p>Baixe suas informações financeiras</p>
+  </div>
+</div>
+
+<!-- Date Range Card -->
+<div class="card p-5 mb-6">
+  <h3 style="font-size:0.875rem; font-weight:600; margin-bottom:14px;">Período de exportação</h3>
+  <form method="GET" action="/export" id="exportForm">
+    <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end;">
+      <div class="form-group" style="flex:1; min-width:160px;">
+        <label class="form-label" for="expFrom">Data inicial</label>
+        <div class="input-wrap">
+          <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+            <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
+            <line x1="3" y1="10" x2="21" y2="10"/>
+          </svg>
+          <input
+            type="date"
+            id="expFrom"
+            name="from"
+            class="form-input form-input--icon"
+            value="{{ request.query_params.from or date_from }}"
+          >
+        </div>
+      </div>
+      <div class="form-group" style="flex:1; min-width:160px;">
+        <label class="form-label" for="expTo">Data final</label>
+        <div class="input-wrap">
+          <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+            <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
+            <line x1="3" y1="10" x2="21" y2="10"/>
+          </svg>
+          <input
+            type="date"
+            id="expTo"
+            name="to"
+            class="form-input form-input--icon"
+            value="{{ request.query_params.to or date_to }}"
+          >
+        </div>
+      </div>
+      <div class="form-group" style="flex:1; min-width:160px;">
+        <label class="form-label" for="expType">Tipo de dado</label>
+        <select id="expType" name="data_type" class="form-select">
+          <option value="all"           {% if not request.query_params.data_type or request.query_params.data_type == 'all' %}selected{% endif %}>Todos</option>
+          <option value="transactions"  {% if request.query_params.data_type == 'transactions'  %}selected{% endif %}>Transações</option>
+          <option value="subscriptions" {% if request.query_params.data_type == 'subscriptions' %}selected{% endif %}>Assinaturas</option>
+          <option value="goals"         {% if request.query_params.data_type == 'goals'         %}selected{% endif %}>Metas</option>
+          <option value="categories"    {% if request.query_params.data_type == 'categories'    %}selected{% endif %}>Categorias</option>
+        </select>
+      </div>
+    </div>
+  </form>
+</div>
+
+<!-- Format Cards -->
+<div class="three-col">
+
+  <!-- CSV -->
+  <div class="card-hover export-format-card">
+    <div class="export-format-card__icon">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <line x1="16" y1="13" x2="8" y2="13"/>
+        <line x1="16" y1="17" x2="8" y2="17"/>
+        <polyline points="10 9 9 9 8 9"/>
+      </svg>
+    </div>
+    <div class="export-format-card__name">CSV</div>
+    <div class="export-format-card__desc">Valores separados por vírgula — compatível com Excel e Google Sheets</div>
+    <a
+      href="{{ url_for('views.export_download', format='csv') }}?from={{ request.query_params.from or date_from }}&to={{ request.query_params.to or date_to }}&data_type={{ request.query_params.data_type or 'all' }}"
+      class="btn btn--outline"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="7 10 12 15 17 10"/>
+        <line x1="12" y1="15" x2="12" y2="3"/>
+      </svg>
+      Exportar .csv
+    </a>
+  </div>
+
+  <!-- Excel -->
+  <div class="card-hover export-format-card">
+    <div class="export-format-card__icon">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="18" height="18" rx="2"/>
+        <path d="M3 9h18M3 15h18M9 3v18"/>
+      </svg>
+    </div>
+    <div class="export-format-card__name">Excel</div>
+    <div class="export-format-card__desc">Planilha Microsoft Excel com formatação e múltiplas abas</div>
+    <a
+      href="{{ url_for('views.export_download', format='xlsx') }}?from={{ request.query_params.from or date_from }}&to={{ request.query_params.to or date_to }}&data_type={{ request.query_params.data_type or 'all' }}"
+      class="btn btn--outline"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="7 10 12 15 17 10"/>
+        <line x1="12" y1="15" x2="12" y2="3"/>
+      </svg>
+      Exportar .xlsx
+    </a>
+  </div>
+
+  <!-- PDF -->
+  <div class="card-hover export-format-card">
+    <div class="export-format-card__icon">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <path d="M9 15h6M9 11h6M9 7h3"/>
+      </svg>
+    </div>
+    <div class="export-format-card__name">PDF</div>
+    <div class="export-format-card__desc">Relatório financeiro formatado, pronto para impressão</div>
+    <a
+      href="{{ url_for('views.export_download', format='pdf') }}?from={{ request.query_params.from or date_from }}&to={{ request.query_params.to or date_to }}&data_type={{ request.query_params.data_type or 'all' }}"
+      class="btn btn--outline"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="7 10 12 15 17 10"/>
+        <line x1="12" y1="15" x2="12" y2="3"/>
+      </svg>
+      Exportar .pdf
+    </a>
+  </div>
+</div>
+
+<!-- Export Summary -->
+{% if export_summary %}
+<div class="card p-5 mt-6">
+  <h3 style="font-size:0.875rem; font-weight:600; margin-bottom:14px;">Resumo do período</h3>
+  <div style="display:flex; flex-wrap:wrap; gap:24px;">
+    <div>
+      <div style="font-size:0.75rem; color:var(--text-dim);">Total de registros</div>
+      <div class="mono fw-700" style="font-size:1.25rem; margin-top:2px;">{{ export_summary.total_records }}</div>
+    </div>
+    <div>
+      <div style="font-size:0.75rem; color:var(--text-dim);">Receitas</div>
+      <div class="mono fw-700 text-income" style="font-size:1.25rem; margin-top:2px;">{{ export_summary.income_fmt }}</div>
+    </div>
+    <div>
+      <div style="font-size:0.75rem; color:var(--text-dim);">Despesas</div>
+      <div class="mono fw-700 text-expense" style="font-size:1.25rem; margin-top:2px;">{{ export_summary.expense_fmt }}</div>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,416 +1,67 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Contas & Cartões — Save Point Finanças</title>
-  <link rel="stylesheet" href="css/styles.css">
-</head>
-<body>
+{% extends "base.html" %}
+{% block title %}Contas & Cartões — SavePoint Finance{% endblock %}
+{% block breadcrumb %}Contas & Cartões{% endblock %}
 
-<div class="app-shell">
-  <div id="sidebar-mount"></div>
-  <div class="main-content">
-    <div class="page-header">
-      <div class="page-title">Contas & Cartões</div>
-    </div>
-
-    <div class="page-body">
-      <div class="tabs">
-        <div class="tab active" data-section="accounts">Contas bancárias</div>
-        <div class="tab" data-section="cards">Cartões de crédito</div>
-        <div class="tab" data-section="password">Alterar senha</div>
-      </div>
-
-      <!-- ACCOUNTS -->
-      <div id="section-accounts">
-        <div class="section-header">
-          <div class="section-title">Contas</div>
-          <button class="btn btn--primary" id="btn-new-account">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-            Nova conta
-          </button>
-        </div>
-        <div class="table-wrapper">
-          <table>
-            <thead>
-              <tr><th style="width:10px"></th><th>Nome</th><th>Tipo</th><th style="text-align:right">Saldo</th><th>Moeda</th><th>Status</th><th></th></tr>
-            </thead>
-            <tbody id="accounts-tbody">
-              <tr><td colspan="7" style="padding:24px;text-align:center;color:var(--text-3)">Carregando...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- CARDS -->
-      <div id="section-cards" class="hidden">
-        <div class="section-header">
-          <div class="section-title">Cartões</div>
-          <button class="btn btn--primary" id="btn-new-card">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-            Novo cartão
-          </button>
-        </div>
-        <div class="table-wrapper">
-          <table>
-            <thead>
-              <tr><th style="width:10px"></th><th>Nome</th><th>Bandeira</th><th>Final</th><th style="text-align:right">Limite</th><th>Fech.</th><th>Venc.</th><th></th></tr>
-            </thead>
-            <tbody id="cards-tbody">
-              <tr><td colspan="8" style="padding:24px;text-align:center;color:var(--text-3)">Carregando...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- PASSWORD -->
-      <div id="section-password" class="hidden">
-        <div class="card" style="max-width:420px">
-          <div class="card-header"><div class="card-title">Alterar senha</div></div>
-          <div style="padding:20px;display:flex;flex-direction:column;gap:14px">
-            <div id="pwd-error" class="auth-error hidden"></div>
-            <div id="pwd-success" class="hidden" style="background:var(--em-bg);border:1px solid var(--em-border);border-radius:var(--radius);color:var(--em);font-size:0.8rem;padding:10px 12px"></div>
-            <form id="pwd-form" style="display:flex;flex-direction:column;gap:14px">
-              <div class="form-group">
-                <label class="form-label">Senha atual</label>
-                <input type="password" id="pwd-current" class="form-control">
-              </div>
-              <div class="form-group">
-                <label class="form-label">Nova senha</label>
-                <input type="password" id="pwd-new" class="form-control">
-              </div>
-              <div class="form-group">
-                <label class="form-label">Confirmar nova senha</label>
-                <input type="password" id="pwd-confirm" class="form-control">
-              </div>
-              <button type="submit" class="btn btn--primary" style="align-self:flex-start" id="pwd-btn">
-                Alterar senha
-              </button>
-            </form>
-          </div>
-        </div>
-      </div>
-    </div>
+{% block content %}
+<div class="page-header">
+  <div class="page-header__meta">
+    <h1>Contas & Cartões</h1>
+    <p>Gerencie suas contas bancárias e cartões</p>
   </div>
 </div>
 
-<!-- Account Modal -->
-<div class="modal" id="acc-modal">
-  <div class="modal-box">
-    <div class="modal-header">
-      <h3 id="acc-modal-title">Nova Conta</h3>
-      <button class="btn btn--ghost btn--icon" data-close-modal>✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="form-group">
-        <label class="form-label">Nome *</label>
-        <input type="text" id="acc-name" class="form-control" placeholder="Ex: Nubank Conta">
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Tipo</label>
-          <select id="acc-type" class="form-control">
-            <option value="checking">Conta corrente</option>
-            <option value="savings">Poupança</option>
-            <option value="investment">Investimento</option>
-            <option value="wallet">Carteira</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Saldo inicial (R$)</label>
-          <input type="number" id="acc-balance" class="form-control" value="0" step="0.01">
-        </div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Cor</label>
-        <input type="color" id="acc-color" value="#10B981"
-          style="height:36px;width:60px;border:1px solid var(--border-2);border-radius:4px">
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn--ghost" data-close-modal>Cancelar</button>
-      <button class="btn btn--primary" id="acc-save-btn">Salvar</button>
-    </div>
-  </div>
+<!-- Net Worth -->
+<div class="card net-worth-block mb-6">
+  <div class="net-worth-label">Patrimônio Líquido Total</div>
+  <div class="net-worth-value">{{ net_worth_fmt or 'R$ 0,00' }}</div>
 </div>
 
-<!-- Card Modal -->
-<div class="modal" id="card-modal">
-  <div class="modal-box">
-    <div class="modal-header">
-      <h3 id="card-modal-title">Novo Cartão</h3>
-      <button class="btn btn--ghost btn--icon" data-close-modal>✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Nome *</label>
-          <input type="text" id="card-name" class="form-control" placeholder="Nubank Platinum">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Bandeira</label>
-          <select id="card-brand" class="form-control">
-            <option>Visa</option><option>Mastercard</option><option>Elo</option>
-            <option>Amex</option><option>Hipercard</option>
-          </select>
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Últimos 4 dígitos</label>
-          <input type="text" id="card-last4" class="form-control" maxlength="4" placeholder="1234">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Limite (R$)</label>
-          <input type="number" id="card-limit" class="form-control" step="0.01" value="0">
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Dia fechamento</label>
-          <input type="number" id="card-close" class="form-control" min="1" max="31" value="3">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Dia vencimento</label>
-          <input type="number" id="card-due" class="form-control" min="1" max="31" value="10">
-        </div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Cor</label>
-        <input type="color" id="card-color" value="#374151"
-          style="height:36px;width:60px;border:1px solid var(--border-2);border-radius:4px">
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn--ghost" data-close-modal>Cancelar</button>
-      <button class="btn btn--primary" id="card-save-btn">Salvar</button>
-    </div>
-  </div>
+<!-- Tabs -->
+<div class="tab-list mb-6">
+  <button class="tab-btn active" onclick="showSettingsTab('accounts', this)">Contas</button>
+  <button class="tab-btn"        onclick="showSettingsTab('cards',    this)">Cartões</button>
 </div>
 
-<script type="module">
-  import { requireAuthAndRender } from './js/nav.js';
-  import { accountsApi, cardsApi, authApi } from './js/api.js';
-  import { formatBRL, toast, confirm, openModal, closeModal, setupModalClose, setLoading } from './js/utils.js';
+<!-- Accounts Tab -->
+<div id="settings-accounts">
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+    <h2 style="font-size:1rem; font-weight:600;">Contas Bancárias</h2>
+    <button
+      class="btn btn--primary"
+      hx-get="/settings/accounts/new"
+      hx-target="#modal-content"
+      hx-swap="innerHTML"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Nova Conta
+    </button>
+  </div>
+  {% include "partials/_accounts_table.html" %}
+</div>
 
-  if (!requireAuthAndRender('settings.html')) throw new Error('not auth');
+<!-- Cards Tab -->
+<div id="settings-cards" style="display:none;">
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+    <h2 style="font-size:1rem; font-weight:600;">Cartões</h2>
+    <button
+      class="btn btn--primary"
+      hx-get="/settings/cards/new"
+      hx-target="#modal-content"
+      hx-swap="innerHTML"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Novo Cartão
+    </button>
+  </div>
+  {% include "partials/_cards_table.html" %}
+</div>
 
-  let editAccId = null, editCardId = null;
-  let accounts = [], cards = [];
-
-  const sections = ['accounts', 'cards', 'password'];
-  document.querySelectorAll('[data-section]').forEach(tab => {
-    tab.onclick = () => {
-      document.querySelectorAll('[data-section]').forEach(t => t.classList.toggle('active', t === tab));
-      sections.forEach(s => {
-        document.getElementById(`section-${s}`).classList.toggle('hidden', s !== tab.dataset.section);
-      });
-    };
-  });
-
-  // ── ACCOUNTS ──────────────────────────────────────────────────────
-  async function loadAccounts() {
-    const tbody = document.getElementById('accounts-tbody');
-    try {
-      accounts = await accountsApi.list();
-      const typeMap = { checking: 'Corrente', savings: 'Poupança', investment: 'Investimento', wallet: 'Carteira' };
-      if (!accounts.length) {
-        tbody.innerHTML = `<tr><td colspan="7" style="padding:24px;text-align:center;color:var(--text-3)">Nenhuma conta cadastrada.</td></tr>`;
-        return;
-      }
-      tbody.innerHTML = accounts.map(a => `
-        <tr>
-          <td><span class="color-dot" style="background:${a.color}"></span></td>
-          <td class="text-strong">${a.name}</td>
-          <td>${typeMap[a.type] || a.type}</td>
-          <td class="td-amount text-right">${formatBRL(a.balance)}</td>
-          <td class="text-muted">${a.currency}</td>
-          <td>${a.is_active
-            ? '<span class="badge badge--active">Ativa</span>'
-            : '<span class="badge badge--inactive">Inativa</span>'}</td>
-          <td class="td-actions">
-            <button class="btn btn--ghost btn--sm" onclick="editAcc('${a.id}')">✎</button>
-            <button class="btn btn--ghost btn--sm" style="color:var(--red)"
-              onclick="deleteAcc('${a.id}','${a.name.replace(/'/g,"\\'")}')">✕</button>
-          </td>
-        </tr>`).join('');
-    } catch (err) {
-      console.error('[Configurações] loadAccounts:', err);
-      tbody.innerHTML = `<tr><td colspan="7" style="padding:24px;text-align:center;color:var(--red)">⚠️ ${err.message}</td></tr>`;
-      toast('Erro ao carregar contas: ' + err.message, 'error');
-    }
-  }
-
-  window.editAcc = (id) => {
-    const a = accounts.find(x => x.id === id);
-    if (!a) return;
-    editAccId = id;
-    document.getElementById('acc-modal-title').textContent = 'Editar Conta';
-    document.getElementById('acc-name').value    = a.name;
-    document.getElementById('acc-type').value    = a.type;
-    document.getElementById('acc-balance').value = a.balance;
-    document.getElementById('acc-color').value   = a.color;
-    openModal('acc-modal');
-  };
-
-  window.deleteAcc = async (id, name) => {
-    if (!await confirm(`Excluir conta "${name}"?`)) return;
-    try { await accountsApi.delete(id); toast('Conta excluída.', 'success'); loadAccounts(); }
-    catch (err) { toast(err.message, 'error'); }
-  };
-
-  document.getElementById('btn-new-account').onclick = () => {
-    editAccId = null;
-    document.getElementById('acc-modal-title').textContent = 'Nova Conta';
-    document.getElementById('acc-name').value    = '';
-    document.getElementById('acc-type').value    = 'checking';
-    document.getElementById('acc-balance').value = '0';
-    document.getElementById('acc-color').value   = '#10B981';
-    openModal('acc-modal');
-  };
-
-  document.getElementById('acc-save-btn').onclick = async () => {
-    const btn = document.getElementById('acc-save-btn');
-    const name = document.getElementById('acc-name').value.trim();
-    if (!name) { toast('Informe um nome para a conta.', 'warning'); return; }
-    btn.disabled = true;
-    try {
-      const body = {
-        name,
-        type:     document.getElementById('acc-type').value,
-        balance:  parseFloat(document.getElementById('acc-balance').value) || 0,
-        currency: 'BRL',
-        color:    document.getElementById('acc-color').value,
-      };
-      if (editAccId) { await accountsApi.update(editAccId, body); toast('Conta atualizada.', 'success'); }
-      else           { await accountsApi.create(body);             toast('Conta criada.', 'success'); }
-      closeModal('acc-modal');
-      loadAccounts();
-    } catch (err) { toast(err.message, 'error'); }
-    finally { btn.disabled = false; }
-  };
-
-  // ── CARDS ─────────────────────────────────────────────────────────
-  async function loadCards() {
-    const tbody = document.getElementById('cards-tbody');
-    try {
-      cards = await cardsApi.list();
-      if (!cards.length) {
-        tbody.innerHTML = `<tr><td colspan="8" style="padding:24px;text-align:center;color:var(--text-3)">Nenhum cartão cadastrado.</td></tr>`;
-        return;
-      }
-      tbody.innerHTML = cards.map(c => `
-        <tr>
-          <td><span class="color-dot" style="background:${c.color}"></span></td>
-          <td class="text-strong">${c.name}</td>
-          <td class="text-muted">${c.brand}</td>
-          <td class="text-muted mono">${c.last4 ? '•••• ' + c.last4 : '—'}</td>
-          <td class="td-amount text-right">${formatBRL(c.limit_amount)}</td>
-          <td class="text-muted">Dia ${c.close_day}</td>
-          <td class="text-muted">Dia ${c.due_day}</td>
-          <td class="td-actions">
-            <button class="btn btn--ghost btn--sm" onclick="editCard('${c.id}')">✎</button>
-            <button class="btn btn--ghost btn--sm" style="color:var(--red)"
-              onclick="deleteCard('${c.id}','${c.name.replace(/'/g,"\\'")}')">✕</button>
-          </td>
-        </tr>`).join('');
-    } catch (err) {
-      console.error('[Configurações] loadCards:', err);
-      tbody.innerHTML = `<tr><td colspan="8" style="padding:24px;text-align:center;color:var(--red)">⚠️ ${err.message}</td></tr>`;
-      toast('Erro ao carregar cartões: ' + err.message, 'error');
-    }
-  }
-
-  window.editCard = (id) => {
-    const c = cards.find(x => x.id === id);
-    if (!c) return;
-    editCardId = id;
-    document.getElementById('card-modal-title').textContent = 'Editar Cartão';
-    document.getElementById('card-name').value  = c.name;
-    document.getElementById('card-brand').value = c.brand;
-    document.getElementById('card-last4').value = c.last4 || '';
-    document.getElementById('card-limit').value = c.limit_amount;
-    document.getElementById('card-close').value = c.close_day;
-    document.getElementById('card-due').value   = c.due_day;
-    document.getElementById('card-color').value = c.color;
-    openModal('card-modal');
-  };
-
-  window.deleteCard = async (id, name) => {
-    if (!await confirm(`Excluir cartão "${name}"?`)) return;
-    try { await cardsApi.delete(id); toast('Cartão excluído.', 'success'); loadCards(); }
-    catch (err) { toast(err.message, 'error'); }
-  };
-
-  document.getElementById('btn-new-card').onclick = () => {
-    editCardId = null;
-    document.getElementById('card-modal-title').textContent = 'Novo Cartão';
-    ['card-name','card-last4'].forEach(id => document.getElementById(id).value = '');
-    document.getElementById('card-brand').value = 'Visa';
-    document.getElementById('card-limit').value = '0';
-    document.getElementById('card-close').value = '3';
-    document.getElementById('card-due').value   = '10';
-    document.getElementById('card-color').value = '#374151';
-    openModal('card-modal');
-  };
-
-  document.getElementById('card-save-btn').onclick = async () => {
-    const btn = document.getElementById('card-save-btn');
-    const name = document.getElementById('card-name').value.trim();
-    if (!name) { toast('Informe um nome para o cartão.', 'warning'); return; }
-    btn.disabled = true;
-    try {
-      const body = {
-        name,
-        brand:        document.getElementById('card-brand').value,
-        last4:        document.getElementById('card-last4').value || null,
-        limit_amount: parseFloat(document.getElementById('card-limit').value) || 0,
-        close_day:    parseInt(document.getElementById('card-close').value),
-        due_day:      parseInt(document.getElementById('card-due').value),
-        color:        document.getElementById('card-color').value,
-      };
-      if (editCardId) { await cardsApi.update(editCardId, body); toast('Cartão atualizado.', 'success'); }
-      else            { await cardsApi.create(body);              toast('Cartão criado.', 'success'); }
-      closeModal('card-modal');
-      loadCards();
-    } catch (err) { toast(err.message, 'error'); }
-    finally { btn.disabled = false; }
-  };
-
-  // ── PASSWORD ──────────────────────────────────────────────────────
-  document.getElementById('pwd-form').onsubmit = async (e) => {
-    e.preventDefault();
-    const errEl = document.getElementById('pwd-error');
-    const sucEl = document.getElementById('pwd-success');
-    errEl.classList.add('hidden');
-    sucEl.classList.add('hidden');
-
-    const newPwd     = document.getElementById('pwd-new').value;
-    const confirmPwd = document.getElementById('pwd-confirm').value;
-    if (newPwd !== confirmPwd) {
-      errEl.textContent = 'As senhas não coincidem.';
-      errEl.classList.remove('hidden');
-      return;
-    }
-
-    const btn = document.getElementById('pwd-btn');
-    setLoading(btn, true);
-    try {
-      await authApi.changePassword(document.getElementById('pwd-current').value, newPwd);
-      sucEl.textContent = 'Senha alterada com sucesso!';
-      sucEl.classList.remove('hidden');
-      document.getElementById('pwd-form').reset();
-    } catch (err) {
-      errEl.textContent = err.message;
-      errEl.classList.remove('hidden');
-    } finally { setLoading(btn, false); }
-  };
-
-  setupModalClose('acc-modal');
-  setupModalClose('card-modal');
-  loadAccounts();
-  loadCards();
+<script>
+function showSettingsTab(tab, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('settings-accounts').style.display = tab === 'accounts' ? '' : 'none';
+  document.getElementById('settings-cards').style.display    = tab === 'cards'    ? '' : 'none';
+}
 </script>
-</body>
-</html>
+{% endblock %}
