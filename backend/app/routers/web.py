@@ -618,7 +618,7 @@ async def categories_page(request: Request, db: AsyncSession = Depends(get_db), 
     return templates.TemplateResponse("categories.html", {
         "request": request,
         "user": current_user,
-        "categories": [{"id": str(c.id), "name": c.name, "icon": c.icon, "type": c.tx_type} for c in categories],
+        "categories": [{"id": str(c.id), "name": c.name, "icon": c.icon, "type": c.type} for c in categories],
     })
 
 
