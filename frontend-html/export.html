@@ -80,7 +80,7 @@
     <div class="export-format-card__name">CSV</div>
     <div class="export-format-card__desc">Valores separados por vírgula — compatível com Excel e Google Sheets</div>
     <a
-      href="{{ url_for('views.export_download', format='csv') }}?from={{ request.query_params.from or date_from }}&to={{ request.query_params.to or date_to }}&data_type={{ request.query_params.data_type or 'all' }}"
+      href="/api/v1/data/export?format=csv&from={{ request.query_params.from or date_from }}&to={{ request.query_params.to or date_to }}&data_type={{ request.query_params.data_type or 'all' }}"
       class="btn btn--outline"
     >
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -103,7 +103,7 @@
     <div class="export-format-card__name">Excel</div>
     <div class="export-format-card__desc">Planilha Microsoft Excel com formatação e múltiplas abas</div>
     <a
-      href="{{ url_for('views.export_download', format='xlsx') }}?from={{ request.query_params.from or date_from }}&to={{ request.query_params.to or date_to }}&data_type={{ request.query_params.data_type or 'all' }}"
+      href="/api/v1/data/export?format=xlsx&from={{ request.query_params.from or date_from }}&to={{ request.query_params.to or date_to }}&data_type={{ request.query_params.data_type or 'all' }}"
       class="btn btn--outline"
     >
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -127,7 +127,7 @@
     <div class="export-format-card__name">PDF</div>
     <div class="export-format-card__desc">Relatório financeiro formatado, pronto para impressão</div>
     <a
-      href="{{ url_for('views.export_download', format='pdf') }}?from={{ request.query_params.from or date_from }}&to={{ request.query_params.to or date_to }}&data_type={{ request.query_params.data_type or 'all' }}"
+      href="/api/v1/data/export?format=pdf&from={{ request.query_params.from or date_from }}&to={{ request.query_params.to or date_to }}&data_type={{ request.query_params.data_type or 'all' }}"
       class="btn btn--outline"
     >
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
