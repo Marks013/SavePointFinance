@@ -68,13 +68,6 @@ async def check_limit(tenant_id: uuid.UUID, resource_type: str, db: AsyncSession
     # Count current resources
     if resource_type == "accounts":
         from app.models.account import Account
-        col = Account.tenant_id
-    elif resource_type == "cards":
-        from app.models.card import Card
-        col = Card.tenant_id
-    from app.models.account import Account
-    
-    if resource_type == "accounts":
         result = await db.execute(select(func.count(Account.id)).where(Account.tenant_id == tenant_id))
     elif resource_type == "cards":
         from app.models.card import Card
