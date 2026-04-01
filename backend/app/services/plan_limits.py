@@ -72,16 +72,25 @@ async def check_limit(tenant_id: uuid.UUID, resource_type: str, db: AsyncSession
     elif resource_type == "cards":
         from app.models.card import Card
         col = Card.tenant_id
+    from app.models.account import Account
+    
+    if resource_type == "accounts":
+        result = await db.execute(select(func.count(Account.id)).where(Account.tenant_id == tenant_id))
+    elif resource_type == "cards":
+        from app.models.card import Card
+        result = await db.execute(select(func.count(Card.id)).where(Card.tenant_id == tenant_id))
+    elif resource_type == "transactions":
+        from app.models.transaction import Transaction
+        result = await db.execute(select(func.count(Transaction.id)).where(Transaction.tenant_id == tenant_id))
     elif resource_type == "categories":
         from app.models.category import Category
-        col = Category.tenant_id
+        result = await db.execute(select(func.count(Category.id)).where(Category.tenant_id == tenant_id))
     elif resource_type == "users":
         from app.models.user import User
-        col = User.tenant_id
+        result = await db.execute(select(func.count(User.id)).where(User.tenant_id == tenant_id))
     else:
         return True, ""
     
-    result = await db.execute(select(func.count()).select_from(col.where(col == tenant_id)))
     current_count = result.scalar() or 0
     
     if current_count >= max_count:
