@@ -635,6 +635,266 @@ async def settings_page(request: Request, db: AsyncSession = Depends(get_db), cu
     })
 
 
+@router.get("/settings/accounts/new")
+async def new_account_modal(request: Request, current_user: User = Depends(require_user)):
+    return templates.TemplateResponse("partials/_account_modal.html", {"request": request, "user": current_user, "account": None})
+
+
+@router.post("/settings/accounts/new")
+async def create_account(request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_user)):
+    from app.routers.accounts_cards import create_account as api_create_account, AccountCreate
+    from app.services.plan_limits import check_limit
+    
+    form = await request.form()
+    allowed, error = await check_limit(current_user.tenant_id, "accounts", db)
+    if not allowed:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(content={"error": error}, status_code=403)
+    
+    try:
+        body = AccountCreate(
+            name=form.get("name", ""),
+            type=form.get("type", "checking"),
+            balance=float(form.get("balance", 0) or 0),
+            currency=form.get("currency", "BRL"),
+            color=form.get("color", "#10B981"),
+        )
+        from app.routers.accounts_cards import account_to_dict
+        account = await api_create_account(body=body, db=db, current_user=current_user)
+        return templates.TemplateResponse("partials/_account_modal.html", {"request": request, "user": current_user, "account": account_to_dict(account), "success": True})
+    except Exception as e:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(content={"error": str(e)}, status_code=400)
+
+
+@router.get("/settings/cards/new")
+async def new_card_modal(request: Request, current_user: User = Depends(require_user)):
+    return templates.TemplateResponse("partials/_card_modal.html", {"request": request, "user": current_user, "card": None})
+
+
+@router.post("/settings/cards/new")
+async def create_card(request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_user)):
+    from app.routers.accounts_cards import create_card as api_create_card, CardCreate
+    from app.services.plan_limits import check_limit
+    
+    form = await request.form()
+    allowed, error = await check_limit(current_user.tenant_id, "cards", db)
+    if not allowed:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(content={"error": error}, status_code=403)
+    
+    try:
+        body = CardCreate(
+            name=form.get("name", ""),
+            card_type=form.get("type", "credit"),
+            limit=float(form.get("limit", 0) or 0),
+            color=form.get("color", "#3B82F6"),
+        )
+        from app.routers.accounts_cards import card_to_dict
+        card = await api_create_card(body=body, db=db, current_user=current_user)
+        return templates.TemplateResponse("partials/_card_modal.html", {"request": request, "user": current_user, "card": card_to_dict(card), "success": True})
+    except Exception as e:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(content={"error": str(e)}, status_code=400)
+
+
+@router.post("/transactions/new")
+async def create_transaction(request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_user)):
+    from app.routers.transactions import create_transaction as api_create_transaction, TransactionCreate
+    
+    form = await request.form()
+    try:
+        body = TransactionCreate(
+            description=form.get("description", ""),
+            amount=float(form.get("amount", 0) or 0),
+            type=form.get("type", "expense"),
+            date=datetime.fromisoformat(form.get("date", datetime.now().isoformat())),
+            category_id=uuid.UUID(form.get("category_id")) if form.get("category_id") else None,
+            account_id=uuid.UUID(form.get("account_id")) if form.get("account_id") else None,
+            card_id=uuid.UUID(form.get("card_id")) if form.get("card_id") else None,
+        )
+        tx = await api_create_transaction(body=body, db=db, current_user=current_user)
+        from app.routers.htmx import transaction_to_dict
+        return templates.TemplateResponse("partials/_tx_modal.html", {"request": request, "user": current_user, "tx": transaction_to_dict(tx), "success": True})
+    except Exception as e:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(content={"error": str(e)}, status_code=400)
+
+
+@router.post("/transactions/{tx_id}/edit")
+async def edit_transaction(tx_id: str, request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_user)):
+    from app.routers.transactions import update_transaction, TransactionUpdate
+    
+    form = await request.form()
+    try:
+        body = TransactionUpdate(
+            description=form.get("description", ""),
+            amount=float(form.get("amount", 0) or 0),
+            type=form.get("type", "expense"),
+            date=datetime.fromisoformat(form.get("date", datetime.now().isoformat())),
+            category_id=uuid.UUID(form.get("category_id")) if form.get("category_id") else None,
+            account_id=uuid.UUID(form.get("account_id")) if form.get("account_id") else None,
+            card_id=uuid.UUID(form.get("card_id")) if form.get("card_id") else None,
+        )
+        tx = await update_transaction(tx_id=uuid.UUID(tx_id), body=body, db=db, current_user=current_user)
+        from app.routers.htmx import transaction_to_dict
+        return templates.TemplateResponse("partials/_tx_modal.html", {"request": request, "user": current_user, "tx": transaction_to_dict(tx), "success": True})
+    except Exception as e:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(content={"error": str(e)}, status_code=400)
+
+
+@router.post("/categories/new")
+async def create_category(request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_user)):
+    from app.routers.categories import create_category as api_create_category, CategoryCreate
+    
+    form = await request.form()
+    try:
+        body = CategoryCreate(
+            name=form.get("name", ""),
+            icon=form.get("icon", "folder"),
+            type=form.get("type", "expense"),
+        )
+        cat = await api_create_category(body=body, db=db, current_user=current_user)
+        return templates.TemplateResponse("partials/_cat_modal.html", {"request": request, "user": current_user, "cat": {"id": str(cat.id), "name": cat.name, "icon": cat.icon, "type": cat.type}, "success": True})
+    except Exception as e:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(content={"error": str(e)}, status_code=400)
+
+
+@router.post("/categories/{cat_id}/edit")
+async def edit_category(cat_id: str, request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_user)):
+    from app.routers.categories import update_category, CategoryUpdate
+    
+    form = await request.form()
+    try:
+        body = CategoryUpdate(
+            name=form.get("name", ""),
+            icon=form.get("icon", "folder"),
+            type=form.get("type", "expense"),
+        )
+        cat = await update_category(cat_id=uuid.UUID(cat_id), body=body, db=db, current_user=current_user)
+        return templates.TemplateResponse("partials/_cat_modal.html", {"request": request, "user": current_user, "cat": {"id": str(cat.id), "name": cat.name, "icon": cat.icon, "type": cat.type}, "success": True})
+    except Exception as e:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(content={"error": str(e)}, status_code=400)
+
+
+@router.get("/goals/new")
+async def new_goal_modal(request: Request, current_user: User = Depends(require_user)):
+    return templates.TemplateResponse("partials/_goal_modal.html", {"request": request, "user": current_user, "goal": None})
+
+
+@router.post("/goals/new")
+async def create_goal(request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_user)):
+    from app.routers.goals import create_goal as api_create_goal, GoalCreate
+    
+    form = await request.form()
+    try:
+        body = GoalCreate(
+            name=form.get("name", ""),
+            target_amount=float(form.get("target_amount", 0) or 0),
+            deadline=datetime.fromisoformat(form.get("deadline")) if form.get("deadline") else None,
+        )
+        goal = await api_create_goal(body=body, db=db, current_user=current_user)
+        return templates.TemplateResponse("partials/_goal_modal.html", {"request": request, "user": current_user, "goal": {"id": str(goal.id), "name": goal.name, "target_amount": float(goal.target_amount), "current_amount": float(goal.current_amount), "deadline": goal.deadline}, "success": True})
+    except Exception as e:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(content={"error": str(e)}, status_code=400)
+
+
+@router.get("/goals/{goal_id}/edit")
+async def edit_goal_modal(goal_id: str, request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_user)):
+    from app.routers.goals import get_goal
+    goal = await get_goal(goal_id=uuid.UUID(goal_id), db=db, current_user=current_user)
+    return templates.TemplateResponse("partials/_goal_modal.html", {"request": request, "user": current_user, "goal": {"id": str(goal.id), "name": goal.name, "target_amount": float(goal.target_amount), "current_amount": float(goal.current_amount), "deadline": goal.deadline}})
+
+
+@router.post("/goals/{goal_id}/edit")
+async def edit_goal(goal_id: str, request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_user)):
+    from app.routers.goals import update_goal, GoalUpdate
+    
+    form = await request.form()
+    try:
+        body = GoalUpdate(
+            name=form.get("name", ""),
+            target_amount=float(form.get("target_amount", 0) or 0),
+            deadline=datetime.fromisoformat(form.get("deadline")) if form.get("deadline") else None,
+        )
+        goal = await update_goal(goal_id=uuid.UUID(goal_id), body=body, db=db, current_user=current_user)
+        return templates.TemplateResponse("partials/_goal_modal.html", {"request": request, "user": current_user, "goal": {"id": str(goal.id), "name": goal.name, "target_amount": float(goal.target_amount), "current_amount": float(goal.current_amount), "deadline": goal.deadline}, "success": True})
+    except Exception as e:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(content={"error": str(e)}, status_code=400)
+
+
+@router.post("/goals/{goal_id}/deposit")
+async def deposit_goal(goal_id: str, request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_user)):
+    from app.routers.goals import deposit_to_goal
+    
+    form = await request.form()
+    try:
+        amount = float(form.get("amount", 0) or 0)
+        goal = await deposit_to_goal(goal_id=uuid.UUID(goal_id), amount=amount, db=db, current_user=current_user)
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url="/goals?success=deposit", status_code=302)
+    except Exception as e:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(content={"error": str(e)}, status_code=400)
+
+
+@router.get("/subscriptions/new")
+async def new_subscription_modal(request: Request, current_user: User = Depends(require_user)):
+    return templates.TemplateResponse("partials/_sub_modal.html", {"request": request, "user": current_user, "sub": None})
+
+
+@router.post("/subscriptions/new")
+async def create_subscription(request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_user)):
+    from app.routers.subscriptions import create_subscription as api_create_subscription, SubscriptionCreate
+    
+    form = await request.form()
+    try:
+        body = SubscriptionCreate(
+            name=form.get("name", ""),
+            amount=float(form.get("amount", 0) or 0),
+            frequency=form.get("frequency", "monthly"),
+            category_id=uuid.UUID(form.get("category_id")) if form.get("category_id") else None,
+            next_billing_date=datetime.fromisoformat(form.get("next_billing_date")) if form.get("next_billing_date") else None,
+        )
+        sub = await api_create_subscription(body=body, db=db, current_user=current_user)
+        return templates.TemplateResponse("partials/_sub_modal.html", {"request": request, "user": current_user, "sub": {"id": str(sub.id), "name": sub.name, "amount": float(sub.amount), "frequency": sub.frequency}, "success": True})
+    except Exception as e:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(content={"error": str(e)}, status_code=400)
+
+
+@router.get("/subscriptions/{sub_id}/edit")
+async def edit_subscription_modal(sub_id: str, request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_user)):
+    from app.routers.subscriptions import get_subscription
+    sub = await get_subscription(sub_id=uuid.UUID(sub_id), db=db, current_user=current_user)
+    return templates.TemplateResponse("partials/_sub_modal.html", {"request": request, "user": current_user, "sub": {"id": str(sub.id), "name": sub.name, "amount": float(sub.amount), "frequency": sub.frequency, "category_id": str(sub.category_id) if sub.category_id else None, "next_billing_date": sub.next_billing_date}})
+
+
+@router.post("/subscriptions/{sub_id}/edit")
+async def edit_subscription(sub_id: str, request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_user)):
+    from app.routers.subscriptions import update_subscription, SubscriptionUpdate
+    
+    form = await request.form()
+    try:
+        body = SubscriptionUpdate(
+            name=form.get("name", ""),
+            amount=float(form.get("amount", 0) or 0),
+            frequency=form.get("frequency", "monthly"),
+            category_id=uuid.UUID(form.get("category_id")) if form.get("category_id") else None,
+            next_billing_date=datetime.fromisoformat(form.get("next_billing_date")) if form.get("next_billing_date") else None,
+        )
+        sub = await update_subscription(sub_id=uuid.UUID(sub_id), body=body, db=db, current_user=current_user)
+        return templates.TemplateResponse("partials/_sub_modal.html", {"request": request, "user": current_user, "sub": {"id": str(sub.id), "name": sub.name, "amount": float(sub.amount), "frequency": sub.frequency}, "success": True})
+    except Exception as e:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(content={"error": str(e)}, status_code=400)
+
+
 @router.get("/options", response_class=HTMLResponse)
 async def options_page(request: Request, current_user: User = Depends(require_user)):
     return templates.TemplateResponse("options.html", {"request": request, "user": current_user})

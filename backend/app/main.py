@@ -128,7 +128,7 @@ app.include_router(data_router)
 app.include_router(htmx_router)
 
 
-# ── Health Check Otimizado ───────────────────────────────────────────────────
+# Health Check Otimizado
 
 @app.get("/health")
 async def health():
@@ -138,6 +138,39 @@ async def health():
         "version": "2.0.0",
         "environment": settings.APP_ENV
     }
+
+
+@app.exception_handler(405)
+async def method_not_allowed_handler(request: Request, exc):
+    return JSONResponse(
+        status_code=405,
+        content={
+            "detail": "Método não permitido. Ação não disponível para esta funcionalidade.",
+            "code": "METHOD_NOT_ALLOWED"
+        }
+    )
+
+
+@app.exception_handler(404)
+async def not_found_handler(request: Request, exc):
+    return JSONResponse(
+        status_code=404,
+        content={
+            "detail": "Página não encontrada.",
+            "code": "NOT_FOUND"
+        }
+    )
+
+
+@app.exception_handler(500)
+async def internal_error_handler(request: Request, exc):
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "Erro interno do servidor. Tente novamente mais tarde.",
+            "code": "INTERNAL_ERROR"
+        }
+    )
 
 
 @app.get("/health/ready")
