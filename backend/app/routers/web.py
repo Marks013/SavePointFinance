@@ -581,6 +581,9 @@ async def reports_page(request: Request, month: int = None, year: int = None, db
         "year": year,
         "month_label": get_month_label(month, year),
         "expense_breakdown": expense_breakdown,
+        "monthly_labels": [],
+        "monthly_income": [],
+        "monthly_expense": [],
     })
 
 
