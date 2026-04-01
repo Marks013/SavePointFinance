@@ -630,8 +630,8 @@ async def settings_page(request: Request, db: AsyncSession = Depends(get_db), cu
     return templates.TemplateResponse("settings.html", {
         "request": request,
         "user": current_user,
-        "accounts": [{"id": str(a.id), "name": a.name, "balance": a.balance, "balance_fmt": fmt_money(a.balance), "type": a.account_type} for a in accounts],
-        "cards": [{"id": str(c.id), "name": c.name, "limit": c.limit, "limit_fmt": fmt_money(c.limit), "type": c.card_type} for c in cards],
+        "accounts": [{"id": str(a.id), "name": a.name, "balance": a.balance, "balance_fmt": fmt_money(a.balance), "type": a.type} for a in accounts],
+        "cards": [{"id": str(c.id), "name": c.name, "limit": c.limit, "limit_fmt": fmt_money(c.limit), "type": c.type} for c in cards],
     })
 
 
@@ -646,6 +646,12 @@ async def create_account(request: Request, db: AsyncSession = Depends(get_db), c
     from app.services.plan_limits import check_limit
     
     form = await request.form()
+    name = form.get("name", "").strip()
+    
+    if not name:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(content={"error": "Nome da conta é obrigatório"}, status_code=400)
+    
     allowed, error = await check_limit(current_user.tenant_id, "accounts", db)
     if not allowed:
         from fastapi.responses import JSONResponse
@@ -653,7 +659,7 @@ async def create_account(request: Request, db: AsyncSession = Depends(get_db), c
     
     try:
         body = AccountCreate(
-            name=form.get("name", ""),
+            name=name,
             type=form.get("type", "checking"),
             balance=float(form.get("balance", 0) or 0),
             currency=form.get("currency", "BRL"),
