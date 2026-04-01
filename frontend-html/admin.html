@@ -304,29 +304,49 @@
         </div>
         <h3 class="settings-section__title">Configurações Globais</h3>
       </div>
-      <form method="POST" action="/admin/settings" class="form-stack">
+      <form method="POST" action="/admin/settings" class="form-stack" onsubmit="handleSettingsSubmit(event)">
+        <input type="hidden" name="maintenance_mode" id="maintenance_mode" value="">
+        <input type="hidden" name="open_registration" id="open_registration" value="">
+        <input type="hidden" name="ai_classifier" id="ai_classifier" value="">
+        <input type="hidden" name="whatsapp_bot" id="whatsapp_bot" value="">
         <div class="toggle-row">
           <span class="toggle-row__label">Modo de manutenção</span>
           <div class="toggle {{ 'on' if system_config and system_config.maintenance_mode }}"
-            onclick="this.classList.toggle('on')"></div>
+            onclick="this.classList.toggle('on'); syncToggle(this, 'maintenance_mode')"></div>
         </div>
         <div class="toggle-row">
           <span class="toggle-row__label">Registros abertos</span>
           <div class="toggle {{ 'on' if not system_config or system_config.open_registration }}"
-            onclick="this.classList.toggle('on')"></div>
+            onclick="this.classList.toggle('on'); syncToggle(this, 'open_registration')"></div>
         </div>
         <div class="toggle-row">
           <span class="toggle-row__label">IA Classifier ativo</span>
           <div class="toggle {{ 'on' if not system_config or system_config.ai_classifier }}"
-            onclick="this.classList.toggle('on')"></div>
+            onclick="this.classList.toggle('on'); syncToggle(this, 'ai_classifier')"></div>
         </div>
         <div class="toggle-row" style="border-bottom:none;">
           <span class="toggle-row__label">WhatsApp Bot ativo</span>
           <div class="toggle {{ 'on' if system_config and system_config.whatsapp_bot }}"
-            onclick="this.classList.toggle('on')"></div>
+            onclick="this.classList.toggle('on'); syncToggle(this, 'whatsapp_bot')"></div>
         </div>
         <button type="submit" class="btn btn--primary btn--sm" style="margin-top:8px;">Salvar</button>
       </form>
+      <script>
+        function syncToggle(el, name) {
+          document.getElementById(name).value = el.classList.contains('on') ? 'on' : '';
+        }
+        function handleSettingsSubmit(e) {
+          ['maintenance_mode','open_registration','ai_classifier','whatsapp_bot'].forEach(function(name) {
+            var el = document.querySelector('form[action="/admin/settings"] .toggle:nth-of-type(' + (['maintenance_mode','open_registration','ai_classifier','whatsapp_bot'].indexOf(name) + 1) + ')');
+            var hidden = document.getElementById(name);
+            if (el && el.classList.contains('on')) hidden.value = 'on';
+          });
+        }
+        ['maintenance_mode','open_registration','ai_classifier','whatsapp_bot'].forEach(function(name) {
+          var el = document.querySelector('form[action="/admin/settings"] .toggle-row:nth-of-type(' + (['maintenance_mode','open_registration','ai_classifier','whatsapp_bot'].indexOf(name) + 1) + ') .toggle');
+          if (el && el.classList.contains('on')) document.getElementById(name).value = 'on';
+        });
+      </script>
     </div>
 
     <div class="card settings-section">

@@ -50,4 +50,8 @@ class Category(Base):
 
     tenant: Mapped["Tenant"] = relationship("Tenant", back_populates="categories")
     parent: Mapped["Category | None"] = relationship("Category", remote_side="Category.id")
-    transactions: Mapped[list["Transaction"]] = relationship("Transaction", back_populates="category")
+    transactions: Mapped[list["Transaction"]] = relationship(
+        "Transaction", 
+        back_populates="category",
+        foreign_keys="Transaction.category_id"
+    )

@@ -37,5 +37,5 @@ class Goal(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     tenant: Mapped["Tenant"] = relationship("Tenant", back_populates="goals")
-    account: Mapped["Account | None"] = relationship("Account")
-    user: Mapped["User | None"] = relationship("User")
+    account: Mapped["Account | None"] = relationship("Account", foreign_keys=[account_id])
+    user: Mapped["User | None"] = relationship("User", foreign_keys=[user_id])

@@ -36,7 +36,7 @@ class Subscription(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     tenant: Mapped["Tenant"] = relationship("Tenant", back_populates="subscriptions")
-    user: Mapped["User | None"] = relationship("User")
-    category: Mapped["Category | None"] = relationship("Category")
-    account: Mapped["Account | None"] = relationship("Account")
-    card: Mapped["Card | None"] = relationship("Card")
+    user: Mapped["User | None"] = relationship("User", foreign_keys=[user_id])
+    category: Mapped["Category | None"] = relationship("Category", foreign_keys=[category_id])
+    account: Mapped["Account | None"] = relationship("Account", foreign_keys=[account_id])
+    card: Mapped["Card | None"] = relationship("Card", foreign_keys=[card_id])

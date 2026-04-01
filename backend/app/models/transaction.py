@@ -68,6 +68,6 @@ class Transaction(Base):
 
     tenant: Mapped["Tenant"] = relationship("Tenant", back_populates="transactions")
     user: Mapped["User | None"] = relationship("User", back_populates="transactions")
-    category: Mapped["Category | None"] = relationship("Category", back_populates="transactions")
+    category: Mapped["Category | None"] = relationship("Category", back_populates="transactions", foreign_keys=[category_id])
     account: Mapped["Account | None"] = relationship("Account", back_populates="transactions")
     card: Mapped["Card | None"] = relationship("Card", back_populates="transactions")

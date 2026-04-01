@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -50,14 +50,24 @@ def decode_token(token: str) -> dict:
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+    request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> User:
-    payload = decode_token(credentials.credentials)
+    token = None
+    
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+    else:
+        token = request.cookies.get("access_token")
+    
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    payload = decode_token(token)
     if payload.get("type") != "access":
         raise HTTPException(status_code=401, detail="Tipo de token inválido")
 
-    # BUG FIX: must cast to uuid.UUID — SQLAlchemy won't match UUID column vs string
     try:
         user_id = uuid.UUID(payload["sub"])
     except (KeyError, ValueError):
@@ -68,11 +78,9 @@ async def get_current_user(
     if not user or not user.is_active:
         raise HTTPException(status_code=401, detail="Usuário não encontrado ou inativo")
 
-    # Superadmin bypass — not bound to tenant expiry
     if user.role == UserRole.superadmin:
         return user
 
-    # Check tenant subscription status
     from app.models.tenant import Tenant
     tenant_res = await db.execute(select(Tenant).where(Tenant.id == user.tenant_id))
     tenant = tenant_res.scalar_one_or_none()
