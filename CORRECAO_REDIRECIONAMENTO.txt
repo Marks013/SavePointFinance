@@ -1,0 +1,78 @@
+PASSO A PASSO - CORREÇÃO DO REDIRECIONAMENTO INFINITO
+========================================================
+
+PROBLEMA IDENTIFICADO
+---------------------
+O loop de redirecionamento ocorre porque o nginx do frontend está apontando 
+para um IP errado do backend. Os containers mudam de IP a cada recreation.
+
+
+IPS ATUAIS (verificar no Ubuntu)
+---------------------------------
+Frontend: 172.16.80.3
+Backend:  172.16.80.7
+
+
+PASSO 1: CORRIGIR O NGINX.CONF DO FRONTEND
+------------------------------------------
+Arquivo: frontend-html/nginx.conf
+
+Linha 20, mudar de:
+    proxy_pass http://172.16.80.x:8000;
+
+Para:
+    proxy_pass http://172.16.80.7:8000;
+
+(O IP do backend sempre verificar com: docker inspect savepoint_api | grep IPAddress)
+
+
+PASSO 2: REBUILD E RECRIAR O FRONTEND
+-------------------------------------
+No servidor Ubuntu, executar:
+
+    cd ~/SavePointFinance
+    docker-compose build frontend
+    docker-compose up -d --force-recreate frontend
+
+
+PASSO 3: VERIFICAR IP DO FRONTEND APÓS RECRIAR
+----------------------------------------------
+    docker inspect savepoint_web | grep IPAddress
+
+Guardar o novo IP (pode mudar após recreate).
+
+
+PASSO 4: CONFIGURAR O NGINX PROXY MANAGER
+-----------------------------------------
+Acessar o painel: http://161.153.204.226:81
+
+Editar o Proxy Host existente:
+- Domain Names: savepointfinanca.duckdns.org
+- Forward Hostname/IP: <NOVO_IP_DO_FRONTEND_DO_PASSO_3>
+- Forward Port: 80
+- Scheme: http
+- SSL Certificate: Let's Encrypt (id 6)
+- Force SSL: ATIVO
+- HTTP/2: ATIVO
+- Block Common Exploits: ATIVO
+
+
+PASSO 5: TESTAR
+---------------
+Acessar: https://savepointfinanca.duckdns.org
+
+
+NOTAS IMPORTANTES
+-----------------
+1. Os IPs dos containers mudam a cada "docker-compose up/down"
+2. Sempre verificar os IPs atuais com "docker inspect <container>"
+3. O ALLOWED_ORIGINS no .env deve incluir o domínio: 
+   ALLOWED_ORIGINS="https://savepointfinanca.duckdns.org,http://localhost:3000,http://localhost:8000"
+
+
+COMANDOS ÚTEIS PARA VERIFICAR
+-----------------------------
+    docker ps --filter "name=savepoint"
+    docker inspect savepoint_web | grep IPAddress
+    docker inspect savepoint_api | grep IPAddress
+    curl http://<IP_BACKEND>:8000/api/health
