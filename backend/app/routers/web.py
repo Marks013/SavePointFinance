@@ -802,11 +802,18 @@ async def import_page(request: Request, db: AsyncSession = Depends(get_db), curr
     
     is_free = limits == PLAN_LIMITS["free"]
     
+    from datetime import date
+    today = date.today()
+    first_day = date(today.year, 1, 1)
+    
     return templates.TemplateResponse("import.html", {
         "request": request,
         "user": current_user,
         "can_import": allowed,
+        "plan_error": error,
         "plan_name": "Free" if is_free else ("Pro" if limits.get("max_users", 1) <= 5 else "Enterprise"),
+        "date_from": first_day.isoformat(),
+        "date_to": today.isoformat(),
     })
 
 

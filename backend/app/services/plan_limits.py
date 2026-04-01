@@ -102,7 +102,7 @@ async def check_feature(tenant_id: uuid.UUID, feature: str, db: AsyncSession) ->
         if limits[feature]:
             return True, ""
         plan_name = "Free" if limits == PLAN_LIMITS["free"] else ("Pro" if limits == PLAN_LIMITS["pro"] else "Enterprise")
-        return False, f"Feature disponível apenas nos planos Pro ou Enterprise. Upgrade seu plano para usar."
+        return False, f"Funcionalidade disponível apenas nos planos Pro ou Enterprise. Faça upgrade do seu plano para usar."
     
     return True, ""
 

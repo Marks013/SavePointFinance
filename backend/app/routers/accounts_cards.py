@@ -64,7 +64,7 @@ async def update_account(account_id: uuid.UUID, body: AccountCreate, db: AsyncSe
     result = await db.execute(select(Account).where(Account.id == account_id, Account.tenant_id == current_user.tenant_id))
     account = result.scalar_one_or_none()
     if not account:
-        raise HTTPException(status_code=404, detail="Account not found")
+        raise HTTPException(status_code=404, detail="Conta não encontrada")
     for field, value in body.model_dump(exclude_unset=True).items():
         setattr(account, field, value)
     await db.commit()
@@ -77,7 +77,7 @@ async def delete_account(account_id: uuid.UUID, db: AsyncSession = Depends(get_d
     result = await db.execute(select(Account).where(Account.id == account_id, Account.tenant_id == current_user.tenant_id))
     account = result.scalar_one_or_none()
     if not account:
-        raise HTTPException(status_code=404, detail="Account not found")
+        raise HTTPException(status_code=404, detail="Conta não encontrada")
     await db.delete(account)
     await db.commit()
     return {"message": "Conta excluída com sucesso."}
@@ -135,7 +135,7 @@ async def update_card(card_id: uuid.UUID, body: CardCreate, db: AsyncSession = D
     result = await db.execute(select(Card).where(Card.id == card_id, Card.tenant_id == current_user.tenant_id))
     card = result.scalar_one_or_none()
     if not card:
-        raise HTTPException(status_code=404, detail="Card not found")
+        raise HTTPException(status_code=404, detail="Cartão não encontrado")
     for field, value in body.model_dump(exclude_unset=True).items():
         setattr(card, field, value)
     await db.commit()
@@ -148,7 +148,7 @@ async def delete_card(card_id: uuid.UUID, db: AsyncSession = Depends(get_db), cu
     result = await db.execute(select(Card).where(Card.id == card_id, Card.tenant_id == current_user.tenant_id))
     card = result.scalar_one_or_none()
     if not card:
-        raise HTTPException(status_code=404, detail="Card not found")
+        raise HTTPException(status_code=404, detail="Cartão não encontrado")
     await db.delete(card)
     await db.commit()
     return {"message": "Cartão excluído com sucesso."}

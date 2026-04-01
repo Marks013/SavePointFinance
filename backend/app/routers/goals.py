@@ -104,7 +104,7 @@ async def update_goal(
     )
     goal = result.scalar_one_or_none()
     if not goal:
-        raise HTTPException(status_code=404, detail="Goal not found")
+        raise HTTPException(status_code=404, detail="meta não encontrada")
 
     old_amount = goal.current_amount
     update_data = goal_in.model_dump(exclude_unset=True)
@@ -165,7 +165,7 @@ async def delete_goal(
     )
     goal = result.scalar_one_or_none()
     if not goal:
-        raise HTTPException(status_code=404, detail="Goal not found")
+        raise HTTPException(status_code=404, detail="meta não encontrada")
 
     await db.delete(goal)
     await db.commit()

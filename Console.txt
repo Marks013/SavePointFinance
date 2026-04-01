@@ -1,2 +1,23 @@
-ubuntu@savepoint:~/SavePointFinance$ docker exec savepoint_api cat /app/frontend-html/index.html
-cat: /app/frontend-html/index.html: No such file or directory
+s
+ubuntu@savepoint:~/SavePointFinance$ docker compose logs backend --tail=20
+savepoint_api  |     self.environment.handle_exception()
+savepoint_api  |   File "/usr/local/lib/python3.12/site-packages/jinja2/environment.py", line 939, in handle_exception
+savepoint_api  |     raise rewrite_traceback_stack(source=source)
+savepoint_api  |   File "/app/frontend-html/export.html", line 1, in top-level template code
+savepoint_api  |     {% extends "base.html" %}
+savepoint_api  |   File "/app/frontend-html/base.html", line 75, in top-level template code
+savepoint_api  |     {% block content %}{% endblock %}
+savepoint_api  |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+savepoint_api  |   File "/app/frontend-html/export.html", line 83, in block 'content'
+savepoint_api  |     href="{{ url_for('views.export_download', format='csv') }}?from={{ request.query_params.from or date_from }}&to={{ request.query_params.to or date_to }}&data_type={{ request.query_params.data_type or 'all' }}"
+savepoint_api  |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+savepoint_api  |   File "/usr/local/lib/python3.12/site-packages/starlette/templating.py", line 126, in url_for
+savepoint_api  |     return request.url_for(name, **path_params)
+savepoint_api  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+savepoint_api  |   File "/usr/local/lib/python3.12/site-packages/starlette/requests.py", line 186, in url_for
+savepoint_api  |     url_path = url_path_provider.url_path_for(name, **path_params)
+savepoint_api  |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+savepoint_api  |   File "/usr/local/lib/python3.12/site-packages/starlette/routing.py", line 662, in url_path_for
+savepoint_api  |     raise NoMatchFound(name, path_params)
+savepoint_api  | starlette.routing.NoMatchFound: No route exists for name "views.export_download" and params "format".
+ubuntu@savepoint:~/SavePointFinance$
