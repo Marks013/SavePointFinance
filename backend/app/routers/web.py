@@ -786,6 +786,7 @@ async def export_page(request: Request, db: AsyncSession = Depends(get_db), curr
         "request": request,
         "user": current_user,
         "can_export": allowed,
+        "plan_error": error,
         "plan_name": "Free" if is_free else ("Pro" if limits.get("max_users", 1) <= 5 else "Enterprise"),
         "date_from": first_day.isoformat(),
         "date_to": today.isoformat(),

@@ -10,6 +10,20 @@
   </div>
 </div>
 
+{% if not can_export %}
+<div class="card p-5 mb-6" style="background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.3);">
+  <div style="display: flex; align-items: center; gap: 12px;">
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2">
+      <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+    </svg>
+    <div>
+      <h3 style="color: #F59E0B; font-size: 1rem; font-weight: 600; margin-bottom: 4px;">Plano {{ plan_name }}</h3>
+      <p style="color: var(--text-dim); font-size: 0.875rem;">{{ plan_error }}</p>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 <!-- Date Range Card -->
 <div class="card p-5 mb-6">
   <h3 style="font-size:0.875rem; font-weight:600; margin-bottom:14px;">Período de exportação</h3>
@@ -81,7 +95,8 @@
     <div class="export-format-card__desc">Valores separados por vírgula — compatível com Excel e Google Sheets</div>
     <a
       href="/api/v1/data/export?format=csv&from={{ request.query_params.from or date_from }}&to={{ request.query_params.to or date_to }}&data_type={{ request.query_params.data_type or 'all' }}"
-      class="btn btn--outline"
+      class="btn btn--outline{% if not can_export %} disabled{% endif %}"
+      {% if not can_export %}onclick="return false;"{% endif %}
     >
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -104,7 +119,8 @@
     <div class="export-format-card__desc">Planilha Microsoft Excel com formatação e múltiplas abas</div>
     <a
       href="/api/v1/data/export?format=xlsx&from={{ request.query_params.from or date_from }}&to={{ request.query_params.to or date_to }}&data_type={{ request.query_params.data_type or 'all' }}"
-      class="btn btn--outline"
+      class="btn btn--outline{% if not can_export %} disabled{% endif %}"
+      {% if not can_export %}onclick="return false;"{% endif %}
     >
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -125,10 +141,11 @@
       </svg>
     </div>
     <div class="export-format-card__name">PDF</div>
-    <div class="export-format-card__desc">Relatório financeiro formatado, pronto para impressão</div>
+    <div class="export-format-card__desc">Documento compactado com todas as informações em formato PDF</div>
     <a
       href="/api/v1/data/export?format=pdf&from={{ request.query_params.from or date_from }}&to={{ request.query_params.to or date_to }}&data_type={{ request.query_params.data_type or 'all' }}"
-      class="btn btn--outline"
+      class="btn btn--outline{% if not can_export %} disabled{% endif %}"
+      {% if not can_export %}onclick="return false;"{% endif %}
     >
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
