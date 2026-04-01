@@ -193,7 +193,7 @@ async def reset_password(body: ResetPasswordRequest, db: AsyncSession = Depends(
     result = await db.execute(select(User).where(User.reset_token == body.token))
     user = result.scalar_one_or_none()
     if not user or not user.reset_token_expires or user.reset_token_expires < datetime.now(timezone.utc):
-        raise HTTPException(status_code=400, detail="Token expirado ou inválido.")
+        raise HTTPException(status_code=400, detail="Token expirado ou inválido. Faça login novamente.")
     
     user.password_hash = hash_password(body.new_password)
     user.reset_token = None
