@@ -274,7 +274,7 @@
   
   {% block head %}{% endblock %}
 </head>
-<body>
+<body hx-boost="true">
 
 <!-- Mobile sidebar overlay -->
 <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
@@ -570,7 +570,9 @@ function changeMonth(delta) {
   
   url.searchParams.set('month', m);
   url.searchParams.set('year',  y);
-  window.location = url.toString();
+  
+  window.history.pushState({}, '', url.toString());
+  window.dispatchEvent(new Event('sp:refreshData'));
 }
 
 /* ── Premium Interactions ──────────────────────────────────────────────── */
