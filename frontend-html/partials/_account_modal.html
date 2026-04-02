@@ -25,8 +25,13 @@
 
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
       <div class="form-group">
-        <label class="form-label" for="accBank">Banco</label>
-        <input type="text" id="accBank" name="bank" class="form-input" placeholder="Ex.: Nubank, Itaú…" value="{{ account.bank if account else '' }}">
+        <label class="form-label" for="accInstitution">Instituição</label>
+        <select id="accInstitution" name="institution_id" class="form-select">
+          <option value="">Nenhuma</option>
+          {% for inst in institutions %}
+          <option value="{{ inst.id }}" {% if account and account.institution_id == inst.id %}selected{% endif %}>{{ inst.name }}</option>
+          {% endfor %}
+        </select>
       </div>
       <div class="form-group">
         <label class="form-label" for="accType">Tipo</label>

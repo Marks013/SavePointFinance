@@ -33,6 +33,32 @@ async def lifespan(app: FastAPI):
     # Create all tables on startup (idempotent)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    
+    # Seed default institutions if none exist
+    from app.models.institution import Institution
+    from app.database import AsyncSessionLocal
+    from sqlalchemy import select, func
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(func.count(Institution.id)))
+        count = result.scalar()
+        if count == 0:
+            default_institutions = [
+                Institution(name="Nubank", code="260", color="#820AD1", type="fintech"),
+                Institution(name="Itaú", code="607", color="#EC7000", type="bank"),
+                Institution(name="Bradesco", code="237", color="#0F2F63", type="bank"),
+                Institution(name="Banco do Brasil", code="001", color="#FFD100", type="bank"),
+                Institution(name="Santander", code="033", color="#EC1C24", type="bank"),
+                Institution(name="Caixa", code="104", color="#0079D7", type="bank"),
+                Institution(name="PicPay", code="380", color="#11FF00", type="wallet"),
+                Institution(name="PayPal", code="380", color="#003087", type="wallet"),
+                Institution(name="BTG Pactual", code="208", color="#009CDE", type="broker"),
+                Institution(name="Rico", code="177", color="#F40612", type="broker"),
+            ]
+            for inst in default_institutions:
+                db.add(inst)
+            await db.commit()
+            logger.info("✅ Seeded 10 default institutions")
+    
     logger.info("✅ SavePoint Finance started")
     yield
     logger.info("👋 SavePoint Finance shutting down")

@@ -648,8 +648,9 @@ async def settings_page(request: Request, db: AsyncSession = Depends(get_db), cu
 
 
 @router.get("/settings/accounts/new")
-async def new_account_modal(request: Request, current_user: User = Depends(require_user)):
-    return templates.TemplateResponse("partials/_account_modal.html", {"request": request, "user": current_user, "account": None})
+async def new_account_modal(request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_user)):
+    inst_result = await db.execute(select(Institution).where(Institution.is_active == True).order_by(Institution.name))
+    return templates.TemplateResponse("partials/_account_modal.html", {"request": request, "user": current_user, "account": None, "institutions": inst_result.scalars().all()})
 
 
 @router.post("/settings/accounts/new")
@@ -676,12 +677,14 @@ async def create_account(request: Request, db: AsyncSession = Depends(get_db), c
         except ValueError:
             account_type = AccountType.checking
         
+        inst_id = form.get("institution_id")
         body = AccountCreate(
             name=name,
             type=account_type,
             balance=Decimal(str(form.get("balance", 0) or 0)),
             currency=form.get("currency", "BRL"),
             color=form.get("color", "#10B981"),
+            institution_id=uuid.UUID(inst_id) if inst_id else None,
         )
         account = Account(**body.model_dump(), tenant_id=current_user.tenant_id)
         db.add(account)
