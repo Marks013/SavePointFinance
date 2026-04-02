@@ -14,6 +14,7 @@
   hx-post="{{ '/categories/' + cat.id|string + '/edit' if cat else '/categories/new' }}"
   hx-target="body"
   hx-swap="none"
+  hx-on::after-request="if(event.detail.successful) { closeModal(); location.reload(); }"
   class="modal-body"
 >
   <div class="form-stack">
