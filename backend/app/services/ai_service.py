@@ -13,7 +13,7 @@ async def analyze_transaction(user_message: str, user_categories: list[dict]) ->
     Calls Anthropic (Claude 3.5 Haiku) to extract transaction data from a user's natural language message.
     Categories must match the exact ones passed.
     """
-    categories_context = "\\n".join(
+    categories_context = "\n".join(
         [f"- ID: {c['id']}, Nome: {c['name']}, Tipo: {c['type']}" for c in user_categories]
     )
 

@@ -5,53 +5,52 @@
 
 // ── Formatting ───────────────────────────────────────────────────────────────
 
-export function formatBRL(value) {
+function formatBRL(value) {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
     currency: 'BRL',
   }).format(value ?? 0);
 }
 
-export function formatDate(isoStr) {
+function formatDate(isoStr) {
   if (!isoStr) return '—';
   return new Date(isoStr + (isoStr.includes('T') ? '' : 'T00:00:00')).toLocaleDateString('pt-BR');
 }
 
-export function formatMonth(year, month) {
+function formatMonth(year, month) {
   const d = new Date(year, month - 1, 1);
   return d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
 }
 
-export function currentYearMonth() {
+function currentYearMonth() {
   const now = new Date();
   return { year: now.getFullYear(), month: now.getMonth() + 1 };
 }
 
-export function monthLabel(period) {
+function monthLabel(period) {
   // period = "2025-03"
   const [y, m] = period.split('-');
   return new Date(+y, +m - 1, 1).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
 }
 
-export function typeLabel(type) {
+function typeLabel(type) {
   return type === 'income' ? 'Receita' : 'Despesa';
 }
 
-export function paymentLabel(pm) {
+function paymentLabel(pm) {
   const map = {
     credit_card: 'Cartão de Crédito',
     debit_card: 'Cartão de Débito',
     pix: 'Pix',
     money: 'Dinheiro',
-    bank_transfer: 'Transferência',
-    boleto: 'Boleto',
+    transfer: 'Transferência',
   };
   return map[pm] || pm;
 }
 
 // ── Form Validation ────────────────────────────────────────────────────────────
 
-export const Validation = {
+const Validation = {
   required(value, message = 'Campo obrigatório') {
     if (!value || (typeof value === 'string' && !value.trim())) {
       return message;
@@ -154,7 +153,7 @@ export const Validation = {
 };
 
 // Form Validator Class
-export class FormValidator {
+class FormValidator {
   constructor(formId) {
     this.form = document.getElementById(formId);
     this.errors = {};
@@ -243,7 +242,7 @@ function getToastContainer() {
   return toastContainer;
 }
 
-export function toast(message, type = 'info', duration = 4000) {
+function toast(message, type = 'info', duration = 4000) {
   const c = getToastContainer();
   const el = document.createElement('div');
   el.className = `toast toast--${type}`;
@@ -262,17 +261,17 @@ export function toast(message, type = 'info', duration = 4000) {
 
 // ── Modal ────────────────────────────────────────────────────────────────────
 
-export function openModal(modalId) {
+function openModal(modalId) {
   const m = document.getElementById(modalId);
   if (m) { m.classList.add('modal--open'); document.body.style.overflow = 'hidden'; }
 }
 
-export function closeModal(modalId) {
+function closeModal(modalId) {
   const m = document.getElementById(modalId);
   if (m) { m.classList.remove('modal--open'); document.body.style.overflow = ''; }
 }
 
-export function setupModalClose(modalId) {
+function setupModalClose(modalId) {
   const m = document.getElementById(modalId);
   if (!m) return;
   m.addEventListener('click', (e) => {
@@ -285,30 +284,30 @@ export function setupModalClose(modalId) {
 
 // ── DOM Helpers ──────────────────────────────────────────────────────────────
 
-export function el(selector) { return document.querySelector(selector); }
-export function els(selector) { return [...document.querySelectorAll(selector)]; }
+function el(selector) { return document.querySelector(selector); }
+function els(selector) { return [...document.querySelectorAll(selector)]; }
 
-export function setHTML(selector, html) {
+function setHTML(selector, html) {
   const e = el(selector);
   if (e) e.innerHTML = html;
 }
 
-export function setText(selector, text) {
+function setText(selector, text) {
   const e = el(selector);
   if (e) e.textContent = text;
 }
 
-export function show(selector) {
+function show(selector) {
   const e = typeof selector === 'string' ? el(selector) : selector;
   if (e) e.style.display = '';
 }
 
-export function hide(selector) {
+function hide(selector) {
   const e = typeof selector === 'string' ? el(selector) : selector;
   if (e) e.style.display = 'none';
 }
 
-export function setLoading(buttonEl, loading) {
+function setLoading(buttonEl, loading) {
   if (!buttonEl) return;
   if (loading) {
     buttonEl.dataset.originalText = buttonEl.textContent;
@@ -322,7 +321,7 @@ export function setLoading(buttonEl, loading) {
 
 // ── Confirm Dialog ───────────────────────────────────────────────────────────
 
-export function confirm(message) {
+function confirmDialog(message) {
   return new Promise((resolve) => {
     const overlay = document.createElement('div');
     overlay.className = 'modal modal--open';
@@ -343,7 +342,7 @@ export function confirm(message) {
 
 // ── Fill Select from API data ─────────────────────────────────────────────────
 
-export function fillSelect(selectEl, items, valueKey, labelKey, placeholder = '— Selecione —') {
+function fillSelect(selectEl, items, valueKey, labelKey, placeholder = '— Selecione —') {
   if (!selectEl) return;
   const current = selectEl.value;
   selectEl.innerHTML = `<option value="">${placeholder}</option>`;
@@ -358,7 +357,7 @@ export function fillSelect(selectEl, items, valueKey, labelKey, placeholder = '�
 
 // ── Badge helpers ─────────────────────────────────────────────────────────────
 
-export function typeBadge(type) {
+function typeBadge(type) {
   return type === 'income'
     ? '<span class="badge badge--income">Receita</span>'
     : '<span class="badge badge--expense">Despesa</span>';
@@ -366,7 +365,7 @@ export function typeBadge(type) {
 
 // ── Real-time Validation Helpers ───────────────────────────────────────────
 
-export function setupFieldValidation(formId, fieldName, validators) {
+function setupFieldValidation(formId, fieldName, validators) {
   const form = document.getElementById(formId);
   if (!form) return;
   
@@ -414,7 +413,7 @@ export function setupFieldValidation(formId, fieldName, validators) {
 
 // ── Auto-format helpers ───────────────────────────────────────────────────
 
-export function setupAutoFormat() {
+function setupAutoFormat() {
   // CPF
   document.querySelectorAll('[data-format="cpf"]').forEach(input => {
     input.addEventListener('input', (e) => {

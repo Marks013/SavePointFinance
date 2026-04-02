@@ -220,7 +220,7 @@ Este link expira em 24 horas.
 Se você não solicitou esta recuperação, pode ignorar este e-mail com segurança.
 
 Atenciosamente,
-Equadipe SavePoint Finance
+Equipe SavePoint Finance
         """
         
         return await self.send_email(
@@ -317,7 +317,7 @@ Equadipe SavePoint Finance
         .footer {{
             text-align: center;
             padding: 20px;
-            color: #8BBB4;
+            color: #8B9BB4;
             font-size: 14px;
         }}
     </style>
@@ -384,7 +384,7 @@ Agora você pode começar a controlar suas finanças de forma inteligente:
 Acesse: {settings.APP_URL}/login
 
 Atenciosamente,
-Equadipe SavePoint Finance
+Equipe SavePoint Finance
         """
         
         return await self.send_email(

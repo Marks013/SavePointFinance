@@ -101,24 +101,21 @@ async def check_feature(tenant_id: uuid.UUID, feature: str, db: AsyncSession) ->
 
 async def check_transaction_limit(tenant_id: uuid.UUID, db: AsyncSession, month: int = None, year: int = None) -> tuple[bool, str]:
     """Check if tenant can add more transactions this month."""
-    from datetime import datetime
+    from datetime import date as date_type
     from app.models.transaction import Transaction
-    
-    now = datetime.now()
+
+    now = date_type.today()
     month = month or now.month
     year = year or now.year
-    
+
     limits = await get_tenant_limits(tenant_id, db)
     max_tx = limits.get("max_transactions_per_month", 100)
-    
+
     if max_tx >= 999999:
         return True, ""
-    
-    start = datetime(year, month, 1)
-    if month == 12:
-        end = datetime(year + 1, 1, 1)
-    else:
-        end = datetime(year, month + 1, 1)
+
+    start = date_type(year, month, 1)
+    end = date_type(year + 1, 1, 1) if month == 12 else date_type(year, month + 1, 1)
     
     result = await db.execute(
         select(func.count(Transaction.id)).where(

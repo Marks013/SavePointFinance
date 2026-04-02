@@ -108,6 +108,7 @@ async def get_current_user(
             else:
                 # Trial not set - set it now
                 from datetime import timedelta
+                now = datetime.now(timezone.utc)  # FIX: define now in this scope
                 tenant.trial_start = now
                 tenant.trial_expires_at = now + timedelta(days=tenant.trial_days)
                 await db.commit()

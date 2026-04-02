@@ -27,6 +27,11 @@ services:
     command: redis-server --requirepass ${REDIS_PASSWORD:-changeme} --maxmemory 128mb --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-changeme}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - internal
 
@@ -44,7 +49,7 @@ services:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
     networks:
       - internal
     expose:
@@ -102,6 +107,7 @@ services:
       - DISABLE_IPV6=false
     depends_on:
       - frontend
+      - backend
     networks:
       - internal
 
