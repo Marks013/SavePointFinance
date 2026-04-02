@@ -753,25 +753,26 @@ async def create_transaction(request: Request, db: AsyncSession = Depends(get_db
         
     date_str = form.get("date", datetime.now().date().isoformat())
     tx_date = datetime.strptime(date_str, "%Y-%m-%d").date() if isinstance(date_str, str) else date_str
-        
-    body = TransactionCreate(
-        description=form.get("description", ""),
-        amount=Decimal(str(form.get("amount", 0) or 0)),
-        type=tx_type,
-        payment_method=pay_method,
-        date=tx_date,
-        category_id=uuid.UUID(form.get("category_id")) if form.get("category_id") else None,
-        account_id=uuid.UUID(form.get("account_id")) if form.get("account_id") else None,
-        card_id=uuid.UUID(form.get("card_id")) if form.get("card_id") else None,
-        installments=int(form.get("installments", 1) or 1),
-    )
-    tx = await api_create_transaction(body=body, db=db, current_user=current_user)
-    from app.routers.htmx import transaction_to_dict
-    return templates.TemplateResponse("partials/_tx_modal.html", {"request": request, "user": current_user, "tx": transaction_to_dict(tx), "success": True})
-except Exception as e:
-    import traceback
-    traceback.print_exc()
-    return JSONResponse(content={"error": str(e)}, status_code=400)
+    
+    try:
+        body = TransactionCreate(
+            description=form.get("description", ""),
+            amount=Decimal(str(form.get("amount", 0) or 0)),
+            type=tx_type,
+            payment_method=pay_method,
+            date=tx_date,
+            category_id=uuid.UUID(form.get("category_id")) if form.get("category_id") else None,
+            account_id=uuid.UUID(form.get("account_id")) if form.get("account_id") else None,
+            card_id=uuid.UUID(form.get("card_id")) if form.get("card_id") else None,
+            installments=int(form.get("installments", 1) or 1),
+        )
+        tx = await api_create_transaction(body=body, db=db, current_user=current_user)
+        from app.routers.htmx import transaction_to_dict
+        return templates.TemplateResponse("partials/_tx_modal.html", {"request": request, "user": current_user, "tx": transaction_to_dict(tx), "success": True})
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JSONResponse(content={"error": str(e)}, status_code=400)
 
 
 @router.post("/transactions/{tx_id}/edit")
@@ -825,14 +826,15 @@ async def create_category(request: Request, db: AsyncSession = Depends(get_db), 
     except ValueError:
         cat_type = CategoryType.expense
         
-    body = CategoryCreate(
-        name=form.get("name", ""),
-        icon=form.get("icon", "folder"),
-        color=form.get("color", "#6B7280"),
-        type=cat_type,
-    )
-    cat = await api_create_category(body=body, db=db, current_user=current_user)
-    return templates.TemplateResponse("partials/_cat_modal.html", {"request": request, "user": current_user, "cat": {"id": str(cat.id), "name": cat.name, "icon": cat.icon, "type": cat.type}, "success": True})
+    try:
+        body = CategoryCreate(
+            name=form.get("name", ""),
+            icon=form.get("icon", "folder"),
+            color=form.get("color", "#6B7280"),
+            type=cat_type,
+        )
+        cat = await api_create_category(body=body, db=db, current_user=current_user)
+        return templates.TemplateResponse("partials/_cat_modal.html", {"request": request, "user": current_user, "cat": {"id": str(cat.id), "name": cat.name, "icon": cat.icon, "type": cat.type}, "success": True})
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -968,16 +970,17 @@ async def create_subscription(request: Request, db: AsyncSession = Depends(get_d
     else:
         billing_date = datetime.now().date()
         
-    body = SubscriptionCreate(
-        name=form.get("name", ""),
-        amount=Decimal(str(form.get("amount", 0) or 0)),
-        billing_day=int(form.get("billing_day", 1) or 1),
-        type=sub_type,
-        category_id=uuid.UUID(form.get("category_id")) if form.get("category_id") else None,
-        next_billing_date=billing_date,
-    )
-    sub = await api_create_subscription(body=body, db=db, current_user=current_user)
-    return templates.TemplateResponse("partials/_sub_modal.html", {"request": request, "user": current_user, "sub": {"id": str(sub.id), "name": sub.name, "amount": float(sub.amount), "type": sub.type}, "success": True})
+    try:
+        body = SubscriptionCreate(
+            name=form.get("name", ""),
+            amount=Decimal(str(form.get("amount", 0) or 0)),
+            billing_day=int(form.get("billing_day", 1) or 1),
+            type=sub_type,
+            category_id=uuid.UUID(form.get("category_id")) if form.get("category_id") else None,
+            next_billing_date=billing_date,
+        )
+        sub = await api_create_subscription(body=body, db=db, current_user=current_user)
+        return templates.TemplateResponse("partials/_sub_modal.html", {"request": request, "user": current_user, "sub": {"id": str(sub.id), "name": sub.name, "amount": float(sub.amount), "type": sub.type}, "success": True})
     except Exception as e:
         import traceback
         traceback.print_exc()
