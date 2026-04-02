@@ -165,8 +165,8 @@ async def get_monthly_data(tenant_id: uuid.UUID, db: AsyncSession, months: int =
 
         data.append({
             "label": get_month_label(m, y),
-            "income": inc,
-            "expense": exp,
+            "income": float(inc),
+            "expense": float(exp),
             "income_fmt": fmt_money(inc),
             "expense_fmt": fmt_money(exp),
         })
