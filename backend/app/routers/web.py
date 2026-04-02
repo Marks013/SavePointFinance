@@ -675,6 +675,8 @@ async def create_account(request: Request, db: AsyncSession = Depends(get_db), c
         account = await api_create_account(body=body, db=db, current_user=current_user)
         return templates.TemplateResponse("partials/_account_modal.html", {"request": request, "user": current_user, "account": account_to_dict(account), "success": True})
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return JSONResponse(content={"error": str(e)}, status_code=400)
 
 
