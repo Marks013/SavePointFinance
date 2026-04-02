@@ -649,15 +649,8 @@ async def settings_page(request: Request, db: AsyncSession = Depends(get_db), cu
 
 @router.get("/settings/accounts/new")
 async def new_account_modal(request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_user)):
-    # Get only institutions that have at least one account for this tenant
-    inst_result = await db.execute(
-        select(Institution)
-        .join(Account, Account.institution_id == Institution.id)
-        .where(Institution.is_active == True, Account.tenant_id == current_user.tenant_id)
-        .group_by(Institution.id)
-        .order_by(Institution.name)
-    )
-    return templates.TemplateResponse("partials/_account_modal.html", {"request": request, "user": current_user, "account": None, "institutions": inst_result.scalars().all()})
+    inst_result = await db.execute(select(Institution).where(Institution.is_active == True).order_by(Institution.name))
+    return templates.TemplateResponse("partials/_account_modal.html", {"request": request, "user": current_user, "account": None, "institutions": [{"id": str(i.id), "name": i.name} for i in inst_result.scalars().all()]})
 
 
 @router.post("/settings/accounts/new")
@@ -743,13 +736,12 @@ async def delete_card(card_id: uuid.UUID, request: Request, db: AsyncSession = D
 
 @router.get("/settings/cards/new")
 async def new_card_modal(request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_user)):
-    from app.models.institution import Institution
     inst_result = await db.execute(select(Institution).where(Institution.is_active == True).order_by(Institution.name))
     return templates.TemplateResponse("partials/_card_modal.html", {
         "request": request,
         "user": current_user,
         "card": None,
-        "institutions": inst_result.scalars().all(),
+        "institutions": [{"id": str(i.id), "name": i.name} for i in inst_result.scalars().all()],
     })
 
 
