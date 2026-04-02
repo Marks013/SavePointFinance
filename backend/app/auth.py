@@ -62,16 +62,16 @@ async def get_current_user(
         token = request.cookies.get("access_token")
     
     if not token:
-        raise HTTPException(status_code=401, detail="Not authenticated")
+        raise HTTPException(status_code=401, detail="Usuário não autenticado. Faça login para continuar.")
     
     payload = decode_token(token)
     if payload.get("type") != "access":
-        raise HTTPException(status_code=401, detail="Tipo de token inválido")
+        raise HTTPException(status_code=401, detail="Token de sessão inválido.")
 
     try:
         user_id = uuid.UUID(payload["sub"])
     except (KeyError, ValueError):
-        raise HTTPException(status_code=401, detail="Token malformado")
+        raise HTTPException(status_code=401, detail="Token de acesso inválido ou expirado.")
 
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
