@@ -475,8 +475,9 @@ async def dashboard_page(request: Request, month: int = None, year: int = None, 
     cards_result = await db.execute(select(Card).where(Card.tenant_id == current_user.tenant_id, Card.is_active == True))
     cards = cards_result.scalars().all()
 
-    start_date = datetime(year, month, 1)
-    end_date = datetime(year + 1, 1, 1) if month == 12 else datetime(year, month + 1, 1)
+    from datetime import date as dt_date
+    start = dt_date(year, month, 1)
+    end = dt_date(year + 1, 1, 1) if month == 12 else dt_date(year, month + 1, 1)
 
     cards_summary = []
     for card in cards:
@@ -487,7 +488,7 @@ async def dashboard_page(request: Request, month: int = None, year: int = None, 
         invoice_result = await db.execute(
             select(func.sum(Transaction.amount)).where(
                 Transaction.card_id == card.id, Transaction.type == "expense",
-                Transaction.date >= start_date, Transaction.date < end_date
+                Transaction.date >= start, Transaction.date < end
             )
         )
         invoice = invoice_result.scalar() or Decimal("0")
@@ -559,8 +560,9 @@ async def transactions_page(request: Request, month: int = None, year: int = Non
         except ValueError:
             pass
 
-    start_date = datetime(year, month, 1)
-    end_date = datetime(year + 1, 1, 1) if month == 12 else datetime(year, month + 1, 1)
+    from datetime import date as dt_date
+    start_date = dt_date(year, month, 1)
+    end_date = dt_date(year + 1, 1, 1) if month == 12 else dt_date(year, month + 1, 1)
     query = query.where(Transaction.date >= start_date, Transaction.date < end_date)
 
     total = (await db.execute(select(func.count()).select_from(query.subquery()))).scalar()
@@ -795,8 +797,9 @@ async def reports_page(request: Request, month: int = None, year: int = None, db
     month = month or now.month
     year = year or now.year
 
-    start = datetime(year, month, 1)
-    end = datetime(year + 1 if month == 12 else year, (month + 1) if month < 12 else 1, 1)
+    from datetime import date as dt_date
+    start = dt_date(year, month, 1)
+    end = dt_date(year + 1, 1, 1) if month == 12 else dt_date(year, month + 1, 1)
 
     result = await db.execute(
         select(Category.name, Category.color, func.sum(Transaction.amount).label("total"))
@@ -849,10 +852,10 @@ async def reports_page(request: Request, month: int = None, year: int = None, db
         while m <= 0:
             m += 12
             y -= 1
-        m_start = datetime(y, m, 1)
-        m_end = datetime(y, m + 1, 1) if m < 12 else datetime(y + 1, 1, 1)
+        m_start = dt_date(y, m, 1)
+        m_end = dt_date(y, m + 1, 1) if m < 12 else dt_date(y + 1, 1, 1)
         inc_val = float((await db.execute(select(func.coalesce(func.sum(Transaction.amount), 0)).where(Transaction.tenant_id == current_user.tenant_id, Transaction.type == TransactionType.income, Transaction.date >= m_start, Transaction.date < m_end))).scalar() or 0)
-        exp_val = float((await db.execute(select(func.coalesce(func.sum(Transaction.amount), 0)).where(Transaction.tenant_id == current_user.tenant_id, Transaction.type == TransactionType.expense, Transaction.date >= m_start, Transaction.date < m_end))).scalar() or 0)
+        exp_val = float((await db.execute(select(func.coalesce(func.sum(Transaction.amount), 0)).where(Transaction.tenant_id == current_user.tenant_id, Transaction.type == TransactionType.expense, Transaction.date >= m_start, Transaction.date < m_end))).scalar() or 0.0)
         bal = inc_val - exp_val
         comparison_data.append({"label": get_month_label(m, y), "income": inc_val, "income_fmt": fmt_money(inc_val), "expense": exp_val, "expense_fmt": fmt_money(exp_val), "balance": bal, "balance_fmt": fmt_money(bal), "savings_rate": round((bal / inc_val * 100), 1) if inc_val > 0 else 0})
 
@@ -872,8 +875,8 @@ async def reports_page(request: Request, month: int = None, year: int = None, db
             m += 12
             y -= 1
         monthly_labels.append(get_month_label(m, y))
-        m_start = datetime(y, m, 1)
-        m_end = datetime(y, m + 1, 1) if m < 12 else datetime(y + 1, 1, 1)
+        m_start = dt_date(y, m, 1)
+        m_end = dt_date(y, m + 1, 1) if m < 12 else dt_date(y + 1, 1, 1)
         monthly_income.append(float((await db.execute(select(func.coalesce(func.sum(Transaction.amount), 0)).where(Transaction.tenant_id == current_user.tenant_id, Transaction.type == TransactionType.income, Transaction.date >= m_start, Transaction.date < m_end))).scalar() or 0))
         monthly_expense.append(float((await db.execute(select(func.coalesce(func.sum(Transaction.amount), 0)).where(Transaction.tenant_id == current_user.tenant_id, Transaction.type == TransactionType.expense, Transaction.date >= m_start, Transaction.date < m_end))).scalar() or 0))
 
