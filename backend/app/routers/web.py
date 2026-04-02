@@ -14,6 +14,9 @@ from app.database import get_db
 from app.auth import require_user, require_superadmin
 from app.models.user import User
 from app.models.tenant import Tenant
+from app.models.account import Account
+from app.models.card import Card
+from app.models.institution import Institution
 from app.models.transaction import Transaction
 from app.models.category import Category
 from app.models.account import Account
@@ -627,12 +630,15 @@ async def categories_page(request: Request, db: AsyncSession = Depends(get_db), 
 async def settings_page(request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_user)):
     accounts = (await db.execute(select(Account).where(Account.tenant_id == current_user.tenant_id))).scalars().all()
     cards = (await db.execute(select(Card).where(Card.tenant_id == current_user.tenant_id))).scalars().all()
+    institutions = (await db.execute(select(Institution).where(Institution.is_active == True).order_by(Institution.name))).scalars().all()
+    institution_map = {str(i.id): i.name for i in institutions}
     
     return templates.TemplateResponse("settings.html", {
         "request": request,
         "user": current_user,
-        "accounts": [{"id": str(a.id), "name": a.name, "balance": a.balance, "balance_fmt": fmt_money(a.balance), "type": a.type} for a in accounts],
-        "cards": [{"id": str(c.id), "name": c.name, "limit_amount": c.limit_amount, "limit_fmt": fmt_money(c.limit_amount), "brand": c.brand} for c in cards],
+        "accounts": [{"id": str(a.id), "name": a.name, "balance": a.balance, "balance_fmt": fmt_money(a.balance), "type": a.type, "institution_id": str(a.institution_id) if a.institution_id else None, "institution_name": institution_map.get(str(a.institution_id), "") if a.institution_id else ""} for a in accounts],
+        "cards": [{"id": str(c.id), "name": c.name, "last4": c.last4, "brand": c.brand, "limit": float(c.limit_amount), "limit_fmt": fmt_money(c.limit_amount), "due_day": c.due_day, "color": c.color, "institution_id": str(c.institution_id) if c.institution_id else None, "institution_name": institution_map.get(str(c.institution_id), "") if c.institution_id else ""} for c in cards],
+        "institutions": [{"id": str(i.id), "name": i.name} for i in institutions],
     })
 
 
@@ -698,6 +704,24 @@ async def delete_account(account_id: uuid.UUID, request: Request, db: AsyncSessi
     try:
         await api_delete_account(account_id=account_id, db=db, current_user=current_user)
         return JSONResponse(content={"success": True, "message": "Conta excluída com sucesso"})
+    except Exception as e:
+        return JSONResponse(content={"error": str(e)}, status_code=400)
+
+
+@router.post("/settings/cards/{card_id}/delete")
+async def delete_card(card_id: uuid.UUID, request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_user)):
+    from fastapi.responses import JSONResponse
+    from app.routers.accounts_cards import delete_card as api_delete_card
+    from app.models.card import Card
+    
+    result = await db.execute(select(Card).where(Card.id == card_id, Card.tenant_id == current_user.tenant_id))
+    card = result.scalar_one_or_none()
+    if not card:
+        return JSONResponse(content={"error": "Cartão não encontrado"}, status_code=404)
+    
+    try:
+        await api_delete_card(card_id=card_id, db=db, current_user=current_user)
+        return JSONResponse(content={"success": True, "message": "Cartão excluído com sucesso"})
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=400)
 
