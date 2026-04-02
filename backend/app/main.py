@@ -180,45 +180,54 @@ async def log_requests(request: Request, call_next):
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"❌ Unhandled exception: {exc}", exc_info=True)
-    # Return JSON for API requests, HTML for browser requests
-    accept = request.headers.get("Accept", "")
-    if "application/json" in accept or request.url.path.startswith("/api"):
-        return JSONResponse(
+    # Return HTML for browser navigation, JSON only for explicit API/AJAX
+    is_api = request.url.path.startswith("/api")
+    is_htmx = request.headers.get("HX-Request") == "true"
+    
+    # For regular browser navigation, always return HTML
+    if not is_api and not is_htmx:
+        return HTMLResponse(
             status_code=500,
-            content={"detail": str(exc)[:200], "code": "INTERNAL_ERROR"}
+            content=get_error_html(500, f"Erro interno: {str(exc)[:100]}")
         )
-    return HTMLResponse(
+    
+    return JSONResponse(
         status_code=500,
-        content=get_error_html(500, "Erro interno do servidor")
+        content={"detail": str(exc)[:200], "code": "INTERNAL_ERROR"}
     )
 
 
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
-    accept = request.headers.get("Accept", "")
-    # Return JSON for API requests or AJAX (HTMX)
-    if "application/json" in accept or request.url.path.startswith("/api") or "HX-Request" in request.headers:
-        return JSONResponse(
+    is_api = request.url.path.startswith("/api")
+    is_htmx = request.headers.get("HX-Request") == "true"
+    
+    # For regular browser navigation, always return HTML
+    if not is_api and not is_htmx:
+        return HTMLResponse(
             status_code=exc.status_code,
-            content={"detail": exc.detail, "code": f"HTTP_{exc.status_code}"}
+            content=get_error_html(exc.status_code, exc.detail)
         )
-    return HTMLResponse(
+    
+    return JSONResponse(
         status_code=exc.status_code,
-        content=get_error_html(exc.status_code, exc.detail)
+        content={"detail": exc.detail, "code": f"HTTP_{exc.status_code}"}
     )
 
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    accept = request.headers.get("Accept", "")
-    if "application/json" in accept or request.url.path.startswith("/api") or "HX-Request" in request.headers:
-        return JSONResponse(
+    is_api = request.url.path.startswith("/api")
+    is_htmx = request.headers.get("HX-Request") == "true"
+    
+    if not is_api and not is_htmx:
+        return HTMLResponse(
             status_code=422,
-            content={"detail": "Dados inválidos", "errors": exc.errors()}
+            content=get_error_html(400, "Dados inválidos. Verifique os campos preenchidos.")
         )
-    return HTMLResponse(
+    return JSONResponse(
         status_code=422,
-        content=get_error_html(400, "Dados inválidos. Verifique os campos preenchidos.")
+        content={"detail": "Dados inválidos", "errors": exc.errors()}
     )
 
 

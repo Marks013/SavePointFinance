@@ -699,6 +699,8 @@ async def categories_page(request: Request, db: AsyncSession = Depends(get_db), 
     except Exception as e:
         import traceback
         traceback.print_exc()
+        logger = logging.getLogger(__name__)
+        logger.error(f"❌ Error in categories_page: {e}")
         from fastapi import HTTPException
         raise HTTPException(status_code=500, detail=str(e))
 
