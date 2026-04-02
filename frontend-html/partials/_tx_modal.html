@@ -25,6 +25,7 @@
         <button type="button" class="tab-btn {{ 'active' if tx and tx.type == 'income' }}"   onclick="setTxType('income',  this)">Receita</button>
       </div>
       <input type="hidden" name="type" id="txTypeInput" value="{{ tx.type if tx else 'expense' }}">
+      <script>window.currentTxType = "{{ tx_type if tx_type else 'expense' }}";</script>
     </div>
 
     <!-- Description -->
@@ -97,11 +98,13 @@
       <textarea id="txNotes" name="notes" class="form-textarea" rows="2" placeholder="Detalhes adicionais…">{{ tx.notes if tx else '' }}</textarea>
     </div>
 
-    <!-- Tithe checkbox -->
+    {% if tx_type == 'income' %}
+    <!-- Tithe checkbox - shown only for income -->
     <div style="display:flex; align-items:center; gap:10px; padding:10px; background:var(--secondary); border-radius:8px;">
-      <input type="checkbox" id="txTithe" name="tithe" value="1" {% if tx and tx.tithe %}checked{% endif %} style="accent-color:var(--accent); width:16px; height:16px; cursor:pointer;">
-      <label for="txTithe" style="font-size:0.875rem; cursor:pointer;">Incluir dízimo (10% desta receita)</label>
+      <input type="checkbox" id="txTithe" name="tithe" value="1" checked style="accent-color:var(--accent); width:16px; height:16px; cursor:pointer;">
+      <label for="txTithe" style="font-size:0.875rem; cursor:pointer;">Criar dízimo (10% desta receita)</label>
     </div>
+    {% endif %}
   </div>
 
   <div class="modal-footer">
@@ -121,6 +124,12 @@ function setTxType(type, btn) {
   document.getElementById('txTypeInput').value = type;
   btn.closest('.tab-list').querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
+  
+  // Toggle tithe checkbox visibility
+  const titheDiv = document.getElementById('titheWrap');
+  if (titheDiv) {
+    titheDiv.style.display = type === 'income' ? '' : 'none';
+  }
 }
 
 function toggleAccountCard(source) {
@@ -128,7 +137,4 @@ function toggleAccountCard(source) {
   document.getElementById('accountWrap').style.display = useCard ? 'none' : '';
   document.getElementById('cardWrap').style.display    = useCard ? '' : 'none';
 }
-
-// init on load
-toggleAccountCard(document.getElementById('txSource').value);
 </script>

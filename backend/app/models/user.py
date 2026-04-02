@@ -60,3 +60,21 @@ class Invite(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     used: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class UserPreferences(Base):
+    __tablename__ = "user_preferences"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True
+    )
+    currency: Mapped[str] = mapped_column(String(3), default="BRL", nullable=False)
+    date_format: Mapped[str] = mapped_column(String(20), default="DD/MM/YYYY", nullable=False)
+    email_notifications: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    monthly_reports: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    budget_alerts: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    due_reminders: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    auto_tithe: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

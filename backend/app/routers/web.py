@@ -814,6 +814,7 @@ async def create_transaction(request: Request, db: AsyncSession = Depends(get_db
     from fastapi.responses import JSONResponse
     from app.routers.transactions import create_transaction as api_create_transaction, TransactionCreate, TransactionType, PaymentMethod
     from app.models.transaction import TransactionType as TT, PaymentMethod as PM
+    from app.models.user import UserPreferences
     
     form = await request.form()
     try:
@@ -835,6 +836,16 @@ async def create_transaction(request: Request, db: AsyncSession = Depends(get_db
     date_str = form.get("date", datetime.now().date().isoformat())
     tx_date = datetime.strptime(date_str, "%Y-%m-%d").date() if isinstance(date_str, str) else date_str
     
+    # Check auto_tithe preference
+    auto_tithe = False
+    prefs_result = await db.execute(select(UserPreferences).where(UserPreferences.user_id == current_user.id))
+    prefs = prefs_result.scalar_one_or_none()
+    if prefs:
+        auto_tithe = prefs.auto_tithe
+    
+    # Check if tithe checkbox is unchecked (form sends "on" when checked)
+    tithe_enabled = form.get("tithe") in ("1", "on", "true")
+    
     try:
         body = TransactionCreate(
             description=form.get("description", ""),
@@ -846,7 +857,7 @@ async def create_transaction(request: Request, db: AsyncSession = Depends(get_db
             account_id=uuid.UUID(form.get("account_id")) if form.get("account_id") else None,
             card_id=uuid.UUID(form.get("card_id")) if form.get("card_id") else None,
             installments=int(form.get("installments", 1) or 1),
-            calculate_tithe=form.get("tithe") in ("1", "on", "true"),
+            calculate_tithe=tithe_enabled or (auto_tithe and tx_type == TT.income),
         )
         tx = await api_create_transaction(body=body, db=db, current_user=current_user)
         return templates.TemplateResponse("partials/_tx_modal.html", {"request": request, "user": current_user, "tx": tx, "success": True})
@@ -1168,6 +1179,7 @@ async def options_notifications(request: Request, db: AsyncSession = Depends(get
     monthly_report = form.get("monthly_report") == "1"
     budget_alerts = form.get("budget_alerts") == "1"
     due_reminders = form.get("due_reminders") == "1"
+    auto_tithe = form.get("auto_tithe") == "1"
     
     prefs = await db.execute(select(UserPreferences).where(UserPreferences.user_id == current_user.id))
     prefs_obj = prefs.scalar_one_or_none()
@@ -1177,6 +1189,7 @@ async def options_notifications(request: Request, db: AsyncSession = Depends(get
         prefs_obj.monthly_reports = monthly_report
         prefs_obj.budget_alerts = budget_alerts
         prefs_obj.due_reminders = due_reminders
+        prefs_obj.auto_tithe = auto_tithe
     else:
         prefs_obj = UserPreferences(
             user_id=current_user.id,
@@ -1184,6 +1197,7 @@ async def options_notifications(request: Request, db: AsyncSession = Depends(get
             monthly_reports=monthly_report,
             budget_alerts=budget_alerts,
             due_reminders=due_reminders,
+            auto_tithe=auto_tithe,
         )
         db.add(prefs_obj)
     

@@ -240,7 +240,7 @@ async def create_transaction(
     
     # Auto-create tithe transaction if requested and it's an income
     if body.calculate_tithe and body.type == TransactionType.income and body.amount > 0:
-        tithe_amount = (body.amount * Decimal("0.10")) / body.installments
+        tithe_amount_total = body.amount * Decimal("0.10")
         
         # Find "Dízimo / Doações" category
         tithe_cat_result = await db.execute(
@@ -252,26 +252,37 @@ async def create_transaction(
         tithe_category = tithe_cat_result.scalar_one_or_none()
         
         if tithe_category:
-            for i in range(body.installments):
-                current_date = add_months(body.date, i)
-                
+            # Check if there's an existing unpaid tithe transaction
+            existing_tithe = await db.execute(
+                select(Transaction).where(
+                    Transaction.tenant_id == current_user.tenant_id,
+                    Transaction.type == TransactionType.expense,
+                    Transaction.category_id == tithe_category.id,
+                    Transaction.tithe_category_id == tithe_category.id,
+                ).order_by(Transaction.date.desc()).limit(1)
+            )
+            existing = existing_tithe.scalar_one_or_none()
+            
+            if existing:
+                # Update existing tithe with new amount
+                existing.amount += tithe_amount_total
+                existing.description = f"Dízimo acumulado - {body.description}"
+            else:
+                # Create single tithe transaction with total amount
                 tithe_tx = Transaction(
                     tenant_id=current_user.tenant_id,
                     user_id=current_user.id,
-                    date=current_date,
-                    amount=tithe_amount,
-                    description=f"Dízimo - {body.description}" if body.installments > 1 else f"Dízimo - {body.description}",
+                    date=body.date,
+                    amount=tithe_amount_total,
+                    description=f"Dízimo - {body.description}",
                     type=TransactionType.expense,
                     payment_method=body.payment_method,
                     category_id=tithe_category.id,
                     account_id=body.account_id,
-                    notes=f"Dízimo (10%) de {body.description}",
+                    notes=f"Dízimo (10%) acumulado de {body.description}",
                     source=TransactionSource.manual,
-                    tithe_amount=tithe_amount,
+                    tithe_amount=tithe_amount_total,
                     tithe_category_id=tithe_category.id,
-                    installments_total=body.installments,
-                    installment_number=i + 1,
-                    parent_id=first_transaction.id if i == 0 else None,
                 )
                 db.add(tithe_tx)
             

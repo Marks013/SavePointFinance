@@ -112,6 +112,14 @@
           onclick="this.classList.toggle('on'); document.getElementById('dueRemindersVal').value = this.classList.contains('on') ? '1' : '0';">
         </div>
       </div>
+      <div class="toggle-row">
+        <span class="toggle-row__label">Criar dízimo automaticamente (10% de receitas)</span>
+        <input type="hidden" name="auto_tithe" id="autoTitheVal"
+          value="{{ '1' if prefs and prefs.auto_tithe else '0' }}">
+        <div class="toggle {{ 'on' if prefs and prefs.auto_tithe }}"
+          onclick="this.classList.toggle('on'); document.getElementById('autoTitheVal').value = this.classList.contains('on') ? '1' : '0';">
+        </div>
+      </div>
       <div style="margin-top:16px;">
         <button type="submit" class="btn btn--primary btn--sm">Salvar preferências</button>
       </div>

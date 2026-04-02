@@ -45,6 +45,7 @@ async def new_transaction_modal(
     return templates.TemplateResponse("partials/_tx_modal.html", {
         "request": request,
         "tx": None,
+        "tx_type": "expense",
         "categories": [{"id": str(c.id), "name": c.name, "icon": c.icon} for c in categories],
         "accounts": [{"id": str(a.id), "name": a.name} for a in accounts],
         "cards": [{"id": str(c.id), "name": c.name} for c in cards],
