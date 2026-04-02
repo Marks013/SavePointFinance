@@ -42,7 +42,9 @@ def get_error_html(status_code: int, detail: str = None) -> str:
     template = ERROR_TEMPLATES.get(status_code, ERROR_TEMPLATES[500])
     if detail:
         detail = detail[:200] + "..." if len(detail) > 200 else detail
-    return template.format(detail=detail or "Tente novamente mais tarde.")
+    else:
+        detail = "Tente novamente mais tarde."
+    return template.replace("{detail}", detail)
 
 
 @asynccontextmanager
