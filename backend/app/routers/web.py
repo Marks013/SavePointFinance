@@ -788,6 +788,39 @@ async def edit_installment(inst_id: str, request: Request, db: AsyncSession = De
         traceback.print_exc()
         return JSONResponse(content={"error": str(e)}, status_code=400)
 
+@router.post("/installments/{inst_id}/delete")
+async def delete_installment_web(inst_id: str, request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_user)):
+    from app.models.transaction import Transaction
+    from sqlalchemy import or_
+    try:
+        result = await db.execute(
+            select(Transaction).where(
+                Transaction.id == uuid.UUID(inst_id),
+                Transaction.tenant_id == current_user.tenant_id,
+                Transaction.parent_id == None
+            )
+        )
+        tx = result.scalar_one_or_none()
+        if not tx:
+            return JSONResponse(content={"error": "Parcelamento não encontrado"}, status_code=404)
+
+        root_id = tx.id
+        siblings = await db.execute(
+            select(Transaction).where(
+                or_(Transaction.id == root_id, Transaction.parent_id == root_id),
+                Transaction.tenant_id == current_user.tenant_id,
+            )
+        )
+        for sibling in siblings.scalars().all():
+            await db.delete(sibling)
+
+        await db.commit()
+        return JSONResponse(content={"message": "Parcelamento excluído com sucesso."})
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JSONResponse(content={"error": str(e)}, status_code=400)
+
 
 @router.get("/reports", response_class=HTMLResponse)
 async def reports_page(request: Request, month: int = None, year: int = None, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_user)):
@@ -1234,6 +1267,46 @@ async def edit_transaction_web(tx_id: str, request: Request, db: AsyncSession = 
         return JSONResponse(content={"error": str(e)}, status_code=400)
 
 
+# ── Transaction DELETE handler ────────────────────────────────────────────────
+
+@router.post("/transactions/{tx_id}/delete")
+async def delete_transaction_web(tx_id: str, request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_user)):
+    from app.models.transaction import Transaction
+    from sqlalchemy import or_
+    try:
+        result = await db.execute(
+            select(Transaction).where(
+                Transaction.id == uuid.UUID(tx_id),
+                Transaction.tenant_id == current_user.tenant_id,
+            )
+        )
+        tx = result.scalar_one_or_none()
+        if not tx:
+            return JSONResponse(content={"error": "Transação não encontrada"}, status_code=404)
+
+        # If installment, optionally delete siblings
+        delete_all = (await request.form()).get("delete_all") in ("1", "true", "on")
+        if delete_all and tx.installments_total > 1:
+            root_id = tx.parent_id or tx.id
+            siblings = await db.execute(
+                select(Transaction).where(
+                    or_(Transaction.id == root_id, Transaction.parent_id == root_id),
+                    Transaction.tenant_id == current_user.tenant_id,
+                )
+            )
+            for sibling in siblings.scalars().all():
+                await db.delete(sibling)
+        else:
+            await db.delete(tx)
+
+        await db.commit()
+        return JSONResponse(content={"message": "Transação excluída com sucesso."})
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JSONResponse(content={"error": str(e)}, status_code=400)
+
+
 # ── Category POST handlers ────────────────────────────────────────────────────
 
 @router.post("/categories/new")
@@ -1268,6 +1341,30 @@ async def edit_category_web(cat_id: str, request: Request, db: AsyncSession = De
         body = CategoryUpdate(name=form.get("name", ""), icon=form.get("icon", "folder"), color=form.get("color", "#6B7280"), type=cat_type)
         cat_data = await update_category(category_id=uuid.UUID(cat_id), body=body, db=db, current_user=current_user)
         return templates.TemplateResponse("partials/_cat_modal.html", {"request": request, "user": current_user, "cat": cat_data, "success": True})
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JSONResponse(content={"error": str(e)}, status_code=400)
+
+
+@router.post("/categories/{cat_id}/delete")
+async def delete_category_web(cat_id: str, request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_user)):
+    from app.models.category import Category
+    from fastapi.responses import JSONResponse
+    try:
+        result = await db.execute(
+            select(Category).where(
+                Category.id == uuid.UUID(cat_id),
+                Category.tenant_id == current_user.tenant_id,
+            )
+        )
+        cat = result.scalar_one_or_none()
+        if not cat:
+            return JSONResponse(content={"error": "Categoria não encontrada"}, status_code=404)
+
+        await db.delete(cat)
+        await db.commit()
+        return JSONResponse(content={"message": "Categoria excluída com sucesso."})
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -1339,6 +1436,29 @@ async def edit_subscription_web(sub_id: str, request: Request, db: AsyncSession 
         return JSONResponse(content={"error": str(e)}, status_code=400)
 
 
+@router.post("/subscriptions/{sub_id}/delete")
+async def delete_subscription_web(sub_id: str, request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_user)):
+    from app.models.subscription import Subscription
+    try:
+        result = await db.execute(
+            select(Subscription).where(
+                Subscription.id == uuid.UUID(sub_id),
+                Subscription.tenant_id == current_user.tenant_id,
+            )
+        )
+        sub = result.scalar_one_or_none()
+        if not sub:
+            return JSONResponse(content={"error": "Assinatura não encontrada"}, status_code=404)
+
+        await db.delete(sub)
+        await db.commit()
+        return JSONResponse(content={"message": "Assinatura excluída com sucesso."})
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JSONResponse(content={"error": str(e)}, status_code=400)
+
+
 # ── Goal POST handlers ────────────────────────────────────────────────────────
 
 @router.post("/goals/new")
@@ -1390,6 +1510,29 @@ async def edit_goal_web(goal_id: str, request: Request, db: AsyncSession = Depen
             "goal": {"id": str(goal.id), "name": goal.name, "target_amount": float(goal.target_amount), "current_amount": float(goal.current_amount), "deadline": goal.deadline},
             "success": True, "accounts": []
         })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JSONResponse(content={"error": str(e)}, status_code=400)
+
+
+@router.post("/goals/{goal_id}/delete")
+async def delete_goal_web(goal_id: str, request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_user)):
+    from app.models.goal import Goal
+    try:
+        result = await db.execute(
+            select(Goal).where(
+                Goal.id == uuid.UUID(goal_id),
+                Goal.tenant_id == current_user.tenant_id,
+            )
+        )
+        goal = result.scalar_one_or_none()
+        if not goal:
+            return JSONResponse(content={"error": "Meta não encontrada"}, status_code=404)
+
+        await db.delete(goal)
+        await db.commit()
+        return JSONResponse(content={"message": "Meta excluída com sucesso."})
     except Exception as e:
         import traceback
         traceback.print_exc()
