@@ -42,6 +42,8 @@ async def lifespan(app: FastAPI):
         result = await db.execute(select(func.count(Institution.id)))
         count = result.scalar()
         if count == 0:
+            # Check each institution before inserting to avoid duplicates on restart
+            existing = {i.name: i for i in (await db.execute(select(Institution))).scalars().all()}
             default_institutions = [
                 Institution(name="Nubank", code="260", color="#820AD1", type="fintech"),
                 Institution(name="Itaú", code="607", color="#EC7000", type="bank"),
@@ -55,9 +57,10 @@ async def lifespan(app: FastAPI):
                 Institution(name="Rico", code="177", color="#F40612", type="broker"),
             ]
             for inst in default_institutions:
-                db.add(inst)
+                if inst.name not in existing:
+                    db.add(inst)
             await db.commit()
-            logger.info("✅ Seeded 10 default institutions")
+            logger.info("✅ Seeded default institutions")
     
     logger.info("✅ SavePoint Finance started")
     yield

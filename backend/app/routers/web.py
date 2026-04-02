@@ -649,7 +649,14 @@ async def settings_page(request: Request, db: AsyncSession = Depends(get_db), cu
 
 @router.get("/settings/accounts/new")
 async def new_account_modal(request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_user)):
-    inst_result = await db.execute(select(Institution).where(Institution.is_active == True).order_by(Institution.name))
+    # Get only institutions that have at least one account for this tenant
+    inst_result = await db.execute(
+        select(Institution)
+        .join(Account, Account.institution_id == Institution.id)
+        .where(Institution.is_active == True, Account.tenant_id == current_user.tenant_id)
+        .group_by(Institution.id)
+        .order_by(Institution.name)
+    )
     return templates.TemplateResponse("partials/_account_modal.html", {"request": request, "user": current_user, "account": None, "institutions": inst_result.scalars().all()})
 
 
