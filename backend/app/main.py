@@ -39,48 +39,70 @@ async def lifespan(app: FastAPI):
     from app.database import AsyncSessionLocal
     from sqlalchemy import select, func
     async with AsyncSessionLocal() as db:
-        result = await db.execute(select(func.count(Institution.id)))
-        count = result.scalar()
-        if count == 0:
-            # Check each institution before inserting to avoid duplicates on restart
-            existing = {i.name: i for i in (await db.execute(select(Institution))).scalars().all()}
-            default_institutions = [
-                # Fintechs
-                Institution(name="Nubank", code="260", color="#820AD1", type="fintech"),
-                Institution(name="PicPay", code="380", color="#11FF00", type="wallet"),
-                Institution(name="PagSeguro", code="273", color="#00D4A1", type="fintech"),
-                Institution(name="Mercado Pago", code="323", color="#7946F5", type="wallet"),
-                Institution(name="Inter", code="077", color="#FF7A00", type="fintech"),
-                Institution(name="C6 Bank", code="336", color="#000000", type="fintech"),
-                Institution(name="Nuconta", code="260", color="#820AD1", type="fintech"),
-                # Bancos tradicionais
-                Institution(name="Itaú", code="607", color="#EC7000", type="bank"),
-                Institution(name="Bradesco", code="237", color="#0F2F63", type="bank"),
-                Institution(name="Banco do Brasil", code="001", color="#FFD100", type="bank"),
-                Institution(name="Santander", code="033", color="#EC1C24", type="bank"),
-                Institution(name="Caixa", code="104", color="#0079D7", type="bank"),
-                Institution(name="Banco Safra", code="422", color="#005C34", type="bank"),
-                Institution(name="Banrisul", code="041", color="#005C34", type="bank"),
-                Institution(name="Sicoob", code="756", color="#00A651", type="bank"),
-                Institution(name="Sicredi", code="748", color="#1B4F71", type="bank"),
-                # Carteiras digitais
-                Institution(name="PayPal", code="380", color="#003087", type="wallet"),
-                Institution(name="Shopee Pay", code="380", color="#FF5722", type="wallet"),
-                Institution(name="Google Pay", code="380", color="#4285F4", type="wallet"),
-                Institution(name="Apple Pay", code="380", color="#000000", type="wallet"),
-                # Corretoras
-                Institution(name="BTG Pactual", code="208", color="#009CDE", type="broker"),
-                Institution(name="Rico", code="177", color="#F40612", type="broker"),
-                Institution(name="XP Investimentos", code="102", color="#009145", type="broker"),
-                Institution(name="Clear", code="105", color="#00A2E8", type="broker"),
-                Institution(name="Toro", code="178", color="#00D39E", type="broker"),
-                Institution(name="Warren", code="314", color="#F5353F", type="broker"),
-            ]
-            for inst in default_institutions:
-                if inst.name not in existing:
-                    db.add(inst)
+        result = await db.execute(select(Institution))
+        all_institutions = list(result.scalars().all())
+        
+        # Remove duplicates by name, keeping the first one
+        seen = set()
+        to_delete = []
+        for inst in all_institutions:
+            if inst.name in seen:
+                to_delete.append(inst.id)
+            else:
+                seen.add(inst.name)
+        
+        if to_delete:
+            from sqlalchemy import delete
+            await db.execute(delete(Institution).where(Institution.id.in_(to_delete)))
             await db.commit()
-            logger.info("✅ Seeded default institutions")
+            logger.info(f"✅ Removed {len(to_delete)} duplicate institutions")
+        
+        # Now check what's left and add missing ones
+        existing_names = {i.name for i in all_institutions if i.name not in seen or i.name not in [j.name for j in to_delete]}
+        
+        result = await db.execute(select(Institution.name))
+        existing_names = {r[0] for r in result.all()}
+        
+        default_institutions = [
+            # Fintechs
+            Institution(name="Nubank", code="260", color="#820AD1", type="fintech"),
+            Institution(name="PicPay", code="380", color="#11FF00", type="wallet"),
+            Institution(name="PagSeguro", code="273", color="#00D4A1", type="fintech"),
+            Institution(name="Mercado Pago", code="323", color="#7946F5", type="wallet"),
+            Institution(name="Inter", code="077", color="#FF7A00", type="fintech"),
+            Institution(name="C6 Bank", code="336", color="#000000", type="fintech"),
+            Institution(name="Nuconta", code="260", color="#820AD1", type="fintech"),
+            # Bancos tradicionais
+            Institution(name="Itaú", code="607", color="#EC7000", type="bank"),
+            Institution(name="Bradesco", code="237", color="#0F2F63", type="bank"),
+            Institution(name="Banco do Brasil", code="001", color="#FFD100", type="bank"),
+            Institution(name="Santander", code="033", color="#EC1C24", type="bank"),
+            Institution(name="Caixa", code="104", color="#0079D7", type="bank"),
+            Institution(name="Banco Safra", code="422", color="#005C34", type="bank"),
+            Institution(name="Banrisul", code="041", color="#005C34", type="bank"),
+            Institution(name="Sicoob", code="756", color="#00A651", type="bank"),
+            Institution(name="Sicredi", code="748", color="#1B4F71", type="bank"),
+            # Carteiras digitais
+            Institution(name="PayPal", code="380", color="#003087", type="wallet"),
+            Institution(name="Shopee Pay", code="380", color="#FF5722", type="wallet"),
+            Institution(name="Google Pay", code="380", color="#4285F4", type="wallet"),
+            Institution(name="Apple Pay", code="380", color="#000000", type="wallet"),
+            # Corretoras
+            Institution(name="BTG Pactual", code="208", color="#009CDE", type="broker"),
+            Institution(name="Rico", code="177", color="#F40612", type="broker"),
+            Institution(name="XP Investimentos", code="102", color="#009145", type="broker"),
+            Institution(name="Clear", code="105", color="#00A2E8", type="broker"),
+            Institution(name="Toro", code="178", color="#00D39E", type="broker"),
+            Institution(name="Warren", code="314", color="#F5353F", type="broker"),
+        ]
+        added = 0
+        for inst in default_institutions:
+            if inst.name not in existing_names:
+                db.add(inst)
+                added += 1
+        if added:
+            await db.commit()
+            logger.info(f"✅ Added {added} default institutions")
     
     logger.info("✅ SavePoint Finance started")
     yield
