@@ -60,7 +60,7 @@ async def export_data(
     allowed, error = await check_feature(current_user.tenant_id, "export", db)
     if not allowed:
         raise HTTPException(status_code=403, detail=error)
-    
+
     from datetime import datetime
     if year and month:
         start = date(year, month, 1)
@@ -71,9 +71,9 @@ async def export_data(
     else:
         start = None
         end = None
-    
+
     data = {}
-    
+
     if transactions:
         q = select(Transaction).where(Transaction.tenant_id == current_user.tenant_id)
         if start and end:
@@ -92,42 +92,48 @@ async def export_data(
             }
             for t in result.scalars().all()
         ]
-    
+
     if categories:
         result = await db.execute(select(Category).where(Category.tenant_id == current_user.tenant_id))
         data["categories"] = [
             {"name": c.name, "icon": c.icon, "color": c.color, "type": c.type.value}
             for c in result.scalars().all()
         ]
-    
+
     if accounts:
         result = await db.execute(select(Account).where(Account.tenant_id == current_user.tenant_id))
         data["accounts"] = [
             {"name": a.name, "type": a.type.value, "balance": float(a.balance), "color": a.color}
             for a in result.scalars().all()
         ]
-    
+
     if cards:
         result = await db.execute(select(Card).where(Card.tenant_id == current_user.tenant_id))
         data["cards"] = [
             {"name": c.name, "brand": c.brand, "limit": float(c.limit_amount), "due_day": c.due_day}
             for c in result.scalars().all()
         ]
-    
+
     if subscriptions:
         result = await db.execute(select(Subscription).where(Subscription.tenant_id == current_user.tenant_id))
         data["subscriptions"] = [
             {"name": s.name, "amount": float(s.amount), "billing_day": s.billing_day, "is_active": s.is_active}
             for s in result.scalars().all()
         ]
-    
+
     if goals:
         result = await db.execute(select(Goal).where(Goal.tenant_id == current_user.tenant_id))
+        # FIX: Goal model usa target_amount e current_amount, não target e current
         data["goals"] = [
-            {"name": g.name, "target": float(g.target), "current": float(g.current), "deadline": g.deadline.isoformat() if g.deadline else None}
+            {
+                "name": g.name,
+                "target": float(g.target_amount),
+                "current": float(g.current_amount),
+                "deadline": g.deadline.isoformat() if g.deadline else None,
+            }
             for g in result.scalars().all()
         ]
-    
+
     if format == "csv":
         # Flatten to CSV - main focus on transactions
         output = io.StringIO()
@@ -138,13 +144,13 @@ async def export_data(
                 writer.writerow(row)
         else:
             output.write("No data to export")
-        
+
         return StreamingResponse(
             iter([output.getvalue()]),
             media_type="text/csv",
             headers={"Content-Disposition": f"attachment; filename=savepoint_export_{year or 'all'}_{month or 'all'}.csv"}
         )
-    
+
     # JSON format
     import json
     return StreamingResponse(
@@ -175,54 +181,54 @@ async def import_transactions(
     allowed, error = await check_feature(current_user.tenant_id, "export", db)
     if not allowed:
         raise HTTPException(status_code=403, detail=error)
-    
+
     if file.content_type not in ["text/csv", "application/csv", "text/plain"]:
         raise HTTPException(status_code=400, detail="Apenas arquivos CSV são permitidos.")
-    
+
     content = await file.read()
     text = content.decode("utf-8")
-    
+
     reader = csv.DictReader(io.StringIO(text))
     imported = 0
     errors = []
-    
+
     categories = {c.name.lower(): c for c in (await db.execute(select(Category).where(Category.tenant_id == current_user.tenant_id))).scalars().all()}
     accounts = {a.name.lower(): a for a in (await db.execute(select(Account).where(Account.tenant_id == current_user.tenant_id))).scalars().all()}
     cards = {c.name.lower(): c for c in (await db.execute(select(Card).where(Card.tenant_id == current_user.tenant_id))).scalars().all()}
-    
+
     for row_num, row in enumerate(reader, start=2):
         try:
             date_str = row.get("date", "").strip()
             if not date_str:
                 errors.append(f"Linha {row_num}: Data obrigatória")
                 continue
-            
+
             try:
                 tx_date = datetime.strptime(date_str, "%Y-%m-%d").date()
             except ValueError:
                 errors.append(f"Linha {row_num}: Data inválida (use YYYY-MM-DD)")
                 continue
-            
+
             desc = row.get("description", "").strip()
             if not desc:
                 errors.append(f"Linha {row_num}: Descrição obrigatória")
                 continue
-            
+
             try:
                 amount = abs(float(row.get("amount", "0").replace(",", "").replace("R$", "").strip()))
             except ValueError:
                 errors.append(f"Linha {row_num}: Valor inválido")
                 continue
-            
+
             type_str = row.get("type", "expense").strip().lower()
             tx_type = TransactionType.expense if type_str == "expense" else TransactionType.income
-            
+
             category = categories.get(row.get("category", "").strip().lower())
             account = accounts.get(row.get("account", "").strip().lower())
             card = cards.get(row.get("card", "").strip().lower())
-            
+
             payment_method = PaymentMethod.credit_card if card else (PaymentMethod.debit_card if account else PaymentMethod.pix)
-            
+
             tx = Transaction(
                 tenant_id=current_user.tenant_id,
                 user_id=current_user.id,
@@ -239,10 +245,10 @@ async def import_transactions(
             )
             db.add(tx)
             imported += 1
-            
+
         except Exception as e:
             errors.append(f"Linha {row_num}: Erro - {str(e)}")
-    
+
     await db.commit()
     return ImportResult(imported=imported, errors=errors[:20])  # Limit to 20 errors
 
@@ -258,7 +264,7 @@ async def get_import_template(
     writer.writerow(["date", "description", "amount", "type", "category", "account", "card", "notes"])
     writer.writerow(["2026-03-15", "Mercado R$ 150,00", 150.00, "expense", "Alimentação", "Nubank", "", "Compras semanal"])
     writer.writerow(["2026-03-10", "Salário", 5000.00, "income", "Salário", "Itau", "", ""])
-    
+
     return StreamingResponse(
         iter([output.getvalue()]),
         media_type="text/csv",

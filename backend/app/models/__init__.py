@@ -4,7 +4,9 @@ from app.models.category import Category, CategoryType
 from app.models.institution import Institution, InstitutionType
 from app.models.account import Account, AccountType
 from app.models.card import Card
-from app.models.transaction import Transaction, TransactionType, TransactionSource
+# FIX: PaymentMethod não estava exportado, causando ImportError em qualquer
+# módulo que tentasse importar de app.models diretamente.
+from app.models.transaction import Transaction, TransactionType, TransactionSource, PaymentMethod
 from app.models.subscription import Subscription
 from app.models.alert_log import AlertLog
 from app.models.goal import Goal
@@ -16,7 +18,7 @@ __all__ = [
     "Institution", "InstitutionType",
     "Account", "AccountType",
     "Card",
-    "Transaction", "TransactionType", "TransactionSource",
+    "Transaction", "TransactionType", "TransactionSource", "PaymentMethod",
     "Subscription",
     "AlertLog", "Goal",
     "Notification",

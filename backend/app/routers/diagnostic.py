@@ -27,28 +27,28 @@ router = APIRouter(prefix="/api/v1/admin", tags=["diagnostics"])
 
 
 class DiagnosticCheck:
-    """Representa um único检查"""
+    """Representa um único check"""
     def __init__(self, name: str):
         self.name = name
         self.status = "pending"  # pending, ok, warning, error
         self.message = ""
         self.details: Dict[str, Any] = {}
-    
+
     def set_ok(self, message: str = "", details: Dict = None):
         self.status = "ok"
         self.message = message
         self.details = details or {}
-    
+
     def set_warning(self, message: str, details: Dict = None):
         self.status = "warning"
         self.message = message
         self.details = details or {}
-    
+
     def set_error(self, message: str, details: Dict = None):
         self.status = "error"
         self.message = message
         self.details = details or {}
-    
+
     def to_dict(self):
         return {
             "name": self.name,
@@ -63,12 +63,11 @@ class DiagnosticSuite:
     def __init__(self):
         self.checks: Dict[str, DiagnosticCheck] = {}
         self.start_time = time.time()
-    
+
     def add_check(self, check: DiagnosticCheck):
         self.checks[check.name] = check
-    
+
     def get_status(self) -> str:
-        """Determina status geral"""
         has_error = any(c.status == "error" for c in self.checks.values())
         has_warning = any(c.status == "warning" for c in self.checks.values())
         if has_error:
@@ -76,7 +75,7 @@ class DiagnosticSuite:
         if has_warning:
             return "warning"
         return "ok"
-    
+
     def to_dict(self):
         duration = (time.time() - self.start_time) * 1000
         return {
@@ -90,7 +89,7 @@ class DiagnosticSuite:
 async def verify_database(db: AsyncSession) -> DiagnosticSuite:
     """Verificação profunda do banco de dados"""
     suite = DiagnosticSuite()
-    
+
     # Check 1: Conexão básica
     check = DiagnosticCheck("db_connection")
     try:
@@ -98,7 +97,7 @@ async def verify_database(db: AsyncSession) -> DiagnosticSuite:
         result = await db.execute(text("SELECT 1, current_database()"))
         row = result.fetchone()
         latency = (time.time() - start) * 1000
-        
+
         if row and row[0] == 1:
             db_name = row[1]
             if latency < 50:
@@ -112,19 +111,19 @@ async def verify_database(db: AsyncSession) -> DiagnosticSuite:
     except Exception as e:
         check.set_error(f"Sem conexão: {str(e)[:100]}")
     suite.add_check(check)
-    
+
     # Check 2: Tabelas essenciais
     check = DiagnosticCheck("db_tables")
     try:
         result = await db.execute(text("""
-            SELECT table_name FROM information_schema.tables 
+            SELECT table_name FROM information_schema.tables
             WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
         """))
         tables = {row[0] for row in result.fetchall()}
-        
+
         required = {'users', 'tenants', 'categories', 'accounts', 'cards', 'transactions'}
         missing = required - tables
-        
+
         if missing:
             check.set_error(f"Tabelas faltando: {', '.join(missing)}", {"missing": list(missing)})
         else:
@@ -132,7 +131,7 @@ async def verify_database(db: AsyncSession) -> DiagnosticSuite:
     except Exception as e:
         check.set_error(f"Erro ao verificar tabelas: {str(e)[:80]}")
     suite.add_check(check)
-    
+
     # Check 3: Índices
     check = DiagnosticCheck("db_indexes")
     try:
@@ -140,7 +139,7 @@ async def verify_database(db: AsyncSession) -> DiagnosticSuite:
             SELECT COUNT(*) FROM pg_indexes WHERE schemaname = 'public'
         """))
         index_count = result.scalar() or 0
-        
+
         if index_count > 0:
             check.set_ok(f"{index_count} índices encontrados", {"indexes": index_count})
         else:
@@ -148,7 +147,7 @@ async def verify_database(db: AsyncSession) -> DiagnosticSuite:
     except Exception as e:
         check.set_warning(f"Não foi possível verificar índices: {str(e)[:50]}")
     suite.add_check(check)
-    
+
     return suite
 
 
@@ -156,17 +155,17 @@ async def verify_redis() -> DiagnosticSuite:
     """Verificação do Redis"""
     suite = DiagnosticSuite()
     check = DiagnosticCheck("redis_connection")
-    
+
     try:
         import redis.asyncio as redis
         r = redis.from_url(settings.REDIS_URL, decode_responses=True, socket_timeout=3)
-        
+
         start = time.time()
         pong = await r.ping()
         latency = (time.time() - start) * 1000
-        
+
         await r.close()
-        
+
         if pong is True:
             if latency < 50:
                 check.set_ok(f"Redis OK ({latency:.1f}ms)", {"latency_ms": round(latency, 1)})
@@ -176,7 +175,7 @@ async def verify_redis() -> DiagnosticSuite:
             check.set_warning("Redis respondeu de forma inesperada")
     except Exception as e:
         check.set_warning(f"Redis indisponível", {"error": str(e)[:50]})
-    
+
     suite.add_check(check)
     return suite
 
@@ -184,7 +183,7 @@ async def verify_redis() -> DiagnosticSuite:
 async def verify_tenant(db: AsyncSession, tenant_id: uuid.UUID) -> DiagnosticSuite:
     """Verificação do tenant atual"""
     suite = DiagnosticSuite()
-    
+
     # Check 1: Tenant existe e está ativo
     check = DiagnosticCheck("tenant_exists")
     try:
@@ -192,7 +191,7 @@ async def verify_tenant(db: AsyncSession, tenant_id: uuid.UUID) -> DiagnosticSui
             select(Tenant).where(Tenant.id == tenant_id)
         )
         tenant = result.scalar_one_or_none()
-        
+
         if not tenant:
             check.set_error("Tenant não encontrado")
         elif not tenant.is_active:
@@ -205,7 +204,7 @@ async def verify_tenant(db: AsyncSession, tenant_id: uuid.UUID) -> DiagnosticSui
     except Exception as e:
         check.set_error(f"Erro: {str(e)[:80]}")
     suite.add_check(check)
-    
+
     # Check 2: Plano e Trial
     check = DiagnosticCheck("subscription_status")
     try:
@@ -213,18 +212,17 @@ async def verify_tenant(db: AsyncSession, tenant_id: uuid.UUID) -> DiagnosticSui
             select(Tenant).where(Tenant.id == tenant_id)
         )
         tenant = result.scalar_one_or_none()
-        
+
         if tenant:
             if tenant.plan == "pro":
                 check.set_ok("Plano Pro - acesso vitalício")
             elif tenant.plan == "free":
                 if tenant.trial_expires_at:
                     now = datetime.now(timezone.utc)
-                    #确保时区一致
                     exp = tenant.trial_expires_at
                     if exp.tzinfo is None:
                         exp = exp.replace(tzinfo=timezone.utc)
-                    
+
                     if exp < now:
                         check.set_error("Período de teste expirado", {
                             "expired_at": exp.isoformat()
@@ -238,33 +236,32 @@ async def verify_tenant(db: AsyncSession, tenant_id: uuid.UUID) -> DiagnosticSui
                                 "days_left": days_left
                             })
                 else:
-                    # Trial não inicializado - não é erro, é só avisar
                     check.set_warning("Período de teste não inicializado")
             else:
                 check.set_warning(f"Plano: {tenant.plan}")
     except Exception as e:
         check.set_warning(f"Não foi possível verificar plano: {str(e)[:50]}")
     suite.add_check(check)
-    
+
     # Check 3: Dados do tenant
     check = DiagnosticCheck("tenant_data")
     try:
         cat_count = (await db.execute(
             select(Category).where(Category.tenant_id == tenant_id)
         )).scalars().all()
-        
+
         acc_count = (await db.execute(
             select(Account).where(Account.tenant_id == tenant_id)
         )).scalars().all()
-        
+
         card_count = (await db.execute(
             select(Card).where(Card.tenant_id == tenant_id)
         )).scalars().all()
-        
+
         tx_count = (await db.execute(
             select(Transaction).where(Transaction.tenant_id == tenant_id)
         )).scalars().all()
-        
+
         check.set_ok(f"OK", {
             "categories": len(cat_count),
             "accounts": len(acc_count),
@@ -274,14 +271,14 @@ async def verify_tenant(db: AsyncSession, tenant_id: uuid.UUID) -> DiagnosticSui
     except Exception as e:
         check.set_warning(f"Erro ao contar dados: {str(e)[:50]}")
     suite.add_check(check)
-    
+
     return suite
 
 
 async def verify_system() -> DiagnosticSuite:
     """Verificação de recursos do sistema"""
     suite = DiagnosticSuite()
-    
+
     # CPU
     check = DiagnosticCheck("system_cpu")
     try:
@@ -295,7 +292,7 @@ async def verify_system() -> DiagnosticSuite:
     except Exception as e:
         check.set_warning("Não foi possível verificar CPU")
     suite.add_check(check)
-    
+
     # Memória
     check = DiagnosticCheck("system_memory")
     try:
@@ -309,7 +306,7 @@ async def verify_system() -> DiagnosticSuite:
     except Exception as e:
         check.set_warning("Não foi possível verificar memória")
     suite.add_check(check)
-    
+
     # Disco
     check = DiagnosticCheck("system_disk")
     try:
@@ -323,20 +320,20 @@ async def verify_system() -> DiagnosticSuite:
     except Exception as e:
         check.set_warning("Não foi possível verificar disco")
     suite.add_check(check)
-    
+
     return suite
 
 
 async def verify_config() -> DiagnosticSuite:
     """Verificação de configurações"""
     suite = DiagnosticSuite()
-    
+
     checks = [
         ("config_app", "APP", settings.APP_NAME and settings.APP_ENV),
         ("config_ai", "AI (Anthropic)", bool(settings.ANTHROPIC_API_KEY)),
         ("config_email", "E-mail (SMTP)", bool(settings.SMTP_HOST and settings.SMTP_USER)),
     ]
-    
+
     for name, label, is_set in checks:
         check = DiagnosticCheck(name)
         if is_set:
@@ -344,7 +341,7 @@ async def verify_config() -> DiagnosticSuite:
         else:
             check.set_warning(f"{label} não configurado")
         suite.add_check(check)
-    
+
     return suite
 
 
@@ -359,27 +356,27 @@ async def full_diagnostic(
     Sem falsos positivos - cada verificação é assertiva
     """
     result = DiagnosticSuite()
-    
+
     # 1. Banco de dados (mais importante)
     db_suite = await verify_database(db)
     result.checks.update(db_suite.checks)
-    
+
     # 2. Redis
     redis_suite = await verify_redis()
     result.checks.update(redis_suite.checks)
-    
+
     # 3. Tenant atual
     tenant_suite = await verify_tenant(db, current_user.tenant_id)
     result.checks.update(tenant_suite.checks)
-    
+
     # 4. Sistema
     system_suite = await verify_system()
     result.checks.update(system_suite.checks)
-    
+
     # 5. Configurações
     config_suite = await verify_config()
     result.checks.update(config_suite.checks)
-    
+
     # Adicionar informações da app
     check = DiagnosticCheck("app_info")
     check.set_ok(f"{settings.APP_NAME} v2.0", {
@@ -387,7 +384,7 @@ async def full_diagnostic(
         "app_name": settings.APP_NAME
     })
     result.checks["app_info"] = check
-    
+
     return result.to_dict()
 
 
@@ -397,7 +394,7 @@ async def quick_diagnostic():
     Diagnóstico rápido público (sem auth)
     """
     result = DiagnosticSuite()
-    
+
     # Database
     check = DiagnosticCheck("database")
     try:
@@ -407,7 +404,7 @@ async def quick_diagnostic():
     except Exception as e:
         check.set_error(f"DB error: {str(e)[:50]}")
     result.checks["database"] = check
-    
+
     # Redis
     check = DiagnosticCheck("redis")
     try:
@@ -416,10 +413,10 @@ async def quick_diagnostic():
         await r.ping()
         await r.close()
         check.set_ok("Redis OK")
-    except:
+    except Exception:
         check.set_warning("Redis offline")
     result.checks["redis"] = check
-    
+
     return result.to_dict()
 
 
@@ -434,5 +431,10 @@ async def diagnostic_for_tenant(
         tid = uuid.UUID(tenant_id)
     except ValueError:
         return {"error": "ID de tenant inválido"}
-    
-    return await verify_tenant(db, tid).to_dict()
+
+    # FIX: era `return await verify_tenant(db, tid).to_dict()` — não é possível
+    # encadear .to_dict() diretamente no resultado de await em Python.
+    # verify_tenant retorna uma coroutine; é necessário aguardá-la primeiro
+    # e depois chamar .to_dict() no objeto retornado.
+    suite = await verify_tenant(db, tid)
+    return suite.to_dict()

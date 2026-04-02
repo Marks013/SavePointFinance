@@ -6,6 +6,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from contextlib import asynccontextmanager
+from sqlalchemy.exc import IntegrityError as SAIntegrityError
 import time
 import logging
 
@@ -52,9 +53,29 @@ def get_error_html(status_code: int, detail: str = None) -> str:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Create all tables on startup (idempotent)
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    # ─────────────────────────────────────────────────────────────────
+    # FIX: Race condition ao iniciar com múltiplos workers (--workers 2)
+    #
+    # Problema: Cada worker uvicorn executa o lifespan de forma independente
+    # e simultaneamente. O primeiro worker cria os ENUM types do PostgreSQL
+    # (ex: userrole, categorytype, etc.) com sucesso. O segundo worker tenta
+    # fazer o mesmo e recebe IntegrityError: "already exists".
+    #
+    # Solução: Capturar SAIntegrityError durante create_all e continuar se o
+    # schema já foi criado por outro worker. Isso é seguro porque:
+    # 1. Se o primeiro worker criou tudo com sucesso, o schema está correto.
+    # 2. O segundo worker não precisa criar nada — apenas continuar.
+    # ─────────────────────────────────────────────────────────────────
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+    except SAIntegrityError as e:
+        err_str = str(e).lower()
+        if "already exists" in err_str or "duplicate" in err_str or "unique" in err_str:
+            logger.info("📋 Schema já inicializado por outro worker — continuando normalmente.")
+        else:
+            logger.error(f"❌ Erro fatal ao criar schema: {e}")
+            raise
 
     # Seed default institutions if none exist
     from app.models.institution import Institution
@@ -220,31 +241,6 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 
 # ── Routers ───────────────────────────────────────────────────────────────────
-#
-# BUG FIX #12/#25 — Ordem de registro dos routers:
-#
-# Problema original: htmx_router era incluído ANTES de web_router, fazendo com que
-# rotas duplicadas (ex: GET /goals/{id}/edit) em ambos os arquivos fossem resolvidas
-# pelo htmx_router — que retorna HTML parcial em vez da página completa.
-#
-# Solução: htmx_router deve ser registrado DEPOIS de web_router. Como o FastAPI
-# usa o primeiro handler que faz match, web_router (páginas completas) ganha para
-# rotas de navegação, e htmx_router serve as partials que não existem em web.py.
-#
-# Além disso, as rotas GET de modal que existiam duplicadas em web.py foram
-# removidas de lá — apenas htmx.py as define. Isso elimina qualquer ambiguidade.
-#
-# Ordem correta:
-#   1. Routers de API JSON          → prefixo /api/v1/*
-#   2. web_router (páginas SSR)     → rotas de navegação HTML completas
-#   3. data_router                  → /api/v1/data/* (export/import)
-#   4. htmx_router (partials HTMX) → rotas de fragmentos HTML para modais/updates
-#
-# Com esta ordem:
-#   GET /dashboard            → web_router ✓ (página completa)
-#   GET /transactions/new     → htmx_router ✓ (partial modal)
-#   GET /goals/123/edit       → htmx_router ✓ (partial modal)
-
 # API JSON routers
 app.include_router(auth_router)
 app.include_router(transactions_router)
@@ -274,8 +270,7 @@ app.include_router(web_router)
 # Data export/import
 app.include_router(data_router)
 
-# HTMX partials router — deve vir DEPOIS do web_router para que rotas de página
-# completa em web.py tenham prioridade sobre partials quando houver sobreposição.
+# HTMX partials router — deve vir DEPOIS do web_router
 app.include_router(htmx_router)
 
 
@@ -306,36 +301,6 @@ async def health_ready():
             status_code=503,
             content={"status": "not_ready", "error": str(e)}
         )
-
-
-@app.exception_handler(405)
-async def method_not_allowed_handler(request: Request, exc):
-    return JSONResponse(
-        status_code=405,
-        content={
-            "detail": "Método não permitido.",
-            "code": "METHOD_NOT_ALLOWED",
-        }
-    )
-
-
-@app.exception_handler(404)
-async def not_found_handler(request: Request, exc):
-    return JSONResponse(
-        status_code=404,
-        content={"detail": "Página não encontrada.", "code": "NOT_FOUND"}
-    )
-
-
-@app.exception_handler(500)
-async def internal_error_handler(request: Request, exc):
-    return JSONResponse(
-        status_code=500,
-        content={
-            "detail": "Erro interno do servidor. Tente novamente mais tarde.",
-            "code": "INTERNAL_ERROR",
-        }
-    )
 
 
 # Import para health check

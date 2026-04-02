@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, date
 from decimal import Decimal
 from enum import Enum
-from sqlalchemy import String, DateTime, Date, ForeignKey, Numeric, Text, func, Enum as SAEnum, Boolean, Integer
+from sqlalchemy import String, DateTime, Date, ForeignKey, Numeric, Text, func, Enum as SAEnum, Boolean, Integer, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 from app.database import Base
@@ -46,20 +46,22 @@ class Transaction(Base):
     type: Mapped[TransactionType] = mapped_column(SAEnum(TransactionType), nullable=False, index=True)
     source: Mapped[TransactionSource] = mapped_column(SAEnum(TransactionSource), default=TransactionSource.manual, nullable=False)
     payment_method: Mapped[PaymentMethod] = mapped_column(SAEnum(PaymentMethod), default=PaymentMethod.money, nullable=False)
-    
+
     installments_total: Mapped[int] = mapped_column(Integer, default=1, nullable=False, index=True)
     installment_number: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     parent_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("transactions.id", ondelete="CASCADE"), nullable=True, index=True)
 
-    # Index composto para consultas comuns
+    # FIX: __table_args__ anterior continha {"mysql_where": None} que não é uma
+    # opção válida para PostgreSQL e causava warnings silenciosos. Substituído por
+    # índices compostos reais que melhoram a performance das queries mais comuns.
     __table_args__ = (
-        # Transactions por tenant + data (dashboard, relatórios)
-        {"mysql_where": None},
+        Index("ix_transactions_tenant_date", "tenant_id", "date"),
+        Index("ix_transactions_tenant_type", "tenant_id", "type"),
     )
 
     ai_classified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     ai_confidence: Mapped[float | None] = mapped_column(Numeric(3, 2), nullable=True)
-    
+
     tithe_amount: Mapped[Decimal | None] = mapped_column(Numeric(15, 2), nullable=True)
     tithe_category_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("categories.id", ondelete="SET NULL"), nullable=True)
 
