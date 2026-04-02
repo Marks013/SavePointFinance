@@ -1,4 +1,10 @@
 <!-- _cat_modal.html -->
+{% if success %}
+<script>
+  closeModal();
+  window.dispatchEvent(new Event('sp:refreshData'));
+</script>
+{% else %}
 <!-- BUG FIX: havia dois inputs com name="color" (o color picker e o text field, que tinha name="color_hex").
      O backend recebia apenas o valor do color picker e ignorava o que estava digitado no texto.
      Corrigido: o color picker perde seu name (só serve como visual), e o text input recebe name="color".
@@ -91,7 +97,7 @@
     <button type="submit" class="btn btn--primary">{{ 'Salvar' if cat else 'Criar' }}</button>
   </div>
 </form>
-
+{% endif %}
 <script>
 function setCatType(type, btn) {
   document.getElementById('catTypeInput').value = type;

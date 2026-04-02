@@ -173,7 +173,7 @@ async function submitPlanChange() {
     
     addToast({ message: data.message || 'Plano alterado com sucesso', kind: 'success' });
     closeModal();
-    location.reload();
+    window.dispatchEvent(new Event('sp:refreshData'));
   } catch (e) {
     addToast({ message: 'Erro de conexão', kind: 'error' });
   }

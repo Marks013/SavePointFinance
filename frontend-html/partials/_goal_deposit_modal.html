@@ -1,4 +1,10 @@
 <!-- _goal_deposit_modal.html -->
+{% if success %}
+<script>
+  closeModal();
+  window.dispatchEvent(new Event('sp:refreshData'));
+</script>
+{% else %}
 <div class="modal-header">
   <span class="modal-title">Depositar na Meta</span>
   <button class="modal-close" onclick="closeModal()">
@@ -73,3 +79,4 @@
     </button>
   </div>
 </form>
+{% endif %}

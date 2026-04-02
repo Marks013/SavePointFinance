@@ -27,28 +27,27 @@ Você está classificando transações financeiras de um usuário brasileiro no 
 - Conta de água = saneamento
 - IPTU = imposto propriedade
 - Condomínio = rateio edifício
---farmácia = drogaria
-- Uber/99 = aplicativos de transporte
-- iFood = entrega de comida
+- Farmácia/Drogaria = saúde
+- Uber/99 = aplicativos de transporte, locomoção
+- iFood = entrega de comida, alimentação
 - Cartão de crédito parcelado = compra parcelada
 - Dízimo = contribuição religiosa (10%)
-- autônomo = profissional independente
+- Autônomo = profissional independente
 - MEI = microempreendedor individual
 
-### Exemplos de Classificação:
-- "Netflix" → Assinaturas (ou Entretenimento)
-- "Uber corrida" → Transporte
-- "Farmácia" → Saúde
-- "iFood" → Alimentação
-- "Salário" → Salário
-- "Aluguel" → Moradia
-- "Conta de luz" → Moradia
-- "PIX transferencia" → pode ser transferência
-- "Parcelamento" → Cartão de Crédito
-- "igreja" → Dízimo/Ofertas
-- "academia" → Saúde
-- "supermercado" → Alimentação
-- "farmácia" → Saúde
+### Mega Dedução Lógica (IMPORTANTE):
+Você tem TOTAL permissão para utilizar super-dedução lógica sobre palavras isoladas. 
+Se a descrição for um substantivo de consumo trivial, amarre IMEDIATAMENTE à categoria macro.
+Exemplos MANDATÓRIOS de dedução:
+- "Fruta", "Maçã", "Pão", "Açougue", "Padaria", "Supermercado" → Alimentação
+- "Gasolina", "Posto", "Estacionamento", "Uber" → Transporte
+- "Netflix", "Spotify", "Amazon Prime" → Assinaturas ou Lazer
+- "Remédio", "Consulta", "Dentista" → Saúde
+- "Igreja", "Oferta", "Culto" → Dízimo/Ofertas
+
+Tente ao máximo usar uma categoria cadastrada antes de devolver "OUTROS".
+Se a palavra for puramente sobre comida/bebida, escolha "Alimentação".
+Se for veículo/locomoção, escolha "Transporte".
 """
 
 

@@ -1,4 +1,10 @@
 <!-- _inst_modal.html -->
+{% if success %}
+<script>
+  closeModal();
+  window.dispatchEvent(new Event('sp:refreshData'));
+</script>
+{% else %}
 <div class="modal-header">
   <span class="modal-title">{{ 'Editar Parcelamento' if inst else 'Novo Parcelamento' }}</span>
   <button class="modal-close" onclick="closeModal()">
@@ -76,7 +82,7 @@
     <button type="submit" class="btn btn--primary">{{ 'Salvar' if inst else 'Criar' }}</button>
   </div>
 </form>
-
+{% endif %}
 <script>
 // Calculate and show installment preview
 document.getElementById('instAmount')?.addEventListener('input', updatePreview);

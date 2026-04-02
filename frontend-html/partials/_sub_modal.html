@@ -1,4 +1,10 @@
 <!-- _sub_modal.html -->
+{% if success %}
+<script>
+  closeModal();
+  window.dispatchEvent(new Event('sp:refreshData'));
+</script>
+{% else %}
 <div class="modal-header">
   <span class="modal-title">{{ 'Editar Assinatura' if sub else 'Nova Assinatura' }}</span>
   <button class="modal-close" onclick="closeModal()">
@@ -121,7 +127,7 @@
     <button type="submit" class="btn btn--primary">{{ 'Salvar' if sub else 'Criar' }}</button>
   </div>
 </form>
-
+{% endif %}
 <script>
 function setSubType(type, btn) {
   document.getElementById('subTypeInput').value = type;

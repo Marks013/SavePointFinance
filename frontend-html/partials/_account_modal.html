@@ -1,4 +1,10 @@
 <!-- _account_modal.html -->
+{% if success %}
+<script>
+  closeModal();
+  window.dispatchEvent(new Event('sp:refreshData'));
+</script>
+{% else %}
 <div class="modal-header">
   <span class="modal-title">{{ 'Editar Conta' if account else 'Nova Conta' }}</span>
   <button class="modal-close" onclick="closeModal()">
@@ -69,3 +75,4 @@
     <button type="submit" class="btn btn--primary">{{ 'Salvar' if account else 'Criar' }}</button>
   </div>
 </form>
+{% endif %}

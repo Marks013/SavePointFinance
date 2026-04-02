@@ -2,7 +2,7 @@
 {% if success %}
 <script>
   closeModal();
-  location.reload();
+  window.dispatchEvent(new Event('sp:refreshData'));
 </script>
 {% else %}
 <div class="modal-header">

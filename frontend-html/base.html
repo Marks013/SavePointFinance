@@ -418,7 +418,7 @@ function confirmDelete(url, message) {
   fetch(url, { method: 'POST' })
     .then(r => {
       if (r.ok) {
-        location.reload();
+        window.dispatchEvent(new Event('sp:refreshData'));
       } else {
         return r.json().then(err => { throw new Error(err.error || 'Erro ao excluir'); });
       }
@@ -537,10 +537,9 @@ document.body.addEventListener('htmx:responseError', e => {
   addToast({ message, kind: 'error' });
 });
 
-/* ── Dashboard refresh ──────────────────────────────────────────────── */
-window.addEventListener('sp:refreshDashboard', () => {
-  if (window.location.pathname === '/dashboard')
-    htmx.ajax('GET', '/dashboard', { target: '#main-content', swap: 'innerHTML' });
+/* ── Global Soft Refresh (SPA feeling) ──────────────────────────────── */
+window.addEventListener('sp:refreshData', () => {
+  htmx.ajax('GET', window.location.href, { target: '#main-content', swap: 'outerHTML', select: '#main-content' });
 });
 
 /* ── Toggle switch ──────────────────────────────────────────────────── */

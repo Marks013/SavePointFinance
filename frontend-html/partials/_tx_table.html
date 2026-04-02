@@ -122,6 +122,6 @@
 function confirmDelete(url, message) {
   if (!confirm(message + '\n\nEsta ação não pode ser desfeita.')) return;
   fetch(url, { method: 'POST' })
-    .then(r => { if (r.ok) location.reload(); });
+    .then(r => { if (r.ok) window.dispatchEvent(new Event('sp:refreshData')); });
 }
 </script>

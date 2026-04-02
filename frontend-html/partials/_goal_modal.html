@@ -1,4 +1,10 @@
 <!-- _goal_modal.html -->
+{% if success %}
+<script>
+  closeModal();
+  window.dispatchEvent(new Event('sp:refreshData'));
+</script>
+{% else %}
 <div class="modal-header">
   <span class="modal-title">{{ 'Editar Meta' if goal else 'Nova Meta' }}</span>
   <button class="modal-close" onclick="closeModal()">
@@ -88,3 +94,4 @@
     <button type="submit" class="btn btn--primary">{{ 'Salvar' if goal else 'Criar meta' }}</button>
   </div>
 </form>
+{% endif %}
