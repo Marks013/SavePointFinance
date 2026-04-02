@@ -32,36 +32,238 @@
   </div>
 </div>
 
+<!-- Summary Cards -->
+<div class="summary-cards mb-6">
+  <div class="summary-card">
+    <div class="summary-card__icon" style="background:rgba(0,229,122,0.15); color:var(--income);">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+    </div>
+    <div class="summary-card__content">
+      <span class="summary-card__label">Receitas</span>
+      <span class="summary-card__value mono text-income">{{ total_income_fmt }}</span>
+    </div>
+  </div>
+  
+  <div class="summary-card">
+    <div class="summary-card__icon" style="background:rgba(255,77,106,0.15); color:var(--expense);">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+    </div>
+    <div class="summary-card__content">
+      <span class="summary-card__label">Despesas</span>
+      <span class="summary-card__value mono text-expense">{{ total_expense_fmt }}</span>
+    </div>
+  </div>
+  
+  <div class="summary-card">
+    <div class="summary-card__icon" style="background:rgba(59,130,246,0.15); color:#3B82F6;">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+    </div>
+    <div class="summary-card__content">
+      <span class="summary-card__label">Saldo</span>
+      <span class="summary-card__value mono {{ 'text-income' if net_balance >= 0 else 'text-expense' }}">{{ net_balance_fmt }}</span>
+    </div>
+  </div>
+  
+  <div class="summary-card">
+    <div class="summary-card__icon" style="background:rgba(168,85,247,0.15); color:#A855F7;">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>
+    </div>
+    <div class="summary-card__content">
+      <span class="summary-card__label">Poupança</span>
+      <span class="summary-card__value mono {{ 'text-income' if savings_rate >= 20 else 'text-warning' }}">{{ savings_rate }}%</span>
+    </div>
+  </div>
+</div>
+
 <!-- Charts Row -->
 <div class="two-col mb-6">
   <!-- Donut: Expense Breakdown -->
   <div class="card p-5">
-    <h3 style="font-size:0.875rem; font-weight:600; margin-bottom:16px;">Composição de Despesas</h3>
-    <div style="height:280px; position:relative;">
+    <h3 style="font-size:0.875rem; font-weight:600; margin-bottom:16px;">Despesas por Categoria</h3>
+    <div style="height:260px; position:relative;">
       <canvas id="pieChart"></canvas>
     </div>
-    <!-- Legend -->
-    <div style="display:flex; flex-wrap:wrap; gap:10px; margin-top:16px;">
+    {% if expense_breakdown %}
+    <div style="margin-top:16px; max-height:120px; overflow-y:auto;">
       {% for item in expense_breakdown %}
-      <div style="display:flex; align-items:center; gap:6px; font-size:0.75rem; color:var(--text-dim);">
-        <span style="width:8px; height:8px; border-radius:50%; background:{{ item.color }}; flex-shrink:0;"></span>
-        {{ item.name }}
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--border); font-size:0.8rem;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="width:8px; height:8px; border-radius:50%; background:{{ item.color }};"></span>
+          <span>{{ item.name }}</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:12px;">
+          <span class="mono text-expense">{{ item.value_fmt }}</span>
+          <span style="color:var(--text-dim); font-size:0.7rem;">{{ item.pct }}%</span>
+        </div>
       </div>
       {% endfor %}
     </div>
+    {% endif %}
   </div>
 
   <!-- Bar: 6-Month Trend -->
   <div class="card p-5">
     <h3 style="font-size:0.875rem; font-weight:600; margin-bottom:16px;">Tendência 6 Meses</h3>
-    <div style="height:280px; position:relative;">
+    <div style="height:260px; position:relative;">
       <canvas id="trendChart"></canvas>
     </div>
   </div>
 </div>
 
-<!-- Reports body partial (full width, card-by-card) -->
-{% include "partials/_reports_body.html" %}
+<!-- Income Breakdown -->
+{% if income_breakdown %}
+<div class="card p-5 mb-6">
+  <h3 style="font-size:0.875rem; font-weight:600; margin-bottom:16px;">Receitas por Categoria</h3>
+  <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:12px;">
+    {% for item in income_breakdown %}
+    <div style="padding:16px; border-radius:10px; background:var(--secondary);">
+      <div style="font-size:0.75rem; color:var(--text-dim); margin-bottom:4px;">{{ item.name }}</div>
+      <div class="mono fw-700" style="font-size:1rem; color:var(--income);">{{ item.value_fmt }}</div>
+      <div style="font-size:0.7rem; color:var(--text-dim); margin-top:2px;">{{ item.pct }}% do total</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- Account / Card Summary -->
+{% if account_summary or card_summary %}
+<div class="two-col mb-6">
+  {% if account_summary %}
+  <div class="card p-5">
+    <h3 style="font-size:0.875rem; font-weight:600; margin-bottom:16px;">Resumo por Conta (este mês)</h3>
+    <div class="data-table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Conta</th>
+            <th style="text-align:right;">Saldo Atual</th>
+            <th style="text-align:right;">Receitas</th>
+            <th style="text-align:right;">Despesas</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for acc in account_summary %}
+          <tr>
+            <td style="font-weight:500;">{{ acc.name }}</td>
+            <td style="text-align:right;" class="mono {{ 'text-income' if acc.current_balance >= 0 else 'text-expense' }}">{{ acc.current_balance_fmt }}</td>
+            <td style="text-align:right;" class="text-income mono">{{ acc.income_fmt }}</td>
+            <td style="text-align:right;" class="text-expense mono">{{ acc.expense_fmt }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if card_summary %}
+  <div class="card p-5">
+    <h3 style="font-size:0.875rem; font-weight:600; margin-bottom:16px;">Uso de Cartões (este mês)</h3>
+    <div class="data-table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Cartão</th>
+            <th style="text-align:right;">Gasto</th>
+            <th style="text-align:right;">Limite</th>
+            <th style="text-align:right;">Disponível</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for card in card_summary %}
+          <tr>
+            <td style="font-weight:500;">{{ card.name }}</td>
+            <td style="text-align:right;" class="text-expense mono">{{ card.spent_fmt }}</td>
+            <td style="text-align:right; color:var(--text-dim);" class="mono">{{ card.limit_fmt }}</td>
+            <td style="text-align:right;" class="mono {{ 'text-income' if card.available >= 0 else 'text-expense' }}">{{ card.available_fmt }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- Top Transactions -->
+{% if top_transactions %}
+<div class="card p-5 mb-6">
+  <h3 style="font-size:0.875rem; font-weight:600; margin-bottom:16px;">Maiores Transações</h3>
+  <div class="data-table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Data</th>
+          <th>Descrição</th>
+          <th>Categoria</th>
+          <th style="text-align:right;">Valor</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for tx in top_transactions %}
+        <tr>
+          <td style="color:var(--text-dim); font-size:0.8rem;">{{ tx.date }}</td>
+          <td style="font-weight:500;">{{ tx.description }}</td>
+          <td><span class="pill">{{ tx.category }}</span></td>
+          <td style="text-align:right;" class="mono {{ 'text-income' if tx.type == 'income' else 'text-expense' }}">{{ tx.amount_fmt }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- Comparative Month Table -->
+{% if comparison_data %}
+<div class="card p-5">
+  <h3 style="font-size:0.875rem; font-weight:600; margin-bottom:16px;">Comparativo Mensal</h3>
+  <div class="data-table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Mês</th>
+          <th style="text-align:right;">Receitas</th>
+          <th style="text-align:right;">Despesas</th>
+          <th style="text-align:right;">Saldo</th>
+          <th style="text-align:right;">Poupança %</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in comparison_data %}
+        <tr>
+          <td style="font-weight:500;">{{ row.label }}</td>
+          <td style="text-align:right;" class="text-income mono">{{ row.income_fmt }}</td>
+          <td style="text-align:right;" class="text-expense mono">{{ row.expense_fmt }}</td>
+          <td style="text-align:right;" class="mono fw-600 {{ 'text-income' if row.balance >= 0 else 'text-expense' }}">{{ row.balance_fmt }}</td>
+          <td style="text-align:right;">
+            <span class="badge {{ 'badge--income' if row.savings_rate >= 20 else 'badge--warning' }}">{{ row.savings_rate }}%</span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<script>
+function changeMonth(delta) {
+  const url = new URL(window.location.href);
+  let month = parseInt(url.searchParams.get('month') || {{ month }});
+  let year = parseInt(url.searchParams.get('year') || {{ year }});
+  
+  month += delta;
+  if (month > 12) { month = 1; year += 1; }
+  if (month < 1) { month = 12; year -= 1; }
+  
+  url.searchParams.set('month', month);
+  url.searchParams.set('year', year);
+  window.location.href = url.toString();
+}
+</script>
 {% endblock %}
 
 {% block scripts %}
@@ -148,4 +350,15 @@ new Chart(document.getElementById('trendChart').getContext('2d'), {
   },
 });
 </script>
+
+<style>
+@media print {
+  .page-header__actions, .icon-btn, button { display: none !important; }
+  body { background: white !important; }
+  .card { box-shadow: none; border: 1px solid #ddd; }
+  .summary-card__icon { display: none; }
+  .summary-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .summary-card { border: 1px solid #ddd; padding: 16px; border-radius: 8px; }
+}
+</style>
 {% endblock %}

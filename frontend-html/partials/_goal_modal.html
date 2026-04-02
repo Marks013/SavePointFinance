@@ -26,11 +26,11 @@
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
       <div class="form-group">
         <label class="form-label" for="goalTarget">Valor alvo (R$)</label>
-        <input type="number" id="goalTarget" name="target" class="form-input mono" placeholder="0,00" step="0.01" min="1" value="{{ goal.target if goal else '' }}" required>
+        <input type="number" id="goalTarget" name="target_amount" class="form-input mono" placeholder="0,00" step="0.01" min="1" value="{{ goal.target_amount if goal else '' }}" required>
       </div>
       <div class="form-group">
         <label class="form-label" for="goalCurrent">Valor atual (R$)</label>
-        <input type="number" id="goalCurrent" name="current" class="form-input mono" placeholder="0,00" step="0.01" min="0" value="{{ goal.current if goal else '0' }}">
+        <input type="number" id="goalCurrent" name="current_amount" class="form-input mono" placeholder="0,00" step="0.01" min="0" value="{{ goal.current_amount if goal else '0' }}">
       </div>
     </div>
 
@@ -47,6 +47,36 @@
         </div>
       </div>
     </div>
+
+    <div class="form-group">
+      <label class="form-label" for="goalAccount">Conta para acumular</label>
+      {% if accounts %}
+      <select id="goalAccount" name="account_id" class="form-select">
+        <option value="">Nenhuma (apenas registro)</option>
+        {% for acc in accounts %}
+        <option value="{{ acc.id }}" {% if goal and goal.account_id == acc.id %}selected{% endif %}>{{ acc.name }} ({{ acc.balance_fmt }})</option>
+        {% endfor %}
+      </select>
+      <p style="font-size:0.75rem; color:var(--text-dim); margin-top:4px;">O dinheiro será transferido para esta conta ao depositar</p>
+      {% else %}
+      <div style="padding:8px 12px; background:var(--secondary); border-radius:6px; font-size:0.875rem;">
+        Nenhuma conta. <a href="/accounts" target="_blank" style="color:var(--accent);">Cadastrar</a>
+      </div>
+      {% endif %}
+    </div>
+
+    {% if goal %}
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; padding:12px; background:var(--secondary); border-radius:8px;">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <input type="checkbox" id="goalNotifyComplete" name="notify_on_complete" value="1" {% if goal.notify_on_complete %}checked{% endif %} style="width:16px; height:16px;">
+        <label for="goalNotifyComplete" style="font-size:0.875rem;">Notificar ao completar</label>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <input type="checkbox" id="goalNotifyDeadline" name="notify_on_deadline" value="1" {% if goal.notify_on_deadline %}checked{% endif %} style="width:16px; height:16px;">
+        <label for="goalNotifyDeadline" style="font-size:0.875rem;">Notificar perto do prazo</label>
+      </div>
+    </div>
+    {% endif %}
   </div>
 
   <div class="modal-footer">

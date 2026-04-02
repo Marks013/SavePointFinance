@@ -52,16 +52,55 @@
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
       <div class="form-group">
         <label class="form-label" for="subNextDate">Próxima cobrança</label>
-        <input type="date" id="subNextDate" name="next_date" class="form-input" value="{{ sub.next_date.strftime('%Y-%m-%d') if sub and sub.next_date else today }}">
+        <input type="date" id="subNextDate" name="next_date" class="form-input" value="{{ sub.next_billing_date if sub and sub.next_billing_date else today }}">
       </div>
       <div class="form-group">
         <label class="form-label" for="subCat">Categoria</label>
+        {% if categories %}
         <select id="subCat" name="category_id" class="form-select">
           <option value="">Sem categoria</option>
           {% for cat in categories %}
-          <option value="{{ cat.id }}" {% if sub and sub.category_id == cat.id %}selected{% endif %}>{{ cat.icon or '' }} {{ cat.name }}</option>
+          <option value="{{ cat.id }}" {% if sub and sub.category_id == cat.id %}selected{% endif %}>{{ cat.icon | icon | safe }} {{ cat.name }}</option>
           {% endfor %}
         </select>
+        {% else %}
+        <div style="padding:8px 12px; background:var(--secondary); border-radius:6px; font-size:0.875rem;">
+          Nenhuma categoria. <a href="/categories" target="_blank" style="color:var(--accent);">Cadastrar</a>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+      <div class="form-group">
+        <label class="form-label" for="subAccount">Conta</label>
+        {% if accounts %}
+        <select id="subAccount" name="account_id" class="form-select">
+          <option value="">Selecionar conta</option>
+          {% for acc in accounts %}
+          <option value="{{ acc.id }}" {% if sub and sub.account_id == acc.id %}selected{% endif %}>{{ acc.name }}</option>
+          {% endfor %}
+        </select>
+        {% else %}
+        <div style="padding:8px 12px; background:var(--secondary); border-radius:6px; font-size:0.875rem;">
+          Nenhuma conta. <a href="/accounts" target="_blank" style="color:var(--accent);">Cadastrar</a>
+        </div>
+        {% endif %}
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="subCard">Cartão</label>
+        {% if cards %}
+        <select id="subCard" name="card_id" class="form-select">
+          <option value="">Selecionar cartão</option>
+          {% for card in cards %}
+          <option value="{{ card.id }}" {% if sub and sub.card_id == card.id %}selected{% endif %}>{{ card.name }}</option>
+          {% endfor %}
+        </select>
+        {% else %}
+        <div style="padding:8px 12px; background:var(--secondary); border-radius:6px; font-size:0.875rem;">
+          Nenhum cartão. <a href="/accounts" target="_blank" style="color:var(--accent);">Cadastrar</a>
+        </div>
+        {% endif %}
       </div>
     </div>
 

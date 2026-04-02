@@ -73,9 +73,11 @@ async def edit_transaction_modal(
     return templates.TemplateResponse("partials/_tx_modal.html", {
         "request": request,
         "tx": tx,
+        "tx_type": tx.type.value if tx.type else "expense",
         "categories": [{"id": str(c.id), "name": c.name, "icon": c.icon} for c in categories],
         "accounts": [{"id": str(a.id), "name": a.name} for a in accounts],
         "cards": [{"id": str(c.id), "name": c.name} for c in cards],
+        "today": date.today().strftime("%Y-%m-%d"),
     })
 
 
@@ -130,9 +132,21 @@ async def deposit_goal_modal(
     if not goal:
         raise HTTPException(status_code=404, detail="Meta não encontrada")
     
+    accounts = (await db.execute(select(Account).where(Account.tenant_id == current_user.tenant_id, Account.is_active == True).order_by(Account.name))).scalars().all()
+    
     return templates.TemplateResponse("partials/_goal_deposit_modal.html", {
         "request": request,
-        "goal": goal,
+        "goal": {
+            "id": str(goal.id),
+            "name": goal.name,
+            "target": float(goal.target_amount),
+            "target_fmt": fmt_money(goal.target_amount),
+            "current": float(goal.current_amount),
+            "current_fmt": fmt_money(goal.current_amount),
+            "color": goal.color or "#00E57A",
+            "account_id": str(goal.account_id) if goal.account_id else None,
+        },
+        "accounts": [{"id": str(a.id), "name": a.name, "balance": float(a.balance), "balance_fmt": fmt_money(a.balance)} for a in accounts],
     })
 
 
@@ -146,7 +160,7 @@ async def new_category_modal(
     """HTMX: Render new category modal."""
     return templates.TemplateResponse("partials/_cat_modal.html", {
         "request": request,
-        "category": None,
+        "cat": None,
     })
 
 
@@ -164,7 +178,14 @@ async def edit_category_modal(
     
     return templates.TemplateResponse("partials/_cat_modal.html", {
         "request": request,
-        "category": cat,
+        "cat": {
+            "id": str(cat.id),
+            "name": cat.name,
+            "type": cat.type.value if cat.type else "expense",
+            "icon": cat.icon,
+            "color": cat.color,
+            "budget": float(cat.monthly_limit) if cat.monthly_limit else None,
+        },
     })
 
 
@@ -288,7 +309,30 @@ async def edit_subscription_modal(
     })
 
 
+
 # ── Installments Modals ────────────────────────────────────────────────────────
+
+@router.get("/installments/new", response_class=HTMLResponse)
+async def new_installment_modal(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """HTMX: Render new installment modal."""
+    from app.models.category import Category
+    from app.models.card import Card
+    
+    categories = (await db.execute(select(Category).where(Category.tenant_id == current_user.tenant_id).order_by(Category.name))).scalars().all()
+    cards = (await db.execute(select(Card).where(Card.tenant_id == current_user.tenant_id, Card.is_active == True).order_by(Card.name))).scalars().all()
+    
+    return templates.TemplateResponse("partials/_inst_modal.html", {
+        "request": request,
+        "inst": None,
+        "categories": [{"id": str(c.id), "name": c.name, "icon": c.icon} for c in categories],
+        "cards": [{"id": str(c.id), "name": c.name} for c in cards],
+        "today": date.today().strftime("%Y-%m-%d"),
+    })
+
 
 @router.get("/installments/{inst_id}/edit", response_class=HTMLResponse)
 async def edit_installment_modal(
@@ -298,5 +342,39 @@ async def edit_installment_modal(
     current_user: User = Depends(get_current_user),
 ):
     """HTMX: Render edit installment modal."""
-    # This would need to fetch the installment data
-    return HTMLResponse("<!-- installment edit modal -->")
+    from app.models.category import Category
+    from app.models.card import Card
+    from app.models.transaction import Transaction
+    
+    # Get the root transaction (parent_id is null)
+    tx_result = await db.execute(
+        select(Transaction).where(
+            Transaction.id == uuid.UUID(inst_id),
+            Transaction.tenant_id == current_user.tenant_id,
+            Transaction.parent_id == None,
+            Transaction.installments_total > 1
+        )
+    )
+    tx = tx_result.scalar_one_or_none()
+    
+    if not tx:
+        raise HTTPException(status_code=404, detail="Parcelamento não encontrado")
+    
+    categories = (await db.execute(select(Category).where(Category.tenant_id == current_user.tenant_id).order_by(Category.name))).scalars().all()
+    cards = (await db.execute(select(Card).where(Card.tenant_id == current_user.tenant_id, Card.is_active == True).order_by(Card.name))).scalars().all()
+    
+    return templates.TemplateResponse("partials/_inst_modal.html", {
+        "request": request,
+        "inst": {
+            "id": str(tx.id),
+            "description": tx.description,
+            "total_amount": float(tx.amount) * tx.installments_total,
+            "total_installments": tx.installments_total,
+            "first_date": tx.date.strftime("%Y-%m-%d") if tx.date else None,
+            "card_id": str(tx.card_id) if tx.card_id else None,
+            "category_id": str(tx.category_id) if tx.category_id else None,
+        },
+        "categories": [{"id": str(c.id), "name": c.name, "icon": c.icon} for c in categories],
+        "cards": [{"id": str(c.id), "name": c.name} for c in cards],
+        "today": date.today().strftime("%Y-%m-%d"),
+    })

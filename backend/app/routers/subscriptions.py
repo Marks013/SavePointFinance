@@ -26,6 +26,9 @@ class SubscriptionCreate(BaseModel):
     account_id: Optional[uuid.UUID] = None
     card_id: Optional[uuid.UUID] = None
     next_billing_date: date
+    type: str = "expense"
+    is_active: bool = True
+    frequency: str = "monthly"
 
 
 class SubscriptionUpdate(BaseModel):
@@ -37,6 +40,8 @@ class SubscriptionUpdate(BaseModel):
     card_id: Optional[uuid.UUID] = None
     is_active: Optional[bool] = None
     next_billing_date: Optional[date] = None
+    type: Optional[str] = None
+    frequency: Optional[str] = None
 
 
 def subscription_to_dict(sub: Subscription) -> dict:
@@ -75,6 +80,9 @@ async def create_subscription(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    from app.models.subscription import SubscriptionType
+    sub_type = SubscriptionType.income if body.type == "income" else SubscriptionType.expense
+    
     subscription = Subscription(
         tenant_id=current_user.tenant_id,
         user_id=current_user.id,
@@ -85,6 +93,8 @@ async def create_subscription(
         account_id=body.account_id,
         card_id=body.card_id,
         next_billing_date=body.next_billing_date,
+        type=sub_type,
+        is_active=body.is_active,
     )
     db.add(subscription)
     await db.commit()

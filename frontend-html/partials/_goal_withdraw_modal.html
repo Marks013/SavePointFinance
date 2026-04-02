@@ -1,6 +1,6 @@
-<!-- _goal_deposit_modal.html -->
+<!-- _goal_withdraw_modal.html -->
 <div class="modal-header">
-  <span class="modal-title">Depositar na Meta</span>
+  <span class="modal-title">Sacar da Meta</span>
   <button class="modal-close" onclick="closeModal()">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
@@ -10,8 +10,8 @@
 
 <form
   method="POST"
-  action="/goals/{{ goal.id }}/deposit"
-  hx-post="/goals/{{ goal.id }}/deposit"
+  action="/goals/{{ goal.id }}/withdraw"
+  hx-post="/goals/{{ goal.id }}/withdraw"
   hx-target="body"
   hx-swap="none"
   hx-on::after-request="if(event.detail.successful) { closeModal(); location.reload(); }"
@@ -21,26 +21,20 @@
   <div style="background:var(--secondary); border-radius:10px; padding:16px; margin-bottom:16px; display:flex; align-items:center; justify-content:space-between;">
     <div>
       <div style="font-weight:600;">{{ goal.name }}</div>
-      <div style="font-size:0.75rem; color:var(--text-dim); margin-top:2px;">Progresso atual</div>
+      <div style="font-size:0.75rem; color:var(--text-dim); margin-top:2px;">Valor disponível</div>
     </div>
     <div style="text-align:right;">
       <div class="mono fw-600" style="color:var(--accent);">{{ goal.current_fmt or goal.current }}</div>
-      <div style="font-size:0.75rem; color:var(--text-dim);">de {{ goal.target_fmt or goal.target }}</div>
     </div>
   </div>
 
-  {% set pct = [(goal.current / goal.target * 100), 100]|min if goal.target else 0 %}
-  <div class="progress-track" style="margin-bottom:20px;">
-    <div class="progress-bar" style="width:{{ pct }}%; background:{{ goal.color or '#00E57A' }};"></div>
-  </div>
-
   <div class="form-stack">
-    {% if accounts %}
+    {% if target_accounts %}
     <div class="form-group">
-      <label class="form-label" for="depositSourceAccount">Transferir da conta</label>
-      <select id="depositSourceAccount" name="source_account_id" class="form-select" required>
+      <label class="form-label" for="withdrawTargetAccount">Transferir para conta</label>
+      <select id="withdrawTargetAccount" name="target_account_id" class="form-select" required>
         <option value="">Selecionar conta...</option>
-        {% for acc in accounts %}
+        {% for acc in target_accounts %}
         <option value="{{ acc.id }}">{{ acc.name }} ({{ acc.balance_fmt }})</option>
         {% endfor %}
       </select>
@@ -53,13 +47,14 @@
     {% endif %}
 
     <div class="form-group">
-      <label class="form-label" for="depositAmount">Valor do depósito (R$)</label>
-      <input type="number" id="depositAmount" name="amount" class="form-input mono" placeholder="0,00" step="0.01" min="0.01" required autofocus>
+      <label class="form-label" for="withdrawAmount">Valor do saque (R$)</label>
+      <input type="number" id="withdrawAmount" name="amount" class="form-input mono" placeholder="0,00" step="0.01" min="0.01" max="{{ goal.current }}" required autofocus>
+      <p style="font-size:0.75rem; color:var(--text-dim); margin-top:4px;">Máximo disponível: {{ goal.current_fmt or goal.current }}</p>
     </div>
 
     <div class="form-group">
-      <label class="form-label" for="depositNote">Nota (opcional)</label>
-      <input type="text" id="depositNote" name="note" class="form-input" placeholder="Ex.: Salário de março">
+      <label class="form-label" for="withdrawNote">Motivo (opcional)</label>
+      <input type="text" id="withdrawNote" name="note" class="form-input" placeholder="Ex.: Urgência, investimento...">
     </div>
   </div>
 
@@ -67,9 +62,9 @@
     <button type="button" class="btn btn--outline" onclick="closeModal()">Cancelar</button>
     <button type="submit" class="btn btn--primary">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>
+        <line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>
       </svg>
-      Depositar
+      Sacar
     </button>
   </div>
 </form>

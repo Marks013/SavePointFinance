@@ -42,7 +42,7 @@
           </td>
           <td>
             {% if tx.category %}
-            <span class="pill">{{ tx.category.icon or '' }} {{ tx.category.name }}</span>
+            <span class="pill">{{ tx.category.icon | icon | safe if tx.category.icon else '' }} {{ tx.category.name }}</span>
             {% else %}
             <span style="color:var(--text-dim); font-size:0.8rem;">—</span>
             {% endif %}

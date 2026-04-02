@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.notification import Notification
@@ -17,8 +18,8 @@ async def create_notification(
     link: str = None
 ) -> Notification:
     notification = Notification(
-        tenant_id=tenant_id,
-        user_id=user_id,
+        tenant_id=UUID(tenant_id) if isinstance(tenant_id, str) else tenant_id,
+        user_id=UUID(user_id) if isinstance(user_id, str) else user_id,
         title=title,
         message=message,
         type=notif_type,
@@ -32,9 +33,10 @@ async def create_notification(
 async def check_card_due_notifications(db: AsyncSession, tenant_id: str, user_id: str) -> list[Notification]:
     notifications = []
     today = datetime.now().date()
+    tenant_uuid = UUID(tenant_id) if isinstance(tenant_id, str) else tenant_id
     
     result = await db.execute(
-        select(Card).where(Card.tenant_id == tenant_id, Card.is_active == True)
+        select(Card).where(Card.tenant_id == tenant_uuid, Card.is_active == True)
     )
     cards = result.scalars().all()
     
@@ -76,9 +78,10 @@ async def check_card_due_notifications(db: AsyncSession, tenant_id: str, user_id
 
 async def check_goal_notifications(db: AsyncSession, tenant_id: str, user_id: str) -> list[Notification]:
     notifications = []
+    tenant_uuid = UUID(tenant_id) if isinstance(tenant_id, str) else tenant_id
     
     result = await db.execute(
-        select(Goal).where(Goal.tenant_id == tenant_id, Goal.is_active == True)
+        select(Goal).where(Goal.tenant_id == tenant_uuid, Goal.is_completed == False)
     )
     goals = result.scalars().all()
     
@@ -86,7 +89,7 @@ async def check_goal_notifications(db: AsyncSession, tenant_id: str, user_id: st
         if goal.target_amount and goal.current_amount >= goal.target_amount:
             existing = await db.execute(
                 select(Notification).where(
-                    Notification.tenant_id == tenant_id,
+                    Notification.tenant_id == tenant_uuid,
                     Notification.title.like(f"%{goal.name}%"),
                     Notification.message.like("%meta alcançada%")
                 )
@@ -102,7 +105,7 @@ async def check_goal_notifications(db: AsyncSession, tenant_id: str, user_id: st
                 notifications.append(notif)
         
         if goal.deadline:
-            days_until = (goal.deadline.date() - datetime.now().date()).days
+            days_until = (goal.deadline - datetime.now().date()).days
             if days_until == 7 and goal.current_amount < goal.target_amount:
                 notif = await create_notification(
                     db, tenant_id, user_id,
@@ -119,15 +122,16 @@ async def check_goal_notifications(db: AsyncSession, tenant_id: str, user_id: st
 async def check_subscription_due_notifications(db: AsyncSession, tenant_id: str, user_id: str) -> list[Notification]:
     notifications = []
     today = datetime.now().date()
+    tenant_uuid = UUID(tenant_id) if isinstance(tenant_id, str) else tenant_id
     
     result = await db.execute(
-        select(Subscription).where(Subscription.tenant_id == tenant_id, Subscription.is_active == True)
+        select(Subscription).where(Subscription.tenant_id == tenant_uuid, Subscription.is_active == True)
     )
     subs = result.scalars().all()
     
     for sub in subs:
         if sub.next_billing_date:
-            days_until = (sub.next_billing_date.date() - today).days
+            days_until = (sub.next_billing_date - today).days
             
             if days_until == 2:
                 notif = await create_notification(

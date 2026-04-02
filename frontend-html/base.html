@@ -2,9 +2,11 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
   <meta name="description" content="SavePoint Finance - Controle suas finanças pessoais">
-  <meta name="theme-color" content="#10B981">
+  <meta name="theme-color" content="#080B10">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>{% block title %}SavePoint Finance{% endblock %}</title>
   
   <!-- Preconnect para performance -->
@@ -12,31 +14,253 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="dns-prefetch" href="https://fonts.googleapis.com">
   
-  <!-- CSS crítico inline para first paint -->
+  <!-- CSS crítico inline para first paint - versão completa -->
   <style>
-    :root {--accent: #10B981; --bg: #0f0f0f; --card: #1a1a1a; --border: #2a2a2a; --text: #f5f5f5; --text-dim: #888;}
-    body {margin:0; font-family:Inter,sans-serif; background:var(--bg); color:var(--text);}
-    .app-shell {display:flex; min-height:100vh;}
-    .main-content {flex:1; margin-left:260px; padding:20px; transition:margin 0.2s;}
-    @media (max-width:768px) {.main-content {margin-left:0;}}
-    .toast-container {position:fixed; top:20px; right:20px; z-index:9999; display:flex; flex-direction:column; gap:8px;}
-    .toast {display:flex; align-items:center; gap:10px; padding:12px 16px; background:#1a1a1a; border-radius:8px; border:1px solid #333; box-shadow:0 4px 12px rgba(0,0,0,0.3); min-width:280px; max-width:400px; transform:translateX(120%); opacity:0; transition:transform .3s, opacity .3s;}
-    .toast--show {transform:translateX(0); opacity:1;}
-    .toast--success {border-color:#10B981; background:linear-gradient(135deg,#10B98115,#05966910);}
-    .toast--error {border-color:#ef4444; background:linear-gradient(135deg,#ef444415,#dc262610);}
-    .toast--warning {border-color:#f59e0b; background:linear-gradient(135deg,#f59e0b15,#d9770610);}
-    .toast--info {border-color:#3b82f6; background:linear-gradient(135deg,#3b82f615,#2563eb10);}
-    .toast-icon {font-size:1rem;}
-    .toast--success .toast-icon {color:#10B981;}
-    .toast--error .toast-icon {color:#ef4444;}
-    .toast--warning .toast-icon {color:#f59e0b;}
-    .toast--info .toast-icon {color:#3b82f6;}
-    .toast-message {font-size:0.875rem; color:#f5f5f5; flex:1;}
+    :root {
+      --accent: #00E57A;
+      --bg: #080B10;
+      --bg-2: #0A0E14;
+      --card: #0F1419;
+      --secondary: #141C24;
+      --border: rgba(255,255,255,0.06);
+      --text: #E8EDF2;
+      --text-dim: #8B9BB4;
+      --income: #00E57A;
+      --expense: #FF4D6A;
+      --radius-sm: 6px;
+      --radius: 10px;
+      --radius-lg: 14px;
+      --sidebar-w: 240px;
+      --header-h: 56px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 16px; scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      -webkit-overflow-scrolling: touch;
+      min-height: 100vh;
+    }
+    a { color: inherit; text-decoration: none; }
+    button { cursor: pointer; font-family: inherit; }
+    input, select, textarea { font-family: inherit; }
+    svg { display: block; }
+    
+    /* App Shell */
+    .app-shell { display: flex; min-height: 100vh; }
+    
+    .main-content {
+      flex: 1;
+      min-width: 0;
+      margin-left: var(--sidebar-w);
+      display: flex;
+      flex-direction: column;
+      transition: margin-left 0.3s ease;
+    }
+    
+    .page-body {
+      flex: 1;
+      padding: 24px 28px;
+    }
+    
+    /* Sidebar */
+    .sidebar {
+      width: var(--sidebar-w);
+      height: 100vh;
+      position: fixed;
+      top: 0;
+      left: 0;
+      background: #080C12;
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      z-index: 50;
+      overflow-y: auto;
+    }
+    
+    /* Cards */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+    }
+    
+    /* Stats Grid */
+    .stats-grid { 
+      display: grid; 
+      grid-template-columns: repeat(4, 1fr); 
+      gap: 16px; 
+      margin-bottom: 24px;
+    }
+    
+    /* Flex helpers */
+    .flex { display: flex; }
+    .items-center { align-items: center; }
+    .justify-between { justify-content: space-between; }
+    .gap-2 { gap: 8px; }
+    .gap-4 { gap: 16px; }
+    
+    /* Toast */
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    
+    .toast {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 0.875rem;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+      min-width: 260px;
+      max-width: 380px;
+      transform: translateX(120%);
+      transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1);
+    }
+    
+    .toast--show { transform: translateX(0); }
+    .toast--success { border-left: 3px solid var(--income); }
+    .toast--error { border-left: 3px solid var(--expense); }
+    .toast--warning { border-left: 3px solid: #F59E0B; }
+    .toast--info { border-left: 3px solid: #3B9EFF; }
+    .toast-icon { font-size: 1rem; }
+    .toast-message { flex: 1; }
+    
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.65);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.2s, visibility 0.2s;
+    }
+    
+    .modal-overlay.modal--open { opacity: 1; visibility: visible; }
+    
+    .modal-box {
+      width: 100%;
+      max-width: 500px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+      transform: translateY(12px);
+      transition: transform 0.25s ease;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    
+    .modal-overlay.modal--open .modal-box { transform: translateY(0); }
+    
+    /* Header */
+    .top-header {
+      height: var(--header-h);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(8,11,16,0.8);
+      backdrop-filter: blur(12px);
+      position: sticky;
+      top: 0;
+      z-index: 30;
+    }
+    
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      padding: 0 16px;
+      height: 36px;
+      border-radius: var(--radius-sm);
+      font-size: 0.8125rem;
+      font-weight: 500;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 0.18s ease;
+      white-space: nowrap;
+      background: var(--accent);
+      color: #050A07;
+    }
+    
+    .btn--secondary {
+      background: var(--secondary);
+      color: var(--text);
+      border-color: var(--border);
+    }
+    
+    /* Responsive */
+    @media (max-width: 768px) {
+      .main-content { margin-left: 0; }
+      .sidebar { transform: translateX(-100%); transition: transform 0.3s ease; }
+      .sidebar.open { transform: translateX(0); }
+      .page-body { padding: 16px; }
+      .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+      .modal-box { max-width: 100%; border-radius: var(--radius); }
+      .toast-container { left: 12px; right: 12px; bottom: 12px; }
+      .toast { min-width: 0; max-width: 100%; }
+    }
+    
+    @media (max-width: 480px) {
+      .stats-grid { grid-template-columns: 1fr; }
+    }
+    
+    /* Sidebar toggle */
+    .sidebar-toggle { display: none; }
+    @media (max-width: 768px) {
+      .sidebar-toggle { 
+        display: flex; 
+        width: 34px; 
+        height: 34px; 
+        border-radius: 8px; 
+        background: none; 
+        border: 1px solid var(--border); 
+        color: var(--text-dim); 
+        align-items: center; 
+        justify-content: center; 
+        cursor: pointer;
+      }
+    }
+    
+    /* Overlay */
+    .sidebar-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 40;
+    }
+    .sidebar-overlay.open { display: block; }
   </style>
   
   <!-- Fontes com display swap para performance -->
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
   <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap"></noscript>
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
   
   <!-- CSS principal -->
   <link rel="stylesheet" href="/css/styles.css">
@@ -45,6 +269,9 @@
   
   <!-- HTMX com defer -->
   <script src="https://unpkg.com/htmx.org@2.0.3/dist/htmx.min.js" defer></script>
+  
+  <!-- API & Auth -->
+  <script src="/js/api.js"></script>
   
   {% block head %}{% endblock %}
 </head>
@@ -336,6 +563,178 @@ function changeMonth(delta) {
   url.searchParams.set('year',  y);
   window.location = url.toString();
 }
+
+/* ── Premium Interactions ──────────────────────────────────────────────── */
+
+// Smooth scroll reveal
+const revealOnScroll = () => {
+  const reveals = document.querySelectorAll('.reveal');
+  reveals.forEach(el => {
+    const windowHeight = window.innerHeight;
+    const elementTop = el.getBoundingClientRect().top;
+    const elementVisible = 100;
+    if (elementTop < windowHeight - elementVisible) {
+      el.classList.add('visible');
+    }
+  });
+};
+
+window.addEventListener('scroll', revealOnScroll);
+document.addEventListener('DOMContentLoaded', revealOnScroll);
+
+// Stagger animation for list items
+document.querySelectorAll('[data-stagger]').forEach((container, i) => {
+  container.querySelectorAll(':scope > *').forEach((child, j) => {
+    child.style.animationDelay = `${(i + j) * 0.05}s`;
+    child.classList.add('stagger-item');
+  });
+});
+
+// Add ripple effect to buttons
+document.querySelectorAll('.btn, .icon-btn, .tab-btn, .tab-pill').forEach(btn => {
+  btn.classList.add('ripple');
+});
+
+// Animate numbers on page load
+document.querySelectorAll('[data-count]').forEach(el => {
+  const target = parseFloat(el.dataset.count);
+  const duration = 1500;
+  const start = performance.now();
+  
+  const animate = (now) => {
+    const progress = Math.min((now - start) / duration, 1);
+    const eased = 1 - Math.pow(1 - progress, 3); // ease-out-cubic
+    const current = target * eased;
+    el.textContent = target % 1 === 0 
+      ? Math.floor(current).toLocaleString('pt-BR')
+      : current.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    
+    if (progress < 1) requestAnimationFrame(animate);
+  };
+  
+  requestAnimationFrame(animate);
+});
+
+// Progress bar animation
+document.querySelectorAll('.progress-bar[data-progress]').forEach(bar => {
+  const progress = bar.dataset.progress;
+  setTimeout(() => {
+    bar.style.width = `${progress}%`;
+  }, 300);
+});
+
+// Card hover sound effect (optional - disabled by default)
+const playHoverSound = () => {
+  // Can be enabled for accessibility or preference
+  // const audio = new Audio('/sounds/hover.mp3');
+  // audio.volume = 0.1;
+  // audio.play().catch(() => {});
+};
+
+// Add entrance animations
+document.addEventListener('DOMContentLoaded', () => {
+  // Add fade-in class to main content children
+  document.querySelectorAll('.page-body > *').forEach((el, i) => {
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(20px)';
+    el.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+    setTimeout(() => {
+      el.style.opacity = '1';
+      el.style.transform = 'translateY(0)';
+    }, 100 + (i * 80));
+  });
+});
+
+// Form validation feedback
+document.querySelectorAll('form').forEach(form => {
+  form.addEventListener('submit', (e) => {
+    const submitBtn = form.querySelector('button[type="submit"]');
+    if (submitBtn && !form.checkValidity()) {
+      submitBtn.classList.add('shake');
+      setTimeout(() => submitBtn.classList.add('shake'), 500);
+    }
+  });
+});
+
+// Sidebar active link animation
+document.querySelectorAll('.nav-link').forEach(link => {
+  link.addEventListener('mouseenter', () => {
+    link.style.transform = 'translateX(4px)';
+  });
+  link.addEventListener('mouseleave', () => {
+    link.style.transform = '';
+  });
+});
+
+// Add focus trap for modals
+document.addEventListener('keydown', (e) => {
+  if (!modalOverlay.classList.contains('modal--open')) return;
+  
+  const focusable = modalOverlay.querySelectorAll(
+    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+  );
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  
+  if (e.key === 'Tab') {
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
+});
+
+// Lazy load images with fade-in
+document.querySelectorAll('img[data-src]').forEach(img => {
+  img.src = img.dataset.src;
+  img.onload = () => img.classList.add('loaded');
+  img.onerror = () => {
+    img.src = '/static/img/placeholder.svg';
+    img.classList.add('error');
+  };
+});
+
+// Add loading state to links
+document.querySelectorAll('a[hx-get], a[href]').forEach(link => {
+  link.addEventListener('click', function(e) {
+    if (this.href && !this.href.startsWith('#') && !this.target) {
+      this.style.opacity = '0.7';
+      this.style.pointerEvents = 'none';
+    }
+  });
+});
+
+// Initialize Lucide icons with animation
+document.addEventListener('DOMContentLoaded', () => {
+  if (typeof lucide !== 'undefined') {
+    lucide.createIcons({
+      attrs: {
+        'stroke-width': 2,
+        'stroke': 'currentColor'
+      }
+    });
+  }
+});
+
+// Debounced resize handler
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    // Trigger any responsive adjustments
+    document.body.classList.add('resize-complete');
+  }, 200);
+});
+
+// Console branding
+console.log(
+  '%c💰 SavePoint Finance',
+  'font-size: 20px; font-weight: bold; color: #00E57A; text-shadow: 0 0 10px rgba(0,229,122,0.5);'
+);
+console.log('%c✨ Premium UI Loaded', 'color: #8B9BB4;');
 </script>
 
 {% block scripts %}{% endblock %}

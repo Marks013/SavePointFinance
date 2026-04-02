@@ -2,8 +2,8 @@
 <div class="card-hover" style="padding:20px;" id="cat-{{ loop_cat.id if loop_cat else cat.id }}">
   <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
     <div style="display:flex; align-items:center; gap:12px;">
-      <div style="width:40px; height:40px; border-radius:10px; background:var(--accent)18; display:flex; align-items:center; justify-content:center; font-size:1.25rem; flex-shrink:0;">
-        {{ loop_cat.icon if loop_cat else cat.icon }}
+      <div style="width:40px; height:40px; border-radius:10px; background:var(--accent)15; display:flex; align-items:center; justify-content:center; font-size:1.25rem; flex-shrink:0;">
+        {{ (loop_cat.icon if loop_cat else cat.icon) | icon | safe }}
       </div>
       <div>
         <div style="font-weight:600; font-size:0.9375rem;">{{ loop_cat.name if loop_cat else cat.name }}</div>

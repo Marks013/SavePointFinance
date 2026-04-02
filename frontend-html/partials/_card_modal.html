@@ -66,7 +66,7 @@
         <select id="cardInstitution" name="institution_id" class="form-select">
           <option value="">Nenhuma</option>
           {% for inst in institutions %}
-          <option value="{{ inst.id }}" {% if card and card.institution_id == inst.id|string %}selected{% endif %}>
+          <option value="{{ inst.id }}" {% if card and card.institution_id == inst.id %}selected{% endif %}>
             {{ inst.name }}
           </option>
           {% endfor %}

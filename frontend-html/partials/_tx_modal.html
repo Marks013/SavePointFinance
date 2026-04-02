@@ -52,7 +52,7 @@
       <select id="txCat" name="category_id" class="form-select">
         <option value="">Sem categoria</option>
         {% for cat in categories %}
-        <option value="{{ cat.id }}" {% if tx and tx.category_id == cat.id %}selected{% endif %}>{{ cat.icon or '' }} {{ cat.name }}</option>
+          <option value="{{ cat.id }}" {% if tx and tx.category_id == cat.id %}selected{% endif %}>{{ cat.icon | icon | safe }} {{ cat.name }}</option>
         {% endfor %}
       </select>
     </div>
@@ -61,7 +61,8 @@
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
       <div class="form-group">
         <label class="form-label" for="txSource">Origem</label>
-        <select id="txSource" name="source" class="form-select" onchange="toggleAccountCard(this.value)">
+        <select id="txSource" name="source" class="form-select" onchange="toggleAccountCard(this.value)" required>
+          <option value="">Selecione...</option>
           <option value="pix"           {% if tx and tx.source == 'pix'           %}selected{% endif %}>PIX</option>
           <option value="bank"          {% if tx and tx.source == 'bank'          %}selected{% endif %}>Transferência</option>
           <option value="credit_card"   {% if tx and tx.source == 'credit_card'   %}selected{% endif %}>Cartão de Crédito</option>
@@ -72,23 +73,37 @@
       </div>
 
       <div class="form-group" id="accountWrap">
-        <label class="form-label" for="txAccount">Conta</label>
-        <select id="txAccount" name="account_id" class="form-select">
+        <label class="form-label" for="txAccount">Conta <span style="color:var(--expense);">*</span></label>
+        {% if accounts %}
+        <select id="txAccount" name="account_id" class="form-select" required>
           <option value="">Selecionar conta</option>
           {% for acc in accounts %}
           <option value="{{ acc.id }}" {% if tx and tx.account_id == acc.id %}selected{% endif %}>{{ acc.name }}</option>
           {% endfor %}
         </select>
+        {% else %}
+        <div style="padding:8px 12px; background:var(--secondary); border-radius:6px; font-size:0.875rem;">
+          Nenhuma conta cadastrada.
+          <a href="/accounts" target="_blank" style="color:var(--accent); text-decoration:underline;">Cadastrar conta</a>
+        </div>
+        {% endif %}
       </div>
 
       <div class="form-group" id="cardWrap" style="display:none;">
-        <label class="form-label" for="txCard">Cartão</label>
-        <select id="txCard" name="card_id" class="form-select">
+        <label class="form-label" for="txCard">Cartão <span style="color:var(--expense);">*</span></label>
+        {% if cards %}
+        <select id="txCard" name="card_id" class="form-select" required>
           <option value="">Selecionar cartão</option>
           {% for card in cards %}
           <option value="{{ card.id }}" {% if tx and tx.card_id == card.id %}selected{% endif %}>{{ card.name }}</option>
           {% endfor %}
         </select>
+        {% else %}
+        <div style="padding:8px 12px; background:var(--secondary); border-radius:6px; font-size:0.875rem;">
+          Nenhum cartão cadastrado.
+          <a href="/accounts" target="_blank" style="color:var(--accent); text-decoration:underline;">Cadastrar cartão</a>
+        </div>
+        {% endif %}
       </div>
     </div>
 
@@ -125,7 +140,6 @@ function setTxType(type, btn) {
   btn.closest('.tab-list').querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   
-  // Toggle tithe checkbox visibility
   const titheDiv = document.getElementById('titheWrap');
   if (titheDiv) {
     titheDiv.style.display = type === 'income' ? '' : 'none';
@@ -133,8 +147,36 @@ function setTxType(type, btn) {
 }
 
 function toggleAccountCard(source) {
-  const useCard = source === 'credit_card' || source === 'debit_card';
-  document.getElementById('accountWrap').style.display = useCard ? 'none' : '';
-  document.getElementById('cardWrap').style.display    = useCard ? '' : 'none';
+  const accountWrap = document.getElementById('accountWrap');
+  const cardWrap = document.getElementById('cardWrap');
+  const accountSelect = document.getElementById('txAccount');
+  const cardSelect = document.getElementById('txCard');
+  
+  const needsCard = source === 'credit_card' || source === 'debit_card';
+  const needsAccount = source === 'pix' || source === 'bank' || needsCard;
+  
+  if (needsCard) {
+    accountWrap.style.display = 'none';
+    cardWrap.style.display = '';
+    accountSelect.removeAttribute('required');
+    cardSelect.setAttribute('required', 'required');
+  } else if (needsAccount) {
+    accountWrap.style.display = '';
+    cardWrap.style.display = 'none';
+    accountSelect.setAttribute('required', 'required');
+    cardSelect.removeAttribute('required');
+  } else {
+    accountWrap.style.display = 'none';
+    cardWrap.style.display = 'none';
+    accountSelect.removeAttribute('required');
+    cardSelect.removeAttribute('required');
+  }
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+  const sourceSelect = document.getElementById('txSource');
+  if (sourceSelect.value) {
+    toggleAccountCard(sourceSelect.value);
+  }
+});
 </script>
