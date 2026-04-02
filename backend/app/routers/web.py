@@ -4,6 +4,7 @@ All pages are protected via require_user or require_superadmin.
 """
 import uuid
 from datetime import datetime
+from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -642,26 +643,31 @@ async def new_account_modal(request: Request, current_user: User = Depends(requi
 
 @router.post("/settings/accounts/new")
 async def create_account(request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_user)):
-    from app.routers.accounts_cards import create_account as api_create_account, AccountCreate
+    from fastapi.responses import JSONResponse
+    from app.routers.accounts_cards import create_account as api_create_account, AccountCreate, AccountType
     from app.services.plan_limits import check_limit
     
     form = await request.form()
     name = form.get("name", "").strip()
     
     if not name:
-        from fastapi.responses import JSONResponse
         return JSONResponse(content={"error": "Nome da conta é obrigatório"}, status_code=400)
     
     allowed, error = await check_limit(current_user.tenant_id, "accounts", db)
     if not allowed:
-        from fastapi.responses import JSONResponse
         return JSONResponse(content={"error": error}, status_code=403)
     
     try:
+        acc_type = form.get("type", "checking")
+        try:
+            account_type = AccountType(acc_type)
+        except ValueError:
+            account_type = AccountType.checking
+        
         body = AccountCreate(
             name=name,
-            type=form.get("type", "checking"),
-            balance=float(form.get("balance", 0) or 0),
+            type=account_type,
+            balance=Decimal(str(form.get("balance", 0) or 0)),
             currency=form.get("currency", "BRL"),
             color=form.get("color", "#10B981"),
         )
@@ -669,7 +675,6 @@ async def create_account(request: Request, db: AsyncSession = Depends(get_db), c
         account = await api_create_account(body=body, db=db, current_user=current_user)
         return templates.TemplateResponse("partials/_account_modal.html", {"request": request, "user": current_user, "account": account_to_dict(account), "success": True})
     except Exception as e:
-        from fastapi.responses import JSONResponse
         return JSONResponse(content={"error": str(e)}, status_code=400)
 
 
