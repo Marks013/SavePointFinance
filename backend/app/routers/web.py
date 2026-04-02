@@ -699,22 +699,54 @@ async def delete_account(account_id: uuid.UUID, request: Request, db: AsyncSessi
 
 
 @router.get("/settings/cards/new")
-async def new_card_modal(request: Request, current_user: User = Depends(require_user)):
-    return templates.TemplateResponse("partials/_card_modal.html", {"request": request, "user": current_user, "card": None})
+async def new_card_modal(request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_user)):
+    from app.models.institution import Institution
+    inst_result = await db.execute(select(Institution).where(Institution.is_active == True).order_by(Institution.name))
+    return templates.TemplateResponse("partials/_card_modal.html", {
+        "request": request,
+        "user": current_user,
+        "card": None,
+        "institutions": inst_result.scalars().all(),
+    })
+
+
+@router.get("/settings/cards/{card_id}/edit")
+async def edit_card_modal(card_id: str, request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_user)):
+    from app.models.institution import Institution
+    from app.routers.accounts_cards import card_to_dict
+    from app.models.card import Card
+    card_result = await db.execute(select(Card).where(Card.id == uuid.UUID(card_id), Card.tenant_id == current_user.tenant_id))
+    card = card_result.scalar_one_or_none()
+    if not card:
+        return JSONResponse(content={"error": "Cartão não encontrado"}, status_code=404)
+    inst_result = await db.execute(select(Institution).where(Institution.is_active == True).order_by(Institution.name))
+    return templates.TemplateResponse("partials/_card_modal.html", {
+        "request": request,
+        "user": current_user,
+        "card": card_to_dict(card),
+        "institutions": inst_result.scalars().all(),
+    })
 
 
 @router.post("/settings/cards/new")
 async def create_card(request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_user)):
     from fastapi.responses import JSONResponse
     from app.routers.accounts_cards import create_card as api_create_card, CardCreate
+    from app.models.institution import Institution
     from app.services.plan_limits import check_limit
     
     form = await request.form()
     allowed, error = await check_limit(current_user.tenant_id, "cards", db)
     if not allowed:
-        return JSONResponse(content={"error": error}, status_code=403)
+        inst_result = await db.execute(select(Institution).where(Institution.is_active == True).order_by(Institution.name))
+        return templates.TemplateResponse("partials/_card_modal.html", {
+            "request": request, "user": current_user, "card": None,
+            "institutions": inst_result.scalars().all(),
+            "error": error,
+        })
     
     try:
+        inst_id = form.get("institution_id")
         body = CardCreate(
             name=form.get("name", ""),
             brand=form.get("brand", "Visa"),
@@ -723,13 +755,19 @@ async def create_card(request: Request, db: AsyncSession = Depends(get_db), curr
             due_day=int(form.get("due_day", 10) or 10),
             close_day=int(form.get("close_day", 3) or 3),
             color=form.get("color", "#3B82F6"),
+            institution_id=uuid.UUID(inst_id) if inst_id else None,
         )
         card_data = await api_create_card(body=body, db=db, current_user=current_user)
         return templates.TemplateResponse("partials/_card_modal.html", {"request": request, "user": current_user, "card": card_data, "success": True})
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return JSONResponse(content={"error": str(e)}, status_code=400)
+        inst_result = await db.execute(select(Institution).where(Institution.is_active == True).order_by(Institution.name))
+        return templates.TemplateResponse("partials/_card_modal.html", {
+            "request": request, "user": current_user, "card": None,
+            "institutions": inst_result.scalars().all(),
+            "error": str(e),
+        })
 
 
 @router.post("/transactions/new")
