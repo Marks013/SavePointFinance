@@ -432,6 +432,24 @@ async def dashboard_page(request: Request, month: int = None, year: int = None, 
     recent = await get_recent_transactions(current_user.tenant_id, db, month, year)
     monthly = await get_monthly_data(current_user.tenant_id, db)
     
+    # Get accounts summary
+    accounts_result = await db.execute(select(Account).where(Account.tenant_id == current_user.tenant_id, Account.is_active == True))
+    accounts = accounts_result.scalars().all()
+    accounts_summary = [{"id": str(a.id), "name": a.name, "balance": float(a.balance), "balance_fmt": fmt_money(a.balance), "color": a.color} for a in accounts]
+    total_balance = sum(a.balance for a in accounts)
+    
+    # Get active goals progress
+    goals_result = await db.execute(select(Goal).where(Goal.tenant_id == current_user.tenant_id, Goal.is_active == True))
+    goals = goals_result.scalars().all()
+    goals_summary = [{"id": str(g.id), "name": g.name, "target": float(g.target_amount), "current": float(g.current_amount), "target_fmt": fmt_money(g.target_amount), "current_fmt": fmt_money(g.current_amount), "progress": round((g.current_amount or 0) / (g.target_amount or 1) * 100, 1), "color": g.color or "#10B981"} for g in goals[:3]]
+    
+    # Get upcoming subscriptions (next 7 days)
+    from datetime import timedelta
+    upcoming_date = now.date() + timedelta(days=7)
+    subs_result = await db.execute(select(Subscription).where(Subscription.tenant_id == current_user.tenant_id, Subscription.is_active == True, Subscription.next_billing_date <= upcoming_date))
+    subs = subs_result.scalars().all()
+    upcoming_subs = [{"id": str(s.id), "name": s.name, "amount": float(s.amount), "amount_fmt": fmt_money(s.amount), "next_date_fmt": s.next_billing_date.strftime("%d/%m")} for s in subs[:3]]
+    
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "user": current_user,
@@ -444,6 +462,11 @@ async def dashboard_page(request: Request, month: int = None, year: int = None, 
         "monthly_labels": [m["label"] for m in monthly],
         "monthly_income": [m["income"] for m in monthly],
         "monthly_expense": [m["expense"] for m in monthly],
+        "accounts_summary": accounts_summary,
+        "total_balance": float(total_balance),
+        "total_balance_fmt": fmt_money(total_balance),
+        "goals_summary": goals_summary,
+        "upcoming_subs": upcoming_subs,
     })
 
 
@@ -624,48 +647,60 @@ async def reports_page(request: Request, month: int = None, year: int = None, db
 
 @router.get("/goals", response_class=HTMLResponse)
 async def goals_page(request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_user)):
-    result = await db.execute(select(Goal).where(Goal.tenant_id == current_user.tenant_id).order_by(Goal.deadline))
-    goals = result.scalars().all()
-    
-    return templates.TemplateResponse("goals.html", {
-        "request": request,
-        "user": current_user,
-        "goals": [
-            {
-                "id": str(g.id),
-                "name": g.name,
-                "target": g.target_amount,
-                "target_fmt": fmt_money(g.target_amount),
-                "current": g.current_amount,
-                "current_fmt": fmt_money(g.current_amount),
-                "remaining": g.target_amount - g.current_amount if g.target_amount and g.current_amount else 0,
-                "remaining_fmt": fmt_money((g.target_amount or 0) - (g.current_amount or 0)),
-                "deadline": g.deadline.strftime("%Y-%m-%d") if g.deadline else None,
-                "deadline_fmt": g.deadline.strftime("%d/%m/%Y") if g.deadline else "-",
-                "color": g.color or "#10B981",
-                "progress": round((g.current_amount or 0) / (g.target_amount or 1) * 100, 1) if g.target_amount else 0,
-            }
-            for g in goals
-        ],
-    })
+    try:
+        result = await db.execute(select(Goal).where(Goal.tenant_id == current_user.tenant_id).order_by(Goal.deadline))
+        goals = result.scalars().all()
+        
+        return templates.TemplateResponse("goals.html", {
+            "request": request,
+            "user": current_user,
+            "goals": [
+                {
+                    "id": str(g.id),
+                    "name": g.name,
+                    "target": g.target_amount,
+                    "target_fmt": fmt_money(g.target_amount),
+                    "current": g.current_amount,
+                    "current_fmt": fmt_money(g.current_amount),
+                    "remaining": g.target_amount - g.current_amount if g.target_amount and g.current_amount else 0,
+                    "remaining_fmt": fmt_money((g.target_amount or 0) - (g.current_amount or 0)),
+                    "deadline": g.deadline.strftime("%Y-%m-%d") if g.deadline else None,
+                    "deadline_fmt": g.deadline.strftime("%d/%m/%Y") if g.deadline else "-",
+                    "color": g.color or "#10B981",
+                    "progress": round((g.current_amount or 0) / (g.target_amount or 1) * 100, 1) if g.target_amount else 0,
+                }
+                for g in goals
+            ],
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        from fastapi import HTTPException
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/categories", response_class=HTMLResponse)
 async def categories_page(request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_user)):
-    result = await db.execute(select(Category).where(Category.tenant_id == current_user.tenant_id).order_by(Category.name))
-    categories = result.scalars().all()
-    
-    income_cats = [c for c in categories if c.type == "income"]
-    expense_cats = [c for c in categories if c.type == "expense"]
-    
-    return templates.TemplateResponse("categories.html", {
-        "request": request,
-        "user": current_user,
-        "categories": [{"id": str(c.id), "name": c.name, "icon": c.icon, "type": c.type} for c in categories],
-        "income_categories": [{"id": str(c.id), "name": c.name, "icon": c.icon, "type": c.type} for c in income_cats],
-        "expense_categories": [{"id": str(c.id), "name": c.name, "icon": c.icon, "type": c.type} for c in expense_cats],
-        "active_tab": "expense",
-    })
+    try:
+        result = await db.execute(select(Category).where(Category.tenant_id == current_user.tenant_id).order_by(Category.name))
+        categories = result.scalars().all()
+        
+        income_cats = [c for c in categories if c.type == "income"]
+        expense_cats = [c for c in categories if c.type == "expense"]
+        
+        return templates.TemplateResponse("categories.html", {
+            "request": request,
+            "user": current_user,
+            "categories": [{"id": str(c.id), "name": c.name, "icon": c.icon, "type": c.type} for c in categories],
+            "income_categories": [{"id": str(c.id), "name": c.name, "icon": c.icon, "type": c.type} for c in income_cats],
+            "expense_categories": [{"id": str(c.id), "name": c.name, "icon": c.icon, "type": c.type} for c in expense_cats],
+            "active_tab": "expense",
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        from fastapi import HTTPException
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/settings", response_class=HTMLResponse)
