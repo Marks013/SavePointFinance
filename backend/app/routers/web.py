@@ -735,7 +735,8 @@ async def edit_card_modal(card_id: str, request: Request, db: AsyncSession = Dep
 @router.post("/settings/cards/new")
 async def create_card(request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_user)):
     from fastapi.responses import JSONResponse
-    from app.routers.accounts_cards import create_card as api_create_card, CardCreate
+    from app.routers.accounts_cards import CardCreate, card_to_dict
+    from app.models.card import Card
     from app.models.institution import Institution
     from app.services.plan_limits import check_limit
     
@@ -761,8 +762,11 @@ async def create_card(request: Request, db: AsyncSession = Depends(get_db), curr
             color=form.get("color", "#3B82F6"),
             institution_id=uuid.UUID(inst_id) if inst_id else None,
         )
-        card_data = await api_create_card(body=body, db=db, current_user=current_user)
-        return templates.TemplateResponse("partials/_card_modal.html", {"request": request, "user": current_user, "card": card_data, "success": True})
+        card = Card(**body.model_dump(), tenant_id=current_user.tenant_id)
+        db.add(card)
+        await db.commit()
+        await db.refresh(card)
+        return templates.TemplateResponse("partials/_card_modal.html", {"request": request, "user": current_user, "card": card_to_dict(card), "success": True})
     except Exception as e:
         import traceback
         traceback.print_exc()
