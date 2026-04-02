@@ -44,8 +44,6 @@ def decode_token(token: str) -> dict:
     try:
         return jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
     except JWTError:
-        from fastapi.responses import HTMLResponse
-        from app.main import get_error_html
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Sua sessão expirou ou é inválida. Faça login novamente."
@@ -56,6 +54,7 @@ async def get_current_user(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ) -> User:
+    """Get current authenticated user from token."""
     token = None
     
     auth_header = request.headers.get("Authorization")
@@ -99,6 +98,10 @@ async def get_current_user(
     return user
 
 
+# Alias for get_current_user - both can be used as dependencies
+require_user = get_current_user
+
+
 async def require_admin(current_user: User = Depends(get_current_user)) -> User:
     if current_user.role not in (UserRole.admin, UserRole.superadmin):
         raise HTTPException(status_code=403, detail="Acesso de administrador necessário")
@@ -109,7 +112,3 @@ async def require_superadmin(current_user: User = Depends(get_current_user)) -> 
     if current_user.role != UserRole.superadmin:
         raise HTTPException(status_code=403, detail="Acesso restrito ao super-administrador")
     return current_user
-
-
-# Alias for get_current_user - any authenticated user
-require_user = get_current_user
