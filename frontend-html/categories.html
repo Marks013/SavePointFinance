@@ -28,15 +28,40 @@
 </div>
 
 <!-- Expense Categories -->
-<div id="tab-expense" class="cat-tab {{ '' if not active_tab or active_tab == 'expense' else '' }}" style="display: {{ 'grid' if not active_tab or active_tab == 'expense' else 'none' }}; grid-template-columns: repeat(3, 1fr); gap: 16px;">
-  {% include "partials/_cat_table.html" with context %}
+<div id="tab-expense" style="display: {{ 'grid' if not active_tab or active_tab == 'expense' else 'none' }}; grid-template-columns: repeat(3, 1fr); gap: 16px;">
+  {# BUG FIX: {% include "partials/_cat_table.html" with context %} é sintaxe Django, não Jinja2.
+     O Jinja2 já compartilha o contexto por padrão em includes. Remover 'with context'. #}
+  {% include "partials/_cat_table.html" %}
 </div>
 
-<!-- Income Categories (loaded dynamically or server-side) -->
+<!-- Income Categories -->
 <div id="tab-income" style="display: {{ 'grid' if active_tab == 'income' else 'none' }}; grid-template-columns: repeat(3, 1fr); gap: 16px;">
   {% for cat in income_categories %}
-    {% set loop_cat = cat %}
-    {% include "partials/_cat_card.html" %}
+  <div class="card-hover" style="padding:20px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <div style="width:40px; height:40px; border-radius:10px; background:{{ cat.color }}18; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+          {{ cat.icon | icon | safe }}
+        </div>
+        <div>
+          <div style="font-weight:600; font-size:0.9375rem;">{{ cat.name }}</div>
+          <div style="font-size:0.75rem; color:var(--text-dim); margin-top:2px;">Receita</div>
+        </div>
+      </div>
+      <button
+        class="icon-btn"
+        title="Editar"
+        hx-get="/categories/{{ cat.id }}/edit"
+        hx-target="#modal-content"
+        hx-swap="innerHTML"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+        </svg>
+      </button>
+    </div>
+  </div>
   {% else %}
   <div class="empty-state" style="grid-column:1/-1;">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

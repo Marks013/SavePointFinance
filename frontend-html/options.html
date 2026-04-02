@@ -80,46 +80,65 @@
       <h3 class="settings-section__title">Notificações</h3>
     </div>
     <form method="POST" action="/options/notifications">
+      {#
+        BUG FIX: O estado visual dos toggles e o valor dos hidden inputs estavam dessincronizados.
+        Quando prefs=None (usuário novo), o toggle mostrava ON mas o hidden enviava '0'.
+        Corrigido para que o valor do hidden input SEMPRE corresponda ao estado visual do toggle.
+
+        Regra: se prefs não existe OU a preferência está ativa → toggle ON + hidden='1'
+               se prefs existe   E   a preferência está inativa → toggle OFF + hidden='0'
+      #}
+
+      {# Email notifications: default ON se prefs não existe #}
+      {% set email_on = not prefs or prefs.email_notifications %}
       <div class="toggle-row">
         <span class="toggle-row__label">Notificações por e-mail</span>
-        <input type="hidden" name="email_notif" id="emailNotifVal"
-          value="{{ '1' if prefs and prefs.email_notifications else '0' }}">
-        <div class="toggle {{ 'on' if not prefs or prefs.email_notifications }}"
+        <input type="hidden" name="email_notif" id="emailNotifVal" value="{{ '1' if email_on else '0' }}">
+        <div class="toggle {{ 'on' if email_on }}"
           onclick="this.classList.toggle('on'); document.getElementById('emailNotifVal').value = this.classList.contains('on') ? '1' : '0';">
         </div>
       </div>
+
+      {# Monthly reports: default ON se prefs não existe #}
+      {% set monthly_on = not prefs or prefs.monthly_reports %}
       <div class="toggle-row">
         <span class="toggle-row__label">Relatórios mensais</span>
-        <input type="hidden" name="monthly_report" id="monthlyReportVal"
-          value="{{ '1' if prefs and prefs.monthly_reports else '0' }}">
-        <div class="toggle {{ 'on' if not prefs or prefs.monthly_reports }}"
+        <input type="hidden" name="monthly_report" id="monthlyReportVal" value="{{ '1' if monthly_on else '0' }}">
+        <div class="toggle {{ 'on' if monthly_on }}"
           onclick="this.classList.toggle('on'); document.getElementById('monthlyReportVal').value = this.classList.contains('on') ? '1' : '0';">
         </div>
       </div>
+
+      {# Budget alerts: default ON se prefs não existe #}
+      {% set budget_on = not prefs or prefs.budget_alerts %}
       <div class="toggle-row">
         <span class="toggle-row__label">Alertas de orçamento</span>
-        <input type="hidden" name="budget_alerts" id="budgetAlertsVal"
-          value="{{ '1' if prefs and prefs.budget_alerts else '1' }}">
-        <div class="toggle {{ 'on' if not prefs or prefs.budget_alerts }}"
+        <input type="hidden" name="budget_alerts" id="budgetAlertsVal" value="{{ '1' if budget_on else '0' }}">
+        <div class="toggle {{ 'on' if budget_on }}"
           onclick="this.classList.toggle('on'); document.getElementById('budgetAlertsVal').value = this.classList.contains('on') ? '1' : '0';">
         </div>
       </div>
+
+      {# Due reminders: default OFF se prefs não existe #}
+      {% set due_on = prefs and prefs.due_reminders %}
       <div class="toggle-row">
         <span class="toggle-row__label">Lembretes de vencimento</span>
-        <input type="hidden" name="due_reminders" id="dueRemindersVal"
-          value="{{ '1' if prefs and prefs.due_reminders else '0' }}">
-        <div class="toggle {{ 'on' if prefs and prefs.due_reminders }}"
+        <input type="hidden" name="due_reminders" id="dueRemindersVal" value="{{ '1' if due_on else '0' }}">
+        <div class="toggle {{ 'on' if due_on }}"
           onclick="this.classList.toggle('on'); document.getElementById('dueRemindersVal').value = this.classList.contains('on') ? '1' : '0';">
         </div>
       </div>
+
+      {# Auto tithe: default OFF se prefs não existe #}
+      {% set tithe_on = prefs and prefs.auto_tithe %}
       <div class="toggle-row">
         <span class="toggle-row__label">Criar dízimo automaticamente (10% de receitas)</span>
-        <input type="hidden" name="auto_tithe" id="autoTitheVal"
-          value="{{ '1' if prefs and prefs.auto_tithe else '0' }}">
-        <div class="toggle {{ 'on' if prefs and prefs.auto_tithe }}"
+        <input type="hidden" name="auto_tithe" id="autoTitheVal" value="{{ '1' if tithe_on else '0' }}">
+        <div class="toggle {{ 'on' if tithe_on }}"
           onclick="this.classList.toggle('on'); document.getElementById('autoTitheVal').value = this.classList.contains('on') ? '1' : '0';">
         </div>
       </div>
+
       <div style="margin-top:16px;">
         <button type="submit" class="btn btn--primary btn--sm">Salvar preferências</button>
       </div>
@@ -197,7 +216,7 @@
       <button
         type="button"
         class="btn btn--danger"
-        onclick="confirm('Tem certeza? Esta ação não pode ser desfeita.') && (window.location='/options/delete-account')"
+        onclick="if(confirm('Tem certeza? Esta ação não pode ser desfeita.')) window.location='/options/delete-account'"
       >Excluir conta</button>
     </div>
   </div>

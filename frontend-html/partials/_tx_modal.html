@@ -1,4 +1,7 @@
 <!-- _tx_modal.html: Create / Edit transaction modal -->
+<!-- BUG FIX: O form anterior usava hx-target="#tx-table-wrap" mas o servidor retorna o HTML do
+     modal (com success:True), não o HTML da tabela. Isso injetava o modal dentro da tabela,
+     quebrando completamente o layout. Corrigido para recarregar a página após sucesso. -->
 <div class="modal-header">
   <span class="modal-title">{{ 'Editar Transação' if tx else 'Nova Transação' }}</span>
   <button class="modal-close" onclick="closeModal()">
@@ -12,8 +15,9 @@
   method="POST"
   action="{{ '/transactions/' + tx.id|string + '/edit' if tx else '/transactions/new' }}"
   hx-post="{{ '/transactions/' + tx.id|string + '/edit' if tx else '/transactions/new' }}"
-  hx-target="#tx-table-wrap"
+  hx-target="#modal-content"
   hx-swap="innerHTML"
+  hx-on::after-request="if(event.detail.successful){ closeModal(); location.reload(); }"
   class="modal-body"
 >
   <div class="form-stack">
@@ -25,7 +29,6 @@
         <button type="button" class="tab-btn {{ 'active' if tx and tx.type == 'income' }}"   onclick="setTxType('income',  this)">Receita</button>
       </div>
       <input type="hidden" name="type" id="txTypeInput" value="{{ tx.type if tx else 'expense' }}">
-      <script>window.currentTxType = "{{ tx_type if tx_type else 'expense' }}";</script>
     </div>
 
     <!-- Description -->
@@ -52,7 +55,7 @@
       <select id="txCat" name="category_id" class="form-select">
         <option value="">Sem categoria</option>
         {% for cat in categories %}
-          <option value="{{ cat.id }}" {% if tx and tx.category_id == cat.id %}selected{% endif %}>{{ cat.icon | icon | safe }} {{ cat.name }}</option>
+          <option value="{{ cat.id }}" {% if tx and tx.category_id == cat.id %}selected{% endif %}>{{ cat.name }}</option>
         {% endfor %}
       </select>
     </div>
@@ -60,22 +63,22 @@
     <!-- Account / Card (payment method) -->
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
       <div class="form-group">
-        <label class="form-label" for="txSource">Origem</label>
-        <select id="txSource" name="source" class="form-select" onchange="toggleAccountCard(this.value)" required>
+        <label class="form-label" for="txSource">Método de pagamento</label>
+        <select id="txSource" name="source" class="form-select" onchange="toggleAccountCard(this.value)">
           <option value="">Selecione...</option>
-          <option value="pix"           {% if tx and tx.source == 'pix'           %}selected{% endif %}>PIX</option>
-          <option value="bank"          {% if tx and tx.source == 'bank'          %}selected{% endif %}>Transferência</option>
-          <option value="credit_card"   {% if tx and tx.source == 'credit_card'   %}selected{% endif %}>Cartão de Crédito</option>
-          <option value="debit_card"    {% if tx and tx.source == 'debit_card'    %}selected{% endif %}>Cartão de Débito</option>
-          <option value="cash"          {% if tx and tx.source == 'cash'          %}selected{% endif %}>Dinheiro</option>
-          <option value="other"         {% if tx and tx.source == 'other'         %}selected{% endif %}>Outro</option>
+          <option value="pix"           {% if tx and tx.payment_method == 'pix'           %}selected{% endif %}>PIX</option>
+          <option value="bank"          {% if tx and tx.payment_method == 'transfer'       %}selected{% endif %}>Transferência</option>
+          <option value="credit_card"   {% if tx and tx.payment_method == 'credit_card'   %}selected{% endif %}>Cartão de Crédito</option>
+          <option value="debit_card"    {% if tx and tx.payment_method == 'debit_card'    %}selected{% endif %}>Cartão de Débito</option>
+          <option value="cash"          {% if tx and tx.payment_method == 'money'         %}selected{% endif %}>Dinheiro</option>
+          <option value="other"         selected>Outro</option>
         </select>
       </div>
 
       <div class="form-group" id="accountWrap">
-        <label class="form-label" for="txAccount">Conta <span style="color:var(--expense);">*</span></label>
+        <label class="form-label" for="txAccount">Conta</label>
         {% if accounts %}
-        <select id="txAccount" name="account_id" class="form-select" required>
+        <select id="txAccount" name="account_id" class="form-select">
           <option value="">Selecionar conta</option>
           {% for acc in accounts %}
           <option value="{{ acc.id }}" {% if tx and tx.account_id == acc.id %}selected{% endif %}>{{ acc.name }}</option>
@@ -83,16 +86,15 @@
         </select>
         {% else %}
         <div style="padding:8px 12px; background:var(--secondary); border-radius:6px; font-size:0.875rem;">
-          Nenhuma conta cadastrada.
-          <a href="/settings" target="_blank" style="color:var(--accent); text-decoration:underline;">Cadastrar conta</a>
+          Nenhuma conta. <a href="/settings" target="_blank" style="color:var(--accent);">Cadastrar</a>
         </div>
         {% endif %}
       </div>
 
       <div class="form-group" id="cardWrap" style="display:none;">
-        <label class="form-label" for="txCard">Cartão <span style="color:var(--expense);">*</span></label>
+        <label class="form-label" for="txCard">Cartão</label>
         {% if cards %}
-        <select id="txCard" name="card_id" class="form-select" required>
+        <select id="txCard" name="card_id" class="form-select">
           <option value="">Selecionar cartão</option>
           {% for card in cards %}
           <option value="{{ card.id }}" {% if tx and tx.card_id == card.id %}selected{% endif %}>{{ card.name }}</option>
@@ -100,8 +102,7 @@
         </select>
         {% else %}
         <div style="padding:8px 12px; background:var(--secondary); border-radius:6px; font-size:0.875rem;">
-          Nenhum cartão cadastrado.
-          <a href="/settings" target="_blank" style="color:var(--accent); text-decoration:underline;">Cadastrar cartão</a>
+          Nenhum cartão. <a href="/settings" target="_blank" style="color:var(--accent);">Cadastrar</a>
         </div>
         {% endif %}
       </div>
@@ -113,13 +114,16 @@
       <textarea id="txNotes" name="notes" class="form-textarea" rows="2" placeholder="Detalhes adicionais…">{{ tx.notes if tx else '' }}</textarea>
     </div>
 
-    {% if tx_type == 'income' %}
-    <!-- Tithe checkbox - shown only for income -->
-    <div style="display:flex; align-items:center; gap:10px; padding:10px; background:var(--secondary); border-radius:8px;">
-      <input type="checkbox" id="txTithe" name="tithe" value="1" checked style="accent-color:var(--accent); width:16px; height:16px; cursor:pointer;">
-      <label for="txTithe" style="font-size:0.875rem; cursor:pointer;">Criar dízimo (10% desta receita)</label>
+    <!-- BUG FIX: Tithe checkbox agora é sempre renderizado mas controlado por JS via display:none/block.
+         Isso corrige o problema onde server renderizava com tx_type fixo e o toggle JS não atualizava. -->
+    <div id="titheWrap" style="display: {{ '' if not tx or (tx_type or tx.type) == 'income' else 'none' }};">
+      <div style="display:flex; align-items:center; gap:10px; padding:10px; background:var(--secondary); border-radius:8px;">
+        <input type="checkbox" id="txTithe" name="tithe" value="1"
+          {% if not tx or (tx_type or tx.type) == 'income' %}checked{% endif %}
+          style="accent-color:var(--accent); width:16px; height:16px; cursor:pointer;">
+        <label for="txTithe" style="font-size:0.875rem; cursor:pointer;">Criar dízimo (10% desta receita)</label>
+      </div>
     </div>
-    {% endif %}
   </div>
 
   <div class="modal-footer">
@@ -139,7 +143,7 @@ function setTxType(type, btn) {
   document.getElementById('txTypeInput').value = type;
   btn.closest('.tab-list').querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
-  
+  // BUG FIX: controle do tithe via JS em vez de server-side
   const titheDiv = document.getElementById('titheWrap');
   if (titheDiv) {
     titheDiv.style.display = type === 'income' ? '' : 'none';
@@ -151,31 +155,31 @@ function toggleAccountCard(source) {
   const cardWrap = document.getElementById('cardWrap');
   const accountSelect = document.getElementById('txAccount');
   const cardSelect = document.getElementById('txCard');
-  
+
   const needsCard = source === 'credit_card' || source === 'debit_card';
-  const needsAccount = source === 'pix' || source === 'bank' || needsCard;
-  
+
   if (needsCard) {
     accountWrap.style.display = 'none';
     cardWrap.style.display = '';
-    accountSelect.removeAttribute('required');
-    cardSelect.setAttribute('required', 'required');
-  } else if (needsAccount) {
+    if (accountSelect) accountSelect.removeAttribute('required');
+    if (cardSelect) cardSelect.setAttribute('required', 'required');
+  } else if (source && source !== 'cash' && source !== 'other' && source !== '') {
     accountWrap.style.display = '';
     cardWrap.style.display = 'none';
-    accountSelect.setAttribute('required', 'required');
-    cardSelect.removeAttribute('required');
+    if (accountSelect) accountSelect.setAttribute('required', 'required');
+    if (cardSelect) cardSelect.removeAttribute('required');
   } else {
-    accountWrap.style.display = 'none';
+    accountWrap.style.display = '';
     cardWrap.style.display = 'none';
-    accountSelect.removeAttribute('required');
-    cardSelect.removeAttribute('required');
+    if (accountSelect) accountSelect.removeAttribute('required');
+    if (cardSelect) cardSelect.removeAttribute('required');
   }
 }
 
+// Init based on existing value
 document.addEventListener('DOMContentLoaded', function() {
   const sourceSelect = document.getElementById('txSource');
-  if (sourceSelect.value) {
+  if (sourceSelect && sourceSelect.value) {
     toggleAccountCard(sourceSelect.value);
   }
 });

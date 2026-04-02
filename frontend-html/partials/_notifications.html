@@ -1,18 +1,26 @@
 <!-- _notifications.html -->
+<!-- BUG FIX: data-id nunca era definido nos elementos, então a lógica de "marcar como lida"
+     nunca encontrava o ID. Adicionado data-id="{{ notif.id }}" nos itens. -->
 <div class="notifications-panel" id="notificationsPanel">
   <div class="notifications-header">
     <h3>Notificações</h3>
     {% if unread_count > 0 %}
-    <button class="btn btn--outline btn--sm" hx-post="/notifications/read-all" hx-swap="outerHTML">
+    <button class="btn btn--outline btn--sm"
+      hx-post="/notifications/read-all"
+      hx-swap="none"
+      hx-on::after-request="if(event.detail.successful){ document.querySelectorAll('.notification-item.unread').forEach(el => el.classList.remove('unread')); }"
+    >
       Marcar todas como lida
     </button>
     {% endif %}
   </div>
-  
+
   <div class="notifications-list">
     {% if notifications %}
       {% for notif in notifications %}
-      <div class="notification-item {{ 'unread' if not notif.is_read else '' }}" 
+      {# BUG FIX: adicionado data-id="{{ notif.id }}" para que o JS possa identificar a notificação #}
+      <div class="notification-item {{ 'unread' if not notif.is_read else '' }}"
+           data-id="{{ notif.id }}"
            onclick="handleNotificationClick(this, '{{ notif.link or '' }}')">
         <div class="notification-icon notification-icon--{{ notif.type }}">
           {% if notif.type == 'warning' %}
@@ -65,7 +73,6 @@
   z-index: 1000;
   overflow: hidden;
 }
-
 .notifications-header {
   display: flex;
   justify-content: space-between;
@@ -73,18 +80,8 @@
   padding: 16px;
   border-bottom: 1px solid var(--border);
 }
-
-.notifications-header h3 {
-  margin: 0;
-  font-size: 1rem;
-  font-weight: 600;
-}
-
-.notifications-list {
-  max-height: 400px;
-  overflow-y: auto;
-}
-
+.notifications-header h3 { margin: 0; font-size: 1rem; font-weight: 600; }
+.notifications-list { max-height: 400px; overflow-y: auto; }
 .notification-item {
   display: flex;
   gap: 12px;
@@ -93,15 +90,8 @@
   transition: background 0.2s;
   border-bottom: 1px solid var(--border);
 }
-
-.notification-item:hover {
-  background: rgba(255,255,255,0.05);
-}
-
-.notification-item.unread {
-  background: rgba(16, 185, 129, 0.1);
-}
-
+.notification-item:hover { background: rgba(255,255,255,0.05); }
+.notification-item.unread { background: rgba(0,229,122,0.06); }
 .notification-icon {
   width: 36px;
   height: 36px;
@@ -111,87 +101,41 @@
   justify-content: center;
   flex-shrink: 0;
 }
-
-.notification-icon svg {
-  width: 18px;
-  height: 18px;
-}
-
-.notification-icon--info {
-  background: rgba(59, 130, 246, 0.2);
-  color: #3B82F6;
-}
-
-.notification-icon--warning {
-  background: rgba(245, 158, 11, 0.2);
-  color: #F59E0B;
-}
-
-.notification-icon--success {
-  background: rgba(16, 185, 129, 0.2);
-  color: #10B981;
-}
-
-.notification-icon--error {
-  background: rgba(239, 68, 68, 0.2);
-  color: #EF4444;
-}
-
-.notification-content {
-  flex: 1;
-  min-width: 0;
-}
-
-.notification-title {
-  font-weight: 600;
-  font-size: 0.875rem;
-  margin-bottom: 2px;
-}
-
-.notification-message {
-  font-size: 0.8125rem;
-  color: var(--text-dim);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.notification-time {
-  font-size: 0.7rem;
-  color: var(--text-dim);
-  margin-top: 4px;
-}
-
-.notifications-empty {
-  padding: 32px;
-  text-align: center;
-  color: var(--text-dim);
-}
-
-.notifications-empty svg {
-  width: 48px;
-  height: 48px;
-  margin-bottom: 8px;
-  opacity: 0.5;
-}
-
-.notifications-empty p {
-  margin: 0;
-  font-size: 0.875rem;
-}
+.notification-icon svg { width: 18px; height: 18px; }
+.notification-icon--info    { background: rgba(59,130,246,0.2);  color: #3B82F6; }
+.notification-icon--warning { background: rgba(245,158,11,0.2);  color: #F59E0B; }
+.notification-icon--success { background: rgba(16,185,129,0.2);  color: #10B981; }
+.notification-icon--error   { background: rgba(239,68,68,0.2);   color: #EF4444; }
+.notification-content { flex: 1; min-width: 0; }
+.notification-title   { font-weight: 600; font-size: 0.875rem; margin-bottom: 2px; }
+.notification-message { font-size: 0.8125rem; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.notification-time    { font-size: 0.7rem; color: var(--text-dim); margin-top: 4px; }
+.notifications-empty  { padding: 32px; text-align: center; color: var(--text-dim); }
+.notifications-empty svg { width: 48px; height: 48px; margin-bottom: 8px; opacity: 0.5; }
+.notifications-empty p { margin: 0; font-size: 0.875rem; }
 </style>
 
 <script>
-function handleNotificationClick(el, link) {
-  // Mark as read
-  const notifId = el.querySelector('.notification-item')?.closest('[data-id]')?.dataset.id;
-  
+async function handleNotificationClick(el, link) {
+  // BUG FIX: agora data-id existe no elemento, então o ID é encontrado corretamente
+  const notifId = el.dataset.id;
+
+  if (notifId) {
+    try {
+      await fetch(`/notifications/${notifId}/read`, { method: 'POST' });
+      el.classList.remove('unread');
+    } catch (e) {
+      console.warn('Erro ao marcar notificação como lida:', e);
+    }
+  }
+
+  // Close panel
+  const panel = document.getElementById('notificationsPanel');
+  if (panel) panel.remove();
+
   // Navigate if link exists
   if (link) {
     window.location.href = link;
   }
-  
-  // Close panel
-  document.getElementById('notificationsPanel')?.remove();
 }
 </script>

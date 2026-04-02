@@ -1,19 +1,26 @@
 <!-- _cat_table.html: Grid of expense category cards -->
+{#
+  BUG FIX: O servidor (web.py categories_page) passa apenas id, name, icon, type para as categorias.
+  As variáveis cat.spent, cat.spent_fmt, cat.budget, cat.budget_fmt, cat.color NÃO são enviadas.
+  Adicionados filtros |default() para evitar erros de template e exibir valores padrão.
+#}
 {% for cat in expense_categories %}
 <div class="card-hover" style="padding:20px;" id="cat-{{ cat.id }}">
   <!-- Header -->
   <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
     <div style="display:flex; align-items:center; gap:12px;">
-      <div style="width:40px; height:40px; border-radius:10px; background:var(--accent)15; display:flex; align-items:center; justify-content:center; font-size:1.25rem; flex-shrink:0;">
+      <div style="width:40px; height:40px; border-radius:10px; background:{{ (cat.color | default('#00E57A')) }}18; display:flex; align-items:center; justify-content:center; font-size:1.25rem; flex-shrink:0;">
         {{ cat.icon | icon | safe }}
       </div>
       <div>
         <div style="font-weight:600; font-size:0.9375rem;">{{ cat.name }}</div>
         <div style="font-size:0.75rem; color:var(--text-dim); margin-top:2px;">
-          {% if cat.budget %}
-            {{ cat.spent_fmt or '0' }} / {{ cat.budget_fmt or '0' }}
+          {% if cat.budget is defined and cat.budget %}
+            {{ cat.spent_fmt | default('R$ 0,00') }} / {{ cat.budget_fmt | default('R$ 0,00') }}
+          {% elif cat.monthly_limit is defined and cat.monthly_limit %}
+            Limite: R$ {{ '%.2f'|format(cat.monthly_limit) }}
           {% else %}
-            {{ cat.spent_fmt or '0' }} total
+            Despesa
           {% endif %}
         </div>
       </div>
@@ -34,13 +41,13 @@
     </div>
   </div>
 
-  {% if cat.budget %}
-  <!-- Progress Bar -->
-  {% set pct = [(cat.spent / cat.budget * 100), 100]|min %}
+  {% if cat.budget is defined and cat.budget %}
+  {# Budget progress bar - only shown when server sends budget data #}
+  {% set pct = [(cat.spent / cat.budget * 100), 100] | min if cat.spent else 0 %}
   <div class="progress-track">
     <div
       class="progress-bar {{ 'progress-bar--warning' if pct > 80 else ('progress-bar--danger' if pct >= 100 else '') }}"
-      style="width:{{ pct }}%; background:{{ cat.color }};"
+      style="width:{{ pct }}%; background:{{ cat.color | default('#00E57A') }};"
     ></div>
   </div>
   <div style="display:flex; align-items:center; justify-content:space-between; margin-top:6px;">

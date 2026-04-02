@@ -1,4 +1,8 @@
 <!-- _cat_modal.html -->
+<!-- BUG FIX: havia dois inputs com name="color" (o color picker e o text field, que tinha name="color_hex").
+     O backend recebia apenas o valor do color picker e ignorava o que estava digitado no texto.
+     Corrigido: o color picker perde seu name (só serve como visual), e o text input recebe name="color".
+     Ambos ficam sincronizados via JS. -->
 <div class="modal-header">
   <span class="modal-title">{{ 'Editar Categoria' if cat else 'Nova Categoria' }}</span>
   <button class="modal-close" onclick="closeModal()">
@@ -41,16 +45,34 @@
         <input type="text" id="catIcon" name="icon" class="form-input" placeholder="🍕" value="{{ cat.icon if cat else '' }}" maxlength="4">
       </div>
       <div class="form-group">
-        <label class="form-label" for="catColor">Cor</label>
+        <label class="form-label">Cor</label>
         <div style="display:flex; align-items:center; gap:8px;">
-          <input type="color" id="catColor" name="color" value="{{ cat.color if cat else '#00E57A' }}" style="width:42px; height:42px; border:none; background:none; cursor:pointer; border-radius:6px;">
-          <input type="text" name="color_hex" value="{{ cat.color if cat else '#00E57A' }}" class="form-input mono" placeholder="#00E57A" style="flex:1;" oninput="document.getElementById('catColor').value=this.value">
+          <!-- BUG FIX: removido name="color" do color picker para evitar duplicidade.
+               Agora o color picker é apenas visual e sincroniza com o text input via oninput. -->
+          <input
+            type="color"
+            id="catColorPicker"
+            value="{{ cat.color if cat else '#00E57A' }}"
+            style="width:42px; height:42px; border:none; background:none; cursor:pointer; border-radius:6px;"
+            oninput="document.getElementById('catColorHex').value = this.value"
+          >
+          <!-- Este input é o único que envia o valor 'color' para o backend -->
+          <input
+            type="text"
+            id="catColorHex"
+            name="color"
+            value="{{ cat.color if cat else '#00E57A' }}"
+            class="form-input mono"
+            placeholder="#00E57A"
+            style="flex:1;"
+            oninput="document.getElementById('catColorPicker').value = this.value"
+          >
         </div>
       </div>
     </div>
 
     <!-- Budget (expense only) -->
-    <div class="form-group" id="catBudgetWrap">
+    <div class="form-group" id="catBudgetWrap" style="{{ 'display:none;' if cat and cat.type == 'income' else '' }}">
       <label class="form-label" for="catBudget">Limite mensal (R$) — opcional</label>
       <input type="number" id="catBudget" name="budget" class="form-input mono" placeholder="0,00" step="0.01" min="0" value="{{ cat.budget if cat and cat.budget else '' }}">
     </div>

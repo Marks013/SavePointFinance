@@ -3,11 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <title>Save Point Finanças</title>
-  <script>
-    window.location.replace(
-      localStorage.getItem('ff_access_token') ? '/dashboard' : '/login'
-    );
-  </script>
+  <!--
+    BUG FIX: O app usa autenticação via cookies HttpOnly (não localStorage).
+    JavaScript não consegue ler cookies HttpOnly, então não é possível verificar
+    o estado de login no client-side. A solução correta é redirecionar para /dashboard
+    e deixar o servidor decidir: se não autenticado, ele redireciona para /login.
+  -->
+  <script>window.location.replace('/dashboard');</script>
 </head>
 <body></body>
 </html>

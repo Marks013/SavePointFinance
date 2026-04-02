@@ -64,7 +64,7 @@
 {% if subscriptions %}
 <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:16px;">
   {% for sub in subscriptions %}
-  <div class="card-hover sub-card {{ 'opacity-50' if not sub.active }}">
+  <div class="card-hover sub-card" style="{{ 'opacity:0.5;' if not sub.active }}">
     <div class="sub-card__header">
       <div class="sub-card__info">
         <div class="icon-box icon-box--accent">
@@ -76,7 +76,9 @@
         </div>
         <div>
           <div class="sub-card__name">{{ sub.name }}</div>
-          <div class="sub-card__cat">{{ sub.category.name if sub.category else sub.type }}</div>
+          <div class="sub-card__cat">
+            {% if sub.category %}{{ sub.category.name if sub.category.name is defined else sub.category }}{% else %}{{ sub.type }}{% endif %}
+          </div>
         </div>
       </div>
       <div style="display:flex; align-items:center; gap:4px;">
@@ -101,9 +103,14 @@
     <div class="sub-card__footer">
       <span class="sub-card__amount mono">{{ sub.amount_fmt or sub.amount }}</span>
       <div style="text-align:right;">
-        <div class="sub-card__next">{{ sub.frequency }}</div>
+        <div class="sub-card__next">{{ sub.frequency or 'Mensal' }}</div>
         {% if sub.next_date %}
-        <div class="sub-card__next">Próx: {{ sub.next_date.strftime('%d/%m/%Y') if sub.next_date else '' }}</div>
+        {#
+          BUG FIX: sub.next_date já é uma string "YYYY-MM-DD" (convertida pelo servidor em web.py).
+          Chamar .strftime() em uma string Python lança AttributeError.
+          Usar sub.next_date_fmt que o servidor já formata como "DD/MM/YYYY".
+        #}
+        <div class="sub-card__next">Próx: {{ sub.next_date_fmt or sub.next_date }}</div>
         {% endif %}
       </div>
     </div>
