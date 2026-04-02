@@ -51,10 +51,12 @@ async def get_tenant_stats(tenant_id: uuid.UUID, db: AsyncSession, month: int = 
     else:
         end_date = datetime(year, month + 1, 1)
     
+    from app.models.transaction import TransactionType
+    
     result = await db.execute(
         select(func.coalesce(func.sum(Transaction.amount), 0)).where(
             Transaction.tenant_id == tenant_id,
-            Transaction.type == "income",
+            Transaction.type == TransactionType.income,
             Transaction.date >= start_date,
             Transaction.date < end_date,
         )
@@ -64,7 +66,7 @@ async def get_tenant_stats(tenant_id: uuid.UUID, db: AsyncSession, month: int = 
     result = await db.execute(
         select(func.coalesce(func.sum(Transaction.amount), 0)).where(
             Transaction.tenant_id == tenant_id,
-            Transaction.type == "expense",
+            Transaction.type == TransactionType.expense,
             Transaction.date >= start_date,
             Transaction.date < end_date,
         )
@@ -117,6 +119,8 @@ async def get_recent_transactions(tenant_id: uuid.UUID, db: AsyncSession, month:
 
 
 async def get_monthly_data(tenant_id: uuid.UUID, db: AsyncSession, months: int = 6):
+    from app.models.transaction import TransactionType
+    
     now = datetime.now()
     data = []
     for i in range(months - 1, -1, -1):
@@ -135,7 +139,7 @@ async def get_monthly_data(tenant_id: uuid.UUID, db: AsyncSession, months: int =
         inc = (await db.execute(
             select(func.coalesce(func.sum(Transaction.amount), 0)).where(
                 Transaction.tenant_id == tenant_id,
-                Transaction.type == "income",
+                Transaction.type == TransactionType.income,
                 Transaction.date >= start,
                 Transaction.date < end,
             )
@@ -144,7 +148,7 @@ async def get_monthly_data(tenant_id: uuid.UUID, db: AsyncSession, months: int =
         exp = (await db.execute(
             select(func.coalesce(func.sum(Transaction.amount), 0)).where(
                 Transaction.tenant_id == tenant_id,
-                Transaction.type == "expense",
+                Transaction.type == TransactionType.expense,
                 Transaction.date >= start,
                 Transaction.date < end,
             )
