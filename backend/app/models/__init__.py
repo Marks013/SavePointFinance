@@ -8,6 +8,7 @@ from app.models.transaction import Transaction, TransactionType, TransactionSour
 from app.models.subscription import Subscription
 from app.models.alert_log import AlertLog
 from app.models.goal import Goal
+from app.models.notification import Notification
 
 __all__ = [
     "Tenant", "User", "Invite", "UserRole",
@@ -17,5 +18,6 @@ __all__ = [
     "Card",
     "Transaction", "TransactionType", "TransactionSource",
     "Subscription",
-    "AlertLog", "Goal"
+    "AlertLog", "Goal",
+    "Notification",
 ]

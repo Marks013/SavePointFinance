@@ -1,0 +1,197 @@
+<!-- _notifications.html -->
+<div class="notifications-panel" id="notificationsPanel">
+  <div class="notifications-header">
+    <h3>Notificações</h3>
+    {% if unread_count > 0 %}
+    <button class="btn btn--outline btn--sm" hx-post="/notifications/read-all" hx-swap="outerHTML">
+      Marcar todas como lida
+    </button>
+    {% endif %}
+  </div>
+  
+  <div class="notifications-list">
+    {% if notifications %}
+      {% for notif in notifications %}
+      <div class="notification-item {{ 'unread' if not notif.is_read else '' }}" 
+           onclick="handleNotificationClick(this, '{{ notif.link or '' }}')">
+        <div class="notification-icon notification-icon--{{ notif.type }}">
+          {% if notif.type == 'warning' %}
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          {% elif notif.type == 'success' %}
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+          </svg>
+          {% elif notif.type == 'error' %}
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+          </svg>
+          {% else %}
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+          </svg>
+          {% endif %}
+        </div>
+        <div class="notification-content">
+          <div class="notification-title">{{ notif.title }}</div>
+          <div class="notification-message">{{ notif.message }}</div>
+          <div class="notification-time">{{ notif.created_at }}</div>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="notifications-empty">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+        </svg>
+        <p>Nenhuma notificação</p>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<style>
+.notifications-panel {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  width: 360px;
+  max-height: 480px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  z-index: 1000;
+  overflow: hidden;
+}
+
+.notifications-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.notifications-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.notifications-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.notification-item {
+  display: flex;
+  gap: 12px;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background 0.2s;
+  border-bottom: 1px solid var(--border);
+}
+
+.notification-item:hover {
+  background: rgba(255,255,255,0.05);
+}
+
+.notification-item.unread {
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.notification-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.notification-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.notification-icon--info {
+  background: rgba(59, 130, 246, 0.2);
+  color: #3B82F6;
+}
+
+.notification-icon--warning {
+  background: rgba(245, 158, 11, 0.2);
+  color: #F59E0B;
+}
+
+.notification-icon--success {
+  background: rgba(16, 185, 129, 0.2);
+  color: #10B981;
+}
+
+.notification-icon--error {
+  background: rgba(239, 68, 68, 0.2);
+  color: #EF4444;
+}
+
+.notification-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.notification-title {
+  font-weight: 600;
+  font-size: 0.875rem;
+  margin-bottom: 2px;
+}
+
+.notification-message {
+  font-size: 0.8125rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.notification-time {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+
+.notifications-empty {
+  padding: 32px;
+  text-align: center;
+  color: var(--text-dim);
+}
+
+.notifications-empty svg {
+  width: 48px;
+  height: 48px;
+  margin-bottom: 8px;
+  opacity: 0.5;
+}
+
+.notifications-empty p {
+  margin: 0;
+  font-size: 0.875rem;
+}
+</style>
+
+<script>
+function handleNotificationClick(el, link) {
+  // Mark as read
+  const notifId = el.querySelector('.notification-item')?.closest('[data-id]')?.dataset.id;
+  
+  // Navigate if link exists
+  if (link) {
+    window.location.href = link;
+  }
+  
+  // Close panel
+  document.getElementById('notificationsPanel')?.remove();
+}
+</script>

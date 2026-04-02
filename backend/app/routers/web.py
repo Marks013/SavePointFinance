@@ -1457,3 +1457,69 @@ async def admin_tenant_detail(request: Request, tenant_id: str, db: AsyncSession
         "category_count": len(categories),
         "current_plan": tenant.plan,
     })
+
+
+# ---- NOTIFICATIONS ----
+
+@router.get("/notifications")
+async def get_notifications(request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_user)):
+    from app.models.notification import Notification
+    
+    notifications = (await db.execute(
+        select(Notification)
+        .where(Notification.user_id == current_user.id)
+        .order_by(Notification.created_at.desc())
+        .limit(20)
+    )).scalars().all()
+    
+    unread_count = sum(1 for n in notifications if not n.is_read)
+    
+    return templates.TemplateResponse("partials/_notifications.html", {
+        "request": request,
+        "user": current_user,
+        "notifications": [
+            {
+                "id": str(n.id),
+                "title": n.title,
+                "message": n.message,
+                "type": n.type,
+                "is_read": n.is_read,
+                "link": n.link,
+                "created_at": n.created_at.strftime("%d/%m/%Y %H:%M"),
+            }
+            for n in notifications
+        ],
+        "unread_count": unread_count,
+    })
+
+
+@router.post("/notifications/{notification_id}/read")
+async def mark_notification_read(notification_id: uuid.UUID, request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_user)):
+    from app.models.notification import Notification
+    from fastapi.responses import JSONResponse
+    
+    result = await db.execute(
+        select(Notification).where(Notification.id == notification_id, Notification.user_id == current_user.id)
+    )
+    notification = result.scalar_one_or_none()
+    
+    if notification:
+        notification.is_read = True
+        await db.commit()
+    
+    return JSONResponse(content={"success": True})
+
+
+@router.post("/notifications/read-all")
+async def mark_all_notifications_read(request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_user)):
+    from app.models.notification import Notification
+    from fastapi.responses import JSONResponse
+    
+    await db.execute(
+        Notification.__table__.update()
+        .where(Notification.user_id == current_user.id, Notification.is_read == False)
+        .values(is_read=True)
+    )
+    await db.commit()
+    
+    return JSONResponse(content={"success": True})

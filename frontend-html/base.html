@@ -56,12 +56,23 @@
         <span class="header-breadcrumb">{% block breadcrumb %}{% endblock %}</span>
       </div>
       <div class="header-right">
-        <button class="icon-btn" title="Notificações" aria-label="Notificações">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-          </svg>
-          <span class="notif-dot"></span>
-        </button>
+        <div style="position: relative;">
+          <button 
+            class="icon-btn" 
+            title="Notificações" 
+            aria-label="Notificações"
+            hx-get="/notifications"
+            hx-target="#notifications-container"
+            hx-swap="innerHTML"
+            onclick="toggleNotifications(this)"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+            </svg>
+            <span class="notif-dot" id="notif-badge" style="display: none;"></span>
+          </button>
+          <div id="notifications-container" style="position: absolute; top: 100%; right: 0; z-index: 100;"></div>
+        </div>
         <a href="/options" class="icon-btn" title="Configurações" aria-label="Configurações">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/>
@@ -98,6 +109,31 @@ function closeSidebar() {
   document.getElementById('appSidebar').classList.remove('open');
   document.getElementById('sidebarOverlay').classList.remove('open');
 }
+
+/* ── Notifications ─────────────────────────────────────────────────── */
+let notificationsOpen = false;
+
+function toggleNotifications(btn) {
+  const container = document.getElementById('notifications-container');
+  if (notificationsOpen) {
+    container.innerHTML = '';
+    notificationsOpen = false;
+  } else {
+    if (!container.innerHTML) {
+      htmx.trigger(btn, 'hx:get');
+    }
+    notificationsOpen = true;
+  }
+}
+
+document.addEventListener('click', function(e) {
+  const container = document.getElementById('notifications-container');
+  const btn = container.parentElement.querySelector('button');
+  if (notificationsOpen && !container.contains(e.target) && !btn.contains(e.target)) {
+    container.innerHTML = '';
+    notificationsOpen = false;
+  }
+});
 
 /* ── Modal system ───────────────────────────────────────────────────── */
 const modalOverlay = document.getElementById('modal-overlay');
