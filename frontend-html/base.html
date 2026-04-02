@@ -116,7 +116,14 @@ document.addEventListener('keydown', e => {
 function confirmDelete(url, message) {
   if (!confirm(message + '\n\nEsta ação não pode ser desfeita.')) return;
   fetch(url, { method: 'POST' })
-    .then(r => { if (r.ok) location.reload(); });
+    .then(r => {
+      if (r.ok) {
+        location.reload();
+      } else {
+        return r.json().then(err => { throw new Error(err.error || 'Erro ao excluir'); });
+      }
+    })
+    .catch(err => alert(err.message));
 }
 
 /* ── HTMX modal integration ─────────────────────────────────────────── */

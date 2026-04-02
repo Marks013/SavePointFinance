@@ -686,7 +686,7 @@ async def delete_account(account_id: uuid.UUID, request: Request, db: AsyncSessi
     
     try:
         await api_delete_account(account_id=account_id, db=db, current_user=current_user)
-        return JSONResponse(content={"success": True})
+        return JSONResponse(content={"success": True, "message": "Conta excluída com sucesso"})
     except Exception as e:
         return JSONResponse(content={"error": str(e)}, status_code=400)
 
