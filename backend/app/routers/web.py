@@ -170,6 +170,15 @@ async def login_page(request: Request):
     return templates.TemplateResponse("login.html", {"request": request, "session_expired": expired})
 
 
+@router.get("/logout", response_class=HTMLResponse)
+async def logout_page(request: Request):
+    from fastapi.responses import RedirectResponse
+    response = RedirectResponse(url="/login?logged_out=1", status_code=302)
+    response.delete_cookie("access_token")
+    response.delete_cookie("refresh_token")
+    return response
+
+
 @router.post("/login", response_class=HTMLResponse)
 async def login_post(request: Request, db: AsyncSession = Depends(get_db)):
     from app.models.user import User
