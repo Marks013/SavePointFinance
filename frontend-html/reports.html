@@ -250,19 +250,7 @@
 {% endif %}
 
 <script>
-function changeMonth(delta) {
-  const url = new URL(window.location.href);
-  let month = parseInt(url.searchParams.get('month') || {{ month }});
-  let year = parseInt(url.searchParams.get('year') || {{ year }});
-  
-  month += delta;
-  if (month > 12) { month = 1; year += 1; }
-  if (month < 1) { month = 12; year -= 1; }
-  
-  url.searchParams.set('month', month);
-  url.searchParams.set('year', year);
-  window.location.href = url.toString();
-}
+
 </script>
 {% endblock %}
 

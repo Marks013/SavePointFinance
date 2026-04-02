@@ -553,11 +553,22 @@ function toggleSwitch(el) {
 /* ── Month navigation ───────────────────────────────────────────────── */
 function changeMonth(delta) {
   const url = new URL(window.location);
-  let m = parseInt(url.searchParams.get('month') || '{{ now.month if now else "1" }}');
-  let y = parseInt(url.searchParams.get('year')  || '{{ now.year  if now else "2026" }}');
+  let monthStr = url.searchParams.get('month');
+  let m, y;
+  
+  if (monthStr) {
+    m = parseInt(monthStr);
+    y = parseInt(url.searchParams.get('year'));
+  } else {
+    const d = new Date();
+    m = d.getMonth() + 1;
+    y = d.getFullYear();
+  }
+  
   m += delta;
   if (m < 1) { m = 12; y--; }
   if (m > 12) { m = 1;  y++; }
+  
   url.searchParams.set('month', m);
   url.searchParams.set('year',  y);
   window.location = url.toString();
