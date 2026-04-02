@@ -671,9 +671,8 @@ async def create_account(request: Request, db: AsyncSession = Depends(get_db), c
             currency=form.get("currency", "BRL"),
             color=form.get("color", "#10B981"),
         )
-        from app.routers.accounts_cards import account_to_dict
-        account = await api_create_account(body=body, db=db, current_user=current_user)
-        return templates.TemplateResponse("partials/_account_modal.html", {"request": request, "user": current_user, "account": account_to_dict(account), "success": True})
+        account_data = await api_create_account(body=body, db=db, current_user=current_user)
+        return templates.TemplateResponse("partials/_account_modal.html", {"request": request, "user": current_user, "account": account_data, "success": True})
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -719,15 +718,14 @@ async def create_card(request: Request, db: AsyncSession = Depends(get_db), curr
         body = CardCreate(
             name=form.get("name", ""),
             brand=form.get("brand", "Visa"),
-            last4=form.get("last4", "") or None,
+            last4=form.get("last_four", "") or None,
             limit_amount=Decimal(str(form.get("limit", 0) or 0)),
             due_day=int(form.get("due_day", 10) or 10),
             close_day=int(form.get("close_day", 3) or 3),
             color=form.get("color", "#3B82F6"),
         )
-        from app.routers.accounts_cards import card_to_dict
-        card = await api_create_card(body=body, db=db, current_user=current_user)
-        return templates.TemplateResponse("partials/_card_modal.html", {"request": request, "user": current_user, "card": card_to_dict(card), "success": True})
+        card_data = await api_create_card(body=body, db=db, current_user=current_user)
+        return templates.TemplateResponse("partials/_card_modal.html", {"request": request, "user": current_user, "card": card_data, "success": True})
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -746,10 +744,16 @@ async def create_transaction(request: Request, db: AsyncSession = Depends(get_db
     except ValueError:
         tx_type = TT.expense
     
-    try:
-        pay_method = PM(form.get("payment_method", "money"))
-    except ValueError:
-        pay_method = PM.money
+    source = form.get("source", "cash")
+    source_to_payment = {
+        "pix": PM.pix,
+        "bank": PM.transfer,
+        "credit_card": PM.credit_card,
+        "debit_card": PM.debit_card,
+        "cash": PM.money,
+        "other": PM.money,
+    }
+    pay_method = source_to_payment.get(source, PM.money)
         
     date_str = form.get("date", datetime.now().date().isoformat())
     tx_date = datetime.strptime(date_str, "%Y-%m-%d").date() if isinstance(date_str, str) else date_str
@@ -765,10 +769,10 @@ async def create_transaction(request: Request, db: AsyncSession = Depends(get_db
             account_id=uuid.UUID(form.get("account_id")) if form.get("account_id") else None,
             card_id=uuid.UUID(form.get("card_id")) if form.get("card_id") else None,
             installments=int(form.get("installments", 1) or 1),
+            calculate_tithe=form.get("tithe") in ("1", "on", "true"),
         )
         tx = await api_create_transaction(body=body, db=db, current_user=current_user)
-        from app.routers.htmx import transaction_to_dict
-        return templates.TemplateResponse("partials/_tx_modal.html", {"request": request, "user": current_user, "tx": transaction_to_dict(tx), "success": True})
+        return templates.TemplateResponse("partials/_tx_modal.html", {"request": request, "user": current_user, "tx": tx, "success": True})
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -787,10 +791,16 @@ async def edit_transaction(tx_id: str, request: Request, db: AsyncSession = Depe
     except ValueError:
         tx_type = TT.expense
     
-    try:
-        pay_method = PM(form.get("payment_method", "money"))
-    except ValueError:
-        pay_method = PM.money
+    source = form.get("source", "cash")
+    source_to_payment = {
+        "pix": PM.pix,
+        "bank": PM.transfer,
+        "credit_card": PM.credit_card,
+        "debit_card": PM.debit_card,
+        "cash": PM.money,
+        "other": PM.money,
+    }
+    pay_method = source_to_payment.get(source, PM.money)
         
     date_str = form.get("date", datetime.now().date().isoformat())
     tx_date = datetime.strptime(date_str, "%Y-%m-%d").date() if isinstance(date_str, str) else date_str
@@ -805,10 +815,10 @@ async def edit_transaction(tx_id: str, request: Request, db: AsyncSession = Depe
             category_id=uuid.UUID(form.get("category_id")) if form.get("category_id") else None,
             account_id=uuid.UUID(form.get("account_id")) if form.get("account_id") else None,
             card_id=uuid.UUID(form.get("card_id")) if form.get("card_id") else None,
+            notes=form.get("notes") or None,
         )
         tx = await update_transaction(tx_id=uuid.UUID(tx_id), body=body, db=db, current_user=current_user)
-        from app.routers.htmx import transaction_to_dict
-        return templates.TemplateResponse("partials/_tx_modal.html", {"request": request, "user": current_user, "tx": transaction_to_dict(tx), "success": True})
+        return templates.TemplateResponse("partials/_tx_modal.html", {"request": request, "user": current_user, "tx": tx, "success": True})
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -833,8 +843,8 @@ async def create_category(request: Request, db: AsyncSession = Depends(get_db), 
             color=form.get("color", "#6B7280"),
             type=cat_type,
         )
-        cat = await api_create_category(body=body, db=db, current_user=current_user)
-        return templates.TemplateResponse("partials/_cat_modal.html", {"request": request, "user": current_user, "cat": {"id": str(cat.id), "name": cat.name, "icon": cat.icon, "type": cat.type}, "success": True})
+        cat_data = await api_create_category(body=body, db=db, current_user=current_user)
+        return templates.TemplateResponse("partials/_cat_modal.html", {"request": request, "user": current_user, "cat": cat_data, "success": True})
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -859,8 +869,8 @@ async def edit_category(cat_id: str, request: Request, db: AsyncSession = Depend
             color=form.get("color", "#6B7280"),
             type=cat_type,
         )
-        cat = await update_category(cat_id=uuid.UUID(cat_id), body=body, db=db, current_user=current_user)
-        return templates.TemplateResponse("partials/_cat_modal.html", {"request": request, "user": current_user, "cat": {"id": str(cat.id), "name": cat.name, "icon": cat.icon, "type": cat.type}, "success": True})
+        cat_data = await update_category(cat_id=uuid.UUID(cat_id), body=body, db=db, current_user=current_user)
+        return templates.TemplateResponse("partials/_cat_modal.html", {"request": request, "user": current_user, "cat": cat_data, "success": True})
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -955,14 +965,8 @@ async def new_subscription_modal(request: Request, current_user: User = Depends(
 async def create_subscription(request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_user)):
     from fastapi.responses import JSONResponse
     from app.routers.subscriptions import create_subscription as api_create_subscription, SubscriptionCreate
-    from app.models.subscription import SubscriptionType
     
     form = await request.form()
-    try:
-        sub_type = SubscriptionType(form.get("type", "expense"))
-    except ValueError:
-        sub_type = SubscriptionType.expense
-        
     billing_date_str = form.get("next_billing_date")
     billing_date = None
     if billing_date_str:
@@ -975,12 +979,11 @@ async def create_subscription(request: Request, db: AsyncSession = Depends(get_d
             name=form.get("name", ""),
             amount=Decimal(str(form.get("amount", 0) or 0)),
             billing_day=int(form.get("billing_day", 1) or 1),
-            type=sub_type,
             category_id=uuid.UUID(form.get("category_id")) if form.get("category_id") else None,
             next_billing_date=billing_date,
         )
         sub = await api_create_subscription(body=body, db=db, current_user=current_user)
-        return templates.TemplateResponse("partials/_sub_modal.html", {"request": request, "user": current_user, "sub": {"id": str(sub.id), "name": sub.name, "amount": float(sub.amount), "type": sub.type}, "success": True})
+        return templates.TemplateResponse("partials/_sub_modal.html", {"request": request, "user": current_user, "sub": sub, "success": True})
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -998,14 +1001,8 @@ async def edit_subscription_modal(sub_id: str, request: Request, db: AsyncSessio
 async def edit_subscription(sub_id: str, request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_user)):
     from fastapi.responses import JSONResponse
     from app.routers.subscriptions import update_subscription, SubscriptionUpdate
-    from app.models.subscription import SubscriptionType
     
     form = await request.form()
-    try:
-        sub_type = SubscriptionType(form.get("type", "expense"))
-    except ValueError:
-        sub_type = SubscriptionType.expense
-        
     billing_date_str = form.get("next_billing_date")
     billing_date = None
     if billing_date_str:
@@ -1016,12 +1013,12 @@ async def edit_subscription(sub_id: str, request: Request, db: AsyncSession = De
             name=form.get("name", ""),
             amount=Decimal(str(form.get("amount", 0) or 0)) if form.get("amount") else None,
             billing_day=int(form.get("billing_day", 1) or 1) if form.get("billing_day") else None,
-            type=sub_type,
             category_id=uuid.UUID(form.get("category_id")) if form.get("category_id") else None,
+            is_active=form.get("is_active") in ("1", "on", "true"),
             next_billing_date=billing_date,
         )
         sub = await update_subscription(sub_id=uuid.UUID(sub_id), body=body, db=db, current_user=current_user)
-        return templates.TemplateResponse("partials/_sub_modal.html", {"request": request, "user": current_user, "sub": {"id": str(sub.id), "name": sub.name, "amount": float(sub.amount), "type": sub.type}, "success": True})
+        return templates.TemplateResponse("partials/_sub_modal.html", {"request": request, "user": current_user, "sub": sub, "success": True})
     except Exception as e:
         import traceback
         traceback.print_exc()
