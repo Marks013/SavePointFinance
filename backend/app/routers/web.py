@@ -1,6 +1,6 @@
 """
 Web Router — Serves HTML pages using Jinja2 templates.
-All pages are protected via require_user or require_superadmin.
+All pages are protected via require_user or require_admin.
 """
 import uuid
 import logging
@@ -182,9 +182,11 @@ async def logout_page(request: Request):
 @router.post("/login", response_class=HTMLResponse)
 async def login_post(request: Request, db: AsyncSession = Depends(get_db)):
     from app.models.user import User
+    from app.models.tenant import Tenant
     from app.auth import verify_password, create_access_token, create_refresh_token
     from app.routers.auth import TokenResponse
     from sqlalchemy import select
+    from datetime import datetime, timezone
     
     form = await request.form()
     email = form.get("email", "")
@@ -221,6 +223,21 @@ async def login_post(request: Request, db: AsyncSession = Depends(get_db)):
                 "error": "Conta inativa. Contate o administrador.",
                 "email": email
             })
+        
+        # Check tenant trial expiration BEFORE login
+        tenant_result = await db.execute(select(Tenant).where(Tenant.id == user.tenant_id))
+        tenant = tenant_result.scalar_one_or_none()
+        
+        if tenant and tenant.plan == "free" and tenant.trial_expires_at:
+            now = datetime.now(timezone.utc)
+            if tenant.trial_expires_at < now:
+                return templates.TemplateResponse("login.html", {
+                    "request": request,
+                    "error": "Seu período de teste expirou. Assine o plano PRO para continuar usando o SavePoint Finance.",
+                    "email": email,
+                    "trial_expired": True,
+                    "expired_date": tenant.trial_expires_at.strftime("%d/%m/%Y")
+                })
         
         token_data = {"sub": str(user.id), "tenant_id": str(user.tenant_id)}
         tokens = TokenResponse(
@@ -261,6 +278,55 @@ async def login_post(request: Request, db: AsyncSession = Depends(get_db)):
 @router.get("/register", response_class=HTMLResponse)
 async def register_page(request: Request):
     return templates.TemplateResponse("register.html", {"request": request})
+
+
+@router.get("/forgot-password", response_class=HTMLResponse)
+async def forgot_password_page(request: Request):
+    return templates.TemplateResponse("forgot-password.html", {"request": request})
+
+
+@router.post("/forgot-password", response_class=HTMLResponse)
+async def forgot_password_post(request: Request, db: AsyncSession = Depends(get_db)):
+    from app.models.user import User
+    from app.auth import hash_password
+    from sqlalchemy import select
+    import secrets
+    from datetime import datetime, timedelta, timezone
+    
+    form = await request.form()
+    email = form.get("email", "")
+    
+    if not email:
+        return templates.TemplateResponse("forgot-password.html", {
+            "request": request,
+            "error": "E-mail é obrigatório"
+        })
+    
+    result = await db.execute(select(User).where(User.email == email.lower()))
+    user = result.scalar_one_or_none()
+    
+    if user:
+        user.reset_token = secrets.token_urlsafe(32)
+        user.reset_token_expires = datetime.now(timezone.utc) + timedelta(hours=24)
+        await db.commit()
+        
+        # Send password reset email
+        from app.services.email_service import email_service
+        email_sent = email_service.send_password_reset_email(
+            to_email=user.email,
+            reset_token=user.reset_token,
+            user_name=user.name or "Usuário"
+        )
+        
+        if not email_sent:
+            # Log error but don't show to user (security)
+            print(f"[Email] Falha ao enviar e-mail de recuperação para {user.email}")
+    
+    # Always show same message regardless of whether user exists (security)
+    return templates.TemplateResponse("forgot-password.html", {
+        "request": request,
+        "success": "Se o e-mail existir, você receberá um link de recuperação em breve."
+    })
 
 
 @router.post("/register", response_class=HTMLResponse)
@@ -318,8 +384,20 @@ async def register_post(request: Request, db: AsyncSession = Depends(get_db)):
                 "workspace_name": workspace_name
             })
         
+        from datetime import timezone, timedelta
+        
+        # Create tenant with trial period (31 days for free plan)
+        now = datetime.now(timezone.utc)
         slug = workspace_name.lower().replace(" ", "-")[:40] + "-" + secrets.token_hex(4)
-        tenant = Tenant(name=workspace_name, slug=slug)
+        tenant = Tenant(
+            name=workspace_name,
+            slug=slug,
+            plan="free",
+            max_users=1,
+            trial_start=now,
+            trial_days=31,
+            trial_expires_at=now + timedelta(days=31)
+        )
         db.add(tenant)
         await db.flush()
         
@@ -383,6 +461,64 @@ async def index_page(request: Request):
 @router.get("/setup-password", response_class=HTMLResponse)
 async def setup_password_page(request: Request, token: str = None):
     return templates.TemplateResponse("setup_password.html", {"request": request, "token": token})
+
+
+@router.get("/reset-password", response_class=HTMLResponse)
+async def reset_password_page(request: Request, token: str = None):
+    return templates.TemplateResponse("reset-password.html", {"request": request, "token": token})
+
+
+@router.post("/reset-password")
+async def reset_password_post(request: Request, db: AsyncSession = Depends(get_db)):
+    form = await request.form()
+    token = form.get("token", "")
+    new_password = form.get("new_password", "")
+    confirm_password = form.get("confirm_password", "")
+    
+    if not token:
+        return templates.TemplateResponse("reset-password.html", {
+            "request": request,
+            "error": "Token é obrigatório"
+        })
+    
+    if new_password != confirm_password:
+        return templates.TemplateResponse("reset-password.html", {
+            "request": request,
+            "error": "As senhas não conferem",
+            "token": token
+        })
+    
+    if len(new_password) < 6:
+        return templates.TemplateResponse("reset-password.html", {
+            "request": request,
+            "error": "A senha deve ter pelo menos 6 caracteres",
+            "token": token
+        })
+    
+    from sqlalchemy import select
+    from app.models.user import User
+    from app.auth import hash_password
+    from datetime import datetime, timezone
+    
+    result = await db.execute(select(User).where(User.reset_token == token))
+    user = result.scalar_one_or_none()
+    
+    if not user or not user.reset_token_expires or user.reset_token_expires < datetime.now(timezone.utc):
+        return templates.TemplateResponse("reset-password.html", {
+            "request": request,
+            "error": "Token expirado ou inválido. Solicite uma nova recuperação de senha.",
+            "token": token
+        })
+    
+    user.password_hash = hash_password(new_password)
+    user.reset_token = None
+    user.reset_token_expires = None
+    await db.commit()
+    
+    return templates.TemplateResponse("reset-password.html", {
+        "request": request,
+        "success": "Senha alterada com sucesso! Agora você pode fazer login."
+    })
 
 
 @router.post("/setup-password")
@@ -2116,7 +2252,7 @@ async def export_page(request: Request, db: AsyncSession = Depends(get_db), curr
         "user": current_user,
         "can_export": allowed,
         "plan_error": error,
-        "plan_name": "Free" if is_free else ("Pro" if limits.get("max_users", 1) <= 5 else "Enterprise"),
+        "plan_name": "Free" if is_free else "Pro",
         "date_from": first_day.isoformat(),
         "date_to": today.isoformat(),
         "data_type": "all",
@@ -2140,7 +2276,7 @@ async def import_page(request: Request, db: AsyncSession = Depends(get_db), curr
         "user": current_user,
         "can_import": allowed,
         "plan_error": error,
-        "plan_name": "Free" if is_free else ("Pro" if limits.get("max_users", 1) <= 5 else "Enterprise"),
+        "plan_name": "Free" if is_free else "Pro",
         "date_from": first_day.isoformat(),
         "date_to": today.isoformat(),
     })

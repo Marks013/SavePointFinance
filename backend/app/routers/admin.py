@@ -1,6 +1,6 @@
 """
-Admin Router — Accessible ONLY by users with role=superadmin.
-Loaded as a separate router; all endpoints require require_superadmin dependency.
+Admin Router — Accessible ONLY by users with role=admin.
+Loaded as a separate router; all endpoints require require_admin dependency.
 Frontend: admin.html (separate page, not linked in the user navbar).
 """
 import uuid
@@ -13,37 +13,51 @@ from sqlalchemy import select, func
 from pydantic import BaseModel, EmailStr, validator
 
 from app.database import get_db
-from app.auth import require_superadmin, hash_password
+from app.auth import require_admin, hash_password
 from app.models.user import User, UserRole
 from app.models.tenant import Tenant
 
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
 
 # ── Plan constants ────────────────────────────────────────────────────────────────
+# FREE = período teste 31 dias com restrições
+# PRO = acesso vitalício sem limites
 PLAN_FEATURES = {
     "free": {
         "name": "Free",
+        "description": "Período de teste - 31 dias",
         "price": 0,
         "max_users": 1,
         "max_accounts": 3,
         "max_categories": 10,
-        "features": ["3 contas", "100 transações/mês", "Relatórios básicos"],
+        "trial_days": 31,
+        "features": [
+            "Período de teste de 31 dias",
+            "3 contas bancárias",
+            "10 categorias",
+            "Relatórios básicos",
+            "100 transações/mês"
+        ],
     },
     "pro": {
         "name": "Pro",
-        "price": 19.90,
+        "description": "Acesso vitalício completo",
+        "price": 29.90,
         "max_users": 5,
         "max_accounts": 999,
         "max_categories": 999,
-        "features": ["Contas ilimitadas", "Transações ilimitadas", "Relatórios avançados", "Exportação", "IA classifier"],
-    },
-    "enterprise": {
-        "name": "Enterprise",
-        "price": 49.90,
-        "max_users": 999,
-        "max_accounts": 999,
-        "max_categories": 999,
-        "features": ["Tudo no Pro", "Multi-usuários", "API acesso", "Suporte prioritário", "Whatsapp bot"],
+        "trial_days": 0,
+        "features": [
+            "Acesso vitalício sem límite de tempo",
+            "Contas ilimitadas",
+            "Categorias ilimitadas",
+            "Transações ilimitadas",
+            "Relatórios avançados",
+            "Exportação de dados",
+            "Classificação por IA",
+            "Múltiplos usuários",
+            "Suporte prioritário"
+        ],
     },
 }
 
@@ -75,7 +89,6 @@ class CreateSuperadminRequest(BaseModel):
 
 class PlanChangeRequest(BaseModel):
     plan: str
-    expires_at: Optional[datetime] = None
     
     @validator("plan")
     def validate_plan(cls, v):
@@ -98,7 +111,7 @@ class PlanResponse(BaseModel):
 
 @router.get("/plans", response_model=List[PlanResponse])
 async def list_plans(
-    _: User = Depends(require_superadmin),
+    _: User = Depends(require_admin),
 ):
     """List all available plans with their features."""
     return [
@@ -112,7 +125,7 @@ async def change_tenant_plan(
     tenant_id: uuid.UUID,
     body: PlanChangeRequest,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_superadmin),
+    _: User = Depends(require_admin),
 ):
     """Change tenant plan with proper validation and limits."""
     result = await db.execute(select(Tenant).where(Tenant.id == tenant_id))
@@ -169,12 +182,21 @@ async def change_tenant_plan(
     tenant.plan = new_plan
     tenant.max_users = plan_info["max_users"]
     
-    # Handle expiration
-    if body.expires_at:
-        tenant.expires_at = body.expires_at
-    elif body.expires_at is None and old_plan == "free" and new_plan != "free":
-        # First paid plan: set expiration to 30 days from now
-        tenant.expires_at = datetime.now(timezone.utc) + timedelta(days=30)
+    # Handle plan transition
+    if old_plan == "free" and new_plan == "pro":
+        # Moving to Pro: clear trial fields, access is lifetime
+        tenant.trial_start = None
+        tenant.trial_days = 0
+        tenant.trial_expires_at = None
+        tenant.expires_at = None  # No expiration for Pro
+    elif new_plan == "free":
+        # Moving to Free (downgrade): set trial period
+        from datetime import timedelta
+        now = datetime.now(timezone.utc)
+        tenant.trial_start = now
+        tenant.trial_days = 31
+        tenant.trial_expires_at = now + timedelta(days=31)
+        tenant.expires_at = None
     
     await db.commit()
     await db.refresh(tenant)
@@ -184,7 +206,7 @@ async def change_tenant_plan(
         "name": tenant.name,
         "plan": tenant.plan,
         "max_users": tenant.max_users,
-        "expires_at": tenant.expires_at.isoformat() if tenant.expires_at else None,
+        "trial_expires_at": tenant.trial_expires_at.isoformat() if tenant.trial_expires_at else None,
         "message": f"Plano alterado de '{old_plan}' para '{new_plan}' com sucesso.",
     }
 
@@ -198,7 +220,7 @@ async def list_tenants(
     skip: int = 0,
     limit: int = 50,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_superadmin),
+    _: User = Depends(require_admin),
 ):
     q = select(Tenant)
     if search:
@@ -237,7 +259,7 @@ async def list_tenants(
 async def get_tenant(
     tenant_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_superadmin),
+    _: User = Depends(require_admin),
 ):
     result = await db.execute(select(Tenant).where(Tenant.id == tenant_id))
     tenant = result.scalar_one_or_none()
@@ -296,7 +318,7 @@ async def update_tenant(
     tenant_id: uuid.UUID,
     body: TenantUpdate,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_superadmin),
+    _: User = Depends(require_admin),
 ):
     result = await db.execute(select(Tenant).where(Tenant.id == tenant_id))
     tenant = result.scalar_one_or_none()
@@ -323,7 +345,7 @@ async def update_tenant(
 async def delete_tenant(
     tenant_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_superadmin),
+    _: User = Depends(require_admin),
 ):
     result = await db.execute(select(Tenant).where(Tenant.id == tenant_id))
     tenant = result.scalar_one_or_none()
@@ -343,7 +365,7 @@ async def list_all_users(
     skip: int = 0,
     limit: int = 50,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_superadmin),
+    _: User = Depends(require_admin),
 ):
     q = select(User)
     if search:
@@ -381,7 +403,7 @@ async def update_user_admin(
     user_id: uuid.UUID,
     body: UserAdminUpdate,
     db: AsyncSession = Depends(get_db),
-    current_admin: User = Depends(require_superadmin),
+    current_admin: User = Depends(require_admin),
 ):
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
@@ -424,7 +446,7 @@ async def update_user_admin(
 async def delete_user_admin(
     user_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_admin: User = Depends(require_superadmin),
+    current_admin: User = Depends(require_admin),
 ):
     if user_id == current_admin.id:
         raise HTTPException(status_code=400, detail="Você não pode excluir sua própria conta.")
@@ -442,7 +464,7 @@ async def delete_user_admin(
 @router.get("/stats")
 async def platform_stats(
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_superadmin),
+    _: User = Depends(require_admin),
 ):
     total_tenants = (await db.execute(select(func.count()).select_from(Tenant))).scalar()
     active_tenants = (
@@ -458,15 +480,16 @@ async def platform_stats(
     from app.models.transaction import Transaction
     total_tx = (await db.execute(select(func.count()).select_from(Transaction))).scalar()
 
-    # Expiring soon (within 30 days)
+    # Expiring soon (within 30 days) - based on trial_expires_at for free plans
     now = datetime.now(timezone.utc)
     from datetime import timedelta
     expiring_soon = (
         await db.execute(
             select(func.count()).select_from(Tenant).where(
-                Tenant.expires_at != None,
-                Tenant.expires_at > now,
-                Tenant.expires_at < now + timedelta(days=30),
+                Tenant.plan == "free",
+                Tenant.trial_expires_at != None,
+                Tenant.trial_expires_at > now,
+                Tenant.trial_expires_at < now + timedelta(days=30),
                 Tenant.is_active == True,
             )
         )
@@ -475,8 +498,9 @@ async def platform_stats(
     expired = (
         await db.execute(
             select(func.count()).select_from(Tenant).where(
-                Tenant.expires_at != None,
-                Tenant.expires_at < now,
+                Tenant.plan == "free",
+                Tenant.trial_expires_at != None,
+                Tenant.trial_expires_at < now,
                 Tenant.is_active == True,
             )
         )
@@ -493,25 +517,23 @@ async def platform_stats(
         "plans_breakdown": {
             "free": (await db.execute(select(func.count()).select_from(Tenant).where(Tenant.plan == "free"))).scalar() or 0,
             "pro": (await db.execute(select(func.count()).select_from(Tenant).where(Tenant.plan == "pro"))).scalar() or 0,
-            "enterprise": (await db.execute(select(func.count()).select_from(Tenant).where(Tenant.plan == "enterprise"))).scalar() or 0,
         },
         "roles_breakdown": {
-            "superadmin": (await db.execute(select(func.count()).select_from(User).where(User.role == UserRole.superadmin))).scalar() or 0,
             "admin": (await db.execute(select(func.count()).select_from(User).where(User.role == UserRole.admin))).scalar() or 0,
             "member": (await db.execute(select(func.count()).select_from(User).where(User.role == UserRole.member))).scalar() or 0,
         },
     }
 
 
-# ── Bootstrap superadmin (run ONCE) ──────────────────────────────────────────
+# ── Bootstrap admin (run ONCE) ──────────────────────────────────────────
 
 @router.post("/bootstrap", status_code=201, include_in_schema=False)
-async def bootstrap_superadmin(
+async def bootstrap_admin(
     body: CreateSuperadminRequest,
     db: AsyncSession = Depends(get_db),
 ):
     """
-    One-time endpoint to create the first superadmin.
+    One-time endpoint to create the first admin (platform-level).
     Requires a SECRET_KEY env var to prevent unauthorized use.
     Disable or remove after first use.
     """
@@ -519,13 +541,13 @@ async def bootstrap_superadmin(
     if body.secret_key != settings.SECRET_KEY:
         raise HTTPException(status_code=403, detail="Chave secreta incorreta.")
 
-    existing = await db.execute(select(User).where(User.role == UserRole.superadmin))
+    existing = await db.execute(select(User).where(User.role == UserRole.admin))
     if existing.scalar_one_or_none():
         raise HTTPException(
-            status_code=400, detail="Super-administrador já existe."
+            status_code=400, detail="Administrador já existe."
         )
 
-    # Superadmin gets its own tenant (platform workspace)
+    # Admin gets its own tenant (platform workspace)
     slug = "platform-admin-" + secrets.token_hex(4)
     tenant = Tenant(name="Platform Admin", slug=slug)
     db.add(tenant)
@@ -536,7 +558,7 @@ async def bootstrap_superadmin(
         email=body.email.lower(),
         name=body.name,
         password_hash=hash_password(body.password),
-        role=UserRole.superadmin,
+        role=UserRole.admin,
     )
     db.add(user)
     await db.commit()

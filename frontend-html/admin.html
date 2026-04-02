@@ -1,19 +1,19 @@
 {% extends "base.html" %}
-{% block title %}Super Admin — SavePoint Finance{% endblock %}
-{% block breadcrumb %}Super Admin{% endblock %}
+{% block title %}Admin — SavePoint Finance{% endblock %}
+{% block breadcrumb %}Administração{% endblock %}
 
 {% block content %}
 <div class="page-header">
   <div class="page-header__meta">
-    <h1>Super Admin</h1>
-    <p>Painel de administração global do sistema</p>
+    <h1>Painel de Administração</h1>
+    <p>Gerencie workspaces, usuários e configurações do sistema</p>
   </div>
   <div class="page-header__actions">
-    <span class="badge badge--expense" style="padding:6px 12px; font-size:0.75rem;">
+    <span class="badge" style="padding:6px 12px; font-size:0.75rem; background:rgba(0,229,122,0.1); color:var(--accent);">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;">
         <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
       </svg>
-      Acesso Restrito
+      Admin
     </span>
   </div>
 </div>
@@ -22,7 +22,7 @@
 <div class="stats-grid mb-6">
   <div class="stat-card stat-card--balance">
     <div class="stat-card__header">
-      <span class="stat-card__title">Total Tenants</span>
+      <span class="stat-card__title">Total Workspaces</span>
       <div class="stat-card__icon">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
@@ -53,26 +53,24 @@
     </div>
     <div class="stat-card__value">{{ system_stats.transactions_30d or 0 }}</div>
   </div>
-  <div class="stat-card stat-card--income">
+  <div class="stat-card stat-card--expense">
     <div class="stat-card__header">
-      <span class="stat-card__title">Receita MRR</span>
+      <span class="stat-card__title">Workspaces Expirando</span>
       <div class="stat-card__icon">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
         </svg>
       </div>
     </div>
-    <div class="stat-card__value">{{ system_stats.mrr_fmt or 'R$ 0' }}</div>
+    <div class="stat-card__value">{{ system_stats.expiring_soon_30d or 0 }}</div>
   </div>
 </div>
 
 <!-- Navigation Tabs -->
 <div class="tab-pills" id="adminTabs">
-  <button class="tab-pill active" onclick="showAdminTab('tenants', this)">Tenants</button>
+  <button class="tab-pill active" onclick="showAdminTab('tenants', this)">Workspaces</button>
   <button class="tab-pill" onclick="showAdminTab('users', this)">Usuários</button>
   <button class="tab-pill" onclick="showAdminTab('plans', this)">Planos</button>
-  <button class="tab-pill" onclick="showAdminTab('subscriptions', this)">Assinaturas</button>
-  <button class="tab-pill" onclick="showAdminTab('logs', this)">Auditoria</button>
   <button class="tab-pill" onclick="showAdminTab('system', this)">Sistema</button>
 </div>
 
@@ -160,8 +158,8 @@
           <td class="text-sm" style="color:var(--text-dim);">{{ u.email }}</td>
           <td class="text-sm">{{ u.tenant_name or '—' }}</td>
           <td>
-            <span class="badge badge--neutral" style="{% if u.role == 'superadmin' %}background:rgba(0,229,122,0.1);color:var(--accent);{% elif u.role == 'admin' %}background:rgba(59,158,255,0.1);color:var(--info);{% endif %}">
-              {{ u.role }}
+            <span class="badge badge--neutral" style="{% if u.role == 'admin' %}background:rgba(0,229,122,0.1);color:var(--accent);{% else %}background:rgba(59,158,255,0.1);color:var(--info);{% endif %}">
+              {% if u.role == 'admin' %}Administrador{% else %}Membro{% endif %}
             </span>
           </td>
           <td class="mono text-xs text-muted">{{ u.last_login.strftime('%d/%m/%Y %H:%M') if u.last_login else '—' }}</td>
@@ -191,25 +189,45 @@
 
 <!-- Plans Tab -->
 <div id="admin-plans" style="display:none;">
-  <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:16px;">
+  <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:20px; max-width:900px;">
     {% if plans %}
       {% for plan in plans %}
-      <div class="card plan-card {{ 'plan-card--featured' if plan.name|lower == 'pro' }}">
-        <div class="plan-card__name">{{ plan.name }}</div>
-        <div class="plan-card__price">{{ plan.price_fmt or 'R$ ' + plan.price|string }}<span>/mês</span></div>
-        <ul class="plan-card__features">
+      <div class="card plan-card {{ 'plan-card--featured' if plan.name|lower == 'pro' }}" style="padding:24px;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px;">
+          <div>
+            <div class="plan-card__name" style="font-size:1.25rem;">{{ plan.name }}</div>
+            <div style="font-size:0.8125rem; color:var(--text-dim); margin-top:4px;">{{ plan.description or '' }}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:1.5rem; font-weight:700; color:var(--accent);">
+              {% if plan.price > 0 %}
+              R$ {{ "%.2f"|format(plan.price) }}<span style="font-size:0.875rem; font-weight:400; color:var(--text-dim);">/mês</span>
+              {% else %}
+              <span style="color:var(--income);">Grátis</span>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        <ul class="plan-card__features" style="margin-bottom:20px;">
           {% for f in (plan.features or []) %}
-          <li>{{ f }}</li>
+          <li style="font-size:0.875rem;">{{ f }}</li>
           {% endfor %}
         </ul>
-        <div style="margin-top:16px;">
-          <button
-            class="btn btn--outline btn--sm btn--w-full"
-            hx-get="/admin/plans/{{ plan.id }}/edit"
-            hx-target="#modal-content"
-            hx-swap="innerHTML"
-          >Editar plano</button>
+        {% if plan.id == 'free' %}
+        <div style="padding:12px; background:rgba(245,158,11,0.1); border-radius:8px; font-size:0.75rem; color:var(--warning);">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;vertical-align:middle;margin-right:6px;">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          Período de teste: 31 dias. Após expira, usuário não consegue login.
         </div>
+        {% elif plan.id == 'pro' %}
+        <div style="padding:12px; background:rgba(0,229,122,0.1); border-radius:8px; font-size:0.75rem; color:var(--income);">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;vertical-align:middle;margin-right:6px;">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+          </svg>
+          Acesso vitalício sem límite de tempo.
+        </div>
+        {% endif %}
       </div>
       {% endfor %}
     {% else %}
@@ -253,42 +271,6 @@
   </div>
   {% else %}
   <div class="card"><div class="empty-state"><p>Nenhuma assinatura de billing</p></div></div>
-  {% endif %}
-</div>
-
-<!-- Audit Logs Tab -->
-<div id="admin-logs" style="display:none;">
-  {% if audit_logs %}
-  <div class="data-table-wrap">
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th>Ação</th>
-          <th>Usuário</th>
-          <th>Tenant</th>
-          <th>Timestamp</th>
-          <th>IP</th>
-          <th>Detalhes</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for log in audit_logs %}
-        <tr>
-          <td>
-            <span class="pill" style="background:rgba(59,158,255,0.1); color:var(--info);">{{ log.action }}</span>
-          </td>
-          <td class="text-sm" style="color:var(--text-dim);">{{ log.user_email or '—' }}</td>
-          <td class="text-sm" style="color:var(--text-dim);">{{ log.tenant_name or '—' }}</td>
-          <td class="mono text-xs text-muted">{{ log.created_at.strftime('%d/%m/%Y %H:%M:%S') if log.created_at else '—' }}</td>
-          <td class="mono text-xs">{{ log.ip_address or '—' }}</td>
-          <td class="text-xs text-muted">{{ log.details[:60] + '…' if log.details and log.details|length > 60 else log.details or '—' }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% else %}
-  <div class="card"><div class="empty-state"><p>Nenhum log de auditoria</p></div></div>
   {% endif %}
 </div>
 
@@ -379,7 +361,7 @@
 function showAdminTab(tab, btn) {
   document.querySelectorAll('#adminTabs .tab-pill').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
-  ['tenants','users','plans','subscriptions','logs','system'].forEach(t => {
+  ['tenants','users','plans','system'].forEach(t => {
     const el = document.getElementById('admin-' + t);
     if (el) el.style.display = t === tab ? '' : 'none';
   });

@@ -28,16 +28,6 @@ PLAN_LIMITS = {
         "export": True,
         "whatsapp_alerts": True,
     },
-    "enterprise": {
-        "max_users": 999,
-        "max_accounts": 999,
-        "max_categories": 999,
-        "max_cards": 999,
-        "max_transactions_per_month": 999999,
-        "ai_classifier": True,
-        "export": True,
-        "whatsapp_alerts": True,
-    },
 }
 
 
@@ -87,7 +77,7 @@ async def check_limit(tenant_id: uuid.UUID, resource_type: str, db: AsyncSession
     current_count = result.scalar() or 0
     
     if current_count >= max_count:
-        plan_name = "Free" if limits == PLAN_LIMITS["free"] else ("Pro" if limits == PLAN_LIMITS["pro"] else "Enterprise")
+        plan_name = "Free" if limits == PLAN_LIMITS["free"] else "Pro"
         return False, f"Limite do plano {plan_name} atingido: máximo de {max_count} {resource_type}. Faça upgrade para continuar."
     
     return True, ""
@@ -103,8 +93,8 @@ async def check_feature(tenant_id: uuid.UUID, feature: str, db: AsyncSession) ->
     if feature in limits:
         if limits[feature]:
             return True, ""
-        plan_name = "Free" if limits == PLAN_LIMITS["free"] else ("Pro" if limits == PLAN_LIMITS["pro"] else "Enterprise")
-        return False, f"Funcionalidade disponível apenas nos planos Pro ou Enterprise. Faça upgrade do seu plano para usar."
+        plan_name = "Free" if limits == PLAN_LIMITS["free"] else "Pro"
+        return False, f"Funcionalidade disponível apenas no plano Pro. Faça upgrade do seu plano para usar."
     
     return True, ""
 
@@ -140,7 +130,7 @@ async def check_transaction_limit(tenant_id: uuid.UUID, db: AsyncSession, month:
     current_count = result.scalar() or 0
     
     if current_count >= max_tx:
-        plan_name = "Free" if limits == PLAN_LIMITS["free"] else ("Pro" if limits == PLAN_LIMITS["pro"] else "Enterprise")
+        plan_name = "Free" if limits == PLAN_LIMITS["free"] else "Pro"
         return False, f"Limite do plano {plan_name} atingido: {max_tx} transações/mês. Upgrade para transações ilimitadas."
     
     return True, ""

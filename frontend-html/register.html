@@ -35,6 +35,21 @@
       {% endif %}
 
       <form method="POST" action="/register" class="form-stack" onsubmit="return validatePasswords()">
+        
+        <!-- Trial Info Banner -->
+        <div style="background: linear-gradient(135deg, rgba(0,229,122,0.1) 0%, rgba(0,229,122,0.05) 100%); border: 1px solid rgba(0,229,122,0.25); border-radius: 12px; padding: 16px; margin-bottom: 20px;">
+          <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px; color:var(--accent);">
+              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+            </svg>
+            <span style="font-weight:600; font-size:0.875rem; color:var(--accent);">Período de Teste Grátis</span>
+          </div>
+          <div style="font-size:0.8125rem; color:var(--text-dim); line-height:1.5;">
+            Você terá acesso completo ao <strong>SavePoint Finance</strong> por <strong style="color:var(--text);">31 dias</strong>.<br>
+            Após este período, o acesso será bloqueado até a assinatura do plano PRO.
+          </div>
+        </div>
+
         <div class="form-group">
           <label class="form-label" for="workspace_name">Nome do Workspace</label>
           <div class="input-wrap">

@@ -14,11 +14,22 @@ class Tenant(Base):
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     slug: Mapped[str] = mapped_column(String(60), unique=True, nullable=False, index=True)
 
-    # --- Subscription / Plan control (admin sets these) ---
+    # --- Subscription / Plan control ---
+    # plan: "free" = período teste (31 dias), "pro" = acesso vitalício sem limites
     plan: Mapped[str] = mapped_column(String(30), default="free", nullable=False)
-    max_users: Mapped[int] = mapped_column(Integer, default=3, nullable=False)
+    max_users: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    # None = never expires (lifetime deal). Otherwise admin sets the expiry date.
+    
+    # Trial system - only for "free" plan
+    trial_start: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
+    trial_days: Mapped[int] = mapped_column(Integer, default=31, nullable=False)
+    trial_expires_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
+    
+    # None = never expires (PRO). Otherwise is trial period.
     expires_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True, default=None
     )

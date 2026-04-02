@@ -127,7 +127,7 @@
       Importar
     </a>
 
-    {% if user.role == 'superadmin' %}
+    {% if user.role == 'admin' %}
     <div class="nav-section-label">Admin</div>
     <a href="/admin" class="nav-link {% if current_path.startswith('/admin') %}active{% endif %}">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -144,7 +144,13 @@
       <div class="user-avatar">{{ initials|upper }}</div>
       <div class="user-info">
         <div class="user-name">{{ user.name or 'Usuário' }}</div>
-        <div class="user-role">{{ user.role }}</div>
+        <div class="user-role">
+          {% if user.role == 'admin' %}
+          <span style="color: var(--accent);">Administrador</span>
+          {% else %}
+          <span style="color: var(--text-dim);">Membro</span>
+          {% endif %}
+        </div>
       </div>
       <a href="/logout" class="logout-btn" title="Sair">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

@@ -13,13 +13,13 @@
     <p>Análises e insights financeiros</p>
   </div>
   <div class="page-header__actions">
-    <div class="month-nav">
-      <button class="month-nav__btn" onclick="changeMonth(-1)">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+    <div class="month-nav" style="display:flex; align-items:center; gap:8px; background:var(--card); padding:8px 12px; border-radius:var(--radius); border:1px solid var(--border);">
+      <button class="month-nav__btn" style="background:none; border:none; color:var(--text-dim); cursor:pointer; padding:4px;" onclick="changeMonth(-1)">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:18px;height:18px;"><polyline points="15 18 9 12 15 6"/></svg>
       </button>
-      <span class="month-nav__label">{{ month_label or 'Mar 2026' }}</span>
-      <button class="month-nav__btn" onclick="changeMonth(1)">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+      <span class="month-nav__label" style="font-weight:600; font-size:0.875rem; min-width:80px; text-align:center;">{{ month_label or 'Mar 2026' }}</span>
+      <button class="month-nav__btn" style="background:none; border:none; color:var(--text-dim); cursor:pointer; padding:4px;" onclick="changeMonth(1)">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:18px;height:18px;"><polyline points="9 18 15 12 9 6"/></svg>
       </button>
     </div>
     <button class="btn btn--outline" onclick="window.print()">
@@ -33,7 +33,7 @@
 </div>
 
 <!-- Summary Cards -->
-<div class="summary-cards mb-6">
+<div class="summary-cards">
   <div class="summary-card">
     <div class="summary-card__icon" style="background:rgba(0,229,122,0.15); color:var(--income);">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
@@ -76,24 +76,24 @@
 </div>
 
 <!-- Charts Row -->
-<div class="two-col mb-6">
+<div class="two-col">
   <!-- Donut: Expense Breakdown -->
-  <div class="card p-5">
-    <h3 style="font-size:0.875rem; font-weight:600; margin-bottom:16px;">Despesas por Categoria</h3>
-    <div style="height:260px; position:relative;">
+  <div class="card" style="padding:20px;">
+    <h3 style="font-size:0.875rem; font-weight:600; margin-bottom:16px; color:var(--text);">Despesas por Categoria</h3>
+    <div style="height:280px; position:relative;">
       <canvas id="pieChart"></canvas>
     </div>
     {% if expense_breakdown %}
-    <div style="margin-top:16px; max-height:120px; overflow-y:auto;">
+    <div style="margin-top:16px; max-height:140px; overflow-y:auto;">
       {% for item in expense_breakdown %}
-      <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid var(--border); font-size:0.8rem;">
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--border); font-size:0.8rem;">
         <div style="display:flex; align-items:center; gap:8px;">
-          <span style="width:8px; height:8px; border-radius:50%; background:{{ item.color }};"></span>
-          <span>{{ item.name }}</span>
+          <span style="width:10px; height:10px; border-radius:50%; background:{{ item.color }};"></span>
+          <span style="color:var(--text);">{{ item.name }}</span>
         </div>
         <div style="display:flex; align-items:center; gap:12px;">
-          <span class="mono text-expense">{{ item.value_fmt }}</span>
-          <span style="color:var(--text-dim); font-size:0.7rem;">{{ item.pct }}%</span>
+          <span class="mono text-expense" style="font-weight:600;">{{ item.value_fmt }}</span>
+          <span style="color:var(--text-dim); font-size:0.75rem;">{{ item.pct }}%</span>
         </div>
       </div>
       {% endfor %}
@@ -102,9 +102,9 @@
   </div>
 
   <!-- Bar: 6-Month Trend -->
-  <div class="card p-5">
-    <h3 style="font-size:0.875rem; font-weight:600; margin-bottom:16px;">Tendência 6 Meses</h3>
-    <div style="height:260px; position:relative;">
+  <div class="card" style="padding:20px;">
+    <h3 style="font-size:0.875rem; font-weight:600; margin-bottom:16px; color:var(--text);">Tendência 6 Meses</h3>
+    <div style="height:280px; position:relative;">
       <canvas id="trendChart"></canvas>
     </div>
   </div>
@@ -112,13 +112,13 @@
 
 <!-- Income Breakdown -->
 {% if income_breakdown %}
-<div class="card p-5 mb-6">
-  <h3 style="font-size:0.875rem; font-weight:600; margin-bottom:16px;">Receitas por Categoria</h3>
-  <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:12px;">
+<div class="card" style="padding:20px; margin-bottom:24px;">
+  <h3 style="font-size:0.875rem; font-weight:600; margin-bottom:16px; color:var(--text);">Receitas por Categoria</h3>
+  <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:12px;">
     {% for item in income_breakdown %}
-    <div style="padding:16px; border-radius:10px; background:var(--secondary);">
+    <div style="padding:16px; border-radius:10px; background:var(--secondary); border:1px solid var(--border);">
       <div style="font-size:0.75rem; color:var(--text-dim); margin-bottom:4px;">{{ item.name }}</div>
-      <div class="mono fw-700" style="font-size:1rem; color:var(--income);">{{ item.value_fmt }}</div>
+      <div class="mono fw-700" style="font-size:1.125rem; color:var(--income);">{{ item.value_fmt }}</div>
       <div style="font-size:0.7rem; color:var(--text-dim); margin-top:2px;">{{ item.pct }}% do total</div>
     </div>
     {% endfor %}
@@ -128,10 +128,10 @@
 
 <!-- Account / Card Summary -->
 {% if account_summary or card_summary %}
-<div class="two-col mb-6">
+<div class="two-col" style="margin-bottom:24px;">
   {% if account_summary %}
-  <div class="card p-5">
-    <h3 style="font-size:0.875rem; font-weight:600; margin-bottom:16px;">Resumo por Conta (este mês)</h3>
+  <div class="card" style="padding:20px;">
+    <h3 style="font-size:0.875rem; font-weight:600; margin-bottom:16px; color:var(--text);">Resumo por Conta (este mês)</h3>
     <div class="data-table-wrap">
       <table class="data-table">
         <thead>
@@ -158,8 +158,8 @@
   {% endif %}
 
   {% if card_summary %}
-  <div class="card p-5">
-    <h3 style="font-size:0.875rem; font-weight:600; margin-bottom:16px;">Uso de Cartões (este mês)</h3>
+  <div class="card" style="padding:20px;">
+    <h3 style="font-size:0.875rem; font-weight:600; margin-bottom:16px; color:var(--text);">Uso de Cartões (este mês)</h3>
     <div class="data-table-wrap">
       <table class="data-table">
         <thead>
@@ -189,8 +189,8 @@
 
 <!-- Top Transactions -->
 {% if top_transactions %}
-<div class="card p-5 mb-6">
-  <h3 style="font-size:0.875rem; font-weight:600; margin-bottom:16px;">Maiores Transações</h3>
+<div class="card" style="padding:20px; margin-bottom:24px;">
+  <h3 style="font-size:0.875rem; font-weight:600; margin-bottom:16px; color:var(--text);">Maiores Transações</h3>
   <div class="data-table-wrap">
     <table class="data-table">
       <thead>
@@ -218,8 +218,8 @@
 
 <!-- Comparative Month Table -->
 {% if comparison_data %}
-<div class="card p-5">
-  <h3 style="font-size:0.875rem; font-weight:600; margin-bottom:16px;">Comparativo Mensal</h3>
+<div class="card" style="padding:20px;">
+  <h3 style="font-size:0.875rem; font-weight:600; margin-bottom:16px; color:var(--text);">Comparativo Mensal</h3>
   <div class="data-table-wrap">
     <table class="data-table">
       <thead>

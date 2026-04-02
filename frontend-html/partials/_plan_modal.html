@@ -69,13 +69,18 @@
   <form id="planChangeForm" method="POST" action="/admin/tenants/{{ tenant_id }}/plan">
     <input type="hidden" name="plan" id="selectedPlanInput" value="{{ current_plan }}">
     
-    <div class="form-group">
-      <label class="form-label" for="expiresAt">Data de expiração (opcional)</label>
-      <input type="date" id="expiresAt" name="expires_at" class="form-input" 
-        value="{{ expires_at or '' }}">
-      <div class="text-xs text-muted" style="margin-top:4px;">
-        Deixe vazio para expiração automática do plano pago (30 dias)
-      </div>
+    <div style="margin-top:20px; padding:12px; background:var(--secondary); border-radius:8px; font-size:0.8125rem; color:var(--text-dim);">
+      {% if current_plan == 'free' %}
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;vertical-align:middle;margin-right:8px;color:var(--warning);">
+        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+      <strong style="color:var(--text);">Plano Free:</strong> Usuário terá 31 dias de período de teste. Após expirar, não conseguirá fazer login.
+      {% else %}
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;vertical-align:middle;margin-right:8px;color:var(--income);">
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+      </svg>
+      <strong style="color:var(--text);">Plano Pro:</strong> Acesso vitalício sem límite de tempo. Sem necessidade de renovação.
+      {% endif %}
     </div>
   </form>
 </div>

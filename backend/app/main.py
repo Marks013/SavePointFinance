@@ -25,6 +25,9 @@ from app.routers.web import router as web_router
 from app.routers.data import router as data_router
 from app.routers.htmx import router as htmx_router
 
+# Middleware de captura de erros
+from app.middleware.error_handler import setup_error_handlers
+
 # Logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -142,6 +145,10 @@ app = FastAPI(
 # Gzip compression for API responses
 app.add_middleware(GZipMiddleware, minimum_size=500)
 
+# Middleware de captura de erros
+from app.middleware.error_handler import ErrorCaptureMiddleware
+app.add_middleware(ErrorCaptureMiddleware)
+
 # CORS - seguro e restritivo
 app.add_middleware(
     CORSMiddleware,
@@ -247,8 +254,19 @@ app.include_router(subscriptions_router)
 app.include_router(installments_router)
 app.include_router(goals_router)
 
-# Admin router (superadmin only)
+# Admin router (admin only)
 app.include_router(admin_router)
+
+# Migration router
+from app.routers.migration import router as migration_router
+app.include_router(migration_router)
+
+# Diagnostic router
+from app.routers.diagnostic import router as diagnostic_router
+app.include_router(diagnostic_router)
+
+from app.routers.diagnostic_complete import router as diagnostic_complete_router
+app.include_router(diagnostic_complete_router)
 
 # Web pages router
 app.include_router(web_router)

@@ -174,12 +174,12 @@ async def create_transaction(
     ai_confidence = None
 
     if not category_id and auto_classify:
-        # First try rule-based classification (always available)
+        # First try rule-based classification (70% - keywords)
         rule_result = await classify_by_rules(body.description, str(current_user.tenant_id), db)
         if rule_result:
             category_id = rule_result
         else:
-            # AI classifier - check if feature is available for this plan
+            # AI classifier - check if feature is available for this plan (30%)
             allowed, _ = await check_feature(current_user.tenant_id, "ai_classifier", db)
             if allowed:
                 ai_result = await classify_transaction(
@@ -189,6 +189,11 @@ async def create_transaction(
                     category_id = ai_result["category_id"]
                     ai_classified = True
                     ai_confidence = ai_result["confidence"]
+            
+            # Fallback: if nothing matched, use "Outros" category
+            if not category_id:
+                from app.services.category_rules import get_category_others
+                category_id = await get_category_others(current_user.tenant_id, db)
 
     def add_months(d: date, num_months: int) -> date:
         month = d.month - 1 + num_months

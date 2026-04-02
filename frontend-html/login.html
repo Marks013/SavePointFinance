@@ -122,7 +122,24 @@
       </div>
       {% endif %}
 
-      {% if error %}
+      {% if trial_expired %}
+      <div style="background: linear-gradient(135deg, rgba(255,77,106,0.15) 0%, rgba(255,77,106,0.05) 100%); border: 1px solid rgba(255,77,106,0.3); border-radius: 12px; padding: 20px; margin-bottom: 20px; text-align:center;">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:48px;height:48px; color:var(--expense); margin: 0 auto 12px;">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <div style="font-weight:600; font-size:1rem; color:var(--expense); margin-bottom:8px;">Período de Teste Expirado</div>
+        <div style="font-size:0.875rem; color:var(--text-dim); line-height:1.5;">
+          Seu período de teste gratuito expirou em <strong style="color:var(--text);">{{ expired_date }}</strong>.<br>
+          Assine o plano <strong>PRO</strong> para continuar usando o SavePoint Finance sem interrupções.
+        </div>
+        <button type="button" class="btn btn--primary" style="margin-top:16px; width:100%;" onclick="alert('Em breve! Entre em contato para assinar.')">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+          Assinar Plano PRO
+        </button>
+      </div>
+      {% elif error %}
       <div class="badge badge--expense" style="width:100%; margin-bottom:16px; padding: 10px 14px; border-radius: 8px; font-size:0.8125rem; text-transform:none; letter-spacing:0;">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;flex-shrink:0">
           <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>

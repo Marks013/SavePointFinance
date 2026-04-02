@@ -117,7 +117,7 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Conta inativa. Contate o administrador.")
 
-    if user.role != UserRole.superadmin:
+    if user.role != UserRole.admin:
         tenant_res = await db.execute(select(Tenant).where(Tenant.id == user.tenant_id))
         tenant = tenant_res.scalar_one_or_none()
         if tenant:
@@ -228,7 +228,7 @@ async def create_invite(
     current_user: User = Depends(get_current_user),
 ):
     """Create an invite link for a new user."""
-    if current_user.role not in (UserRole.admin, UserRole.superadmin):
+    if current_user.role != UserRole.admin:
         raise HTTPException(status_code=403, detail="Apenas admins podem convidar usuários.")
 
     count_res = await db.execute(
@@ -269,7 +269,7 @@ async def list_invites(
     current_user: User = Depends(get_current_user),
 ):
     """List active invites for this tenant."""
-    if current_user.role not in (UserRole.admin, UserRole.superadmin):
+    if current_user.role != UserRole.admin:
         raise HTTPException(status_code=403, detail="Apenas admins podem listar convites.")
     
     result = await db.execute(
@@ -300,7 +300,7 @@ async def revoke_invite(
     current_user: User = Depends(get_current_user),
 ):
     """Revoke an invite."""
-    if current_user.role not in (UserRole.admin, UserRole.superadmin):
+    if current_user.role != UserRole.admin:
         raise HTTPException(status_code=403, detail="Apenas admins podem revogar convites.")
     
     result = await db.execute(
@@ -392,19 +392,15 @@ async def update_user_role(
         raise HTTPException(status_code=403, detail="Usuário de outro workspace")
     
     # Only admins can change roles
-    if current_user.role not in (UserRole.admin, UserRole.superadmin):
+    if current_user.role != UserRole.admin:
         raise HTTPException(status_code=403, detail="Apenas admins podem alterar funções")
     
-    # Superadmin can set any role
-    if current_user.role == UserRole.superadmin:
-        target_user.role = new_role
-    else:
-        # Tenant admin can only promote members to admin, not superadmin
-        if new_role == UserRole.superadmin:
-            raise HTTPException(status_code=403, detail="Não é possível atribuir superadmin")
-        if target_user.role == UserRole.superadmin:
-            raise HTTPException(status_code=403, detail="Não é possível alterar superadmin")
-        target_user.role = new_role
+    # Admin can promote members to admin or demote admins to member
+    # Cannot change own role
+    if target_user.id == current_user.id:
+        raise HTTPException(status_code=403, detail="Você não pode alterar sua própria função")
+    
+    target_user.role = new_role
     
     await db.commit()
     return {"message": "Função atualizada", "role": target_user.role.value}
@@ -429,7 +425,7 @@ async def toggle_user_active(
         raise HTTPException(status_code=403, detail="Usuário de outro workspace")
     
     # Only admins can change active status
-    if current_user.role not in (UserRole.admin, UserRole.superadmin):
+    if current_user.role != UserRole.admin:
         raise HTTPException(status_code=403, detail="Apenas admins podem ativar/desativar usuários")
     
     # Cannot deactivate yourself

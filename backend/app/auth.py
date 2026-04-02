@@ -80,7 +80,7 @@ async def get_current_user(
     if not user or not user.is_active:
         raise HTTPException(status_code=401, detail="Usuário não encontrado ou inativo")
 
-    if user.role == UserRole.superadmin:
+    if user.role == UserRole.admin:
         return user
 
     from app.models.tenant import Tenant
@@ -89,7 +89,31 @@ async def get_current_user(
     if tenant:
         if not tenant.is_active:
             raise HTTPException(status_code=403, detail="Conta suspensa. Contate o suporte.")
-        if tenant.expires_at and tenant.expires_at < datetime.now(timezone.utc):
+        
+        # Check trial expiration for "free" plan
+        if tenant.plan == "free":
+            if tenant.trial_expires_at:
+                now = datetime.now(timezone.utc)
+                if tenant.trial_expires_at < now:
+                    # Calculate days past expiration
+                    days_past = (now - tenant.trial_expires_at).days
+                    raise HTTPException(
+                        status_code=403,
+                        detail={
+                            "error": "trial_expired",
+                            "message": "Seu período de teste expirou. Assine o plano PRO para continuar usando o SavePoint Finance.",
+                            "expired_at": tenant.trial_expires_at.isoformat(),
+                        }
+                    )
+            else:
+                # Trial not set - set it now
+                from datetime import timedelta
+                tenant.trial_start = now
+                tenant.trial_expires_at = now + timedelta(days=tenant.trial_days)
+                await db.commit()
+        
+        # Check regular expiration (for any other plans with expiry)
+        elif tenant.expires_at and tenant.expires_at < datetime.now(timezone.utc):
             raise HTTPException(
                 status_code=403,
                 detail="Assinatura expirada. Renove para continuar usando o Save Point Finanças.",
@@ -103,12 +127,10 @@ require_user = get_current_user
 
 
 async def require_admin(current_user: User = Depends(get_current_user)) -> User:
-    if current_user.role not in (UserRole.admin, UserRole.superadmin):
+    if current_user.role != UserRole.admin:
         raise HTTPException(status_code=403, detail="Acesso de administrador necessário")
     return current_user
 
 
-async def require_superadmin(current_user: User = Depends(get_current_user)) -> User:
-    if current_user.role != UserRole.superadmin:
-        raise HTTPException(status_code=403, detail="Acesso restrito ao super-administrador")
-    return current_user
+# Alias - admin can access superadmin endpoints
+require_superadmin = require_admin

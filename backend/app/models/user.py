@@ -9,9 +9,8 @@ from app.database import Base
 
 
 class UserRole(str, Enum):
-    superadmin = "superadmin"   # Platform owner — can manage all tenants
-    admin = "admin"             # Tenant admin — manages their own workspace
-    member = "member"           # Regular user
+    admin = "admin"             # Administrator — manages workspace, users, settings
+    member = "member"          # Regular user — can add transactions, view reports
 
 
 class User(Base):
