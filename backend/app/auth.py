@@ -44,8 +44,11 @@ def decode_token(token: str) -> dict:
     try:
         return jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
     except JWTError:
+        from fastapi.responses import HTMLResponse
+        from app.main import get_error_html
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Sua sessão expirou ou é inválida. Faça login novamente."
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Sua sessão expirou ou é inválida. Faça login novamente."
         )
 
 

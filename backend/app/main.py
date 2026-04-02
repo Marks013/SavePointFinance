@@ -3,6 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from contextlib import asynccontextmanager
 import time
 import logging
@@ -26,6 +28,21 @@ from app.routers.htmx import router as htmx_router
 # Logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+ERROR_TEMPLATES = {
+    400: """<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Erro 400 — SavePoint</title><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Inter',sans-serif;background:#0f0f0f;color:#f5f5f5;min-height:100vh;display:flex;align-items:center;justify-content:center}.container{text-align:center;max-width:420px;padding:40px}.icon{width:72px;height:72px;margin:0 auto 20px;background:#ef4444;border-radius:50%;display:flex;align-items:center;justify-content:center}.icon svg{width:36px;height:36px;color:#fff}h1{font-size:1.375rem;font-weight:600;margin-bottom:10px}p{color:#888;font-size:0.9375rem;line-height:1.6;margin-bottom:24px}.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 24px;background:linear-gradient(135deg,#10B981,#059669);color:#fff;border:none;border-radius:8px;font-size:0.9375rem;font-weight:500;cursor:pointer;text-decoration:none;transition:transform .2s,box-shadow .2s}.btn:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(16,185,129,.4)}</style></head><body><div class="container"><div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg></div><h1>Algo deu errado</h1><p>{detail}</p><a href="javascript:history.back()" class="btn">Voltar</a></div></body></html>""",
+    401: """<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Sessão Expirada — SavePoint</title><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Inter',sans-serif;background:#0f0f0f;color:#f5f5f5;min-height:100vh;display:flex;align-items:center;justify-content:center}.container{text-align:center;max-width:420px;padding:40px}.icon{width:72px;height:72px;margin:0 auto 20px;background:linear-gradient(135deg,#f59e0b,#d97706);border-radius:50%;display:flex;align-items:center;justify-content:center}.icon svg{width:36px;height:36px;color:#fff}h1{font-size:1.375rem;font-weight:600;margin-bottom:10px}p{color:#888;font-size:0.9375rem;line-height:1.6;margin-bottom:24px}.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 24px;background:linear-gradient(135deg,#10B981,#059669);color:#fff;border:none;border-radius:8px;font-size:0.9375rem;font-weight:500;cursor:pointer;text-decoration:none;transition:transform .2s,box-shadow .2s}.btn:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(16,185,129,.4)}</style></head><body><div class="container"><div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><h1>Sua sessão expirou</h1><p>Por segurança, sua sessão foi encerrada. Faça login novamente para continuar.</p><a href="/login" class="btn">Fazer login</a></div></body></html>""",
+    403: """<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Acesso Negado — SavePoint</title><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Inter',sans-serif;background:#0f0f0f;color:#f5f5f5;min-height:100vh;display:flex;align-items:center;justify-content:center}.container{text-align:center;max-width:420px;padding:40px}.icon{width:72px;height:72px;margin:0 auto 20px;background:#f59e0b;border-radius:50%;display:flex;align-items:center;justify-content:center}.icon svg{width:36px;height:36px;color:#fff}h1{font-size:1.375rem;font-weight:600;margin-bottom:10px}p{color:#888;font-size:0.9375rem;line-height:1.6;margin-bottom:24px}.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 24px;background:linear-gradient(135deg,#10B981,#059669);color:#fff;border:none;border-radius:8px;font-size:0.9375rem;font-weight:500;cursor:pointer;text-decoration:none;transition:transform .2s,box-shadow .2s}.btn:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(16,185,129,.4)}</style></head><body><div class="container"><div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div><h1>Acesso Negado</h1><p>{detail}</p><a href="/" class="btn">Voltar ao início</a></div></body></html>""",
+    404: """<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Página Não Encontrada — SavePoint</title><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Inter',sans-serif;background:#0f0f0f;color:#f5f5f5;min-height:100vh;display:flex;align-items:center;justify-content:center}.container{text-align:center;max-width:420px;padding:40px}.icon{width:72px;height:72px;margin:0 auto 20px;background:#6b7280;border-radius:50%;display:flex;align-items:center;justify-content:center}.icon svg{width:36px;height:36px;color:#fff}h1{font-size:1.375rem;font-weight:600;margin-bottom:10px}p{color:#888;font-size:0.9375rem;line-height:1.6;margin-bottom:24px}.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 24px;background:linear-gradient(135deg,#10B981,#059669);color:#fff;border:none;border-radius:8px;font-size:0.9375rem;font-weight:500;cursor:pointer;text-decoration:none;transition:transform .2s,box-shadow .2s}.btn:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(16,185,129,.4)}</style></head><body><div class="container"><div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div><h1>Página Não Encontrada</h1><p>O link que você acessou não existe ou foi movido.</p><a href="/" class="btn">Voltar ao início</a></div></body></html>""",
+    500: """<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Erro Interno — SavePoint</title><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Inter',sans-serif;background:#0f0f0f;color:#f5f5f5;min-height:100vh;display:flex;align-items:center;justify-content:center}.container{text-align:center;max-width:420px;padding:40px}.icon{width:72px;height:72px;margin:0 auto 20px;background:#ef4444;border-radius:50%;display:flex;align-items:center;justify-content:center}.icon svg{width:36px;height:36px;color:#fff}h1{font-size:1.375rem;font-weight:600;margin-bottom:10px}p{color:#888;font-size:0.9375rem;line-height:1.6;margin-bottom:24px}.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:12px 24px;background:linear-gradient(135deg,#10B981,#059669);color:#fff;border:none;border-radius:8px;font-size:0.9375rem;font-weight:500;cursor:pointer;text-decoration:none;transition:transform .2s,box-shadow .2s}.btn:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(16,185,129,.4)}</style></head><body><div class="container"><div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div><h1>Algo deu errado</h1><p>Estamos trabalhando para resolver. Tente novamente em alguns minutos.</p><a href="/" class="btn">Voltar ao início</a></div></body></html>""",
+}
+
+
+def get_error_html(status_code: int, detail: str = None) -> str:
+    template = ERROR_TEMPLATES.get(status_code, ERROR_TEMPLATES[500])
+    if detail:
+        detail = detail[:200] + "..." if len(detail) > 200 else detail
+    return template.format(detail=detail or "Tente novamente mais tarde.")
 
 
 @asynccontextmanager
@@ -163,12 +180,36 @@ async def log_requests(request: Request, call_next):
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"❌ Unhandled exception: {exc}", exc_info=True)
-    return JSONResponse(
+    return HTMLResponse(
         status_code=500,
-        content={
-            "detail": "Erro interno do servidor. Tente novamente mais tarde.",
-            "code": "INTERNAL_ERROR"
-        }
+        content=get_error_html(500, "Erro interno do servidor")
+    )
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    # Don't show HTML for API requests (JSON)
+    if request.url.path.startswith("/api/") or request.headers.get("Accept") == "application/json":
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail, "code": f"HTTP_{exc.status_code}"}
+        )
+    return HTMLResponse(
+        status_code=exc.status_code,
+        content=get_error_html(exc.status_code, exc.detail)
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    if request.url.path.startswith("/api/") or request.headers.get("Accept") == "application/json":
+        return JSONResponse(
+            status_code=422,
+            content={"detail": "Dados inválidos", "errors": exc.errors()}
+        )
+    return HTMLResponse(
+        status_code=422,
+        content=get_error_html(400, "Dados inválidos. Verifique os campos preenchidos.")
     )
 
 

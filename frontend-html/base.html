@@ -20,6 +20,18 @@
     .main-content {flex:1; margin-left:260px; padding:20px; transition:margin 0.2s;}
     @media (max-width:768px) {.main-content {margin-left:0;}}
     .toast-container {position:fixed; top:20px; right:20px; z-index:9999; display:flex; flex-direction:column; gap:8px;}
+    .toast {display:flex; align-items:center; gap:10px; padding:12px 16px; background:#1a1a1a; border-radius:8px; border:1px solid #333; box-shadow:0 4px 12px rgba(0,0,0,0.3); min-width:280px; max-width:400px; transform:translateX(120%); opacity:0; transition:transform .3s, opacity .3s;}
+    .toast--show {transform:translateX(0); opacity:1;}
+    .toast--success {border-color:#10B981; background:linear-gradient(135deg,#10B98115,#05966910);}
+    .toast--error {border-color:#ef4444; background:linear-gradient(135deg,#ef444415,#dc262610);}
+    .toast--warning {border-color:#f59e0b; background:linear-gradient(135deg,#f59e0b15,#d9770610);}
+    .toast--info {border-color:#3b82f6; background:linear-gradient(135deg,#3b82f615,#2563eb10);}
+    .toast-icon {font-size:1rem;}
+    .toast--success .toast-icon {color:#10B981;}
+    .toast--error .toast-icon {color:#ef4444;}
+    .toast--warning .toast-icon {color:#f59e0b;}
+    .toast--info .toast-icon {color:#3b82f6;}
+    .toast-message {font-size:0.875rem; color:#f5f5f5; flex:1;}
   </style>
   
   <!-- Fontes com display swap para performance -->
@@ -146,6 +158,32 @@ window.addEventListener('sp:closeModal', closeModal);
 
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && modalOverlay.classList.contains('modal--open')) closeModal();
+});
+
+/* ── HTMX Error Handling ────────────────────────────────────────────── */
+document.body.addEventListener('htmx:responseError', function(evt) {
+  const response = evt.detail.response;
+  if (response.status === 401) {
+    window.location.href = '/login?expired=1';
+    evt.preventDefault();
+    return;
+  }
+  // Show JSON errors as toasts
+  if (response.headers && response.headers.get('content-type')?.includes('application/json')) {
+    response.clone().json().then(data => {
+      if (data.error) {
+        addToast({ message: data.error, kind: 'error' });
+        evt.preventDefault();
+      }
+    }).catch(() => {});
+  }
+});
+
+/* ── Global fetch error handling ────────────────────────────────────── */
+window.addEventListener('unhandledrejection', function(evt) {
+  if (evt.reason?.response?.status === 401) {
+    window.location.href = '/login?expired=1';
+  }
 });
 
 /* ── Delete confirmation ─────────────────────────────────────────────── */

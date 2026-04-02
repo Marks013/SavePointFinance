@@ -161,7 +161,8 @@ async def get_monthly_data(tenant_id: uuid.UUID, db: AsyncSession, months: int =
 
 @router.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
-    return templates.TemplateResponse("login.html", {"request": request})
+    expired = request.query_params.get("expired") == "1"
+    return templates.TemplateResponse("login.html", {"request": request, "session_expired": expired})
 
 
 @router.post("/login", response_class=HTMLResponse)
