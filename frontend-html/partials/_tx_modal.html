@@ -2,6 +2,12 @@
 <!-- BUG FIX: O form anterior usava hx-target="#tx-table-wrap" mas o servidor retorna o HTML do
      modal (com success:True), não o HTML da tabela. Isso injetava o modal dentro da tabela,
      quebrando completamente o layout. Corrigido para recarregar a página após sucesso. -->
+{% if success %}
+<script>
+  closeModal();
+  location.reload();
+</script>
+{% else %}
 <div class="modal-header">
   <span class="modal-title">{{ 'Editar Transação' if tx else 'Nova Transação' }}</span>
   <button class="modal-close" onclick="closeModal()">
@@ -116,7 +122,7 @@
 
     <!-- BUG FIX: Tithe checkbox agora é sempre renderizado mas controlado por JS via display:none/block.
          Isso corrige o problema onde server renderizava com tx_type fixo e o toggle JS não atualizava. -->
-    <div id="titheWrap" style="display: {{ '' if not tx or (tx_type or tx.type) == 'income' else 'none' }};">
+    <div id="titheWrap" {% if tx and (tx_type or tx.type) != 'income' %}style="display: none;"{% endif %}>
       <div style="display:flex; align-items:center; gap:10px; padding:10px; background:var(--secondary); border-radius:8px;">
         <input type="checkbox" id="txTithe" name="tithe" value="1"
           {% if not tx or (tx_type or tx.type) == 'income' %}checked{% endif %}
@@ -137,6 +143,7 @@
     </button>
   </div>
 </form>
+{% endif %}
 
 <script>
 function setTxType(type, btn) {

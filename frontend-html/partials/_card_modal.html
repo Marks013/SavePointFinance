@@ -1,4 +1,10 @@
 <!-- _card_modal.html -->
+{% if success %}
+<script>
+  closeModal();
+  location.reload();
+</script>
+{% else %}
 <div class="modal-header">
   <span class="modal-title">{{ 'Editar Cartão' if card else 'Novo Cartão' }}</span>
   <button class="modal-close" onclick="closeModal()">
@@ -12,11 +18,16 @@
   method="POST"
   action="{{ '/settings/cards/' + card.id|string + '/edit' if card else '/settings/cards/new' }}"
   hx-post="{{ '/settings/cards/' + card.id|string + '/edit' if card else '/settings/cards/new' }}"
-  hx-target="body"
-  hx-swap="none"
-  hx-on::after-request="if(event.detail.successful) { closeModal(); location.reload(); }"
+  hx-target="#modal-content"
+  hx-swap="innerHTML"
   class="modal-body"
 >
+  {% if error %}
+  <div class="badge badge--expense" style="width:100%; margin-bottom:16px; padding: 10px; border-radius: 8px;">
+    {{ error }}
+  </div>
+  {% endif %}
+
   <div class="form-stack">
     <div class="form-group">
       <label class="form-label" for="cardName">Nome do cartão</label>
@@ -102,3 +113,4 @@
     <button type="submit" class="btn btn--primary">{{ 'Salvar' if card else 'Criar cartão' }}</button>
   </div>
 </form>
+{% endif %}

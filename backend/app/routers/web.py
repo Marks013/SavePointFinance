@@ -1094,7 +1094,7 @@ async def create_card_web(request: Request, db: AsyncSession = Depends(get_db), 
         body = CardCreate(
             name=form.get("name", ""), brand=form.get("brand", "Visa"),
             last4=form.get("last_four", "") or None,
-            limit_amount=Decimal(str(form.get("limit", 0) or 0)),
+            limit_amount=Decimal(str(form.get("limit", "0")).replace(',', '.') or "0"),
             due_day=int(form.get("due_day", 10) or 10),
             close_day=int(form.get("close_day", 3) or 3),
             color=form.get("color", "#3B82F6"),
@@ -1133,7 +1133,7 @@ async def edit_card_web(card_id: str, request: Request, db: AsyncSession = Depen
         card.brand = form.get("brand", card.brand)
         # BUG FIX: o atributo do modelo é 'last4', não 'last_four'
         card.last4 = form.get("last_four") or card.last4
-        card.limit_amount = Decimal(str(form.get("limit", 0) or 0)) if form.get("limit") else card.limit_amount
+        card.limit_amount = Decimal(str(form.get("limit", "0")).replace(',', '.') or "0") if form.get("limit") else card.limit_amount
         card.due_day = int(form.get("due_day", card.due_day) or card.due_day)
         card.close_day = int(form.get("close_day", card.close_day) or card.close_day)
         card.color = form.get("color", card.color)
@@ -1180,7 +1180,7 @@ async def create_transaction_web(request: Request, db: AsyncSession = Depends(ge
     try:
         body = TransactionCreate(
             description=form.get("description", ""),
-            amount=Decimal(str(form.get("amount", 0) or 0)),
+            amount=Decimal(str(form.get("amount", "0")).replace(',', '.') or "0"),
             type=tx_type, payment_method=pay_method, date=tx_date,
             category_id=uuid.UUID(form.get("category_id")) if form.get("category_id") else None,
             account_id=uuid.UUID(form.get("account_id")) if form.get("account_id") else None,
@@ -1216,7 +1216,7 @@ async def edit_transaction_web(tx_id: str, request: Request, db: AsyncSession = 
     try:
         body = TransactionUpdate(
             description=form.get("description", ""),
-            amount=Decimal(str(form.get("amount", 0) or 0)),
+            amount=Decimal(str(form.get("amount", "0")).replace(',', '.') or "0"),
             type=tx_type, payment_method=pay_method, date=tx_date,
             category_id=uuid.UUID(form.get("category_id")) if form.get("category_id") else None,
             account_id=uuid.UUID(form.get("account_id")) if form.get("account_id") else None,
