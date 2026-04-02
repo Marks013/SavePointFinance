@@ -538,12 +538,21 @@ async def transactions_page(request: Request, month: int = None, year: int = Non
     
     query = select(Transaction).where(Transaction.tenant_id == current_user.tenant_id)
     
+    from app.models.transaction import TransactionType
+    
     if q:
         query = query.where(Transaction.description.ilike(f"%{q}%"))
     if type:
-        query = query.where(Transaction.type == type)
+        try:
+            tx_type = TransactionType(type)
+            query = query.where(Transaction.type == tx_type)
+        except ValueError:
+            pass
     if category_id:
-        query = query.where(Transaction.category_id == uuid.UUID(category_id))
+        try:
+            query = query.where(Transaction.category_id == uuid.UUID(category_id))
+        except ValueError:
+            pass
     
     start_date = datetime(year, month, 1)
     if month == 12:
