@@ -439,7 +439,7 @@ async def dashboard_page(request: Request, month: int = None, year: int = None, 
     total_balance = sum(a.balance for a in accounts)
     
     # Get active goals progress
-    goals_result = await db.execute(select(Goal).where(Goal.tenant_id == current_user.tenant_id, Goal.is_active == True))
+    goals_result = await db.execute(select(Goal).where(Goal.tenant_id == current_user.tenant_id, Goal.is_completed == False))
     goals = goals_result.scalars().all()
     goals_summary = [{"id": str(g.id), "name": g.name, "target": float(g.target_amount), "current": float(g.current_amount), "target_fmt": fmt_money(g.target_amount), "current_fmt": fmt_money(g.current_amount), "progress": round((g.current_amount or 0) / (g.target_amount or 1) * 100, 1), "color": g.color or "#10B981"} for g in goals[:3]]
     
