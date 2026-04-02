@@ -274,7 +274,7 @@
   
   {% block head %}{% endblock %}
 </head>
-<body hx-boost="true">
+<body>
 
 <!-- Mobile sidebar overlay -->
 <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
@@ -539,7 +539,7 @@ document.body.addEventListener('htmx:responseError', e => {
 
 /* ── Global Soft Refresh (SPA feeling) ──────────────────────────────── */
 window.addEventListener('sp:refreshData', () => {
-  htmx.ajax('GET', window.location.href, { target: '#main-content', swap: 'outerHTML', select: '#main-content' });
+  htmx.ajax('GET', window.location.href, { target: '#main-content', swap: 'innerHTML' });
 });
 
 /* ── Toggle switch ──────────────────────────────────────────────────── */

@@ -10,7 +10,7 @@
 {% set _parts = (user.name or user.email).split(' ')[:2] %}
 {% set initials = (_parts[0][0] if _parts[0] else '') + (_parts[1][0] if _parts|length > 1 and _parts[1] else '') %}
 
-<nav class="sidebar" id="appSidebar">
+<nav class="sidebar" id="appSidebar" hx-boost="true">
   <!-- Logo -->
   <div class="sidebar-logo">
     <div class="sidebar-logo-mark">
