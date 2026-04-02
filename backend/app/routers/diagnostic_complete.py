@@ -452,7 +452,7 @@ def check_jinja2() -> List[CheckResult]:
         for block in required_blocks:
             for t in base_path.glob("*.html"):
                 content = t.read_text(encoding='utf-8', errors='ignore')
-                if f"{{{{ block {block} }}}}" in content or f"{{% block {block} %}" in content:
+                if f"{{{{ block {block} }}}}" in content or f"{{ block {block} }}" in content:
                     found_blocks.append(block)
                     break
         missing = [b for b in required_blocks if b not in found_blocks]
