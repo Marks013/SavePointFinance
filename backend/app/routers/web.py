@@ -632,7 +632,7 @@ async def settings_page(request: Request, db: AsyncSession = Depends(get_db), cu
         "request": request,
         "user": current_user,
         "accounts": [{"id": str(a.id), "name": a.name, "balance": a.balance, "balance_fmt": fmt_money(a.balance), "type": a.type} for a in accounts],
-        "cards": [{"id": str(c.id), "name": c.name, "limit": c.limit, "limit_fmt": fmt_money(c.limit), "type": c.type} for c in cards],
+        "cards": [{"id": str(c.id), "name": c.name, "limit_amount": c.limit_amount, "limit_fmt": fmt_money(c.limit_amount), "brand": c.brand} for c in cards],
     })
 
 
