@@ -26,7 +26,7 @@
       </div>
       <div>
         <div class="account-card__name">{{ acc.name }}</div>
-        <div class="account-card__bank">{{ acc.bank }} · {{ acc.type }}</div>
+        <div class="account-card__bank">{{ acc.institution_name or acc.bank or 'Conta' }} · {{ acc.type }}</div>
       </div>
       <button
         class="icon-btn ml-auto"

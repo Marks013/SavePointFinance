@@ -638,7 +638,7 @@ async def settings_page(request: Request, db: AsyncSession = Depends(get_db), cu
             "request": request,
             "user": current_user,
             "accounts": [{"id": str(a.id), "name": a.name, "balance": a.balance, "balance_fmt": fmt_money(a.balance), "type": a.type, "institution_id": str(a.institution_id) if a.institution_id else None, "institution_name": institution_map.get(str(a.institution_id), "") if a.institution_id else ""} for a in accounts],
-            "cards": [{"id": str(c.id), "name": c.name, "last4": c.last4, "brand": c.brand, "limit": float(c.limit_amount), "limit_fmt": fmt_money(c.limit_amount), "due_day": c.due_day, "color": c.color, "institution_id": str(c.institution_id) if c.institution_id else None, "institution_name": institution_map.get(str(c.institution_id), "") if c.institution_id else ""} for c in cards],
+            "cards": [{"id": str(c.id), "name": c.name, "last4": c.last4, "brand": c.brand, "limit": float(c.limit_amount), "limit_fmt": fmt_money(c.limit_amount), "due_day": c.due_day, "color": c.color, "institution_id": str(c.institution_id) if c.institution_id else None, "institution_name": institution_map.get(str(c.institution_id), "") if c.institution_id else "", "used": 0, "used_fmt": "R$ 0,00", "available_fmt": fmt_money(c.limit_amount), "type": c.brand} for c in cards],
             "institutions": [{"id": str(i.id), "name": i.name} for i in institutions],
         })
     except Exception as e:
