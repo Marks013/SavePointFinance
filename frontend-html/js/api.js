@@ -18,7 +18,7 @@ const API_BASE = '/api/v1';
 
 // ── Auth State (client-side apenas, sem acesso aos tokens HttpOnly) ──────────
 
-export const Auth = {
+const Auth = {
   // Tokens ficam em cookies HttpOnly — JS não pode lê-los.
   // Estes métodos existem apenas para compatibilidade com código legado.
   getToken()        { return null; },
@@ -77,7 +77,7 @@ export const Auth = {
 
 // ── Health Check ─────────────────────────────────────────────────────────────
 
-export async function checkBackendHealth() {
+async function checkBackendHealth() {
   try {
     const res = await fetch('/api/health', {
       method: 'GET',
@@ -92,7 +92,7 @@ export async function checkBackendHealth() {
 
 // ── Global Error Banner ───────────────────────────────────────────────────────
 
-export function showGlobalError(message) {
+function showGlobalError(message) {
   let banner = document.getElementById('_global_err_banner');
   if (!banner) {
     banner = document.createElement('div');
@@ -117,13 +117,13 @@ export function showGlobalError(message) {
   document.getElementById('_global_err_msg').textContent = message;
 }
 
-export function hideGlobalError() {
+function hideGlobalError() {
   document.getElementById('_global_err_banner')?.remove();
 }
 
 // ── Error Class ───────────────────────────────────────────────────────────────
 
-export class ApiError extends Error {
+class ApiError extends Error {
   constructor(message, status) {
     super(message);
     this.status = status;
@@ -185,7 +185,7 @@ const del   = (path)       => request('DELETE', path);
 // Login/register são feitos via formulário HTML POST → o servidor seta os cookies.
 // Os endpoints abaixo são para operações autenticadas pós-login.
 
-export const authApi = {
+const authApi = {
   me: () => get('/auth/me'),
   forgotPassword: (email) => post('/auth/forgot-password', { email }),
   resetPassword: (token, new_password) => post('/auth/reset-password', { token, new_password }),
@@ -201,7 +201,7 @@ export const authApi = {
 
 // ── Transactions ──────────────────────────────────────────────────────────────
 
-export const transactionsApi = {
+const transactionsApi = {
   list:   (params = {}) => get('/transactions', params),
   get:    (id) => get(`/transactions/${id}`),
   create: (body) => post('/transactions', body),
@@ -212,7 +212,7 @@ export const transactionsApi = {
 
 // ── Categories ────────────────────────────────────────────────────────────────
 
-export const categoriesApi = {
+const categoriesApi = {
   list:   () => get('/categories'),
   create: (body) => post('/categories', body),
   update: (id, body) => put(`/categories/${id}`, body),
@@ -221,14 +221,14 @@ export const categoriesApi = {
 
 // ── Accounts & Cards ──────────────────────────────────────────────────────────
 
-export const accountsApi = {
+const accountsApi = {
   list:   () => get('/accounts'),
   create: (body) => post('/accounts', body),
   update: (id, body) => put(`/accounts/${id}`, body),
   delete: (id) => del(`/accounts/${id}`),
 };
 
-export const cardsApi = {
+const cardsApi = {
   list:   () => get('/cards'),
   create: (body) => post('/cards', body),
   update: (id, body) => put(`/cards/${id}`, body),
@@ -237,7 +237,7 @@ export const cardsApi = {
 
 // ── Subscriptions ─────────────────────────────────────────────────────────────
 
-export const subscriptionsApi = {
+const subscriptionsApi = {
   list:   (params = {}) => get('/subscriptions/', params),
   create: (body) => post('/subscriptions/', body),
   update: (id, body) => put(`/subscriptions/${id}`, body),
@@ -247,14 +247,14 @@ export const subscriptionsApi = {
 
 // ── Installments ──────────────────────────────────────────────────────────────
 
-export const installmentsApi = {
+const installmentsApi = {
   list:    (params = {}) => get('/installments', params),
   byMonth: (year, month) => get('/installments/by-month', { year, month }),
 };
 
 // ── Reports ───────────────────────────────────────────────────────────────────
 
-export const reportsApi = {
+const reportsApi = {
   summary: (year, month) => get('/reports/summary', { year, month }),
   monthlyEvolution: (months = 12, future_months = 0) =>
     get('/reports/monthly-evolution', { months, future_months }),
@@ -267,7 +267,7 @@ export const reportsApi = {
 
 // ── Admin ─────────────────────────────────────────────────────────────────────
 
-export const adminApi = {
+const adminApi = {
   stats:        () => get('/admin/stats'),
   listTenants:  (params = {}) => get('/admin/tenants', params),
   getTenant:    (id) => get(`/admin/tenants/${id}`),
@@ -280,7 +280,7 @@ export const adminApi = {
 
 // ── Goals ─────────────────────────────────────────────────────────────────────
 
-export const goalsApi = {
+const goalsApi = {
   list:    () => get('/goals'),
   create:  (body) => post('/goals', body),
   update:  (id, body) => put(`/goals/${id}`, body),
@@ -290,7 +290,7 @@ export const goalsApi = {
 
 // ── Data Export/Import ────────────────────────────────────────────────────────
 
-export const dataApi = {
+const dataApi = {
   export: (params = {}) => get('/data/export', params),
   import: (file) => {
     const formData = new FormData();
@@ -307,7 +307,7 @@ export const dataApi = {
 
 // ── Tenant Users ──────────────────────────────────────────────────────────────
 
-export const tenantApi = {
+const tenantApi = {
   listUsers:    () => get('/auth/users'),
   updateRole:   (userId, role) => patch(`/auth/users/${userId}/role`, { role }),
   toggleActive: (userId, isActive) => patch(`/auth/users/${userId}/active`, { is_active: isActive }),
@@ -315,7 +315,7 @@ export const tenantApi = {
 
 // ── Invites ───────────────────────────────────────────────────────────────────
 
-export const inviteApi = {
+const inviteApi = {
   create: (email) => post('/auth/invite', { email }),
   list:   () => get('/auth/invites'),
   revoke: (id) => del(`/auth/invites/${id}`),
@@ -323,7 +323,7 @@ export const inviteApi = {
 
 // ── Plans ─────────────────────────────────────────────────────────────────────
 
-export const plansApi = {
+const plansApi = {
   list: () => get('/admin/plans'),
 };
 
