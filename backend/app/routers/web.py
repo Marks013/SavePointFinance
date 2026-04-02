@@ -534,10 +534,11 @@ async def subscriptions_page(request: Request, db: AsyncSession = Depends(get_db
                 "name": s.name,
                 "amount": s.amount,
                 "amount_fmt": fmt_money(s.amount),
-                "type": s.subscription_type,
-                "frequency": s.frequency,
-                "next_date": s.next_date,
-                "active": s.active,
+                "type": s.type.value if s.type else "expense",
+                "billing_day": s.billing_day,
+                "next_date": s.next_billing_date.strftime("%Y-%m-%d") if s.next_billing_date else None,
+                "next_date_fmt": s.next_billing_date.strftime("%d/%m/%Y") if s.next_billing_date else "-",
+                "active": s.is_active,
             }
             for s in subscriptions
         ],
@@ -579,6 +580,35 @@ async def reports_page(request: Request, month: int = None, year: int = None, db
         for r in rows[:8]
     ]
     
+    # Get last 6 months data
+    monthly_labels = []
+    monthly_income = []
+    monthly_expense = []
+    
+    for i in range(5, -1, -1):
+        m = now.month - i
+        y = now.year
+        while m <= 0:
+            m += 12
+            y -= 1
+        m_label = get_month_label(m, y)
+        monthly_labels.append(m_label)
+        
+        m_start = datetime(y, m, 1)
+        m_end = datetime(y, m + 1, 1) if m < 12 else datetime(y + 1, 1, 1)
+        
+        inc_result = await db.execute(
+            select(func.coalesce(func.sum(Transaction.amount), 0))
+            .where(Transaction.tenant_id == current_user.tenant_id, Transaction.type == TransactionType.income, Transaction.date >= m_start, Transaction.date < m_end)
+        )
+        exp_result = await db.execute(
+            select(func.coalesce(func.sum(Transaction.amount), 0))
+            .where(Transaction.tenant_id == current_user.tenant_id, Transaction.type == TransactionType.expense, Transaction.date >= m_start, Transaction.date < m_end)
+        )
+        
+        monthly_income.append(float(inc_result.scalar() or 0))
+        monthly_expense.append(float(exp_result.scalar() or 0))
+    
     return templates.TemplateResponse("reports.html", {
         "request": request,
         "user": current_user,
@@ -586,9 +616,9 @@ async def reports_page(request: Request, month: int = None, year: int = None, db
         "year": year,
         "month_label": get_month_label(month, year),
         "expense_breakdown": expense_breakdown,
-        "monthly_labels": [],
-        "monthly_income": [],
-        "monthly_expense": [],
+        "monthly_labels": monthly_labels,
+        "monthly_income": monthly_income,
+        "monthly_expense": monthly_expense,
     })
 
 
@@ -604,11 +634,16 @@ async def goals_page(request: Request, db: AsyncSession = Depends(get_db), curre
             {
                 "id": str(g.id),
                 "name": g.name,
-                "target": g.target,
-                "current": g.current,
-                "deadline": g.deadline,
-                "color": g.color,
-                "progress": round(g.current / g.target * 100, 1) if g.target else 0,
+                "target": g.target_amount,
+                "target_fmt": fmt_money(g.target_amount),
+                "current": g.current_amount,
+                "current_fmt": fmt_money(g.current_amount),
+                "remaining": g.target_amount - g.current_amount if g.target_amount and g.current_amount else 0,
+                "remaining_fmt": fmt_money((g.target_amount or 0) - (g.current_amount or 0)),
+                "deadline": g.deadline.strftime("%Y-%m-%d") if g.deadline else None,
+                "deadline_fmt": g.deadline.strftime("%d/%m/%Y") if g.deadline else "-",
+                "color": g.color or "#10B981",
+                "progress": round((g.current_amount or 0) / (g.target_amount or 1) * 100, 1) if g.target_amount else 0,
             }
             for g in goals
         ],
@@ -620,10 +655,16 @@ async def categories_page(request: Request, db: AsyncSession = Depends(get_db), 
     result = await db.execute(select(Category).where(Category.tenant_id == current_user.tenant_id).order_by(Category.name))
     categories = result.scalars().all()
     
+    income_cats = [c for c in categories if c.type == "income"]
+    expense_cats = [c for c in categories if c.type == "expense"]
+    
     return templates.TemplateResponse("categories.html", {
         "request": request,
         "user": current_user,
         "categories": [{"id": str(c.id), "name": c.name, "icon": c.icon, "type": c.type} for c in categories],
+        "income_categories": [{"id": str(c.id), "name": c.name, "icon": c.icon, "type": c.type} for c in income_cats],
+        "expense_categories": [{"id": str(c.id), "name": c.name, "icon": c.icon, "type": c.type} for c in expense_cats],
+        "active_tab": "expense",
     })
 
 
@@ -635,9 +676,13 @@ async def settings_page(request: Request, db: AsyncSession = Depends(get_db), cu
         institutions = (await db.execute(select(Institution).where(Institution.is_active == True).order_by(Institution.name))).scalars().all()
         institution_map = {str(i.id): i.name for i in institutions}
         
+        net_worth = sum(a.balance for a in accounts)
+        
         return templates.TemplateResponse("settings.html", {
             "request": request,
             "user": current_user,
+            "net_worth": float(net_worth),
+            "net_worth_fmt": fmt_money(net_worth),
             "accounts": [{"id": str(a.id), "name": a.name, "balance": a.balance, "balance_fmt": fmt_money(a.balance), "type": a.type, "institution_id": str(a.institution_id) if a.institution_id else None, "institution_name": institution_map.get(str(a.institution_id), "") if a.institution_id else ""} for a in accounts],
             "cards": [{"id": str(c.id), "name": c.name, "last4": c.last4, "brand": c.brand, "limit": float(c.limit_amount), "limit_fmt": fmt_money(c.limit_amount), "due_day": c.due_day, "color": c.color, "institution_id": str(c.institution_id) if c.institution_id else None, "institution_name": institution_map.get(str(c.institution_id), "") if c.institution_id else "", "used": 0, "used_fmt": "R$ 0,00", "available_fmt": fmt_money(c.limit_amount), "type": c.brand} for c in cards],
             "institutions": [{"id": str(i.id), "name": i.name} for i in institutions],

@@ -15,6 +15,7 @@ from app.models.user import User
 from app.models.category import Category
 from app.models.account import Account
 from app.models.card import Card
+from app.models.institution import Institution
 from app.models.transaction import Transaction, TransactionType
 from app.models.goal import Goal
 from app.models.subscription import Subscription
@@ -172,12 +173,15 @@ async def edit_category_modal(
 @router.get("/settings/accounts/new", response_class=HTMLResponse)
 async def new_account_modal(
     request: Request,
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """HTMX: Render new account modal."""
+    inst_result = await db.execute(select(Institution).where(Institution.is_active == True).order_by(Institution.name))
     return templates.TemplateResponse("partials/_account_modal.html", {
         "request": request,
         "account": None,
+        "institutions": [{"id": str(i.id), "name": i.name} for i in inst_result.scalars().all()],
     })
 
 
@@ -193,21 +197,26 @@ async def edit_account_modal(
     if not acc:
         raise HTTPException(status_code=404, detail="Conta não encontrada")
     
+    inst_result = await db.execute(select(Institution).where(Institution.is_active == True).order_by(Institution.name))
     return templates.TemplateResponse("partials/_account_modal.html", {
         "request": request,
-        "account": acc,
+        "account": {"id": str(acc.id), "name": acc.name, "balance": acc.balance, "type": acc.type, "color": acc.color, "institution_id": str(acc.institution_id) if acc.institution_id else None},
+        "institutions": [{"id": str(i.id), "name": i.name} for i in inst_result.scalars().all()],
     })
 
 
 @router.get("/settings/cards/new", response_class=HTMLResponse)
 async def new_card_modal(
     request: Request,
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """HTMX: Render new card modal."""
+    inst_result = await db.execute(select(Institution).where(Institution.is_active == True).order_by(Institution.name))
     return templates.TemplateResponse("partials/_card_modal.html", {
         "request": request,
         "card": None,
+        "institutions": [{"id": str(i.id), "name": i.name} for i in inst_result.scalars().all()],
     })
 
 
@@ -222,6 +231,13 @@ async def edit_card_modal(
     card = (await db.execute(select(Card).where(Card.id == uuid.UUID(card_id), Card.tenant_id == current_user.tenant_id))).scalar_one_or_none()
     if not card:
         raise HTTPException(status_code=404, detail="Cartão não encontrado")
+    
+    inst_result = await db.execute(select(Institution).where(Institution.is_active == True).order_by(Institution.name))
+    return templates.TemplateResponse("partials/_card_modal.html", {
+        "request": request,
+        "card": {"id": str(card.id), "name": card.name, "brand": card.brand, "last4": card.last4, "limit": float(card.limit_amount), "due_day": card.due_day, "close_day": card.close_day, "color": card.color, "institution_id": str(card.institution_id) if card.institution_id else None},
+        "institutions": [{"id": str(i.id), "name": i.name} for i in inst_result.scalars().all()],
+    })
     
     return templates.TemplateResponse("partials/_card_modal.html", {
         "request": request,
