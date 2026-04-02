@@ -25,6 +25,10 @@ from app.routers.admin import router as admin_router
 from app.routers.web import router as web_router
 from app.routers.data import router as data_router
 from app.routers.htmx import router as htmx_router
+import os
+
+frontend_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend-html")
+
 
 # Middleware de captura de erros
 from app.middleware.error_handler import setup_error_handlers
@@ -273,6 +277,13 @@ app.include_router(data_router)
 # HTMX partials router — deve vir DEPOIS do web_router
 app.include_router(htmx_router)
 
+# ── Static Files (Locally required for python execution) ──────────────
+app.mount("/css", StaticFiles(directory=os.path.join(frontend_dir, "static", "css")), name="css")
+app.mount("/js", StaticFiles(directory=os.path.join(frontend_dir, "js")), name="js")
+if os.path.exists(os.path.join(frontend_dir, "static")):
+    app.mount("/static", StaticFiles(directory=os.path.join(frontend_dir, "static")), name="static")
+if os.path.exists(os.path.join(frontend_dir, "partials")):
+    app.mount("/partials", StaticFiles(directory=os.path.join(frontend_dir, "partials")), name="partials")
 
 # ── Health Check ──────────────────────────────────────────────────────────────
 

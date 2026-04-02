@@ -255,9 +255,8 @@
     .sidebar-overlay.open { display: block; }
   </style>
   
-  <!-- Fontes com display swap para performance -->
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'">
-  <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap"></noscript>
+  <!-- Fontes (Sincronas para evitar flash of unstyled text) -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap">
   
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@0.525.0/dist/umd/lucide.js"></script>
@@ -631,19 +630,6 @@ const playHoverSound = () => {
   // audio.play().catch(() => {});
 };
 
-// Add entrance animations
-document.addEventListener('DOMContentLoaded', () => {
-  // Add fade-in class to main content children
-  document.querySelectorAll('.page-body > *').forEach((el, i) => {
-    el.style.opacity = '0';
-    el.style.transform = 'translateY(20px)';
-    el.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
-    setTimeout(() => {
-      el.style.opacity = '1';
-      el.style.transform = 'translateY(0)';
-    }, 100 + (i * 80));
-  });
-});
 
 // Form validation feedback
 document.querySelectorAll('form').forEach(form => {
