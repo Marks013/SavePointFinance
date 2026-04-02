@@ -30,7 +30,8 @@ class LogLevel:
 
 class AuditLog(Base):
     """Tabela de auditoria para logs estruturados"""
-    __tablename__ = "audit_logs"
+    __tablename__ = "app_audit_logs"
+    __table_args__ = {"extend_existing": True}
     
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     timestamp = Column(DateTime(timezone=True), default=datetime.now(timezone.utc), index=True)
