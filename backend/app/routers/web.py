@@ -1464,6 +1464,14 @@ async def admin_tenant_detail(request: Request, tenant_id: str, db: AsyncSession
 @router.get("/notifications")
 async def get_notifications(request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_user)):
     from app.models.notification import Notification
+    from app.services.notification_service import generate_all_notifications
+    
+    # Generate notifications if none exist
+    existing = await db.execute(
+        select(Notification).where(Notification.user_id == current_user.id).limit(1)
+    )
+    if not existing.scalar_one_or_none():
+        await generate_all_notifications(db, str(current_user.tenant_id), str(current_user.id))
     
     notifications = (await db.execute(
         select(Notification)
