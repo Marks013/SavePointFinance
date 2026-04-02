@@ -3,6 +3,7 @@ Web Router — Serves HTML pages using Jinja2 templates.
 All pages are protected via require_user or require_superadmin.
 """
 import uuid
+import logging
 from datetime import datetime
 from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException, Request
