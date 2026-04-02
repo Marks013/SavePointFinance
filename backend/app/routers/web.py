@@ -675,6 +675,7 @@ async def create_account(request: Request, db: AsyncSession = Depends(get_db), c
 
 @router.post("/settings/accounts/{account_id}/delete")
 async def delete_account(account_id: uuid.UUID, request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_user)):
+    from fastapi.responses import JSONResponse
     from app.routers.accounts_cards import delete_account as api_delete_account
     from sqlalchemy import select
     from app.models.account import Account
