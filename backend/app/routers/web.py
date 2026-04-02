@@ -644,8 +644,9 @@ async def new_account_modal(request: Request, current_user: User = Depends(requi
 @router.post("/settings/accounts/new")
 async def create_account(request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_user)):
     from fastapi.responses import JSONResponse
-    from app.routers.accounts_cards import create_account as api_create_account, AccountCreate, AccountType
+    from app.routers.accounts_cards import AccountCreate, AccountType, account_to_dict
     from app.services.plan_limits import check_limit
+    from app.models.account import Account
     
     form = await request.form()
     name = form.get("name", "").strip()
@@ -671,8 +672,11 @@ async def create_account(request: Request, db: AsyncSession = Depends(get_db), c
             currency=form.get("currency", "BRL"),
             color=form.get("color", "#10B981"),
         )
-        account_data = await api_create_account(body=body, db=db, current_user=current_user)
-        return templates.TemplateResponse("partials/_account_modal.html", {"request": request, "user": current_user, "account": account_data, "success": True})
+        account = Account(**body.model_dump(), tenant_id=current_user.tenant_id)
+        db.add(account)
+        await db.commit()
+        await db.refresh(account)
+        return templates.TemplateResponse("partials/_account_modal.html", {"request": request, "user": current_user, "account": account_to_dict(account), "success": True})
     except Exception as e:
         import traceback
         traceback.print_exc()
