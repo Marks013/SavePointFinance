@@ -2,18 +2,100 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
   <title>Entrar — SavePoint Finance</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
   <link rel="stylesheet" href="/css/styles.css">
+  <style>
+    @media (max-width: 480px) {
+      .auth-page { padding: 16px; }
+      .auth-form-card { padding: 20px; }
+      .auth-logo__mark { width: 44px; height: 44px; }
+      .auth-logo__title { font-size: 1.25rem; }
+      .tab-list { overflow-x: auto; }
+    }
+    
+    /* Premium Auth Animations */
+    .auth-card {
+      animation: authCardEnter 0.6s var(--transition-bounce);
+    }
+    
+    @keyframes authCardEnter {
+      from {
+        opacity: 0;
+        transform: translateY(30px) scale(0.95);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+    
+    .auth-logo__mark {
+      animation: logoFloat 4s ease-in-out infinite;
+    }
+    
+    @keyframes logoFloat {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+    
+    .form-input {
+      transition: all 0.3s ease;
+    }
+    
+    .form-input:focus {
+      transform: translateY(-2px);
+    }
+    
+    .form-input.is-invalid {
+      animation: inputShake 0.4s ease;
+    }
+    
+    @keyframes inputShake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-5px); }
+      40%, 80% { transform: translateX(5px); }
+    }
+    
+    .btn--primary {
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .btn--primary::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,0.2) 0%, transparent 50%);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    
+    .btn--primary:hover::before {
+      opacity: 1;
+    }
+    
+    .btn--primary:active {
+      transform: scale(0.98);
+    }
+    
+    .tab-btn {
+      transition: all 0.3s ease;
+    }
+    
+    .tab-btn.active {
+      box-shadow: 0 0 20px rgba(0,229,122,0.3);
+    }
+  </style>
 </head>
 <body>
 <div class="auth-page">
   <div class="auth-card">
     <!-- Logo -->
     <div class="auth-logo">
-      <div class="auth-logo__mark">
+      <div class="auth-logo__mark pulse-glow">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
           <line x1="12" y1="1" x2="12" y2="23"/>
           <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
@@ -49,7 +131,7 @@
       </div>
       {% endif %}
 
-      <form method="POST" action="/login" class="form-stack">
+      <form method="POST" action="/login" class="form-stack" id="loginForm">
         <div class="form-group">
           <label class="form-label" for="email">E-mail</label>
           <div class="input-wrap">
@@ -66,8 +148,10 @@
               value="{{ email or '' }}"
               required
               autocomplete="email"
+              data-validate="email"
             >
           </div>
+          <span class="form-error" id="emailError"></span>
         </div>
 
         <div class="form-group">
@@ -85,7 +169,9 @@
               placeholder="••••••••"
               required
               autocomplete="current-password"
-              id="pwField"
+              minlength="6"
+              data-validate="required"
+              data-validate-min="6"
             >
             <button type="button" class="input-icon-right" onclick="togglePw()" title="Mostrar/ocultar senha">
               <svg id="eyeIcon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -94,10 +180,11 @@
               </svg>
             </button>
           </div>
+          <span class="form-error" id="passwordError"></span>
         </div>
 
         <button type="submit" class="btn btn--primary btn--lg btn--w-full" style="margin-top:4px;">
-          Entrar
+          <span class="btn-text">Entrar</span>
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
           </svg>
@@ -114,17 +201,134 @@
 </div>
 
 <script>
+// Toggle password visibility with animation
 function togglePw() {
-  const field = document.getElementById('pwField');
+  const field = document.getElementById('pwField') || document.getElementById('password');
   const icon  = document.getElementById('eyeIcon');
   if (field.type === 'password') {
     field.type = 'text';
     icon.innerHTML = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>';
+    icon.style.color = 'var(--accent)';
   } else {
     field.type = 'password';
     icon.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+    icon.style.color = '';
   }
 }
+
+// Form Validation
+const loginForm = document.getElementById('loginForm');
+const emailInput = document.getElementById('email');
+const passwordInput = document.getElementById('password');
+const emailError = document.getElementById('emailError');
+const passwordError = document.getElementById('passwordError');
+
+function validateEmail(value) {
+  if (!value) return 'E-mail é obrigatório';
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(value)) return 'E-mail inválido';
+  return null;
+}
+
+function validatePassword(value) {
+  if (!value) return 'Senha é obrigatória';
+  if (value.length < 6) return 'Senha deve ter pelo menos 6 caracteres';
+  return null;
+}
+
+// Real-time validation
+emailInput.addEventListener('blur', function() {
+  const error = validateEmail(this.value);
+  if (error) {
+    this.classList.add('is-invalid');
+    emailError.textContent = error;
+    emailError.style.display = 'block';
+  } else {
+    this.classList.remove('is-invalid');
+    this.classList.add('is-valid');
+    emailError.textContent = '';
+    emailError.style.display = 'none';
+  }
+});
+
+emailInput.addEventListener('input', function() {
+  if (this.classList.contains('is-invalid')) {
+    const error = validateEmail(this.value);
+    if (!error) {
+      this.classList.remove('is-invalid');
+      this.classList.add('is-valid');
+      emailError.textContent = '';
+      emailError.style.display = 'none';
+    }
+  }
+});
+
+passwordInput.addEventListener('blur', function() {
+  const error = validatePassword(this.value);
+  if (error) {
+    this.classList.add('is-invalid');
+    passwordError.textContent = error;
+    passwordError.style.display = 'block';
+  } else {
+    this.classList.remove('is-invalid');
+    this.classList.add('is-valid');
+    passwordError.textContent = '';
+    passwordError.style.display = 'none';
+  }
+});
+
+passwordInput.addEventListener('input', function() {
+  if (this.classList.contains('is-invalid')) {
+    const error = validatePassword(this.value);
+    if (!error) {
+      this.classList.remove('is-invalid');
+      this.classList.add('is-valid');
+      passwordError.textContent = '';
+      passwordError.style.display = 'none';
+    }
+  }
+});
+
+// Form submit with validation
+loginForm.addEventListener('submit', function(e) {
+  let isValid = true;
+  
+  const emailValidation = validateEmail(emailInput.value);
+  if (emailValidation) {
+    emailInput.classList.add('is-invalid');
+    emailError.textContent = emailValidation;
+    emailError.style.display = 'block';
+    isValid = false;
+  }
+  
+  const passwordValidation = validatePassword(passwordInput.value);
+  if (passwordValidation) {
+    passwordInput.classList.add('is-invalid');
+    passwordError.textContent = passwordValidation;
+    passwordError.style.display = 'block';
+    isValid = false;
+  }
+  
+  if (!isValid) {
+    e.preventDefault();
+    // Add shake animation to form
+    loginForm.classList.add('shake');
+    setTimeout(() => loginForm.classList.remove('shake'), 500);
+  }
+});
+
+// Enter key validation
+emailInput.addEventListener('keypress', function(e) {
+  if (e.key === 'Enter') {
+    passwordInput.focus();
+  }
+});
+
+passwordInput.addEventListener('keypress', function(e) {
+  if (e.key === 'Enter') {
+    loginForm.querySelector('button[type="submit"]').click();
+  }
+});
 </script>
 </body>
 </html>
