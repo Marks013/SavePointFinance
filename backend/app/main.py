@@ -55,7 +55,7 @@ async def lifespan(app: FastAPI):
     # Create all tables on startup (idempotent)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    
+
     # Seed default institutions if none exist
     from app.models.institution import Institution
     from app.database import AsyncSessionLocal
@@ -63,7 +63,7 @@ async def lifespan(app: FastAPI):
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(Institution))
         all_institutions = list(result.scalars().all())
-        
+
         # Remove duplicates by name, keeping the first one
         seen = set()
         to_delete = []
@@ -72,50 +72,42 @@ async def lifespan(app: FastAPI):
                 to_delete.append(inst.id)
             else:
                 seen.add(inst.name)
-        
+
         if to_delete:
             from sqlalchemy import delete
             await db.execute(delete(Institution).where(Institution.id.in_(to_delete)))
             await db.commit()
             logger.info(f"✅ Removed {len(to_delete)} duplicate institutions")
-        
-        # Now check what's left and add missing ones
-        existing_names = {i.name for i in all_institutions if i.name not in seen or i.name not in [j.name for j in to_delete]}
-        
+
         result = await db.execute(select(Institution.name))
         existing_names = {r[0] for r in result.all()}
-        
+
         default_institutions = [
-            # Fintechs
-            Institution(name="Nubank", code="260", color="#820AD1", type="fintech"),
-            Institution(name="PicPay", code="380", color="#11FF00", type="wallet"),
-            Institution(name="PagSeguro", code="273", color="#00D4A1", type="fintech"),
-            Institution(name="Mercado Pago", code="323", color="#7946F5", type="wallet"),
-            Institution(name="Inter", code="077", color="#FF7A00", type="fintech"),
-            Institution(name="C6 Bank", code="336", color="#000000", type="fintech"),
-            Institution(name="Nuconta", code="260", color="#820AD1", type="fintech"),
-            # Bancos tradicionais
-            Institution(name="Itaú", code="607", color="#EC7000", type="bank"),
-            Institution(name="Bradesco", code="237", color="#0F2F63", type="bank"),
-            Institution(name="Banco do Brasil", code="001", color="#FFD100", type="bank"),
-            Institution(name="Santander", code="033", color="#EC1C24", type="bank"),
-            Institution(name="Caixa", code="104", color="#0079D7", type="bank"),
-            Institution(name="Banco Safra", code="422", color="#005C34", type="bank"),
-            Institution(name="Banrisul", code="041", color="#005C34", type="bank"),
-            Institution(name="Sicoob", code="756", color="#00A651", type="bank"),
-            Institution(name="Sicredi", code="748", color="#1B4F71", type="bank"),
-            # Carteiras digitais
-            Institution(name="PayPal", code="380", color="#003087", type="wallet"),
-            Institution(name="Shopee Pay", code="380", color="#FF5722", type="wallet"),
-            Institution(name="Google Pay", code="380", color="#4285F4", type="wallet"),
-            Institution(name="Apple Pay", code="380", color="#000000", type="wallet"),
-            # Corretoras
-            Institution(name="BTG Pactual", code="208", color="#009CDE", type="broker"),
-            Institution(name="Rico", code="177", color="#F40612", type="broker"),
+            Institution(name="Nubank",           code="260", color="#820AD1", type="fintech"),
+            Institution(name="PicPay",           code="380", color="#11FF00", type="wallet"),
+            Institution(name="PagSeguro",        code="273", color="#00D4A1", type="fintech"),
+            Institution(name="Mercado Pago",     code="323", color="#7946F5", type="wallet"),
+            Institution(name="Inter",            code="077", color="#FF7A00", type="fintech"),
+            Institution(name="C6 Bank",          code="336", color="#000000", type="fintech"),
+            Institution(name="Itaú",             code="607", color="#EC7000", type="bank"),
+            Institution(name="Bradesco",         code="237", color="#0F2F63", type="bank"),
+            Institution(name="Banco do Brasil",  code="001", color="#FFD100", type="bank"),
+            Institution(name="Santander",        code="033", color="#EC1C24", type="bank"),
+            Institution(name="Caixa",            code="104", color="#0079D7", type="bank"),
+            Institution(name="Banco Safra",      code="422", color="#005C34", type="bank"),
+            Institution(name="Banrisul",         code="041", color="#005C34", type="bank"),
+            Institution(name="Sicoob",           code="756", color="#00A651", type="bank"),
+            Institution(name="Sicredi",          code="748", color="#1B4F71", type="bank"),
+            Institution(name="PayPal",           code="380", color="#003087", type="wallet"),
+            Institution(name="Shopee Pay",       code="380", color="#FF5722", type="wallet"),
+            Institution(name="Google Pay",       code="380", color="#4285F4", type="wallet"),
+            Institution(name="Apple Pay",        code="380", color="#000000", type="wallet"),
+            Institution(name="BTG Pactual",      code="208", color="#009CDE", type="broker"),
+            Institution(name="Rico",             code="177", color="#F40612", type="broker"),
             Institution(name="XP Investimentos", code="102", color="#009145", type="broker"),
-            Institution(name="Clear", code="105", color="#00A2E8", type="broker"),
-            Institution(name="Toro", code="178", color="#00D39E", type="broker"),
-            Institution(name="Warren", code="314", color="#F5353F", type="broker"),
+            Institution(name="Clear",            code="105", color="#00A2E8", type="broker"),
+            Institution(name="Toro",             code="178", color="#00D39E", type="broker"),
+            Institution(name="Warren",           code="314", color="#F5353F", type="broker"),
         ]
         added = 0
         for inst in default_institutions:
@@ -125,7 +117,7 @@ async def lifespan(app: FastAPI):
         if added:
             await db.commit()
             logger.info(f"✅ Added {added} default institutions")
-    
+
     logger.info("✅ SavePoint Finance started")
     yield
     logger.info("👋 SavePoint Finance shutting down")
@@ -140,16 +132,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# ── Middleware de Performance ───────────────────────────────────────────────
+# ── Middleware ────────────────────────────────────────────────────────────────
 
-# Gzip compression for API responses
 app.add_middleware(GZipMiddleware, minimum_size=500)
 
-# Middleware de captura de erros
 from app.middleware.error_handler import ErrorCaptureMiddleware
 app.add_middleware(ErrorCaptureMiddleware)
 
-# CORS - seguro e restritivo
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,
@@ -159,47 +148,39 @@ app.add_middleware(
 )
 
 
-# ── Request Logging & Performance ───────────────────────────────────────────
+# ── Request Logging ───────────────────────────────────────────────────────────
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     start_time = time.perf_counter()
-    
     response = await call_next(request)
-    
     duration = (time.perf_counter() - start_time) * 1000
-    
-    # Log apenas em desenvolvimento ou se demorar mais de 500ms
+
     if settings.APP_ENV == "development" or duration > 500:
         logger.info(
             f"{request.method} {request.url.path} - {response.status_code} - {duration:.1f}ms"
         )
-    
-    # Headers de performance
+
     response.headers["X-Process-Time"] = f"{duration:.1f}ms"
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
-    
     return response
 
 
-# ── Error Handler Global ───────────────────────────────────────────────────
+# ── Global Exception Handlers ─────────────────────────────────────────────────
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"❌ Unhandled exception: {exc}", exc_info=True)
-    # Return HTML for browser navigation, JSON only for explicit API/AJAX
-    is_api = request.url.path.startswith("/api")
+    is_api  = request.url.path.startswith("/api")
     is_htmx = request.headers.get("HX-Request") == "true"
-    
-    # For regular browser navigation, always return HTML
+
     if not is_api and not is_htmx:
         return HTMLResponse(
             status_code=500,
             content=get_error_html(500, f"Erro interno: {str(exc)[:100]}")
         )
-    
     return JSONResponse(
         status_code=500,
         content={"detail": str(exc)[:200], "code": "INTERNAL_ERROR"}
@@ -208,16 +189,14 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
-    is_api = request.url.path.startswith("/api")
+    is_api  = request.url.path.startswith("/api")
     is_htmx = request.headers.get("HX-Request") == "true"
-    
-    # For regular browser navigation, always return HTML
+
     if not is_api and not is_htmx:
         return HTMLResponse(
             status_code=exc.status_code,
             content=get_error_html(exc.status_code, exc.detail)
         )
-    
     return JSONResponse(
         status_code=exc.status_code,
         content={"detail": exc.detail, "code": f"HTTP_{exc.status_code}"}
@@ -226,9 +205,9 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    is_api = request.url.path.startswith("/api")
+    is_api  = request.url.path.startswith("/api")
     is_htmx = request.headers.get("HX-Request") == "true"
-    
+
     if not is_api and not is_htmx:
         return HTMLResponse(
             status_code=422,
@@ -241,8 +220,32 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 
 # ── Routers ───────────────────────────────────────────────────────────────────
+#
+# BUG FIX #12/#25 — Ordem de registro dos routers:
+#
+# Problema original: htmx_router era incluído ANTES de web_router, fazendo com que
+# rotas duplicadas (ex: GET /goals/{id}/edit) em ambos os arquivos fossem resolvidas
+# pelo htmx_router — que retorna HTML parcial em vez da página completa.
+#
+# Solução: htmx_router deve ser registrado DEPOIS de web_router. Como o FastAPI
+# usa o primeiro handler que faz match, web_router (páginas completas) ganha para
+# rotas de navegação, e htmx_router serve as partials que não existem em web.py.
+#
+# Além disso, as rotas GET de modal que existiam duplicadas em web.py foram
+# removidas de lá — apenas htmx.py as define. Isso elimina qualquer ambiguidade.
+#
+# Ordem correta:
+#   1. Routers de API JSON          → prefixo /api/v1/*
+#   2. web_router (páginas SSR)     → rotas de navegação HTML completas
+#   3. data_router                  → /api/v1/data/* (export/import)
+#   4. htmx_router (partials HTMX) → rotas de fragmentos HTML para modais/updates
+#
+# Com esta ordem:
+#   GET /dashboard            → web_router ✓ (página completa)
+#   GET /transactions/new     → htmx_router ✓ (partial modal)
+#   GET /goals/123/edit       → htmx_router ✓ (partial modal)
 
-# Public/user routers
+# API JSON routers
 app.include_router(auth_router)
 app.include_router(transactions_router)
 app.include_router(categories_router)
@@ -253,32 +256,30 @@ app.include_router(webhook_router)
 app.include_router(subscriptions_router)
 app.include_router(installments_router)
 app.include_router(goals_router)
-
-# Admin router (admin only)
 app.include_router(admin_router)
 
-# Migration router
+# Migration / diagnostic routers
 from app.routers.migration import router as migration_router
 app.include_router(migration_router)
 
-# Diagnostic router
 from app.routers.diagnostic import router as diagnostic_router
 app.include_router(diagnostic_router)
 
 from app.routers.diagnostic_complete import router as diagnostic_complete_router
 app.include_router(diagnostic_complete_router)
 
-# Web pages router
+# Web SSR pages router — deve vir ANTES do htmx_router
 app.include_router(web_router)
 
-# Data export/import router
+# Data export/import
 app.include_router(data_router)
 
-# HTMX partials router
+# HTMX partials router — deve vir DEPOIS do web_router para que rotas de página
+# completa em web.py tenham prioridade sobre partials quando houver sobreposição.
 app.include_router(htmx_router)
 
 
-# Health Check Otimizado
+# ── Health Check ──────────────────────────────────────────────────────────────
 
 @app.get("/health")
 async def health():
@@ -286,49 +287,16 @@ async def health():
         "status": "ok",
         "app": settings.APP_NAME,
         "version": "2.0.0",
-        "environment": settings.APP_ENV
+        "environment": settings.APP_ENV,
     }
-
-
-@app.exception_handler(405)
-async def method_not_allowed_handler(request: Request, exc):
-    return JSONResponse(
-        status_code=405,
-        content={
-            "detail": "Método não permitido. Ação não disponível para esta funcionalidade.",
-            "code": "METHOD_NOT_ALLOWED"
-        }
-    )
-
-
-@app.exception_handler(404)
-async def not_found_handler(request: Request, exc):
-    return JSONResponse(
-        status_code=404,
-        content={
-            "detail": "Página não encontrada.",
-            "code": "NOT_FOUND"
-        }
-    )
-
-
-@app.exception_handler(500)
-async def internal_error_handler(request: Request, exc):
-    return JSONResponse(
-        status_code=500,
-        content={
-            "detail": "Erro interno do servidor. Tente novamente mais tarde.",
-            "code": "INTERNAL_ERROR"
-        }
-    )
 
 
 @app.get("/health/ready")
 async def health_ready():
     """Health check para kubernetes/load balancer"""
     try:
-        # Teste rápido de DB
         from app.database import engine
+        from sqlalchemy import text
         async with engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
         return {"status": "ready"}
@@ -340,5 +308,35 @@ async def health_ready():
         )
 
 
-# Import adicional para health check
+@app.exception_handler(405)
+async def method_not_allowed_handler(request: Request, exc):
+    return JSONResponse(
+        status_code=405,
+        content={
+            "detail": "Método não permitido.",
+            "code": "METHOD_NOT_ALLOWED",
+        }
+    )
+
+
+@app.exception_handler(404)
+async def not_found_handler(request: Request, exc):
+    return JSONResponse(
+        status_code=404,
+        content={"detail": "Página não encontrada.", "code": "NOT_FOUND"}
+    )
+
+
+@app.exception_handler(500)
+async def internal_error_handler(request: Request, exc):
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "Erro interno do servidor. Tente novamente mais tarde.",
+            "code": "INTERNAL_ERROR",
+        }
+    )
+
+
+# Import para health check
 from sqlalchemy import text

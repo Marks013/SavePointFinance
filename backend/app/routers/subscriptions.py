@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from app.database import get_db
 from app.auth import get_current_user
 from app.models.user import User
-from app.models.subscription import Subscription
+from app.models.subscription import Subscription, SubscriptionType
 from app.models.transaction import Transaction, TransactionType, TransactionSource, PaymentMethod
 
 router = APIRouter(prefix="/api/v1/subscriptions", tags=["subscriptions"])
@@ -80,9 +80,9 @@ async def create_subscription(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    from app.models.subscription import SubscriptionType
+    # BUG FIX #17: converter string → SubscriptionType enum antes de persistir
     sub_type = SubscriptionType.income if body.type == "income" else SubscriptionType.expense
-    
+
     subscription = Subscription(
         tenant_id=current_user.tenant_id,
         user_id=current_user.id,
@@ -119,8 +119,22 @@ async def update_subscription(
     if not subscription:
         raise HTTPException(status_code=404, detail="Assinatura não encontrada")
 
-    # FIX: use model_dump() — .dict() is deprecated in Pydantic v2
-    for key, value in body.model_dump(exclude_unset=True).items():
+    # BUG FIX #17/#20: converter o campo 'type' de string → SubscriptionType enum
+    # antes de usar setattr, pois o modelo SQLAlchemy espera enum, não string.
+    # Usar setattr com string em campo SAEnum pode funcionar em algumas versões
+    # do SQLAlchemy mas lança IntegrityError ou comportamento inesperado em outras.
+    update_data = body.model_dump(exclude_unset=True)
+
+    if "type" in update_data and update_data["type"] is not None:
+        type_str = update_data["type"]
+        update_data["type"] = (
+            SubscriptionType.income if type_str == "income" else SubscriptionType.expense
+        )
+
+    # 'frequency' não é campo do modelo — remover silenciosamente para evitar AttributeError
+    update_data.pop("frequency", None)
+
+    for key, value in update_data.items():
         setattr(subscription, key, value)
 
     await db.commit()

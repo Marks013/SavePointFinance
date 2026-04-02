@@ -2,48 +2,73 @@
  * Save Point Finanças API Client
  * Central module for all API calls to the FastAPI backend.
  *
- * BUGFIX: Auto-refresh on 401 agora verifica se existe refresh token ANTES
- * de tentar o refresh. Sem isso, o login com credenciais erradas entrava em
-   * loop: 401 → tryRefresh falha → Auth.clear() → redirect /login → reload.
+ * BUG FIX #16: O app usa autenticação via cookies HttpOnly definidos pelo servidor
+ * em /login. Cookies HttpOnly não são acessíveis via JavaScript — o browser os
+ * envia automaticamente em cada requisição quando `credentials: 'include'` é usado.
+ *
+ * Correções aplicadas:
+ * - Removidos `localStorage.getItem('ff_access_token')` e header `Authorization: Bearer`
+ * - Todas as chamadas fetch agora usam `credentials: 'include'` para enviar cookies
+ * - Auth.getToken() sempre retorna null (tokens não são legíveis por JS em cookies HttpOnly)
+ * - Auth.isLoggedIn() tenta verificar via /api/v1/auth/me ao invés de localStorage
+ * - Removida lógica de auto-refresh via token (o servidor renova via cookie refresh)
  */
 
 const API_BASE = '/api/v1';
 
-// ── Token Management ─────────────────────────────────────────────────────────
+// ── Auth State (client-side apenas, sem acesso aos tokens HttpOnly) ──────────
 
 export const Auth = {
-  getToken() { return localStorage.getItem('ff_access_token'); },
-  getRefreshToken() { return localStorage.getItem('ff_refresh_token'); },
+  // Tokens ficam em cookies HttpOnly — JS não pode lê-los.
+  // Estes métodos existem apenas para compatibilidade com código legado.
+  getToken()        { return null; },
+  getRefreshToken() { return null; },
+
   getUser() {
-    try { return JSON.parse(localStorage.getItem('ff_user') || 'null'); }
+    try { return JSON.parse(sessionStorage.getItem('ff_user') || 'null'); }
     catch { return null; }
   },
-  setTokens(access, refresh) {
-    localStorage.setItem('ff_access_token', access);
-    localStorage.setItem('ff_refresh_token', refresh);
-  },
-  setUser(user) { localStorage.setItem('ff_user', JSON.stringify(user)); },
+
+  setUser(user) { sessionStorage.setItem('ff_user', JSON.stringify(user)); },
+
+  // Não armazena mais tokens — o servidor gerencia via Set-Cookie
+  setTokens(_access, _refresh) { /* no-op: tokens ficam em cookies HttpOnly */ },
+
   clear() {
-    localStorage.removeItem('ff_access_token');
-    localStorage.removeItem('ff_refresh_token');
-    localStorage.removeItem('ff_user');
+    sessionStorage.removeItem('ff_user');
+    // Para logout real, chamar GET /logout que apaga os cookies no servidor
   },
-  isLoggedIn() { return !!this.getToken(); },
-  isSuperadmin() { return this.getUser()?.role === 'superadmin'; },
-  isAdmin() { 
+
+  /**
+   * Verifica se está autenticado tentando /api/v1/auth/me.
+   * Retorna false em caso de 401.
+   * Nota: chamada assíncrona — use `await Auth.checkAuth()`
+   */
+  async checkAuth() {
+    try {
+      const res = await fetch(`${API_BASE}/auth/me`, { credentials: 'include' });
+      if (res.ok) {
+        const user = await res.json();
+        this.setUser(user);
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  },
+
+  // Manter isLoggedIn() síncrono — verifica sessionStorage como cache
+  isLoggedIn() { return !!this.getUser(); },
+
+  isAdmin() {
     const role = this.getUser()?.role;
-    return role === 'superadmin' || role === 'admin';
+    return role === 'admin';
   },
+
   requireAuth() {
     if (!this.isLoggedIn()) {
       window.location.href = '/login';
-      return false;
-    }
-    return true;
-  },
-  requireSuperadmin() {
-    if (!this.isLoggedIn() || !this.isSuperadmin()) {
-      window.location.href = '/dashboard';
       return false;
     }
     return true;
@@ -54,7 +79,11 @@ export const Auth = {
 
 export async function checkBackendHealth() {
   try {
-    const res = await fetch('/api/health', { method: 'GET', signal: AbortSignal.timeout(5000) });
+    const res = await fetch('/api/health', {
+      method: 'GET',
+      credentials: 'include',
+      signal: AbortSignal.timeout(5000),
+    });
     return res.ok;
   } catch {
     return false;
@@ -92,35 +121,40 @@ export function hideGlobalError() {
   document.getElementById('_global_err_banner')?.remove();
 }
 
-// ── Core Fetch Wrapper ───────────────────────────────────────────────────────
+// ── Error Class ───────────────────────────────────────────────────────────────
 
-async function request(method, path, body = null, options = {}) {
+export class ApiError extends Error {
+  constructor(message, status) {
+    super(message);
+    this.status = status;
+  }
+}
+
+// ── Core Fetch Wrapper ────────────────────────────────────────────────────────
+// BUG FIX #16: Removido header Authorization: Bearer.
+// Cookies HttpOnly são enviados automaticamente pelo browser com credentials: 'include'.
+
+async function request(method, path, body = null) {
   const headers = { 'Content-Type': 'application/json' };
-  const token = Auth.getToken();
-  if (token) headers['Authorization'] = `Bearer ${token}`;
+  // NÃO adicionamos Authorization: Bearer — autenticação é via cookie HttpOnly
 
-  const config = { method, headers };
+  const config = {
+    method,
+    headers,
+    credentials: 'include', // envia cookies HttpOnly automaticamente
+  };
   if (body) config.body = JSON.stringify(body);
 
   try {
-    let res = await fetch(`${API_BASE}${path}`, config);
+    const res = await fetch(`${API_BASE}${path}`, config);
 
-    // ── Auto-refresh on 401 ───────────────────────────────────────────────────
-    if (res.status === 401 && !options.skipRefresh) {
-      const rt = Auth.getRefreshToken();
-      if (rt) {
-        const refreshed = await tryRefresh();
-        if (refreshed) {
-          headers['Authorization'] = `Bearer ${Auth.getToken()}`;
-          res = await fetch(`${API_BASE}${path}`, { ...config, headers });
-        } else {
-          Auth.clear();
-          window.location.href = '/login';
-          return null;
-        }
-      }
+    // 401 → redireciona para login; o servidor renova cookies automaticamente
+    // via refresh token se o access token expirou (middleware do backend)
+    if (res.status === 401) {
+      Auth.clear();
+      window.location.href = '/login?expired=1';
+      return null;
     }
-    // ── fim auto-refresh ───────────────────────────────────────────────────────
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({ detail: `Erro HTTP ${res.status}` }));
@@ -131,48 +165,7 @@ async function request(method, path, body = null, options = {}) {
     return res.json();
   } catch (e) {
     if (e instanceof ApiError) throw e;
-    // Network / CORS error
-    throw new ApiError(
-      'Sem conexão com o servidor. Verifique sua internet.',
-      0
-    );
-  }
-}
-
-async function tryRefresh() {
-  const rt = Auth.getRefreshToken();
-  if (!rt) return false;
-  try {
-    const res = await fetch(`${API_BASE}/auth/refresh?refresh_token=${encodeURIComponent(rt)}`, {
-      method: 'POST',
-    });
-    if (!res.ok) return false;
-    const data = await res.json();
-    Auth.setTokens(data.access_token, data.refresh_token);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-export class ApiError extends Error {
-  constructor(message, status) {
-    super(message);
-    this.status = status;
-  }
-}
-
-// Wrapper para tratar erros automaticamente com toasts
-async function requestWithToast(method, path, body = null, options = {}) {
-  try {
-    return await request(method, path, body, options);
-  } catch (e) {
-    if (window.showApiError) {
-      window.showApiError(e);
-    } else {
-      console.error('API Error:', e);
-    }
-    throw e;
+    throw new ApiError('Sem conexão com o servidor. Verifique sua internet.', 0);
   }
 }
 
@@ -183,17 +176,16 @@ const get = (path, params = {}) => {
   const qs = new URLSearchParams(filteredParams).toString();
   return request('GET', qs ? `${path}?${qs}` : path);
 };
-const post = (path, body) => request('POST', path, body);
-const put = (path, body) => request('PUT', path, body);
-const patch = (path, body) => request('PATCH', path, body);
-const del = (path) => request('DELETE', path);
+const post  = (path, body) => request('POST',   path, body);
+const put   = (path, body) => request('PUT',    path, body);
+const patch = (path, body) => request('PATCH',  path, body);
+const del   = (path)       => request('DELETE', path);
 
-// ── Auth Endpoints ───────────────────────────────────────────────────────────
+// ── Auth Endpoints ────────────────────────────────────────────────────────────
+// Login/register são feitos via formulário HTML POST → o servidor seta os cookies.
+// Os endpoints abaixo são para operações autenticadas pós-login.
 
 export const authApi = {
-  login: (email, password) => post('/auth/login', { email, password }),
-  register: (workspace_name, name, email, password, confirm_password) =>
-    post('/auth/register', { workspace_name, name, email, password, confirm_password }),
   me: () => get('/auth/me'),
   forgotPassword: (email) => post('/auth/forgot-password', { email }),
   resetPassword: (token, new_password) => post('/auth/reset-password', { token, new_password }),
@@ -207,60 +199,60 @@ export const authApi = {
   revokeInvite: (id) => del(`/auth/invites/${id}`),
 };
 
-// ── Transactions ─────────────────────────────────────────────────────────────
+// ── Transactions ──────────────────────────────────────────────────────────────
 
 export const transactionsApi = {
-  list: (params = {}) => get('/transactions', params),
-  get: (id) => get(`/transactions/${id}`),
+  list:   (params = {}) => get('/transactions', params),
+  get:    (id) => get(`/transactions/${id}`),
   create: (body) => post('/transactions', body),
   update: (id, body) => put(`/transactions/${id}`, body),
   delete: (id, deleteAll = false) =>
     del(`/transactions/${id}${deleteAll ? '?delete_all_installments=true' : ''}`),
 };
 
-// ── Categories ───────────────────────────────────────────────────────────────
+// ── Categories ────────────────────────────────────────────────────────────────
 
 export const categoriesApi = {
-  list: () => get('/categories'),
+  list:   () => get('/categories'),
   create: (body) => post('/categories', body),
   update: (id, body) => put(`/categories/${id}`, body),
   delete: (id) => del(`/categories/${id}`),
 };
 
-// ── Accounts & Cards ─────────────────────────────────────────────────────────
+// ── Accounts & Cards ──────────────────────────────────────────────────────────
 
 export const accountsApi = {
-  list: () => get('/accounts'),
+  list:   () => get('/accounts'),
   create: (body) => post('/accounts', body),
   update: (id, body) => put(`/accounts/${id}`, body),
   delete: (id) => del(`/accounts/${id}`),
 };
 
 export const cardsApi = {
-  list: () => get('/cards'),
+  list:   () => get('/cards'),
   create: (body) => post('/cards', body),
   update: (id, body) => put(`/cards/${id}`, body),
   delete: (id) => del(`/cards/${id}`),
 };
 
-// ── Subscriptions ────────────────────────────────────────────────────────────
+// ── Subscriptions ─────────────────────────────────────────────────────────────
 
 export const subscriptionsApi = {
-  list: (params = {}) => get('/subscriptions/', params),
+  list:   (params = {}) => get('/subscriptions/', params),
   create: (body) => post('/subscriptions/', body),
   update: (id, body) => put(`/subscriptions/${id}`, body),
   delete: (id) => del(`/subscriptions/${id}`),
   generateTransaction: (id) => post(`/subscriptions/${id}/generate-transaction`),
 };
 
-// ── Installments ─────────────────────────────────────────────────────────────
+// ── Installments ──────────────────────────────────────────────────────────────
 
 export const installmentsApi = {
-  list: (params = {}) => get('/installments', params),
+  list:    (params = {}) => get('/installments', params),
   byMonth: (year, month) => get('/installments/by-month', { year, month }),
 };
 
-// ── Reports ──────────────────────────────────────────────────────────────────
+// ── Reports ───────────────────────────────────────────────────────────────────
 
 export const reportsApi = {
   summary: (year, month) => get('/reports/summary', { year, month }),
@@ -273,63 +265,96 @@ export const reportsApi = {
   cardsUsage: (year, month) => get('/reports/cards-usage', { year, month }),
 };
 
-// ── Admin ────────────────────────────────────────────────────────────────────
+// ── Admin ─────────────────────────────────────────────────────────────────────
 
 export const adminApi = {
-  stats: () => get('/admin/stats'),
-  listTenants: (params = {}) => get('/admin/tenants', params),
-  getTenant: (id) => get(`/admin/tenants/${id}`),
+  stats:        () => get('/admin/stats'),
+  listTenants:  (params = {}) => get('/admin/tenants', params),
+  getTenant:    (id) => get(`/admin/tenants/${id}`),
   updateTenant: (id, body) => patch(`/admin/tenants/${id}`, body),
   deleteTenant: (id) => del(`/admin/tenants/${id}`),
-  listUsers: (params = {}) => get('/admin/users', params),
-  updateUser: (id, body) => patch(`/admin/users/${id}`, body),
-  deleteUser: (id) => del(`/admin/users/${id}`),
+  listUsers:    (params = {}) => get('/admin/users', params),
+  updateUser:   (id, body) => patch(`/admin/users/${id}`, body),
+  deleteUser:   (id) => del(`/admin/users/${id}`),
 };
 
 // ── Goals ─────────────────────────────────────────────────────────────────────
 
 export const goalsApi = {
-  list: () => get('/goals'),
-  create: (body) => post('/goals', body),
-  update: (id, body) => put(`/goals/${id}`, body),
-  delete: (id) => del(`/goals/${id}`),
+  list:    () => get('/goals'),
+  create:  (body) => post('/goals', body),
+  update:  (id, body) => put(`/goals/${id}`, body),
+  delete:  (id) => del(`/goals/${id}`),
   deposit: (id, amount, description) => post(`/goals/${id}/deposit`, { amount, description }),
 };
 
-// ── Data Export/Import ───────────────────────────────────────────────────────
+// ── Data Export/Import ────────────────────────────────────────────────────────
 
 export const dataApi = {
   export: (params = {}) => get('/data/export', params),
   import: (file) => {
     const formData = new FormData();
     formData.append('file', file);
+    // Para upload de arquivo não usamos Content-Type JSON — o browser define multipart
     return fetch(`${API_BASE}/data/import`, {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${Auth.getToken()}` },
+      credentials: 'include',
       body: formData,
     }).then(res => res.json());
   },
   getTemplate: () => get('/data/import/template'),
 };
 
-// ── Tenant Users (Admin) ───────────────────────────────────────────────────────
+// ── Tenant Users ──────────────────────────────────────────────────────────────
 
 export const tenantApi = {
-  listUsers: () => get('/auth/users'),
-  updateRole: (userId, role) => patch(`/auth/users/${userId}/role`, { role }),
+  listUsers:    () => get('/auth/users'),
+  updateRole:   (userId, role) => patch(`/auth/users/${userId}/role`, { role }),
   toggleActive: (userId, isActive) => patch(`/auth/users/${userId}/active`, { is_active: isActive }),
 };
 
-// ── Invites (Admin) ────────────────────────────────────────────────────────────
+// ── Invites ───────────────────────────────────────────────────────────────────
 
 export const inviteApi = {
   create: (email) => post('/auth/invite', { email }),
-  list: () => get('/auth/invites'),
+  list:   () => get('/auth/invites'),
   revoke: (id) => del(`/auth/invites/${id}`),
 };
 
-// ── Plans ───────────────────────────────────────────────────────────────────────
+// ── Plans ─────────────────────────────────────────────────────────────────────
 
 export const plansApi = {
   list: () => get('/admin/plans'),
+};
+
+// ── Global error handler para chamadas diretas ao api.js ─────────────────────
+
+window.showApiError = function(error, defaultMsg = 'Ocorreu um erro') {
+  let message = defaultMsg;
+  let kind = 'error';
+
+  if (error?.message) {
+    message = error.message;
+    if (error.status === 401) {
+      message = 'Sua sessão expirou. Faça login novamente.';
+      kind = 'warning';
+    } else if (error.status === 403) {
+      message = 'Você não tem permissão para esta ação.';
+    } else if (error.status === 404) {
+      message = 'Item não encontrado.';
+    } else if (error.status === 400) {
+      message = error.message;
+      kind = 'warning';
+    } else if (error.status >= 500) {
+      message = 'Erro no servidor. Tente novamente mais tarde.';
+    }
+  } else if (typeof error === 'string') {
+    message = error;
+  }
+
+  if (typeof addToast === 'function') {
+    addToast({ message, kind });
+  } else {
+    console.error('[API Error]', message);
+  }
 };
