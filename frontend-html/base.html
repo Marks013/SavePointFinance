@@ -112,6 +112,13 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && modalOverlay.classList.contains('modal--open')) closeModal();
 });
 
+/* ── Delete confirmation ─────────────────────────────────────────────── */
+function confirmDelete(url, message) {
+  if (!confirm(message + '\n\nEsta ação não pode ser desfeita.')) return;
+  fetch(url, { method: 'POST' })
+    .then(r => { if (r.ok) location.reload(); });
+}
+
 /* ── HTMX modal integration ─────────────────────────────────────────── */
 document.body.addEventListener('htmx:afterSwap', e => {
   if (e.target && e.target.id === 'modal-content') openModal();
