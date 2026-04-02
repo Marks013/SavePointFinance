@@ -628,18 +628,23 @@ async def categories_page(request: Request, db: AsyncSession = Depends(get_db), 
 
 @router.get("/settings", response_class=HTMLResponse)
 async def settings_page(request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_user)):
-    accounts = (await db.execute(select(Account).where(Account.tenant_id == current_user.tenant_id))).scalars().all()
-    cards = (await db.execute(select(Card).where(Card.tenant_id == current_user.tenant_id))).scalars().all()
-    institutions = (await db.execute(select(Institution).where(Institution.is_active == True).order_by(Institution.name))).scalars().all()
-    institution_map = {str(i.id): i.name for i in institutions}
-    
-    return templates.TemplateResponse("settings.html", {
-        "request": request,
-        "user": current_user,
-        "accounts": [{"id": str(a.id), "name": a.name, "balance": a.balance, "balance_fmt": fmt_money(a.balance), "type": a.type, "institution_id": str(a.institution_id) if a.institution_id else None, "institution_name": institution_map.get(str(a.institution_id), "") if a.institution_id else ""} for a in accounts],
-        "cards": [{"id": str(c.id), "name": c.name, "last4": c.last4, "brand": c.brand, "limit": float(c.limit_amount), "limit_fmt": fmt_money(c.limit_amount), "due_day": c.due_day, "color": c.color, "institution_id": str(c.institution_id) if c.institution_id else None, "institution_name": institution_map.get(str(c.institution_id), "") if c.institution_id else ""} for c in cards],
-        "institutions": [{"id": str(i.id), "name": i.name} for i in institutions],
-    })
+    try:
+        accounts = (await db.execute(select(Account).where(Account.tenant_id == current_user.tenant_id))).scalars().all()
+        cards = (await db.execute(select(Card).where(Card.tenant_id == current_user.tenant_id))).scalars().all()
+        institutions = (await db.execute(select(Institution).where(Institution.is_active == True).order_by(Institution.name))).scalars().all()
+        institution_map = {str(i.id): i.name for i in institutions}
+        
+        return templates.TemplateResponse("settings.html", {
+            "request": request,
+            "user": current_user,
+            "accounts": [{"id": str(a.id), "name": a.name, "balance": a.balance, "balance_fmt": fmt_money(a.balance), "type": a.type, "institution_id": str(a.institution_id) if a.institution_id else None, "institution_name": institution_map.get(str(a.institution_id), "") if a.institution_id else ""} for a in accounts],
+            "cards": [{"id": str(c.id), "name": c.name, "last4": c.last4, "brand": c.brand, "limit": float(c.limit_amount), "limit_fmt": fmt_money(c.limit_amount), "due_day": c.due_day, "color": c.color, "institution_id": str(c.institution_id) if c.institution_id else None, "institution_name": institution_map.get(str(c.institution_id), "") if c.institution_id else ""} for c in cards],
+            "institutions": [{"id": str(i.id), "name": i.name} for i in institutions],
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/settings/accounts/new")
