@@ -16,7 +16,7 @@ from pydantic import BaseModel
 from app.database import get_db
 from app.auth import get_current_user, require_admin
 from app.models.user import User
-from app.models.transaction import Transaction, TransactionType, PaymentMethod
+from app.models.transaction import Transaction, TransactionType, PaymentMethod, TransactionSource
 from app.models.category import Category
 from app.models.account import Account
 from app.models.card import Card
@@ -235,7 +235,7 @@ async def import_transactions(
                 account_id=account.id if account else None,
                 card_id=card.id if card else None,
                 notes=row.get("notes", "").strip() or None,
-                source="import",
+                source=TransactionSource.import_csv,
             )
             db.add(tx)
             imported += 1

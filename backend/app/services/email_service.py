@@ -1,4 +1,4 @@
-import smtplib
+import aiosmtplib
 import logging
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -9,12 +9,12 @@ logger = logging.getLogger(__name__)
 
 
 class EmailService:
-    """Serviço de envio de e-mails via SMTP."""
+    """Serviço de envio de e-mails via SMTP异步."""
     
     def __init__(self):
         self.enabled = bool(settings.SMTP_HOST and settings.SMTP_USER)
     
-    def send_email(
+    async def send_email(
         self,
         to_email: str,
         subject: str,
@@ -22,7 +22,7 @@ class EmailService:
         text_content: Optional[str] = None
     ) -> bool:
         """
-        Envia um e-mail via SMTP.
+        Envia um e-mail via SMTP de forma assíncrona.
         
         Args:
             to_email: E-mail do destinatário
@@ -52,10 +52,14 @@ class EmailService:
             msg.attach(part1)
             msg.attach(part2)
             
-            with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
-                server.starttls()
-                server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-                server.sendmail(settings.SMTP_FROM_EMAIL, to_email, msg.as_string())
+            await aiosmtplib.send(
+                msg,
+                hostname=settings.SMTP_HOST,
+                port=settings.SMTP_PORT,
+                start_tls=True,
+                username=settings.SMTP_USER,
+                password=settings.SMTP_PASSWORD,
+            )
             
             logger.info(f"E-mail enviado com sucesso para {to_email}")
             return True
@@ -64,7 +68,7 @@ class EmailService:
             logger.error(f"Erro ao enviar e-mail para {to_email}: {e}")
             return False
     
-    def send_password_reset_email(
+    async def send_password_reset_email(
         self,
         to_email: str,
         reset_token: str,
@@ -216,17 +220,17 @@ Este link expira em 24 horas.
 Se você não solicitou esta recuperação, pode ignorar este e-mail com segurança.
 
 Atenciosamente,
-Equipe SavePoint Finance
+Equadipe SavePoint Finance
         """
         
-        return self.send_email(
+        return await self.send_email(
             to_email=to_email,
             subject="Redefinir sua senha - SavePoint Finance",
             html_content=html_content,
             text_content=text_content
         )
     
-    def send_welcome_email(
+    async def send_welcome_email(
         self,
         to_email: str,
         user_name: str,
@@ -380,10 +384,10 @@ Agora você pode começar a controlar suas finanças de forma inteligente:
 Acesse: {settings.APP_URL}/login
 
 Atenciosamente,
-Equipe SavePoint Finance
+Equadipe SavePoint Finance
         """
         
-        return self.send_email(
+        return await self.send_email(
             to_email=to_email,
             subject=f"Bem-vindo ao SavePoint Finance, {user_name}!",
             html_content=html_content,

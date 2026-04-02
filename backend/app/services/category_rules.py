@@ -200,7 +200,7 @@ DEFAULT_KEYWORD_MAP = {
         r"(?i)\b(produto|domestico|doméstico|generic)\b",
     ],
     "burocracia": [
-        rg"(?i)\b(cartorio|registro|rg|cpf|cnh|passaporte)\b",
+        r"(?i)\b(cartorio|registro|rg|cpf|cnh|passaporte)\b",
         r"(?i)\b(taxa|tarifa|emolumento|cartão|licenciamento)\b",
         r"(?i)\b(imposto|irpf|icms|iss|pis|cofins)\b",
         r"(?i)\b(junta|juntas|commercial|cnpj|mei)\b",

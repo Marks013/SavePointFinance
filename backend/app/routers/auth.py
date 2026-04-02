@@ -28,15 +28,9 @@ class RegisterRequest(BaseModel):
     
     def model_post_init(self, __context):
         if self.password != self.confirm_password:
-            raise HTTPException(
-                status_code=400,
-                detail="As senhas não conferem. Por favor, digite a mesma senha nos dois campos.",
-            )
+            raise ValueError("As senhas não conferem. Por favor, digite a mesma senha nos dois campos.")
         if len(self.password) < 6:
-            raise HTTPException(
-                status_code=400,
-                detail="A senha deve ter pelo menos 6 caracteres.",
-            )
+            raise ValueError("A senha deve ter pelo menos 6 caracteres.")
 
 
 class LoginRequest(BaseModel):
