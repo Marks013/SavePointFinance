@@ -673,6 +673,24 @@ async def create_account(request: Request, db: AsyncSession = Depends(get_db), c
         return JSONResponse(content={"error": str(e)}, status_code=400)
 
 
+@router.post("/settings/accounts/{account_id}/delete")
+async def delete_account(account_id: uuid.UUID, request: Request, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_user)):
+    from app.routers.accounts_cards import delete_account as api_delete_account
+    from sqlalchemy import select
+    from app.models.account import Account
+    
+    result = await db.execute(select(Account).where(Account.id == account_id, Account.tenant_id == current_user.tenant_id))
+    account = result.scalar_one_or_none()
+    if not account:
+        return JSONResponse(content={"error": "Conta não encontrada"}, status_code=404)
+    
+    try:
+        await api_delete_account(account_id=account_id, db=db, current_user=current_user)
+        return JSONResponse(content={"success": True})
+    except Exception as e:
+        return JSONResponse(content={"error": str(e)}, status_code=400)
+
+
 @router.get("/settings/cards/new")
 async def new_card_modal(request: Request, current_user: User = Depends(require_user)):
     return templates.TemplateResponse("partials/_card_modal.html", {"request": request, "user": current_user, "card": None})
