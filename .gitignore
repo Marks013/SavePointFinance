@@ -1,0 +1,11 @@
+.env
+web/.env
+web/node_modules
+web/.next
+web/.npm-cache
+web/tsconfig.tsbuildinfo
+.agent/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*

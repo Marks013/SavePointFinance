@@ -1,240 +1,211 @@
-# Save Point Finanças
+# SavePoint
 
-Plataforma de controle financeiro pessoal com categorização automática por IA, período de teste e sistema de diagnóstico robusto.
+Aplicacao financeira fullstack em `Next.js 15`, `TypeScript 5`, `Prisma 7` e `PostgreSQL 17`, preparada para deploy com `Docker Compose` e proxy reverso como `Nginx Proxy Manager`.
 
-## Stack 2026
+O banco foi consolidado em uma migration baseline unica para ambientes novos.
 
-**100% Dockerizado (x86_64 / ARM64)**
+## Estrutura
 
-| Camada | Tecnologia |
-|--------|-----------|
-| **Frontend** | Vanilla HTML + JS + CSS (Nginx) + HTMX |
-| **Backend** | FastAPI + SQLAlchemy (async) |
-| **Banco de dados** | PostgreSQL 16 |
-| **Cache & Filas** | Redis 7 |
-| **Inteligência Artificial** | Claude 3.5 Haiku (Anthropic) |
-| **Backup Automático** | Backblaze B2 |
-
----
-
-## 🚀 Quick Start
-
-```bash
-# Clone e configure
-git clone <repo> savepoint
-cd savepoint
-cp .env.example .env
-
-# Configure o .env (veja seção abaixo)
-nano .env
-
-# Iniciar
-docker compose up -d --build
-```
-
-Acesse: `http://localhost` (ou seu domínio)
-
----
-
-## ⚙️ Configuração do .env
-
-```env
-# ── App ─────────────────────────────────────────────────────
-APP_NAME=Save Point Finanças
-APP_ENV=production
-SECRET_KEY=gerar_com_openssl_rand_hex_32
-ALLOWED_ORIGINS=["https://seudominio.com"]
-
-# ── Database ─────────────────────────────────────────────────
-POSTGRES_DB=savepoint
-POSTGRES_USER=savepoint
-POSTGRES_PASSWORD=senha_forte
-
-# ── Redis ───────────────────────────────────────────────────
-REDIS_PASSWORD=senha_forte
-REDIS_URL=redis://:senha_forte@redis:6379/0
-
-# ── Auth ─────────────────────────────────────────────────────
-JWT_SECRET_KEY=gerar_com_openssl_rand_hex_64
-JWT_ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=30
-REFRESH_TOKEN_EXPIRE_DAYS=7
-
-# ── AI (Opcional - sem key, só palavras-chave) ─────────────
-ANTHROPIC_API_KEY=sk-ant-...
-
-# ── E-mail (Opcional) ───────────────────────────────────────
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=seu-email@gmail.com
-SMTP_PASSWORD=senha_app_google
-SMTP_FROM_EMAIL=noreply@seudominio.com
-APP_URL=https://seudominio.com
-
-# ── Backup (Opcional) ────────────────────────────────────────
-B2_APPLICATION_KEY_ID=
-B2_APPLICATION_KEY=
-B2_BUCKET_NAME=savepoint-backups
-```
-
----
-
-## 📦 Planos
-
-| Plano | Acesso | Limites |
-|-------|--------|---------|
-| **Free** | 31 dias de teste | 3 contas, 10 categorias, 100 tx/mês |
-| **Pro** | Vitalício | Ilimitado |
-
-### Migrar para Production
-
-Execute a migration após o primeiro deploy:
-
-```bash
-# Via API (requires admin)
-curl -X POST "https://seudominio.com/api/v1/admin/migrate" \
-  -H "Authorization: Bearer TOKEN_ADMIN"
-```
-
----
-
-## 🤖 Sistema de Categorização Automática
-
-### 70% - Palavras-chave (Gratuito)
-- 150+ padrões brasileiros
-- Suporta: com/sem acentos, minúsculas/maiúsculas
-- Execução instantânea, sem custos
-
-### 30% - IA Claude Haiku (Pro)
-- Contexto brasileiro completo
-- Contextualiza: PIX, TED, termos locais
-- Fallback automático para "Outros"
-
-**Arquivo:** `backend/app/services/category_rules.py`
-
----
-
-## 🔍 Sistema de Diagnóstico Robusto
-
-Endpoints disponíveis (requer auth admin):
-
-| Endpoint | Descrição |
-|----------|-----------|
-| `/api/v1/admin/diagnostic/complete` | Diagnóstico TOTAL (Python, DB, Frontend, HTMX, etc) |
-| `/api/v1/admin/diagnostic` | Diagnóstico rápido do tenant |
-| `/api/v1/admin/diagnostic/quick` | Status público do servidor |
-| `/api/v1/admin/diagnostic/category/{name}` | Por categoria específica |
-
-### Categorias de Diagnóstico
-- **python**: Imports, configurações, routers
-- **database**: Conexão, tabelas, FKs, índices
-- **auth**: Usuário, tenant, roles
-- **routers**: Endpoints, páginas web
-- **frontend**: Arquivos HTML, CSS, JS, partials
-- **jinja2**: Templates, blocks, extensões
-- **htmx**: Partial requests, atributos
-- **modais**: Arquivos de modais
-- **system**: CPU, memória, disco
-
-```bash
-# Diagnóstico completo
-curl -H "Authorization: Bearer TOKEN" \
-  https://seudominio.com/api/v1/admin/diagnostic/complete
-
-# Resposta exemplo:
-{
-  "status": "ok",
-  "summary": {"total": 25, "ok": 23, "warning": 2, "error": 0},
-  "checks": [...]
-}
-```
-
----
-
-## 🛡️ Sistema de Roles
-
-| Role | Permissão |
-|------|-----------|
-| **Admin** | Gerenciar workspace, usuários, configurações |
-| **Member** | Adicionar transações, ver relatórios |
-
----
-
-## 📁 Estrutura
-
-```
-savepoint/
-├── backend/                    # FastAPI (Python 3.12)
-│   ├── app/
-│   │   ├── models/            # Modelos SQLAlchemy
-│   │   ├── routers/          # Endpoints API
-│   │   ├── services/          # AI, E-mail, Auditoria
-│   │   ├── middleware/       # Captura de erros
-│   │   └── migrations/        # Scripts de migration
-│   ├── Dockerfile
-│   └── requirements.txt
-├── frontend-html/             # UI Vanilla
-│   ├── css/                  # Estilos
-│   ├── js/                   # Scripts
-│   ├── partials/             # Componentes HTMX
-│   ├── Dockerfile
-│   └── nginx.conf
-├── backup/                   # Script B2
-├── migrations/               # SQL migrations
+```text
+SavePoint/
+├── web/
 ├── docker-compose.yml
-└── .env
+├── .env.example
+├── .env.server.example
+├── .env.local-docker.example
+├── DEPLOY_AND_BOOTSTRAP.md
+└── STACK_MIGRATION_PLAN.md
 ```
 
----
+## Ambientes
 
-## 🐳 Comandos Docker
+- raiz: arquivos de producao e deploy com Docker
+- `web/`: codigo da aplicacao e ambiente de desenvolvimento local
+
+## Deploy em producao
+
+Fluxo recomendado para Oracle Cloud com Nginx Proxy Manager:
+
+1. copie [`.env.server.example`](/C:/Users/samue/Desktop/SavePoint/SavePoint/.env.server.example) para `.env`
+2. ajuste dominio, segredos, senha do admin e `RESEND_API_KEY`
+3. execute:
 
 ```bash
-# Iniciar todos os serviços
-docker compose up -d
-
-# Ver logs
-docker compose logs -f backend
-
-# Reiniciar
-docker compose restart
-
-# Parar
-docker compose down
-
-# Rebuild
-docker compose up -d --build
+docker compose up -d postgres
+docker compose run --rm migrate
+docker compose run --rm bootstrap-admin
+docker compose up -d web
 ```
 
----
+App:
 
-## 📋 Serviços
+- `http://SEU_SERVIDOR:3000`
 
-| Serviço | Porta | Descrição |
-|---------|-------|-----------|
-| **Frontend** | 80 | Interface web |
-| **Backend** | 8000 | API FastAPI |
-| **PostgreSQL** | 5432 | Banco de dados |
-| **Redis** | 6379 | Cache/Session |
-| **Nginx Proxy** | 80/443 | Proxy reverso |
+No Nginx Proxy Manager:
 
----
+- Forward Host/IP: IP do servidor
+- Forward Port: `3000`
+- Scheme: `http`
+- Domain Names: seu dominio final, o mesmo de `NEXT_PUBLIC_APP_URL`
+- SSL: emitir certificado e ativar `Force SSL`
 
-## ✅ Funcionalidades
+## Atualizacoes futuras
 
-- [x] Controle de receitas e despesas
-- [x] Categorização automática (palavras-chave + IA)
-- [x] Metas de economia
-- [x] Assinaturas e parcelamentos
-- [x] Relatórios e gráficos
-- [x] Período de teste 31 dias (Free)
-- [x] Plano Pro vitalício
-- [x] Sistema de diagnóstico completo
-- [x] Recuperação de senha por e-mail
-- [x] Backup automático (Backblaze B2)
+Sem alteracao de banco:
 
----
+```bash
+docker compose up -d --build web
+```
 
-## 📄 Licença
+Com alteracao de schema:
 
-MIT License
+```bash
+docker compose up -d postgres
+docker compose run --rm migrate
+docker compose up -d --build web
+```
+
+## Conta administrativa
+
+O admin inicial vem das variaveis do `.env`:
+
+- `ADMIN_EMAIL`
+- `ADMIN_PASSWORD`
+- `ADMIN_NAME`
+- `ADMIN_TENANT_NAME`
+- `ADMIN_TENANT_SLUG`
+
+Para recriar ou atualizar o admin:
+
+```bash
+docker compose run --rm bootstrap-admin
+```
+
+## Licenciamento
+
+O sistema agora aplica licenca real por organizacao (`tenant`) com os estados:
+
+- `Gratuito`
+- `Premium`
+- `Avaliação Premium`
+- `Expirado`
+- `Inativo`
+
+Regras atuais:
+
+- `Gratuito`
+  - ate `1` usuario ativo
+  - ate `1` conta ativa por usuario
+  - ate `1` cartao ativo por usuario
+  - sem assistente no WhatsApp
+  - sem automacoes recorrentes
+  - sem exportacao PDF dos relatorios
+- `Premium`
+  - multiplos usuarios conforme `maxUsers`
+  - contas e cartoes sem o limite do plano gratuito
+  - WhatsApp habilitavel
+  - automacoes habilitadas
+  - exportacao PDF habilitada
+
+Bloqueios aplicados:
+
+- login bloqueado para organizacao inativa ou expirada
+- rotas protegidas redirecionam para `/license` quando a licenca estiver bloqueada
+- convite e ativacao de usuarios respeitam o limite do plano
+- criacao de contas e cartoes respeita o limite do plano
+- WhatsApp, automacoes e PDF respeitam o plano atual
+
+## Classificacao automatica de categorias
+
+O projeto ja possui classificacao automatica de categorias em dois niveis:
+
+- base brasileira por regras contextuais e palavras-chave
+- refinamento contextual opcional com Haiku, quando configurado por ambiente
+
+As categorias padrao do tenant sao provisionadas automaticamente no bootstrap inicial e podem ser restauradas sob demanda pela interface.
+
+## Assistente no WhatsApp
+
+O projeto agora suporta integracao direta com `WhatsApp Cloud API`, sem `n8n`, com estas regras:
+
+- o numero de WhatsApp fica vinculado ao usuario em `Configuracoes`
+- contas e cartoes sao filtrados por usuario
+- o assistente consegue:
+  - registrar despesa
+  - registrar receita
+  - consultar saldo
+  - consultar fatura e limite
+
+Webhook:
+
+- `GET/POST /api/integrations/whatsapp/webhook`
+
+Configure no `.env`:
+
+- `WHATSAPP_ASSISTANT_ENABLED=true`
+- `WHATSAPP_VERIFY_TOKEN`
+- `WHATSAPP_ACCESS_TOKEN`
+- `WHATSAPP_PHONE_NUMBER_ID`
+- `WHATSAPP_GRAPH_VERSION`
+- `WHATSAPP_APP_SECRET` opcional
+
+## E-mail transacional
+
+O sistema agora envia notificacoes e recuperacao de senha por um destes modos:
+
+- `EMAIL_PROVIDER=resend`
+- `EMAIL_PROVIDER=brevo`
+- `EMAIL_PROVIDER=webhook`
+
+Variaveis:
+
+- `EMAIL_PROVIDER`
+- `EMAIL_FROM`
+- `EMAIL_FROM_NAME`
+- `EMAIL_REPLY_TO`
+- `RESEND_API_KEY`
+- `BREVO_API_KEY`
+- `NOTIFICATION_EMAIL_WEBHOOK_URL`
+
+Recomendacao para producao:
+
+- Oracle Cloud com dominio proprio: `EMAIL_PROVIDER=resend`
+- se voce ja tiver uma automacao externa: `EMAIL_PROVIDER=webhook`
+
+Sem provedor configurado, o sistema registra a tentativa e marca como `skipped`.
+
+Guia completo:
+
+- [WHATSAPP_ASSISTANT.md](/C:/Users/samue/Desktop/SavePoint/SavePoint/WHATSAPP_ASSISTANT.md)
+
+## Desenvolvimento local
+
+### Docker local
+
+Para testar localmente com Docker sem mexer no arquivo de servidor:
+
+```bash
+cp .env.local-docker.example .env
+docker compose up -d postgres
+docker compose run --rm migrate
+docker compose run --rm bootstrap-admin
+docker compose up -d web
+```
+
+### Desenvolvimento fora do Docker
+
+Para rodar fora do Docker:
+
+```bash
+cd web
+npm install
+npm run dev
+```
+
+O ambiente local usa [web/.env.example](/C:/Users/samue/Desktop/SavePoint/SavePoint/web/.env.example) como base.
+
+## Documentacao adicional
+
+- deploy, bootstrap e operacao: [DEPLOY_AND_BOOTSTRAP.md](/C:/Users/samue/Desktop/SavePoint/SavePoint/DEPLOY_AND_BOOTSTRAP.md)
+- historico da migracao: [STACK_MIGRATION_PLAN.md](/C:/Users/samue/Desktop/SavePoint/SavePoint/STACK_MIGRATION_PLAN.md)
+- assistente virtual no WhatsApp: [WHATSAPP_ASSISTANT.md](/C:/Users/samue/Desktop/SavePoint/SavePoint/WHATSAPP_ASSISTANT.md)

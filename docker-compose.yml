@@ -1,120 +1,98 @@
-# Save Point Finanças — Docker Compose
-# Compatible with: ARM64 (Oracle Free) + x86_64 (Hetzner/Contabo/DO)
-
 services:
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: savepoint_web
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-savepoint}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-savepoint}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://savepoint.example.com}
+      AUTH_SECRET: ${AUTH_SECRET:-change-me}
+      AUTH_TRUST_HOST: ${AUTH_TRUST_HOST:-true}
+      AUTOMATION_CRON_SECRET: ${AUTOMATION_CRON_SECRET:-change-me}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@savepoint.local}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-change-me-admin}
+      ADMIN_NAME: ${ADMIN_NAME:-Administrador SavePoint}
+      ADMIN_TENANT_NAME: ${ADMIN_TENANT_NAME:-SavePoint}
+      ADMIN_TENANT_SLUG: ${ADMIN_TENANT_SLUG:-savepoint}
+      HAIKU_ENABLED: ${HAIKU_ENABLED:-false}
+      HAIKU_API_KEY: ${HAIKU_API_KEY:-}
+      HAIKU_MODEL: ${HAIKU_MODEL:-claude-3-5-haiku-latest}
+      HAIKU_BASE_URL: ${HAIKU_BASE_URL:-https://api.anthropic.com/v1/messages}
+      WHATSAPP_ASSISTANT_ENABLED: ${WHATSAPP_ASSISTANT_ENABLED:-false}
+      WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN:-}
+      WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-}
+      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
+      WHATSAPP_GRAPH_VERSION: ${WHATSAPP_GRAPH_VERSION:-v22.0}
+      WHATSAPP_APP_SECRET: ${WHATSAPP_APP_SECRET:-}
+      NOTIFICATION_EMAIL_WEBHOOK_URL: ${NOTIFICATION_EMAIL_WEBHOOK_URL:-}
+      NOTIFICATION_WHATSAPP_WEBHOOK_URL: ${NOTIFICATION_WHATSAPP_WEBHOOK_URL:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    networks:
+      - savepoint
+
+  migrate:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+      target: tools
+    profiles: ["ops"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-savepoint}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-savepoint}
+    command: ["npx", "prisma", "migrate", "deploy", "--schema", "prisma/schema.prisma"]
+    networks:
+      - savepoint
+
+  bootstrap-admin:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+      target: tools
+    profiles: ["ops"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-savepoint}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-savepoint}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@savepoint.local}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-change-me-admin}
+      ADMIN_NAME: ${ADMIN_NAME:-Administrador SavePoint}
+      ADMIN_TENANT_NAME: ${ADMIN_TENANT_NAME:-SavePoint}
+      ADMIN_TENANT_SLUG: ${ADMIN_TENANT_SLUG:-savepoint}
+    command: ["node", "scripts/bootstrap-admin.mjs"]
+    networks:
+      - savepoint
+
   postgres:
-    image: postgres:16-alpine
+    image: postgres:17-alpine
     container_name: savepoint_db
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-savepoint}
       POSTGRES_USER: ${POSTGRES_USER:-savepoint}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-savepoint}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-savepoint} -d ${POSTGRES_DB:-savepoint}"]
       interval: 10s
       timeout: 5s
       retries: 5
-    networks:
-      - internal
-
-  redis:
-    image: redis:7-alpine
-    container_name: savepoint_redis
-    restart: unless-stopped
-    command: redis-server --requirepass ${REDIS_PASSWORD:-changeme} --maxmemory 128mb --maxmemory-policy allkeys-lru
     volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-changeme}", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      - savepoint_postgres:/var/lib/postgresql/data
     networks:
-      - internal
-
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: savepoint_api
-    restart: unless-stopped
-    env_file: .env
-    environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-savepoint}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-savepoint}
-      REDIS_URL: redis://:${REDIS_PASSWORD:-changeme}@redis:6379/0
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - internal
-    expose:
-      - 8000
-    volumes:
-      - ./frontend-html:/app/frontend-html:ro
-
-  frontend:
-    build:
-      context: ./frontend-html
-      dockerfile: Dockerfile
-    container_name: savepoint_web
-    restart: unless-stopped
-    networks:
-      - internal
-    expose:
-      - 80
-
-  backup:
-    build:
-      context: ./backup
-      dockerfile: Dockerfile
-    container_name: savepoint_backup
-    restart: unless-stopped
-    env_file: .env
-    environment:
-      POSTGRES_HOST: postgres
-      POSTGRES_DB: ${POSTGRES_DB:-savepoint}
-      POSTGRES_USER: ${POSTGRES_USER:-savepoint}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
-      B2_APPLICATION_KEY_ID: ${B2_APPLICATION_KEY_ID:-}
-      B2_APPLICATION_KEY: ${B2_APPLICATION_KEY:-}
-      B2_BUCKET_NAME: ${B2_BUCKET_NAME:-savepoint-backups}
-      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - internal
-
-  # Nginx Proxy Manager — HTTPS automático com Let's Encrypt
-  proxy:
-    image: jc21/nginx-proxy-manager:latest
-    container_name: savepoint_proxy
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-      - "81:81"
-    volumes:
-      - ./proxy/data:/data
-      - ./proxy/letsencrypt:/etc/letsencrypt
-    environment:
-      - DB_SQLITE_FILE=/data/database.sqlite
-      - DISABLE_IPV6=false
-    depends_on:
-      - frontend
-      - backend
-    networks:
-      - internal
+      - savepoint
 
 networks:
-  internal:
+  savepoint:
     driver: bridge
 
 volumes:
-  postgres_data:
-  redis_data:
+  savepoint_postgres:

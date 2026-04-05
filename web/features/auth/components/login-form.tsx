@@ -1,0 +1,71 @@
+"use client";
+
+import { zodResolver } from "@hookform/resolvers/zod";
+import { signIn } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { useTransition } from "react";
+import { useForm } from "react-hook-form";
+import { toast } from "sonner";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { loginSchema, type LoginSchema } from "@/features/auth/schemas/login-schema";
+
+export function LoginForm() {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const {
+    register,
+    handleSubmit,
+    formState: { errors }
+  } = useForm<LoginSchema>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      email: "",
+      password: ""
+    }
+  });
+
+  const onSubmit = handleSubmit((values) => {
+    startTransition(async () => {
+      const result = await signIn("credentials", {
+        ...values,
+        redirect: false
+      });
+
+      if (result?.error) {
+        toast.error("Falha ao autenticar", {
+          description: "Verifique seu e-mail, senha e o status da conta."
+        });
+        return;
+      }
+
+      toast.success("Sessao iniciada");
+      router.push("/dashboard");
+      router.refresh();
+    });
+  });
+
+  return (
+    <form className="mt-8 space-y-5" onSubmit={onSubmit}>
+      <div className="space-y-2">
+        <Label htmlFor="email">E-mail</Label>
+        <Input id="email" placeholder="voce@empresa.com" type="email" {...register("email")} />
+        {errors.email ? <p className="text-sm text-[var(--color-destructive)]">{errors.email.message}</p> : null}
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="password">Senha</Label>
+        <Input id="password" placeholder="••••••••" type="password" {...register("password")} />
+        {errors.password ? (
+          <p className="text-sm text-[var(--color-destructive)]">{errors.password.message}</p>
+        ) : null}
+      </div>
+
+      <Button className="w-full" disabled={isPending} type="submit">
+        {isPending ? "Entrando..." : "Entrar no painel"}
+      </Button>
+    </form>
+  );
+}
