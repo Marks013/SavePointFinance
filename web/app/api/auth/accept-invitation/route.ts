@@ -1,5 +1,6 @@
 import { hash } from "bcryptjs";
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
 import { acceptInvitationSchema } from "@/features/password/schemas/password-schema";
 import { getTenantSeatSummary } from "@/lib/licensing/server";
@@ -72,7 +73,11 @@ export async function POST(request: Request) {
         email: user.email
       }
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ message: error.issues[0]?.message ?? "Dados inválidos" }, { status: 400 });
+    }
+
     return NextResponse.json({ message: "Failed to accept invitation" }, { status: 400 });
   }
 }

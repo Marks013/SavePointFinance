@@ -1371,7 +1371,14 @@ export function AdminClient() {
           <h2 className="text-2xl font-semibold tracking-[-0.03em]">Convidar usuário</h2>
           <form
             className="mt-6 space-y-4"
-            onSubmit={invitationForm.handleSubmit((values) => createInvitationMutation.mutate(values))}
+            onSubmit={invitationForm.handleSubmit(
+              (values) => createInvitationMutation.mutate(values),
+              (errors) => {
+                const firstError =
+                  errors.name?.message || errors.email?.message || errors.role?.message;
+                toast.error(firstError ?? "Revise os dados do convite");
+              }
+            )}
           >
             {isPlatformAdmin ? (
               <div className="space-y-2">
@@ -1401,10 +1408,20 @@ export function AdminClient() {
             <div className="space-y-2">
               <Label htmlFor="invite-user-name">Nome</Label>
               <Input id="invite-user-name" {...invitationForm.register("name")} />
+              {invitationForm.formState.errors.name ? (
+                <p className="text-sm text-[var(--color-destructive)]">
+                  {invitationForm.formState.errors.name.message}
+                </p>
+              ) : null}
             </div>
             <div className="space-y-2">
               <Label htmlFor="invite-user-email">E-mail</Label>
               <Input id="invite-user-email" type="email" {...invitationForm.register("email")} />
+              {invitationForm.formState.errors.email ? (
+                <p className="text-sm text-[var(--color-destructive)]">
+                  {invitationForm.formState.errors.email.message}
+                </p>
+              ) : null}
             </div>
             <div className="space-y-2">
               <Label htmlFor="invite-user-role">Perfil</Label>
@@ -1412,6 +1429,11 @@ export function AdminClient() {
                 <option value="member">Membro</option>
                 <option value="admin">Administrador</option>
               </Select>
+              {invitationForm.formState.errors.role ? (
+                <p className="text-sm text-[var(--color-destructive)]">
+                  {invitationForm.formState.errors.role.message}
+                </p>
+              ) : null}
             </div>
             <Button className="w-full" disabled={createInvitationMutation.isPending} type="submit">
               {createInvitationMutation.isPending ? "Criando convite..." : "Gerar convite"}

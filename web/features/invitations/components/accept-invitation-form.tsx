@@ -92,23 +92,29 @@ export function AcceptInvitationForm({ initialToken = "" }: AcceptInvitationForm
   return (
     <form
       className="space-y-5"
-      onSubmit={form.handleSubmit(async (values) => {
-        const response = await fetch("/api/auth/accept-invitation", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(values)
-        });
+      onSubmit={form.handleSubmit(
+        async (values) => {
+          const response = await fetch("/api/auth/accept-invitation", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(values)
+          });
 
-        if (!response.ok) {
-          const payload = (await response.json()) as { message?: string };
-          toast.error(payload.message ?? "Falha ao aceitar convite");
-          return;
+          if (!response.ok) {
+            const payload = (await response.json()) as { message?: string };
+            toast.error(payload.message ?? "Falha ao aceitar convite");
+            return;
+          }
+
+          toast.success("Convite aceito");
+          router.push("/login");
+          router.refresh();
+        },
+        (errors) => {
+          const firstError = errors.confirmPassword?.message || errors.password?.message || errors.name?.message;
+          toast.error(firstError ?? "Revise os dados do convite antes de continuar");
         }
-
-        toast.success("Convite aceito");
-        router.push("/login");
-        router.refresh();
-      })}
+      )}
     >
       <input type="hidden" {...form.register("token")} />
 
@@ -129,16 +135,27 @@ export function AcceptInvitationForm({ initialToken = "" }: AcceptInvitationForm
       <div className="space-y-2">
         <Label htmlFor="invite-name">Nome</Label>
         <Input disabled={isLoading} id="invite-name" {...form.register("name")} />
+        {form.formState.errors.name ? (
+          <p className="text-sm text-[var(--color-destructive)]">{form.formState.errors.name.message}</p>
+        ) : null}
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="invite-password">Senha</Label>
         <Input disabled={isLoading} id="invite-password" type="password" {...form.register("password")} />
+        {form.formState.errors.password ? (
+          <p className="text-sm text-[var(--color-destructive)]">{form.formState.errors.password.message}</p>
+        ) : null}
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="invite-confirm-password">Confirmar senha</Label>
         <Input disabled={isLoading} id="invite-confirm-password" type="password" {...form.register("confirmPassword")} />
+        {form.formState.errors.confirmPassword ? (
+          <p className="text-sm text-[var(--color-destructive)]">
+            {form.formState.errors.confirmPassword.message}
+          </p>
+        ) : null}
       </div>
 
       <Button className="w-full" disabled={isLoading || !normalizedToken} type="submit">

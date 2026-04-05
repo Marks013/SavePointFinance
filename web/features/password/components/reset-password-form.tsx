@@ -26,33 +26,51 @@ export function ResetPasswordForm({ initialToken = "" }: ResetPasswordFormProps)
   return (
     <form
       className="space-y-5"
-      onSubmit={form.handleSubmit(async (values) => {
-        const response = await fetch("/api/auth/reset-password", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(values)
-        });
+      onSubmit={form.handleSubmit(
+        async (values) => {
+          const response = await fetch("/api/auth/reset-password", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(values)
+          });
 
-        if (!response.ok) {
-          const payload = (await response.json()) as { message?: string };
-          toast.error(payload.message ?? "Falha ao redefinir senha");
-          return;
+          if (!response.ok) {
+            const payload = (await response.json()) as { message?: string };
+            toast.error(payload.message ?? "Falha ao redefinir senha");
+            return;
+          }
+
+          toast.success("Senha redefinida");
+        },
+        (errors) => {
+          const firstError =
+            errors.confirmPassword?.message || errors.newPassword?.message || errors.token?.message;
+          toast.error(firstError ?? "Revise os dados antes de continuar");
         }
-
-        toast.success("Senha redefinida");
-      })}
+      )}
     >
       <div className="space-y-2">
         <Label htmlFor="reset-token">Token</Label>
         <Input id="reset-token" placeholder="Cole o token de recuperacao" {...form.register("token")} />
+        {form.formState.errors.token ? (
+          <p className="text-sm text-[var(--color-destructive)]">{form.formState.errors.token.message}</p>
+        ) : null}
       </div>
       <div className="space-y-2">
         <Label htmlFor="reset-new">Nova senha</Label>
         <Input id="reset-new" type="password" {...form.register("newPassword")} />
+        {form.formState.errors.newPassword ? (
+          <p className="text-sm text-[var(--color-destructive)]">{form.formState.errors.newPassword.message}</p>
+        ) : null}
       </div>
       <div className="space-y-2">
         <Label htmlFor="reset-confirm">Confirmar senha</Label>
         <Input id="reset-confirm" type="password" {...form.register("confirmPassword")} />
+        {form.formState.errors.confirmPassword ? (
+          <p className="text-sm text-[var(--color-destructive)]">
+            {form.formState.errors.confirmPassword.message}
+          </p>
+        ) : null}
       </div>
       <Button className="w-full" type="submit">Redefinir senha</Button>
     </form>

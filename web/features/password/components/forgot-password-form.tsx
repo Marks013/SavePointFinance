@@ -20,27 +20,35 @@ export function ForgotPasswordForm() {
   return (
     <form
       className="space-y-5"
-      onSubmit={form.handleSubmit(async (values) => {
-        const response = await fetch("/api/auth/forgot-password", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(values)
-        });
+      onSubmit={form.handleSubmit(
+        async (values) => {
+          const response = await fetch("/api/auth/forgot-password", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(values)
+          });
 
-        if (!response.ok) {
-          toast.error("Nao foi possivel iniciar a recuperacao");
-          return;
+          if (!response.ok) {
+            toast.error("Nao foi possivel iniciar a recuperacao");
+            return;
+          }
+
+          await response.json();
+          toast.success("Solicitação registrada", {
+            description: "Se o e-mail existir, enviaremos o link de redefinição."
+          });
+        },
+        (errors) => {
+          toast.error(errors.email?.message ?? "Revise o e-mail informado");
         }
-
-        await response.json();
-        toast.success("Solicitação registrada", {
-          description: "Se o e-mail existir, enviaremos o link de redefinição."
-        });
-      })}
+      )}
     >
       <div className="space-y-2">
         <Label htmlFor="forgot-email">E-mail</Label>
         <Input id="forgot-email" placeholder="voce@empresa.com" type="email" {...form.register("email")} />
+        {form.formState.errors.email ? (
+          <p className="text-sm text-[var(--color-destructive)]">{form.formState.errors.email.message}</p>
+        ) : null}
       </div>
       <Button className="w-full" type="submit">Enviar link de redefinição</Button>
     </form>
