@@ -15,6 +15,7 @@ type WhatsAppUser = {
   email: string;
   name: string;
   whatsappNumber: string | null;
+  isPlatformAdmin: boolean;
   isActive: boolean;
   tenant: {
     maxUsers: number | null;
@@ -190,6 +191,7 @@ async function findUserByPhoneNumber(phoneNumber: string) {
       email: true,
       name: true,
       whatsappNumber: true,
+      isPlatformAdmin: true,
       isActive: true,
       tenant: {
         select: {
@@ -598,7 +600,7 @@ export async function processIncomingWhatsAppTextMessage(message: IncomingTextMe
 
   const license = resolveTenantLicenseState(user.tenant);
 
-  if (!license.canAccessApp) {
+  if (!user.isPlatformAdmin && !license.canAccessApp) {
     return {
       handled: true,
       to: formattedPhone,
@@ -606,7 +608,7 @@ export async function processIncomingWhatsAppTextMessage(message: IncomingTextMe
     };
   }
 
-  if (!license.features.whatsappAssistant) {
+  if (!user.isPlatformAdmin && !license.features.whatsappAssistant) {
     return {
       handled: true,
       to: formattedPhone,

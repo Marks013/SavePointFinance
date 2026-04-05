@@ -64,26 +64,21 @@ export const DEFAULT_PLAN_DEFINITIONS: PlanDefinition[] = [
 
 export async function ensureDefaultPlans(prisma: PlanClient) {
   for (const definition of DEFAULT_PLAN_DEFINITIONS) {
-    await prisma.plan.upsert({
+    const existing = await prisma.plan.findUnique({
       where: {
         slug: definition.slug
       },
-      update: {
-        name: definition.name,
-        tier: definition.tier,
-        description: definition.description,
-        maxUsers: definition.maxUsers,
-        maxAccounts: definition.maxAccounts,
-        maxCards: definition.maxCards,
-        whatsappAssistant: definition.whatsappAssistant,
-        automation: definition.automation,
-        pdfExport: definition.pdfExport,
-        trialDays: definition.trialDays,
-        isDefault: true,
-        isActive: true,
-        sortOrder: definition.sortOrder
-      },
-      create: {
+      select: {
+        id: true
+      }
+    });
+
+    if (existing) {
+      continue;
+    }
+
+    await prisma.plan.create({
+      data: {
         slug: definition.slug,
         name: definition.name,
         tier: definition.tier,

@@ -500,6 +500,51 @@ export function AdminClient() {
         throw new Error(payload.message ?? "Falha ao atualizar plano");
       }
     },
+    onMutate: async ({ id, data }) => {
+      await Promise.all([
+        queryClient.cancelQueries({ queryKey: ["admin-plans"] }),
+        queryClient.cancelQueries({ queryKey: ["admin-tenants"] })
+      ]);
+
+      const previousPlans = queryClient.getQueryData<{ items: PlanItem[] }>(["admin-plans"]);
+
+      queryClient.setQueryData<{ items: PlanItem[] }>(["admin-plans"], (current) => {
+        if (!current) {
+          return current;
+        }
+
+        return {
+          ...current,
+          items: current.items.map((plan) =>
+            plan.id === id
+              ? {
+                  ...plan,
+                  ...(data.name !== undefined ? { name: String(data.name) } : {}),
+                  ...(data.description !== undefined
+                    ? { description: data.description === null ? null : String(data.description) }
+                    : {}),
+                  ...(data.tier !== undefined ? { tier: data.tier as "free" | "pro" } : {}),
+                  ...(data.maxUsers !== undefined ? { maxUsers: data.maxUsers as number | null } : {}),
+                  ...(data.maxAccounts !== undefined ? { maxAccounts: data.maxAccounts as number | null } : {}),
+                  ...(data.maxCards !== undefined ? { maxCards: data.maxCards as number | null } : {}),
+                  ...(data.trialDays !== undefined ? { trialDays: Number(data.trialDays) } : {}),
+                  ...(data.isActive !== undefined ? { isActive: Boolean(data.isActive) } : {}),
+                  features: {
+                    ...plan.features,
+                    ...(data.whatsappAssistant !== undefined
+                      ? { whatsappAssistant: Boolean(data.whatsappAssistant) }
+                      : {}),
+                    ...(data.automation !== undefined ? { automation: Boolean(data.automation) } : {}),
+                    ...(data.pdfExport !== undefined ? { pdfExport: Boolean(data.pdfExport) } : {})
+                  }
+                }
+              : plan
+          )
+        };
+      });
+
+      return { previousPlans };
+    },
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["admin-plans"] }),
@@ -509,7 +554,11 @@ export function AdminClient() {
       ]);
       toast.success("Plano atualizado");
     },
-    onError: (error) => {
+    onError: (error, _variables, context) => {
+      if (context?.previousPlans) {
+        queryClient.setQueryData(["admin-plans"], context.previousPlans);
+      }
+
       toast.error(error.message);
     }
   });
