@@ -20,7 +20,6 @@ CREATE TYPE "TransactionSource" AS ENUM ('manual', 'whatsapp', 'import_csv', 'im
 CREATE TYPE "PaymentMethod" AS ENUM ('pix', 'money', 'credit_card', 'debit_card', 'transfer');
 
 -- CreateEnum
--- CreateEnum
 CREATE TYPE "GoalMilestoneMode" AS ENUM ('disabled', 'enabled');
 
 -- CreateEnum
@@ -34,6 +33,24 @@ CREATE TYPE "NotificationStatus" AS ENUM ('pending', 'sent', 'failed', 'skipped'
 
 -- CreateEnum
 CREATE TYPE "WhatsAppMessageDirection" AS ENUM ('inbound', 'outbound');
+
+-- CreateTable
+CREATE TABLE "Tenant" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "slug" TEXT NOT NULL,
+    "planId" TEXT NOT NULL,
+    "maxUsers" INTEGER,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "trialStart" TIMESTAMP(3),
+    "trialDays" INTEGER NOT NULL DEFAULT 31,
+    "trialExpiresAt" TIMESTAMP(3),
+    "expiresAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Tenant_pkey" PRIMARY KEY ("id")
+);
 
 -- CreateTable
 CREATE TABLE "Plan" (
@@ -56,24 +73,6 @@ CREATE TABLE "Plan" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "Plan_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "Tenant" (
-    "id" TEXT NOT NULL,
-    "name" TEXT NOT NULL,
-    "slug" TEXT NOT NULL,
-    "planId" TEXT NOT NULL,
-    "maxUsers" INTEGER,
-    "isActive" BOOLEAN NOT NULL DEFAULT true,
-    "trialStart" TIMESTAMP(3),
-    "trialDays" INTEGER NOT NULL DEFAULT 31,
-    "trialExpiresAt" TIMESTAMP(3),
-    "expiresAt" TIMESTAMP(3),
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "Tenant_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -239,6 +238,7 @@ CREATE TABLE "Subscription" (
     "amount" DECIMAL(15,2) NOT NULL,
     "billingDay" INTEGER NOT NULL DEFAULT 1,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "autoTithe" BOOLEAN NOT NULL DEFAULT false,
     "nextBillingDate" TIMESTAMP(3) NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -369,16 +369,16 @@ CREATE TABLE "AdminAuditLog" (
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Plan_slug_key" ON "Plan"("slug");
-
--- CreateIndex
-CREATE INDEX "Plan_tier_isActive_idx" ON "Plan"("tier", "isActive");
-
--- CreateIndex
 CREATE UNIQUE INDEX "Tenant_slug_key" ON "Tenant"("slug");
 
 -- CreateIndex
 CREATE INDEX "Tenant_planId_idx" ON "Tenant"("planId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Plan_slug_key" ON "Plan"("slug");
+
+-- CreateIndex
+CREATE INDEX "Plan_tier_isActive_idx" ON "Plan"("tier", "isActive");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "User_email_key" ON "User"("email");

@@ -11,6 +11,7 @@ import { Select } from "@/components/ui/select";
 import { formatCurrency } from "@/lib/utils";
 
 type ReportResponse = {
+  isPlatformAdmin: boolean;
   license: {
     plan: "free" | "pro";
     planLabel: string;
@@ -236,6 +237,12 @@ export function ReportsClient() {
             <p className="text-sm leading-7 text-[var(--color-muted-foreground)]">
               Cruze contas, cartões, categorias e competência mensal a partir da mesma base de lançamentos usada no painel.
             </p>
+            {data?.isPlatformAdmin ? (
+              <p className="attention-copy mt-3 text-sm">
+                Superadmin ignora restrições de plano neste ambiente. Para validar o bloqueio de PDF, use uma conta
+                comum vinculada à organização.
+              </p>
+            ) : null}
           </div>
           {data?.license.features.pdfExport ? (
             <Button asChild>

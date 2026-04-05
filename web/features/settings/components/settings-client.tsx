@@ -14,6 +14,7 @@ type ProfilePayload = {
   id: string;
   name: string;
   email: string;
+  isPlatformAdmin: boolean;
   whatsappNumber: string;
   license: {
     plan: "free" | "pro";
@@ -264,6 +265,12 @@ export function SettingsClient() {
             Esta área centraliza preferências pessoais, lembretes recorrentes e os sinais operacionais do seu dia a dia.
           </p>
         </div>
+        {profileQuery.data?.isPlatformAdmin ? (
+          <div className="warning-panel mt-6 text-sm">
+            Esta conta é o superadmin da plataforma. Recursos Premium e limites do plano ficam liberados aqui para
+            suporte e auditoria, mesmo que a organização esteja em um plano restritivo.
+          </div>
+        ) : null}
       </section>
 
       <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">

@@ -18,6 +18,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       ...report,
+      isPlatformAdmin: user.isPlatformAdmin,
       license: {
         plan: user.license.plan,
         planLabel: user.license.planLabel,
