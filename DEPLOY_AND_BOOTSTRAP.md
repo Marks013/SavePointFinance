@@ -40,6 +40,7 @@ Arquivo: [`.env`](/C:/Users/samue/Desktop/SavePoint/SavePoint/.env)
 - `AUTH_SECRET`
 - `AUTOMATION_CRON_SECRET`
 - `NEXT_PUBLIC_APP_URL`
+- `AUTH_URL`
 - `ADMIN_EMAIL`
 - `ADMIN_PASSWORD`
 - `ADMIN_NAME`

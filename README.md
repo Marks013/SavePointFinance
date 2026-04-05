@@ -27,7 +27,7 @@ SavePoint/
 Fluxo recomendado para Oracle Cloud com Nginx Proxy Manager:
 
 1. copie [`.env.server.example`](/C:/Users/samue/Desktop/SavePoint/SavePoint/.env.server.example) para `.env`
-2. ajuste dominio, segredos, senha do admin e `RESEND_API_KEY`
+2. ajuste `NEXT_PUBLIC_APP_URL`, `AUTH_URL`, segredos, senha do admin e `RESEND_API_KEY`
 3. execute:
 
 ```bash
