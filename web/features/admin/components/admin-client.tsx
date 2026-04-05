@@ -43,7 +43,15 @@ type UserItem = {
   role: "admin" | "member";
   isPlatformAdmin?: boolean;
   isActive: boolean;
-  tenant: { id: string; name: string };
+  tenant: {
+    id: string;
+    name: string;
+    slug: string;
+    plan: string;
+    isActive: boolean;
+    trialExpiresAt: string | null;
+    expiresAt: string | null;
+  };
   createdAt: string;
   lastLogin: string | null;
 };
@@ -97,6 +105,45 @@ type CurrentProfile = {
   isPlatformAdmin: boolean;
 };
 
+type PlanPreset = {
+  id: string;
+  title: string;
+  badge: string;
+  description: string;
+  plan: "free" | "pro";
+  maxUsers: number;
+  trialDays?: number;
+  expiresAt?: null;
+};
+
+const PLAN_PRESETS: PlanPreset[] = [
+  {
+    id: "free-essential",
+    title: "Gratuito Essencial",
+    badge: "Padrão",
+    description: "Plano base para operação enxuta, com limites reduzidos e recursos premium desativados.",
+    plan: "free",
+    maxUsers: 1
+  },
+  {
+    id: "premium-team",
+    title: "Premium Completo",
+    badge: "Recomendado",
+    description: "Plano completo com usuários extras, relatórios PDF, automações e assistente no WhatsApp.",
+    plan: "pro",
+    maxUsers: 10
+  },
+  {
+    id: "premium-trial-14",
+    title: "Avaliação Premium 14 dias",
+    badge: "Teste",
+    description: "Ativa o Premium por 14 dias para onboarding, validação comercial e implantação inicial.",
+    plan: "pro",
+    maxUsers: 10,
+    trialDays: 14
+  }
+];
+
 function formatRoleLabel(role: "admin" | "member") {
   return role === "admin" ? "Administrador" : "Membro";
 }
@@ -115,6 +162,18 @@ function formatLifecycleLabel(tenant: TenantItem) {
   }
 
   return tenant.isActive ? "Sem vencimento configurado" : "Organização inativa";
+}
+
+function formatUserTenantPlanLabel(user: UserItem) {
+  if (user.tenant.expiresAt) {
+    return `${formatPlanLabel(user.tenant.plan)} • Expirado`;
+  }
+
+  if (user.tenant.plan === "pro" && user.tenant.trialExpiresAt) {
+    return `${formatPlanLabel(user.tenant.plan)} • Em avaliação`;
+  }
+
+  return `${formatPlanLabel(user.tenant.plan)} • ${user.tenant.isActive ? "Ativo" : "Inativo"}`;
 }
 
 function toAbsoluteInviteUrl(inviteUrl: string) {
@@ -185,6 +244,9 @@ async function getCurrentProfile() {
 
 export function AdminClient() {
   const queryClient = useQueryClient();
+  const [newTenantName, setNewTenantName] = useState("");
+  const [newTenantSlug, setNewTenantSlug] = useState("");
+  const [newTenantPlan, setNewTenantPlan] = useState<"free" | "pro">("free");
   const [tenantSearch, setTenantSearch] = useState("");
   const [tenantPlanFilter, setTenantPlanFilter] = useState("");
   const [tenantStatusFilter, setTenantStatusFilter] = useState("");
@@ -266,6 +328,18 @@ export function AdminClient() {
   const invitations = invitationsQuery.data?.items ?? [];
   const auditItems = auditQuery.data?.items ?? [];
   const isPlatformAdmin = Boolean(profileQuery.data?.isPlatformAdmin);
+
+  function applyPlanPreset(tenantId: string, preset: PlanPreset) {
+    updateTenantMutation.mutate({
+      id: tenantId,
+      plan: preset.plan,
+      maxUsers: preset.maxUsers,
+      trialDays: preset.trialDays ?? 0,
+      trialExpiresAt: null,
+      expiresAt: preset.expiresAt ?? null,
+      isActive: true
+    });
+  }
 
   const resetPasswordMutation = useMutation({
     mutationFn: async ({ id, newPassword }: { id: string; newPassword: string }) => {
@@ -349,6 +423,40 @@ export function AdminClient() {
     }
   });
 
+  const createTenantMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch("/api/admin/tenants", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newTenantName,
+          slug: newTenantSlug,
+          plan: newTenantPlan,
+          maxUsers: newTenantPlan === "pro" ? 10 : 1,
+          trialDays: 0
+        })
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json()) as { message?: string };
+        throw new Error(payload.message ?? "Falha ao criar organização");
+      }
+    },
+    onSuccess: async () => {
+      setNewTenantName("");
+      setNewTenantSlug("");
+      setNewTenantPlan("free");
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin-tenants"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-stats"] })
+      ]);
+      toast.success("Organização criada");
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    }
+  });
+
   const createInvitationMutation = useMutation({
     mutationFn: async (values: InvitationValues) => {
       const payload = isPlatformAdmin
@@ -410,11 +518,51 @@ export function AdminClient() {
         <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--color-muted-foreground)]">
           Gerencie organizações, usuários, convites e limites operacionais do ambiente.
         </p>
+        <div className="info-banner mt-5">
+          <strong>Planos são aplicados por organização.</strong> Usuários convidados herdam o plano, os limites e os recursos premium do tenant ao qual pertencem.
+        </div>
         {isPlatformAdmin ? (
           <div className="info-banner mt-5">
             <strong>Superadmin ativo.</strong> A conta principal possui acesso global, recursos Premium e bypass de licença.
           </div>
         ) : null}
+      </section>
+
+      <section className="surface content-section">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-semibold tracking-[-0.03em]">Planos padrão</h2>
+            <p className="mt-2 max-w-3xl text-sm leading-7 text-[var(--color-muted-foreground)]">
+              Estes presets aceleram a gestão comercial. Basta aplicar o plano desejado na organização, e todos os usuários dela passam a obedecer a essa licença.
+            </p>
+          </div>
+        </div>
+        <div className="mt-6 grid gap-4 lg:grid-cols-3">
+          {PLAN_PRESETS.map((preset) => (
+            <article key={preset.id} className="data-card p-5">
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-lg font-semibold">{preset.title}</h3>
+                <span className="rounded-full bg-[color-mix(in_srgb,var(--color-primary)_12%,transparent)] px-3 py-1 text-xs font-semibold text-[var(--color-primary)]">
+                  {preset.badge}
+                </span>
+              </div>
+              <p className="mt-3 text-sm leading-7 text-[var(--color-muted-foreground)]">{preset.description}</p>
+              <div className="mt-4 flex flex-wrap gap-2 text-xs text-[var(--color-muted-foreground)]">
+                <span className="rounded-full border border-[var(--color-border)] px-3 py-1">
+                  Plano {formatPlanLabel(preset.plan)}
+                </span>
+                <span className="rounded-full border border-[var(--color-border)] px-3 py-1">
+                  {preset.maxUsers} usuário{preset.maxUsers > 1 ? "s" : ""}
+                </span>
+                {preset.trialDays ? (
+                  <span className="rounded-full border border-[var(--color-border)] px-3 py-1">
+                    {preset.trialDays} dias de avaliação
+                  </span>
+                ) : null}
+              </div>
+            </article>
+          ))}
+        </div>
       </section>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
@@ -441,6 +589,46 @@ export function AdminClient() {
               <p className="metric-value">{tenants.length}</p>
             </article>
           </div>
+          {isPlatformAdmin ? (
+            <div className="mt-6 rounded-[1.6rem] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-card)_88%,var(--color-muted))] p-4">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <h3 className="text-lg font-semibold">Nova organização</h3>
+                  <p className="mt-1 text-sm leading-7 text-[var(--color-muted-foreground)]">
+                    Crie uma nova organização já com plano inicial, slug limpo e categorias padrão prontas para uso.
+                  </p>
+                </div>
+              </div>
+              <div className="mt-4 grid gap-3 md:grid-cols-3">
+                <Input
+                  onChange={(event) => setNewTenantName(event.target.value)}
+                  placeholder="Nome da organização"
+                  value={newTenantName}
+                />
+                <Input
+                  onChange={(event) => setNewTenantSlug(event.target.value)}
+                  placeholder="Slug da organização"
+                  value={newTenantSlug}
+                />
+                <Select onChange={(event) => setNewTenantPlan(event.target.value as "free" | "pro")} value={newTenantPlan}>
+                  <option value="free">Plano Gratuito</option>
+                  <option value="pro">Plano Premium</option>
+                </Select>
+              </div>
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                <p className="text-xs text-[var(--color-muted-foreground)]">
+                  O plano é da organização. Depois, basta convidar usuários para esse tenant.
+                </p>
+                <Button
+                  disabled={createTenantMutation.isPending || !newTenantName.trim()}
+                  onClick={() => createTenantMutation.mutate()}
+                  type="button"
+                >
+                  {createTenantMutation.isPending ? "Criando organização..." : "Criar organização"}
+                </Button>
+              </div>
+            </div>
+          ) : null}
           <div className="mt-6 space-y-3">
             <div className="grid gap-3 md:grid-cols-3">
               <Input
@@ -466,12 +654,17 @@ export function AdminClient() {
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="min-w-0">
                     <p className="font-semibold">{tenant.name}</p>
-                    <p className="break-words text-sm text-[var(--color-muted-foreground)]">{formatPlanLabel(tenant.plan)} • {tenant.slug}</p>
+                    <p className="break-words text-sm text-[var(--color-muted-foreground)]">
+                      Organização {tenant.slug} • Plano {formatPlanLabel(tenant.plan)}
+                    </p>
                     <p className="text-xs text-[var(--color-muted-foreground)]">
                       {formatLifecycleLabel(tenant)}
                     </p>
                   </div>
-                  <p className="text-sm font-semibold">{tenant.activeUsers}/{tenant.maxUsers}</p>
+                  <div className="text-right">
+                    <p className="text-sm font-semibold">{tenant.activeUsers}/{tenant.maxUsers}</p>
+                    <p className="text-xs text-[var(--color-muted-foreground)]">usuários ativos / limite</p>
+                  </div>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Button
@@ -485,6 +678,27 @@ export function AdminClient() {
                     variant="secondary"
                   >
                     Mudar para {tenant.plan === "free" ? "Premium" : "Gratuito"}
+                  </Button>
+                  <Button
+                    onClick={() => applyPlanPreset(tenant.id, PLAN_PRESETS[0])}
+                    type="button"
+                    variant="ghost"
+                  >
+                    Aplicar Gratuito
+                  </Button>
+                  <Button
+                    onClick={() => applyPlanPreset(tenant.id, PLAN_PRESETS[1])}
+                    type="button"
+                    variant="ghost"
+                  >
+                    Aplicar Premium
+                  </Button>
+                  <Button
+                    onClick={() => applyPlanPreset(tenant.id, PLAN_PRESETS[2])}
+                    type="button"
+                    variant="ghost"
+                  >
+                    Aplicar avaliação 14 dias
                   </Button>
                   <Button
                     onClick={() => {
@@ -638,6 +852,9 @@ export function AdminClient() {
                     <p className="break-words text-sm text-[var(--color-muted-foreground)]">
                       {user.email} • {user.tenant.name}
                       {user.isPlatformAdmin ? " • Superadmin" : ""}
+                    </p>
+                    <p className="text-xs text-[var(--color-muted-foreground)]">
+                      Organização {user.tenant.slug} • {formatUserTenantPlanLabel(user)}
                     </p>
                     <p className="text-xs text-[var(--color-muted-foreground)]">
                       Último login: {user.lastLogin ? new Date(user.lastLogin).toLocaleString("pt-BR") : "Nunca acessou"}

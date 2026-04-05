@@ -54,7 +54,12 @@ export async function GET(request: Request) {
           tenant: {
             select: {
               id: true,
-              name: true
+              name: true,
+              slug: true,
+              plan: true,
+              isActive: true,
+              trialExpiresAt: true,
+              expiresAt: true
             }
           }
         },

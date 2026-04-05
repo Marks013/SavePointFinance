@@ -1,5 +1,14 @@
-import { AdminClient } from "@/features/admin/components/admin-client";
+import { redirect } from "next/navigation";
 
-export default function AdminPage() {
+import { AdminClient } from "@/features/admin/components/admin-client";
+import { requireAdminUser } from "@/lib/auth/admin";
+
+export default async function AdminPage() {
+  try {
+    await requireAdminUser();
+  } catch {
+    redirect("/dashboard");
+  }
+
   return <AdminClient />;
 }
