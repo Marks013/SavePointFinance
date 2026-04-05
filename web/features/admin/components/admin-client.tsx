@@ -244,6 +244,7 @@ async function getCurrentProfile() {
 
 export function AdminClient() {
   const queryClient = useQueryClient();
+  const [userTenantDrafts, setUserTenantDrafts] = useState<Record<string, string>>({});
   const [newTenantName, setNewTenantName] = useState("");
   const [newTenantSlug, setNewTenantSlug] = useState("");
   const [newTenantPlan, setNewTenantPlan] = useState<"free" | "pro">("free");
@@ -329,6 +330,10 @@ export function AdminClient() {
   const auditItems = auditQuery.data?.items ?? [];
   const isPlatformAdmin = Boolean(profileQuery.data?.isPlatformAdmin);
 
+  function getTenantLabel(tenant: TenantItem) {
+    return `${tenant.name} • ${formatPlanLabel(tenant.plan)}`;
+  }
+
   function applyPlanPreset(tenantId: string, preset: PlanPreset) {
     updateTenantMutation.mutate({
       id: tenantId,
@@ -385,6 +390,32 @@ export function AdminClient() {
       await queryClient.invalidateQueries({ queryKey: ["admin-users"] });
       await queryClient.invalidateQueries({ queryKey: ["admin-audit"] });
       toast.success("Perfil do usuário atualizado");
+    }
+  });
+
+  const moveUserTenantMutation = useMutation({
+    mutationFn: async ({ id, tenantId }: { id: string; tenantId: string }) => {
+      const response = await fetch(`/api/admin/users/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tenantId })
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json()) as { message?: string };
+        throw new Error(payload.message ?? "Falha ao alterar organização do usuário");
+      }
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin-users"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-stats"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-audit"] })
+      ]);
+      toast.success("Organização do usuário atualizada");
+    },
+    onError: (error) => {
+      toast.error(error.message);
     }
   });
 
@@ -891,6 +922,38 @@ export function AdminClient() {
                     </Button>
                   </div>
                 </div>
+                {isPlatformAdmin && !user.isPlatformAdmin ? (
+                  <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
+                    <Select
+                      onChange={(event) =>
+                        setUserTenantDrafts((current) => ({
+                          ...current,
+                          [user.id]: event.target.value
+                        }))
+                      }
+                      value={userTenantDrafts[user.id] ?? user.tenant.id}
+                    >
+                      {tenants.map((tenant) => (
+                        <option key={tenant.id} value={tenant.id}>
+                          {getTenantLabel(tenant)}
+                        </option>
+                      ))}
+                    </Select>
+                    <Button
+                      disabled={(userTenantDrafts[user.id] ?? user.tenant.id) === user.tenant.id || moveUserTenantMutation.isPending}
+                      onClick={() =>
+                        moveUserTenantMutation.mutate({
+                          id: user.id,
+                          tenantId: userTenantDrafts[user.id] ?? user.tenant.id
+                        })
+                      }
+                      type="button"
+                      variant="ghost"
+                    >
+                      Alterar organização
+                    </Button>
+                  </div>
+                ) : null}
               </article>
             ))}
             <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
@@ -934,10 +997,22 @@ export function AdminClient() {
                   <option value="">Usar primeira organização listada</option>
                   {tenants.map((tenant) => (
                     <option key={tenant.id} value={tenant.id}>
-                      {tenant.name}
+                      {getTenantLabel(tenant)}
                     </option>
                   ))}
                 </Select>
+                {(() => {
+                  const selectedTenant = tenants.find((tenant) => tenant.id === inviteTenantId) ?? tenants[0];
+                  if (!selectedTenant) return null;
+
+                  return (
+                    <p className="text-xs text-[var(--color-muted-foreground)]">
+                      O usuário convidado entrará na organização <strong>{selectedTenant.name}</strong> com plano{" "}
+                      <strong>{formatPlanLabel(selectedTenant.plan)}</strong> e limite atual {selectedTenant.activeUsers}/
+                      {selectedTenant.maxUsers} usuários.
+                    </p>
+                  );
+                })()}
               </div>
             ) : null}
             <div className="space-y-2">

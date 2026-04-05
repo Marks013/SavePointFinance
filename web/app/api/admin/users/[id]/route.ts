@@ -10,7 +10,8 @@ import { prisma } from "@/lib/prisma/client";
 const adminUserUpdateSchema = z.object({
   isActive: z.boolean().optional(),
   role: z.enum(["admin", "member"]).optional(),
-  newPassword: z.string().min(8, "Minimo de 8 caracteres").optional()
+  newPassword: z.string().min(8, "Minimo de 8 caracteres").optional(),
+  tenantId: z.string().min(1).optional()
 });
 
 type Params = {
@@ -27,6 +28,7 @@ export async function PATCH(request: Request, context: Params) {
       isActive?: boolean;
       role?: "admin" | "member";
       passwordHash?: string;
+      tenantId?: string;
     } = {};
 
     if (typeof body.isActive === "boolean") data.isActive = body.isActive;
@@ -45,7 +47,8 @@ export async function PATCH(request: Request, context: Params) {
       select: {
         id: true,
         tenantId: true,
-        isPlatformAdmin: true
+        isPlatformAdmin: true,
+        isActive: true
       }
     });
 
@@ -57,8 +60,47 @@ export async function PATCH(request: Request, context: Params) {
       return NextResponse.json({ message: "Somente o superadmin pode alterar esta conta" }, { status: 403 });
     }
 
-    if (body.isActive === true) {
-      const seatSummary = await getTenantSeatSummary(target.tenantId);
+    if (body.tenantId) {
+      if (!admin.isPlatformAdmin) {
+        return NextResponse.json({ message: "Somente o superadmin pode mover usuários entre organizações" }, { status: 403 });
+      }
+
+      const nextTenant = await prisma.tenant.findUnique({
+        where: { id: body.tenantId },
+        select: {
+          id: true,
+          plan: true,
+          maxUsers: true,
+          isActive: true,
+          trialExpiresAt: true,
+          expiresAt: true
+        }
+      });
+
+      if (!nextTenant) {
+        return NextResponse.json({ message: "Organização de destino não encontrada" }, { status: 404 });
+      }
+
+      if (body.tenantId !== target.tenantId) {
+        const seatSummary = await getTenantSeatSummary(body.tenantId);
+
+        if (!seatSummary?.license.canAccessApp) {
+          return NextResponse.json({ message: "A organização de destino está indisponível" }, { status: 403 });
+        }
+
+        if (target.isActive && seatSummary.remainingSeats !== null && seatSummary.remainingSeats <= 0) {
+          return NextResponse.json(
+            { message: "O limite de usuários da organização de destino já foi atingido" },
+            { status: 409 }
+          );
+        }
+
+        data.tenantId = body.tenantId;
+      }
+    }
+
+    if (body.isActive === true || (body.tenantId && body.tenantId !== target.tenantId && target.isActive)) {
+      const seatSummary = await getTenantSeatSummary(data.tenantId ?? target.tenantId);
 
       if (!admin.isPlatformAdmin && !seatSummary?.license.canAccessApp) {
         return NextResponse.json({ message: "Licença indisponível para ativar usuários" }, { status: 403 });
@@ -81,7 +123,7 @@ export async function PATCH(request: Request, context: Params) {
       actorUserId: admin.id,
       actorTenantId: admin.tenantId,
       targetUserId: target.id,
-      targetTenantId: target.tenantId,
+      targetTenantId: data.tenantId ?? target.tenantId,
       action: "user.updated",
       entityType: "user",
       entityId: target.id,
