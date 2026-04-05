@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { logAdminAudit } from "@/lib/admin/audit";
 import { requireAdminUser } from "@/lib/auth/admin";
+import { applyPlanDefaultsToTenant } from "@/lib/licensing/default-plans";
 import { prisma } from "@/lib/prisma/client";
 
 type Params = {
@@ -14,8 +15,8 @@ export async function PATCH(request: Request, context: Params) {
     const { id } = await context.params;
     const body = (await request.json()) as {
       name?: string;
-      plan?: "free" | "pro";
-      maxUsers?: number;
+      planId?: string;
+      maxUsers?: number | null;
       isActive?: boolean;
       trialDays?: number;
       trialExpiresAt?: string | null;
@@ -26,14 +27,59 @@ export async function PATCH(request: Request, context: Params) {
       return NextResponse.json({ message: "Forbidden" }, { status: 403 });
     }
 
+    const target = await prisma.tenant.findUnique({
+      where: {
+        id
+      },
+      select: {
+        id: true,
+        planId: true
+      }
+    });
+
+    if (!target) {
+      return NextResponse.json({ message: "Organização não encontrada" }, { status: 404 });
+    }
+
+    let planUpdate:
+      | {
+          planId: string;
+          maxUsers: number | null;
+          trialStart: Date | null;
+          trialDays: number;
+          trialExpiresAt: Date | null;
+        }
+      | undefined;
+
+    if (body.planId && body.planId !== target.planId) {
+      const nextPlan = await prisma.plan.findFirst({
+        where: {
+          id: body.planId,
+          isActive: true
+        },
+        select: {
+          id: true,
+          tier: true,
+          maxUsers: true,
+          trialDays: true
+        }
+      });
+
+      if (!nextPlan) {
+        return NextResponse.json({ message: "Plano não encontrado ou inativo" }, { status: 404 });
+      }
+
+      planUpdate = applyPlanDefaultsToTenant(nextPlan);
+    }
+
     await prisma.tenant.update({
       where: {
         id
       },
       data: {
         ...(body.name ? { name: body.name.trim() } : {}),
-        ...(body.plan ? { plan: body.plan } : {}),
-        ...(typeof body.maxUsers === "number" ? { maxUsers: body.maxUsers } : {}),
+        ...(planUpdate ?? {}),
+        ...(body.maxUsers !== undefined ? { maxUsers: body.maxUsers } : {}),
         ...(typeof body.isActive === "boolean" ? { isActive: body.isActive } : {}),
         ...(typeof body.trialDays === "number" ? { trialDays: body.trialDays } : {}),
         ...(body.trialExpiresAt !== undefined ? { trialExpiresAt: body.trialExpiresAt ? new Date(`${body.trialExpiresAt}T12:00:00`) : null } : {}),

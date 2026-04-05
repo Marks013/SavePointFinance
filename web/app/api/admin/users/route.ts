@@ -56,10 +56,18 @@ export async function GET(request: Request) {
               id: true,
               name: true,
               slug: true,
-              plan: true,
+              planId: true,
               isActive: true,
               trialExpiresAt: true,
-              expiresAt: true
+              expiresAt: true,
+              planConfig: {
+                select: {
+                  id: true,
+                  name: true,
+                  slug: true,
+                  tier: true
+                }
+              }
             }
           }
         },
@@ -84,7 +92,18 @@ export async function GET(request: Request) {
         role: user.role,
         isPlatformAdmin: user.isPlatformAdmin,
         isActive: user.isActive,
-        tenant: user.tenant,
+        tenant: {
+          id: user.tenant.id,
+          name: user.tenant.name,
+          slug: user.tenant.slug,
+          planId: user.tenant.planId,
+          planName: user.tenant.planConfig.name,
+          planSlug: user.tenant.planConfig.slug,
+          planTier: user.tenant.planConfig.tier,
+          isActive: user.tenant.isActive,
+          trialExpiresAt: user.tenant.trialExpiresAt?.toISOString() ?? null,
+          expiresAt: user.tenant.expiresAt?.toISOString() ?? null
+        },
         createdAt: user.createdAt.toISOString(),
         lastLogin: user.lastLogin?.toISOString() ?? null
       }))

@@ -80,8 +80,8 @@ model Tenant {
   id             String             @id @default(cuid())
   name           String
   slug           String             @unique
-  plan           TenantPlan         @default(free)
-  maxUsers       Int                @default(1)
+  planId         String
+  maxUsers       Int?
   isActive       Boolean            @default(true)
   trialStart     DateTime?
   trialDays      Int                @default(31)
@@ -89,6 +89,7 @@ model Tenant {
   expiresAt      DateTime?
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
+  planConfig     Plan               @relation(fields: [planId], references: [id], onDelete: Restrict)
   users          User[]
   categories     Category[]
   financials     FinancialAccount[]
@@ -102,6 +103,31 @@ model Tenant {
   statementPayments StatementPayment[]
   notifications  NotificationDelivery[]
   whatsappMessages WhatsAppMessage[]
+
+  @@index([planId])
+}
+
+model Plan {
+  id                String      @id @default(cuid())
+  name              String
+  slug              String      @unique
+  tier              TenantPlan  @default(free)
+  description       String?
+  maxUsers          Int?
+  maxAccounts       Int?
+  maxCards          Int?
+  whatsappAssistant Boolean     @default(false)
+  automation        Boolean     @default(false)
+  pdfExport         Boolean     @default(false)
+  trialDays         Int         @default(0)
+  isDefault         Boolean     @default(false)
+  isActive          Boolean     @default(true)
+  sortOrder         Int         @default(0)
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  tenants           Tenant[]
+
+  @@index([tier, isActive])
 }
 
 model User {

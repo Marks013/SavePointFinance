@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { requireAdminUser } from "@/lib/auth/admin";
 import { ensureTenantDefaultCategories } from "@/lib/finance/default-categories";
+import { applyPlanDefaultsToTenant, ensureDefaultPlans } from "@/lib/licensing/default-plans";
 import { prisma } from "@/lib/prisma/client";
 
 function slugify(value: string) {
@@ -23,10 +24,20 @@ export async function GET(request: Request) {
     const status = searchParams.get("status");
     const now = new Date();
 
+    await ensureDefaultPlans(prisma);
+
     const tenants = await prisma.tenant.findMany({
       where: {
         ...(admin.isPlatformAdmin ? {} : { id: admin.tenantId }),
-        ...(plan === "free" || plan === "pro" ? { plan } : {}),
+        ...(plan === "free" || plan === "pro"
+          ? {
+              planConfig: {
+                is: {
+                  tier: plan
+                }
+              }
+            }
+          : {}),
         ...(search
           ? {
               OR: [
@@ -42,10 +53,36 @@ export async function GET(request: Request) {
             : status === "expired"
               ? { expiresAt: { lt: now } }
               : status === "trial"
-                ? { plan: "pro", trialExpiresAt: { gte: now }, expiresAt: null }
+                ? {
+                    planConfig: {
+                      is: {
+                        tier: "pro"
+                      }
+                    },
+                    trialExpiresAt: { gte: now },
+                    expiresAt: null
+                  }
                 : {})
       },
       include: {
+        planConfig: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            tier: true,
+            description: true,
+            maxUsers: true,
+            maxAccounts: true,
+            maxCards: true,
+            whatsappAssistant: true,
+            automation: true,
+            pdfExport: true,
+            trialDays: true,
+            isDefault: true,
+            isActive: true
+          }
+        },
         users: {
           where: {
             isActive: true
@@ -66,7 +103,10 @@ export async function GET(request: Request) {
         id: tenant.id,
         name: tenant.name,
         slug: tenant.slug,
-        plan: tenant.plan,
+        planId: tenant.planConfig.id,
+        planName: tenant.planConfig.name,
+        planSlug: tenant.planConfig.slug,
+        planTier: tenant.planConfig.tier,
         maxUsers: tenant.maxUsers,
         isActive: tenant.isActive,
         activeUsers: tenant.users.length,
@@ -97,9 +137,7 @@ export async function POST(request: Request) {
     const body = (await request.json()) as {
       name?: string;
       slug?: string;
-      plan?: "free" | "pro";
-      maxUsers?: number;
-      trialDays?: number;
+      planId?: string;
     };
 
     const name = body.name?.trim();
@@ -124,21 +162,33 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "Já existe uma organização com esse nome ou slug" }, { status: 409 });
     }
 
-    const plan = body.plan === "pro" ? "pro" : "free";
-    const maxUsers = Math.max(1, body.maxUsers || (plan === "pro" ? 10 : 1));
-    const trialDays = plan === "pro" ? Math.max(0, body.trialDays ?? 0) : 0;
-    const now = new Date();
+    await ensureDefaultPlans(prisma);
+
+    const plan = body.planId
+      ? await prisma.plan.findFirst({
+          where: {
+            id: body.planId,
+            isActive: true
+          }
+        })
+      : await prisma.plan.findFirst({
+          where: {
+            isDefault: true,
+            isActive: true
+          },
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
+        });
+
+    if (!plan) {
+      return NextResponse.json({ message: "Nenhum plano ativo foi encontrado" }, { status: 400 });
+    }
 
     const tenant = await prisma.tenant.create({
       data: {
         name,
         slug,
-        plan,
-        maxUsers,
+        ...applyPlanDefaultsToTenant(plan),
         isActive: true,
-        trialStart: trialDays > 0 ? now : null,
-        trialDays,
-        trialExpiresAt: trialDays > 0 ? new Date(now.getTime() + trialDays * 24 * 60 * 60 * 1000) : null,
         expiresAt: null
       }
     });
@@ -150,7 +200,9 @@ export async function POST(request: Request) {
         id: tenant.id,
         name: tenant.name,
         slug: tenant.slug,
-        plan: tenant.plan
+        planId: tenant.planId,
+        planName: plan.name,
+        planTier: plan.tier
       },
       { status: 201 }
     );

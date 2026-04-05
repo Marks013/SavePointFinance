@@ -3,25 +3,33 @@ import type { TenantPlan } from "@prisma/client";
 export type LicenseFeature = "whatsappAssistant" | "automation" | "pdfExport";
 
 export type TenantLicenseTarget = {
-  plan: TenantPlan;
-  maxUsers: number;
+  maxUsers: number | null;
   isActive: boolean;
   trialExpiresAt: Date | null;
   expiresAt: Date | null;
-};
-
-type PlanPolicy = {
-  label: string;
-  maxUsers: number | null;
-  maxAccounts: number | null;
-  maxCards: number | null;
-  features: Record<LicenseFeature, boolean>;
+  planConfig: {
+    id: string;
+    name: string;
+    slug: string;
+    tier: TenantPlan;
+    maxUsers: number | null;
+    maxAccounts: number | null;
+    maxCards: number | null;
+    whatsappAssistant: boolean;
+    automation: boolean;
+    pdfExport: boolean;
+    trialDays: number;
+    isActive: boolean;
+  };
 };
 
 export type TenantLicenseStatus = "free" | "premium" | "trial" | "expired" | "inactive";
 
 export type TenantLicenseState = {
   plan: TenantPlan;
+  planId: string;
+  planName: string;
+  planSlug: string;
   planLabel: string;
   status: TenantLicenseStatus;
   statusLabel: string;
@@ -36,56 +44,32 @@ export type TenantLicenseState = {
   features: Record<LicenseFeature, boolean>;
 };
 
-const PLAN_POLICIES: Record<TenantPlan, PlanPolicy> = {
-  free: {
-    label: "Gratuito",
-    maxUsers: 1,
-    maxAccounts: 1,
-    maxCards: 1,
-    features: {
-      whatsappAssistant: false,
-      automation: false,
-      pdfExport: false
-    }
-  },
-  pro: {
-    label: "Premium",
-    maxUsers: null,
-    maxAccounts: null,
-    maxCards: null,
-    features: {
-      whatsappAssistant: true,
-      automation: true,
-      pdfExport: true
-    }
-  }
-};
-
-function resolveEffectiveLimit(configuredLimit: number, planLimit: number | null) {
-  if (planLimit === null) {
-    return Math.max(1, configuredLimit || 1);
+function resolveEffectiveUsers(tenantLimit: number | null, planLimit: number | null) {
+  if (tenantLimit === null || tenantLimit === undefined) {
+    return planLimit;
   }
 
-  return Math.max(1, Math.min(planLimit, configuredLimit || planLimit));
-}
+  if (planLimit === null || planLimit === undefined) {
+    return Math.max(1, tenantLimit);
+  }
 
-export function getPlanPolicy(plan: TenantPlan) {
-  return PLAN_POLICIES[plan];
+  return Math.max(1, Math.min(planLimit, tenantLimit));
 }
 
 export function resolveTenantLicenseState(tenant: TenantLicenseTarget, now = new Date()): TenantLicenseState {
-  const planPolicy = getPlanPolicy(tenant.plan);
+  const tier = tenant.planConfig.tier;
   const isExpired = Boolean(tenant.expiresAt && tenant.expiresAt < now);
   const isTrial =
-    tenant.plan === "pro" &&
+    tier === "pro" &&
+    tenant.planConfig.trialDays > 0 &&
     Boolean(tenant.trialExpiresAt && tenant.trialExpiresAt >= now && !tenant.expiresAt);
 
-  let status: TenantLicenseStatus = tenant.plan === "pro" ? "premium" : "free";
-  let statusLabel = tenant.plan === "pro" ? "Plano Premium" : "Plano Gratuito";
+  let status: TenantLicenseStatus = tier === "pro" ? "premium" : "free";
+  let statusLabel = tier === "pro" ? "Plano Premium" : "Plano Gratuito";
 
-  if (!tenant.isActive) {
+  if (!tenant.isActive || !tenant.planConfig.isActive) {
     status = "inactive";
-    statusLabel = "Organização inativa";
+    statusLabel = !tenant.planConfig.isActive ? "Plano inativo" : "Organização inativa";
   } else if (isExpired) {
     status = "expired";
     statusLabel = "Licença expirada";
@@ -95,20 +79,25 @@ export function resolveTenantLicenseState(tenant: TenantLicenseTarget, now = new
   }
 
   return {
-    plan: tenant.plan,
-    planLabel: planPolicy.label,
+    plan: tier,
+    planId: tenant.planConfig.id,
+    planName: tenant.planConfig.name,
+    planSlug: tenant.planConfig.slug,
+    planLabel: tenant.planConfig.name,
     status,
     statusLabel,
-    canAccessApp: tenant.isActive && !isExpired,
-    isPremium: tenant.plan === "pro",
+    canAccessApp: tenant.isActive && tenant.planConfig.isActive && !isExpired,
+    isPremium: tier === "pro",
     isTrial,
     effectiveLimits: {
-      users: resolveEffectiveLimit(tenant.maxUsers, planPolicy.maxUsers),
-      accounts: planPolicy.maxAccounts,
-      cards: planPolicy.maxCards
+      users: resolveEffectiveUsers(tenant.maxUsers, tenant.planConfig.maxUsers),
+      accounts: tenant.planConfig.maxAccounts,
+      cards: tenant.planConfig.maxCards
     },
     features: {
-      ...planPolicy.features
+      whatsappAssistant: tenant.planConfig.whatsappAssistant,
+      automation: tenant.planConfig.automation,
+      pdfExport: tenant.planConfig.pdfExport
     }
   };
 }

@@ -36,12 +36,35 @@ CREATE TYPE "NotificationStatus" AS ENUM ('pending', 'sent', 'failed', 'skipped'
 CREATE TYPE "WhatsAppMessageDirection" AS ENUM ('inbound', 'outbound');
 
 -- CreateTable
+CREATE TABLE "Plan" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "slug" TEXT NOT NULL,
+    "tier" "TenantPlan" NOT NULL DEFAULT 'free',
+    "description" TEXT,
+    "maxUsers" INTEGER,
+    "maxAccounts" INTEGER,
+    "maxCards" INTEGER,
+    "whatsappAssistant" BOOLEAN NOT NULL DEFAULT false,
+    "automation" BOOLEAN NOT NULL DEFAULT false,
+    "pdfExport" BOOLEAN NOT NULL DEFAULT false,
+    "trialDays" INTEGER NOT NULL DEFAULT 0,
+    "isDefault" BOOLEAN NOT NULL DEFAULT false,
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "sortOrder" INTEGER NOT NULL DEFAULT 0,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Plan_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "Tenant" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "slug" TEXT NOT NULL,
-    "plan" "TenantPlan" NOT NULL DEFAULT 'free',
-    "maxUsers" INTEGER NOT NULL DEFAULT 1,
+    "planId" TEXT NOT NULL,
+    "maxUsers" INTEGER,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "trialStart" TIMESTAMP(3),
     "trialDays" INTEGER NOT NULL DEFAULT 31,
@@ -346,7 +369,16 @@ CREATE TABLE "AdminAuditLog" (
 );
 
 -- CreateIndex
+CREATE UNIQUE INDEX "Plan_slug_key" ON "Plan"("slug");
+
+-- CreateIndex
+CREATE INDEX "Plan_tier_isActive_idx" ON "Plan"("tier", "isActive");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "Tenant_slug_key" ON "Tenant"("slug");
+
+-- CreateIndex
+CREATE INDEX "Tenant_planId_idx" ON "Tenant"("planId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
@@ -479,6 +511,9 @@ CREATE INDEX "AdminAuditLog_targetTenantId_createdAt_idx" ON "AdminAuditLog"("ta
 
 -- CreateIndex
 CREATE INDEX "AdminAuditLog_entityType_entityId_idx" ON "AdminAuditLog"("entityType", "entityId");
+
+-- AddForeignKey
+ALTER TABLE "Tenant" ADD CONSTRAINT "Tenant_planId_fkey" FOREIGN KEY ("planId") REFERENCES "Plan"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "User" ADD CONSTRAINT "User_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE CASCADE ON UPDATE CASCADE;

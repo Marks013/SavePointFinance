@@ -18,6 +18,51 @@ const {
   ADMIN_TENANT_SLUG = "savepoint"
 } = process.env;
 
+const DEFAULT_PLANS = [
+  {
+    slug: "gratuito-essencial",
+    name: "Gratuito Essencial",
+    tier: "free",
+    description: "Plano base com limites reduzidos e recursos premium desativados.",
+    maxUsers: 1,
+    maxAccounts: 1,
+    maxCards: 1,
+    whatsappAssistant: false,
+    automation: false,
+    pdfExport: false,
+    trialDays: 0,
+    sortOrder: 10
+  },
+  {
+    slug: "premium-completo",
+    name: "Premium Completo",
+    tier: "pro",
+    description: "Plano completo com WhatsApp, automações e exportação em PDF.",
+    maxUsers: 10,
+    maxAccounts: null,
+    maxCards: null,
+    whatsappAssistant: true,
+    automation: true,
+    pdfExport: true,
+    trialDays: 0,
+    sortOrder: 20
+  },
+  {
+    slug: "avaliacao-premium-14-dias",
+    name: "Avaliação Premium 14 dias",
+    tier: "pro",
+    description: "Versão de avaliação com recursos premium liberados por 14 dias.",
+    maxUsers: 10,
+    maxAccounts: null,
+    maxCards: null,
+    whatsappAssistant: true,
+    automation: true,
+    pdfExport: true,
+    trialDays: 14,
+    sortOrder: 30
+  }
+];
+
 if (!DATABASE_URL) {
   throw new Error("DATABASE_URL is required.");
 }
@@ -33,20 +78,78 @@ async function ensureSchemaExists(client) {
   }
 }
 
+async function ensurePlans(client) {
+  for (const plan of DEFAULT_PLANS) {
+    await client.query(
+      `
+        INSERT INTO "Plan" (
+          "id", "name", "slug", "tier", "description", "maxUsers", "maxAccounts", "maxCards",
+          "whatsappAssistant", "automation", "pdfExport", "trialDays", "isDefault", "isActive",
+          "sortOrder", "createdAt", "updatedAt"
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, true, true, $13, NOW(), NOW())
+        ON CONFLICT ("slug")
+        DO UPDATE SET
+          "name" = EXCLUDED."name",
+          "tier" = EXCLUDED."tier",
+          "description" = EXCLUDED."description",
+          "maxUsers" = EXCLUDED."maxUsers",
+          "maxAccounts" = EXCLUDED."maxAccounts",
+          "maxCards" = EXCLUDED."maxCards",
+          "whatsappAssistant" = EXCLUDED."whatsappAssistant",
+          "automation" = EXCLUDED."automation",
+          "pdfExport" = EXCLUDED."pdfExport",
+          "trialDays" = EXCLUDED."trialDays",
+          "isDefault" = true,
+          "isActive" = true,
+          "sortOrder" = EXCLUDED."sortOrder",
+          "updatedAt" = NOW()
+      `,
+      [
+        `plan-${plan.slug}`,
+        plan.name,
+        plan.slug,
+        plan.tier,
+        plan.description,
+        plan.maxUsers,
+        plan.maxAccounts,
+        plan.maxCards,
+        plan.whatsappAssistant,
+        plan.automation,
+        plan.pdfExport,
+        plan.trialDays,
+        plan.sortOrder
+      ]
+    );
+  }
+}
+
 async function ensureAdmin(client) {
   const passwordHash = await bcrypt.hash(ADMIN_PASSWORD, 10);
+  await ensurePlans(client);
+  const bootstrapPlanResult = await client.query(
+    'SELECT "id", "maxUsers" FROM "Plan" WHERE "slug" = $1 LIMIT 1',
+    ["premium-completo"]
+  );
+  const bootstrapPlan = bootstrapPlanResult.rows[0];
+
+  if (!bootstrapPlan?.id) {
+    throw new Error("Unable to resolve bootstrap plan.");
+  }
 
   await client.query(
     `
-      INSERT INTO "Tenant" ("id", "name", "slug", "plan", "maxUsers", "isActive", "trialDays", "createdAt", "updatedAt")
-      VALUES ('tenant-bootstrap', $1, $2, 'pro', 5, true, 31, NOW(), NOW())
+      INSERT INTO "Tenant" ("id", "name", "slug", "planId", "maxUsers", "isActive", "trialDays", "createdAt", "updatedAt")
+      VALUES ('tenant-bootstrap', $1, $2, $3, $4, true, 0, NOW(), NOW())
       ON CONFLICT ("slug")
       DO UPDATE SET
         "name" = EXCLUDED."name",
+        "planId" = EXCLUDED."planId",
+        "maxUsers" = EXCLUDED."maxUsers",
         "isActive" = true,
         "updatedAt" = NOW()
     `,
-    [ADMIN_TENANT_NAME, ADMIN_TENANT_SLUG]
+    [ADMIN_TENANT_NAME, ADMIN_TENANT_SLUG, bootstrapPlan.id, bootstrapPlan.maxUsers]
   );
 
   const tenantResult = await client.query('SELECT "id" FROM "Tenant" WHERE "slug" = $1 LIMIT 1', [ADMIN_TENANT_SLUG]);

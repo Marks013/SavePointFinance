@@ -69,11 +69,26 @@ export async function PATCH(request: Request, context: Params) {
         where: { id: body.tenantId },
         select: {
           id: true,
-          plan: true,
           maxUsers: true,
           isActive: true,
           trialExpiresAt: true,
-          expiresAt: true
+          expiresAt: true,
+          planConfig: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              tier: true,
+              maxUsers: true,
+              maxAccounts: true,
+              maxCards: true,
+              whatsappAssistant: true,
+              automation: true,
+              pdfExport: true,
+              trialDays: true,
+              isActive: true
+            }
+          }
         }
       });
 

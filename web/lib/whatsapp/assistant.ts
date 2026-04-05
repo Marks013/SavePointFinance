@@ -17,11 +17,24 @@ type WhatsAppUser = {
   whatsappNumber: string | null;
   isActive: boolean;
   tenant: {
-    plan: "free" | "pro";
-    maxUsers: number;
+    maxUsers: number | null;
     isActive: boolean;
     trialExpiresAt: Date | null;
     expiresAt: Date | null;
+    planConfig: {
+      id: string;
+      name: string;
+      slug: string;
+      tier: "free" | "pro";
+      maxUsers: number | null;
+      maxAccounts: number | null;
+      maxCards: number | null;
+      whatsappAssistant: boolean;
+      automation: boolean;
+      pdfExport: boolean;
+      trialDays: number;
+      isActive: boolean;
+    };
   };
 };
 
@@ -180,11 +193,26 @@ async function findUserByPhoneNumber(phoneNumber: string) {
       isActive: true,
       tenant: {
         select: {
-          plan: true,
           maxUsers: true,
           isActive: true,
           trialExpiresAt: true,
-          expiresAt: true
+          expiresAt: true,
+          planConfig: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              tier: true,
+              maxUsers: true,
+              maxAccounts: true,
+              maxCards: true,
+              whatsappAssistant: true,
+              automation: true,
+              pdfExport: true,
+              trialDays: true,
+              isActive: true
+            }
+          }
         }
       }
     }

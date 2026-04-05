@@ -1,10 +1,11 @@
 import "dotenv/config";
 
 import { PrismaPg } from "@prisma/adapter-pg";
-import { PrismaClient, AccountType, TenantPlan, UserRole } from "@prisma/client";
+import { PrismaClient, AccountType, UserRole } from "@prisma/client";
 import { hash } from "bcryptjs";
 
 import { ensureTenantDefaultCategories } from "../lib/finance/default-categories";
+import { ensureDefaultPlans, getPreferredBootstrapPlan } from "../lib/licensing/default-plans";
 
 const connectionString = process.env.DATABASE_URL;
 
@@ -22,6 +23,12 @@ const prisma = new PrismaClient({
 
 async function main() {
   const passwordHash = await hash("changeme123", 10);
+  await ensureDefaultPlans(prisma);
+  const bootstrapPlan = await getPreferredBootstrapPlan(prisma);
+
+  if (!bootstrapPlan) {
+    throw new Error("No default plan available.");
+  }
 
   const tenant = await prisma.tenant.upsert({
     where: {
@@ -30,18 +37,20 @@ async function main() {
     update: {
       name: "SavePoint",
       slug: "savepoint",
-      plan: TenantPlan.pro,
-      maxUsers: 5,
+      planId: bootstrapPlan.id,
+      maxUsers: bootstrapPlan.maxUsers ?? 5,
       isActive: true,
       trialStart: null,
+      trialDays: 0,
       trialExpiresAt: null,
       expiresAt: null
     },
     create: {
       name: "SavePoint",
       slug: "savepoint",
-      plan: TenantPlan.pro,
-      maxUsers: 5
+      planId: bootstrapPlan.id,
+      maxUsers: bootstrapPlan.maxUsers ?? 5,
+      trialDays: 0
     }
   });
 

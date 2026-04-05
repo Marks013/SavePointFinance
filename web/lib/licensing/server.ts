@@ -35,12 +35,27 @@ export async function getCurrentTenantAccess(options: CurrentAccessOptions = {})
           id: true,
           name: true,
           slug: true,
-          plan: true,
           maxUsers: true,
           isActive: true,
           trialDays: true,
           trialExpiresAt: true,
-          expiresAt: true
+          expiresAt: true,
+          planConfig: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              tier: true,
+              maxUsers: true,
+              maxAccounts: true,
+              maxCards: true,
+              whatsappAssistant: true,
+              automation: true,
+              pdfExport: true,
+              trialDays: true,
+              isActive: true
+            }
+          }
         }
       }
     }
@@ -102,11 +117,26 @@ export async function getTenantSeatSummary(tenantId: string) {
       id: true,
       name: true,
       slug: true,
-      plan: true,
       maxUsers: true,
       isActive: true,
       trialExpiresAt: true,
-      expiresAt: true
+      expiresAt: true,
+      planConfig: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          tier: true,
+          maxUsers: true,
+          maxAccounts: true,
+          maxCards: true,
+          whatsappAssistant: true,
+          automation: true,
+          pdfExport: true,
+          trialDays: true,
+          isActive: true
+        }
+      }
     }
   });
 
@@ -162,11 +192,26 @@ export async function canCreateAccount(tenantId: string, ownerUserId: string) {
     },
     select: {
       id: true,
-      plan: true,
       maxUsers: true,
       isActive: true,
       trialExpiresAt: true,
-      expiresAt: true
+      expiresAt: true,
+      planConfig: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          tier: true,
+          maxUsers: true,
+          maxAccounts: true,
+          maxCards: true,
+          whatsappAssistant: true,
+          automation: true,
+          pdfExport: true,
+          trialDays: true,
+          isActive: true
+        }
+      }
     }
   });
 
@@ -223,11 +268,26 @@ export async function canCreateCard(tenantId: string, ownerUserId: string) {
     },
     select: {
       id: true,
-      plan: true,
       maxUsers: true,
       isActive: true,
       trialExpiresAt: true,
-      expiresAt: true
+      expiresAt: true,
+      planConfig: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          tier: true,
+          maxUsers: true,
+          maxAccounts: true,
+          maxCards: true,
+          whatsappAssistant: true,
+          automation: true,
+          pdfExport: true,
+          trialDays: true,
+          isActive: true
+        }
+      }
     }
   });
 

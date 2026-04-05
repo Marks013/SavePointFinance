@@ -2,6 +2,7 @@ import "dotenv/config";
 
 import { Client } from "pg";
 
+import { ensureDefaultPlans } from "../lib/licensing/default-plans";
 import { prisma } from "../lib/prisma/client";
 
 type TenantRow = {
@@ -176,6 +177,16 @@ async function main() {
   await legacy.connect();
 
   try {
+    await ensureDefaultPlans(prisma);
+    const [freePlan, premiumPlan] = await Promise.all([
+      prisma.plan.findUnique({ where: { slug: "gratuito-essencial" }, select: { id: true } }),
+      prisma.plan.findUnique({ where: { slug: "premium-completo" }, select: { id: true } })
+    ]);
+
+    if (!freePlan?.id || !premiumPlan?.id) {
+      throw new Error("Default plans are not available.");
+    }
+
     const tenants = (await legacy.query<TenantRow>("select * from tenants order by created_at asc")).rows;
     const users = (await legacy.query<UserRow>("select * from users order by created_at asc")).rows;
     const preferences = (await legacy.query<PreferenceRow>("select * from user_preferences order by created_at asc")).rows;
@@ -200,7 +211,7 @@ async function main() {
         update: {
           name: tenant.name,
           slug: tenant.slug,
-          plan: tenant.plan,
+          planId: tenant.plan === "pro" ? premiumPlan.id : freePlan.id,
           maxUsers: tenant.max_users,
           isActive: tenant.is_active,
           trialStart: tenant.trial_start,
@@ -213,7 +224,7 @@ async function main() {
           id: tenant.id,
           name: tenant.name,
           slug: tenant.slug,
-          plan: tenant.plan,
+          planId: tenant.plan === "pro" ? premiumPlan.id : freePlan.id,
           maxUsers: tenant.max_users,
           isActive: tenant.is_active,
           trialStart: tenant.trial_start,

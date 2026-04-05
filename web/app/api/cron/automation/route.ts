@@ -23,6 +23,24 @@ export async function POST(request: Request) {
       where: {
         isActive: true
       },
+      include: {
+        planConfig: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            tier: true,
+            maxUsers: true,
+            maxAccounts: true,
+            maxCards: true,
+            whatsappAssistant: true,
+            automation: true,
+            pdfExport: true,
+            trialDays: true,
+            isActive: true
+          }
+        }
+      },
       orderBy: {
         createdAt: "asc"
       }

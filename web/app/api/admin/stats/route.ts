@@ -17,7 +17,11 @@ export async function GET() {
       prisma.tenant.count({
         where: {
           ...tenantScope,
-          plan: "pro",
+          planConfig: {
+            is: {
+              tier: "pro"
+            }
+          },
           trialExpiresAt: {
             gte: now
           },

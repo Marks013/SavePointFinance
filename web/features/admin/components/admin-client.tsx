@@ -26,8 +26,11 @@ type TenantItem = {
   id: string;
   name: string;
   slug: string;
-  plan: string;
-  maxUsers: number;
+  planId: string;
+  planName: string;
+  planSlug: string;
+  planTier: "free" | "pro";
+  maxUsers: number | null;
   isActive: boolean;
   activeUsers: number;
   trialStart: string | null;
@@ -47,7 +50,10 @@ type UserItem = {
     id: string;
     name: string;
     slug: string;
-    plan: string;
+    planId: string;
+    planName: string;
+    planSlug: string;
+    planTier: "free" | "pro";
     isActive: boolean;
     trialExpiresAt: string | null;
     expiresAt: string | null;
@@ -105,44 +111,26 @@ type CurrentProfile = {
   isPlatformAdmin: boolean;
 };
 
-type PlanPreset = {
+type PlanItem = {
   id: string;
-  title: string;
-  badge: string;
-  description: string;
-  plan: "free" | "pro";
-  maxUsers: number;
-  trialDays?: number;
-  expiresAt?: null;
+  name: string;
+  slug: string;
+  tier: "free" | "pro";
+  description: string | null;
+  maxUsers: number | null;
+  maxAccounts: number | null;
+  maxCards: number | null;
+  trialDays: number;
+  isDefault: boolean;
+  isActive: boolean;
+  sortOrder: number;
+  tenantsCount: number;
+  features: {
+    whatsappAssistant: boolean;
+    automation: boolean;
+    pdfExport: boolean;
+  };
 };
-
-const PLAN_PRESETS: PlanPreset[] = [
-  {
-    id: "free-essential",
-    title: "Gratuito Essencial",
-    badge: "Padrão",
-    description: "Plano base para operação enxuta, com limites reduzidos e recursos premium desativados.",
-    plan: "free",
-    maxUsers: 1
-  },
-  {
-    id: "premium-team",
-    title: "Premium Completo",
-    badge: "Recomendado",
-    description: "Plano completo com usuários extras, relatórios PDF, automações e assistente no WhatsApp.",
-    plan: "pro",
-    maxUsers: 10
-  },
-  {
-    id: "premium-trial-14",
-    title: "Avaliação Premium 14 dias",
-    badge: "Teste",
-    description: "Ativa o Premium por 14 dias para onboarding, validação comercial e implantação inicial.",
-    plan: "pro",
-    maxUsers: 10,
-    trialDays: 14
-  }
-];
 
 function formatRoleLabel(role: "admin" | "member") {
   return role === "admin" ? "Administrador" : "Membro";
@@ -157,7 +145,7 @@ function formatLifecycleLabel(tenant: TenantItem) {
     return `Expira em ${new Date(tenant.expiresAt).toLocaleDateString("pt-BR")}`;
   }
 
-  if (tenant.plan === "pro" && tenant.trialExpiresAt) {
+  if (tenant.planTier === "pro" && tenant.trialExpiresAt) {
     return `Avaliação até ${new Date(tenant.trialExpiresAt).toLocaleDateString("pt-BR")}`;
   }
 
@@ -166,14 +154,14 @@ function formatLifecycleLabel(tenant: TenantItem) {
 
 function formatUserTenantPlanLabel(user: UserItem) {
   if (user.tenant.expiresAt) {
-    return `${formatPlanLabel(user.tenant.plan)} • Expirado`;
+    return `${user.tenant.planName} • Expirado`;
   }
 
-  if (user.tenant.plan === "pro" && user.tenant.trialExpiresAt) {
-    return `${formatPlanLabel(user.tenant.plan)} • Em avaliação`;
+  if (user.tenant.planTier === "pro" && user.tenant.trialExpiresAt) {
+    return `${user.tenant.planName} • Em avaliação`;
   }
 
-  return `${formatPlanLabel(user.tenant.plan)} • ${user.tenant.isActive ? "Ativo" : "Inativo"}`;
+  return `${user.tenant.planName} • ${user.tenant.isActive ? "Ativo" : "Inativo"}`;
 }
 
 function toAbsoluteInviteUrl(inviteUrl: string) {
@@ -197,6 +185,16 @@ function buildQuery(params: Record<string, string | undefined>) {
   return query ? `?${query}` : "";
 }
 
+function parseNullableLimit(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
 async function getStats() {
   const response = await fetch("/api/admin/stats", { cache: "no-store" });
   if (!response.ok) throw new Error("Falha ao carregar stats");
@@ -207,6 +205,12 @@ async function getTenants(filters: { search?: string; plan?: string; status?: st
   const response = await fetch(`/api/admin/tenants${buildQuery(filters)}`, { cache: "no-store" });
   if (!response.ok) throw new Error("Falha ao carregar tenants");
   return (await response.json()) as { items: TenantItem[] };
+}
+
+async function getPlans(filters: { search?: string; tier?: string; status?: string }) {
+  const response = await fetch(`/api/admin/plans${buildQuery(filters)}`, { cache: "no-store" });
+  if (!response.ok) throw new Error("Falha ao carregar planos");
+  return (await response.json()) as { items: PlanItem[] };
 }
 
 async function getUsers(filters: {
@@ -244,10 +248,22 @@ async function getCurrentProfile() {
 
 export function AdminClient() {
   const queryClient = useQueryClient();
+  const [tenantPlanDrafts, setTenantPlanDrafts] = useState<Record<string, string>>({});
   const [userTenantDrafts, setUserTenantDrafts] = useState<Record<string, string>>({});
+  const [newPlanName, setNewPlanName] = useState("");
+  const [newPlanSlug, setNewPlanSlug] = useState("");
+  const [newPlanTier, setNewPlanTier] = useState<"free" | "pro">("free");
+  const [newPlanDescription, setNewPlanDescription] = useState("");
+  const [newPlanMaxUsers, setNewPlanMaxUsers] = useState("");
+  const [newPlanMaxAccounts, setNewPlanMaxAccounts] = useState("");
+  const [newPlanMaxCards, setNewPlanMaxCards] = useState("");
+  const [newPlanTrialDays, setNewPlanTrialDays] = useState("0");
+  const [newPlanWhatsapp, setNewPlanWhatsapp] = useState(false);
+  const [newPlanAutomation, setNewPlanAutomation] = useState(false);
+  const [newPlanPdfExport, setNewPlanPdfExport] = useState(false);
   const [newTenantName, setNewTenantName] = useState("");
   const [newTenantSlug, setNewTenantSlug] = useState("");
-  const [newTenantPlan, setNewTenantPlan] = useState<"free" | "pro">("free");
+  const [newTenantPlanId, setNewTenantPlanId] = useState("");
   const [tenantSearch, setTenantSearch] = useState("");
   const [tenantPlanFilter, setTenantPlanFilter] = useState("");
   const [tenantStatusFilter, setTenantStatusFilter] = useState("");
@@ -274,6 +290,10 @@ export function AdminClient() {
   });
   const statsQuery = useQuery({ queryKey: ["admin-stats"], queryFn: getStats });
   const profileQuery = useQuery({ queryKey: ["profile"], queryFn: getCurrentProfile });
+  const plansQuery = useQuery({
+    queryKey: ["admin-plans"],
+    queryFn: () => getPlans({})
+  });
   const tenantsQuery = useQuery({
     queryKey: ["admin-tenants", tenantSearch, tenantPlanFilter, tenantStatusFilter],
     queryFn: () =>
@@ -323,6 +343,7 @@ export function AdminClient() {
         action: auditActionFilter || undefined
       })
   });
+  const plans = plansQuery.data?.items ?? [];
   const tenants = tenantsQuery.data?.items ?? [];
   const users = usersQuery.data?.items ?? [];
   const usersMeta = usersQuery.data;
@@ -331,19 +352,7 @@ export function AdminClient() {
   const isPlatformAdmin = Boolean(profileQuery.data?.isPlatformAdmin);
 
   function getTenantLabel(tenant: TenantItem) {
-    return `${tenant.name} • ${formatPlanLabel(tenant.plan)}`;
-  }
-
-  function applyPlanPreset(tenantId: string, preset: PlanPreset) {
-    updateTenantMutation.mutate({
-      id: tenantId,
-      plan: preset.plan,
-      maxUsers: preset.maxUsers,
-      trialDays: preset.trialDays ?? 0,
-      trialExpiresAt: null,
-      expiresAt: preset.expiresAt ?? null,
-      isActive: true
-    });
+    return `${tenant.name} • ${tenant.planName}`;
   }
 
   const resetPasswordMutation = useMutation({
@@ -371,8 +380,12 @@ export function AdminClient() {
       if (!response.ok) throw new Error("Falha ao atualizar usuario");
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["admin-users"] });
-      await queryClient.invalidateQueries({ queryKey: ["admin-audit"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin-users"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-tenants"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-stats"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-audit"] })
+      ]);
       toast.success("Usuário atualizado");
     }
   });
@@ -409,6 +422,7 @@ export function AdminClient() {
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["admin-users"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-tenants"] }),
         queryClient.invalidateQueries({ queryKey: ["admin-stats"] }),
         queryClient.invalidateQueries({ queryKey: ["admin-audit"] })
       ]);
@@ -419,10 +433,114 @@ export function AdminClient() {
     }
   });
 
+  const createPlanMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch("/api/admin/plans", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newPlanName,
+          slug: newPlanSlug,
+          tier: newPlanTier,
+          description: newPlanDescription,
+          maxUsers: parseNullableLimit(newPlanMaxUsers),
+          maxAccounts: parseNullableLimit(newPlanMaxAccounts),
+          maxCards: parseNullableLimit(newPlanMaxCards),
+          trialDays: Number(newPlanTrialDays) || 0,
+          whatsappAssistant: newPlanWhatsapp,
+          automation: newPlanAutomation,
+          pdfExport: newPlanPdfExport
+        })
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json()) as { message?: string };
+        throw new Error(payload.message ?? "Falha ao criar plano");
+      }
+    },
+    onSuccess: async () => {
+      setNewPlanName("");
+      setNewPlanSlug("");
+      setNewPlanTier("free");
+      setNewPlanDescription("");
+      setNewPlanMaxUsers("");
+      setNewPlanMaxAccounts("");
+      setNewPlanMaxCards("");
+      setNewPlanTrialDays("0");
+      setNewPlanWhatsapp(false);
+      setNewPlanAutomation(false);
+      setNewPlanPdfExport(false);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin-plans"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-audit"] })
+      ]);
+      toast.success("Plano criado");
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    }
+  });
+
+  const updatePlanMutation = useMutation({
+    mutationFn: async ({
+      id,
+      data
+    }: {
+      id: string;
+      data: Record<string, unknown>;
+    }) => {
+      const response = await fetch(`/api/admin/plans/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json()) as { message?: string };
+        throw new Error(payload.message ?? "Falha ao atualizar plano");
+      }
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin-plans"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-tenants"] }),
+        queryClient.invalidateQueries({ queryKey: ["profile"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-audit"] })
+      ]);
+      toast.success("Plano atualizado");
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    }
+  });
+
+  const deletePlanMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await fetch(`/api/admin/plans/${id}`, {
+        method: "DELETE"
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json()) as { message?: string };
+        throw new Error(payload.message ?? "Falha ao excluir plano");
+      }
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin-plans"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-audit"] })
+      ]);
+      toast.success("Plano excluído");
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    }
+  });
+
   const updateTenantMutation = useMutation({
     mutationFn: async ({
       id,
-      plan,
+      planId,
       maxUsers,
       isActive,
       trialDays,
@@ -430,8 +548,8 @@ export function AdminClient() {
       expiresAt
     }: {
       id: string;
-      plan?: "free" | "pro";
-      maxUsers?: number;
+      planId?: string;
+      maxUsers?: number | null;
       isActive?: boolean;
       trialDays?: number;
       trialExpiresAt?: string | null;
@@ -440,7 +558,7 @@ export function AdminClient() {
       const response = await fetch(`/api/admin/tenants/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan, maxUsers, isActive, trialDays, trialExpiresAt, expiresAt })
+        body: JSON.stringify({ planId, maxUsers, isActive, trialDays, trialExpiresAt, expiresAt })
       });
       if (!response.ok) throw new Error("Falha ao atualizar tenant");
     },
@@ -462,9 +580,7 @@ export function AdminClient() {
         body: JSON.stringify({
           name: newTenantName,
           slug: newTenantSlug,
-          plan: newTenantPlan,
-          maxUsers: newTenantPlan === "pro" ? 10 : 1,
-          trialDays: 0
+          planId: newTenantPlanId || plans[0]?.id
         })
       });
 
@@ -476,10 +592,11 @@ export function AdminClient() {
     onSuccess: async () => {
       setNewTenantName("");
       setNewTenantSlug("");
-      setNewTenantPlan("free");
+      setNewTenantPlanId("");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["admin-tenants"] }),
-        queryClient.invalidateQueries({ queryKey: ["admin-stats"] })
+        queryClient.invalidateQueries({ queryKey: ["admin-stats"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-audit"] })
       ]);
       toast.success("Organização criada");
     },
@@ -562,35 +679,252 @@ export function AdminClient() {
       <section className="surface content-section">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-2xl font-semibold tracking-[-0.03em]">Planos padrão</h2>
+            <h2 className="text-2xl font-semibold tracking-[-0.03em]">Catálogo de planos</h2>
             <p className="mt-2 max-w-3xl text-sm leading-7 text-[var(--color-muted-foreground)]">
-              Estes presets aceleram a gestão comercial. Basta aplicar o plano desejado na organização, e todos os usuários dela passam a obedecer a essa licença.
+              Os planos agora são registros reais. Você pode criar, editar, ativar, desativar e excluir planos customizados sem depender de presets fixos.
             </p>
           </div>
+          <article className="metric-card">
+            <p className="metric-label">Planos ativos</p>
+            <p className="metric-value">{plans.filter((item) => item.isActive).length}</p>
+          </article>
         </div>
+        {isPlatformAdmin ? (
+          <div className="mt-6 rounded-[1.6rem] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-card)_88%,var(--color-muted))] p-4">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-semibold">Novo plano</h3>
+                <p className="mt-1 text-sm leading-7 text-[var(--color-muted-foreground)]">
+                  Crie planos personalizados com limites, período de avaliação e recursos premium próprios.
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <Input onChange={(event) => setNewPlanName(event.target.value)} placeholder="Nome do plano" value={newPlanName} />
+              <Input onChange={(event) => setNewPlanSlug(event.target.value)} placeholder="Slug do plano" value={newPlanSlug} />
+              <Select onChange={(event) => setNewPlanTier(event.target.value as "free" | "pro")} value={newPlanTier}>
+                <option value="free">Gratuito</option>
+                <option value="pro">Premium</option>
+              </Select>
+              <Input
+                onChange={(event) => setNewPlanTrialDays(event.target.value)}
+                placeholder="Dias de avaliação"
+                type="number"
+                value={newPlanTrialDays}
+              />
+              <Input onChange={(event) => setNewPlanMaxUsers(event.target.value)} placeholder="Limite de usuários" value={newPlanMaxUsers} />
+              <Input onChange={(event) => setNewPlanMaxAccounts(event.target.value)} placeholder="Limite de contas" value={newPlanMaxAccounts} />
+              <Input onChange={(event) => setNewPlanMaxCards(event.target.value)} placeholder="Limite de cartões" value={newPlanMaxCards} />
+              <Input
+                onChange={(event) => setNewPlanDescription(event.target.value)}
+                placeholder="Descrição do plano"
+                value={newPlanDescription}
+              />
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              <label className="muted-panel flex items-center gap-3 text-sm">
+                <input checked={newPlanWhatsapp} className="app-checkbox" onChange={(event) => setNewPlanWhatsapp(event.target.checked)} type="checkbox" />
+                WhatsApp liberado
+              </label>
+              <label className="muted-panel flex items-center gap-3 text-sm">
+                <input checked={newPlanAutomation} className="app-checkbox" onChange={(event) => setNewPlanAutomation(event.target.checked)} type="checkbox" />
+                Automações liberadas
+              </label>
+              <label className="muted-panel flex items-center gap-3 text-sm">
+                <input checked={newPlanPdfExport} className="app-checkbox" onChange={(event) => setNewPlanPdfExport(event.target.checked)} type="checkbox" />
+                PDF liberado
+              </label>
+            </div>
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+              <p className="text-xs text-[var(--color-muted-foreground)]">
+                Limites vazios significam operação sem teto específico naquele item.
+              </p>
+              <Button
+                disabled={createPlanMutation.isPending || !newPlanName.trim()}
+                onClick={() => createPlanMutation.mutate()}
+                type="button"
+              >
+                {createPlanMutation.isPending ? "Criando plano..." : "Criar plano"}
+              </Button>
+            </div>
+          </div>
+        ) : null}
         <div className="mt-6 grid gap-4 lg:grid-cols-3">
-          {PLAN_PRESETS.map((preset) => (
-            <article key={preset.id} className="data-card p-5">
+          {plans.map((plan) => (
+            <article key={plan.id} className="data-card p-5">
               <div className="flex items-center justify-between gap-3">
-                <h3 className="text-lg font-semibold">{preset.title}</h3>
+                <h3 className="text-lg font-semibold">{plan.name}</h3>
                 <span className="rounded-full bg-[color-mix(in_srgb,var(--color-primary)_12%,transparent)] px-3 py-1 text-xs font-semibold text-[var(--color-primary)]">
-                  {preset.badge}
+                  {plan.isDefault ? "Padrão" : "Customizado"}
                 </span>
               </div>
-              <p className="mt-3 text-sm leading-7 text-[var(--color-muted-foreground)]">{preset.description}</p>
+              <p className="mt-3 text-sm leading-7 text-[var(--color-muted-foreground)]">
+                {plan.description || "Sem descrição cadastrada para este plano."}
+              </p>
               <div className="mt-4 flex flex-wrap gap-2 text-xs text-[var(--color-muted-foreground)]">
                 <span className="rounded-full border border-[var(--color-border)] px-3 py-1">
-                  Plano {formatPlanLabel(preset.plan)}
+                  {formatPlanLabel(plan.tier)}
                 </span>
                 <span className="rounded-full border border-[var(--color-border)] px-3 py-1">
-                  {preset.maxUsers} usuário{preset.maxUsers > 1 ? "s" : ""}
+                  {plan.maxUsers === null ? "Usuários livres" : `${plan.maxUsers} usuários`}
                 </span>
-                {preset.trialDays ? (
-                  <span className="rounded-full border border-[var(--color-border)] px-3 py-1">
-                    {preset.trialDays} dias de avaliação
-                  </span>
-                ) : null}
+                <span className="rounded-full border border-[var(--color-border)] px-3 py-1">
+                  {plan.trialDays > 0 ? `${plan.trialDays} dias de avaliação` : "Sem avaliação"}
+                </span>
+                <span className="rounded-full border border-[var(--color-border)] px-3 py-1">
+                  {plan.tenantsCount} organização{plan.tenantsCount === 1 ? "" : "ões"}
+                </span>
               </div>
+              <div className="mt-4 flex flex-wrap gap-2 text-xs text-[var(--color-muted-foreground)]">
+                <span className="rounded-full border border-[var(--color-border)] px-3 py-1">
+                  Contas {plan.maxAccounts === null ? "livres" : plan.maxAccounts}
+                </span>
+                <span className="rounded-full border border-[var(--color-border)] px-3 py-1">
+                  Cartões {plan.maxCards === null ? "livres" : plan.maxCards}
+                </span>
+                <span className="rounded-full border border-[var(--color-border)] px-3 py-1">
+                  {plan.features.whatsappAssistant ? "WhatsApp" : "Sem WhatsApp"}
+                </span>
+                <span className="rounded-full border border-[var(--color-border)] px-3 py-1">
+                  {plan.features.automation ? "Automação" : "Sem automação"}
+                </span>
+                <span className="rounded-full border border-[var(--color-border)] px-3 py-1">
+                  {plan.features.pdfExport ? "PDF" : "Sem PDF"}
+                </span>
+              </div>
+              {isPlatformAdmin ? (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Button
+                    onClick={() => {
+                      const nextName = window.prompt(`Novo nome para ${plan.name}`, plan.name);
+                      if (nextName === null || !nextName.trim()) return;
+                      updatePlanMutation.mutate({ id: plan.id, data: { name: nextName.trim() } });
+                    }}
+                    type="button"
+                    variant="secondary"
+                  >
+                    Nome
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      const nextDescription = window.prompt(`Descrição do plano ${plan.name}`, plan.description || "");
+                      if (nextDescription === null) return;
+                      updatePlanMutation.mutate({ id: plan.id, data: { description: nextDescription } });
+                    }}
+                    type="button"
+                    variant="ghost"
+                  >
+                    Descrição
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      const nextMaxUsers = window.prompt(`Novo limite de usuários para ${plan.name}`, plan.maxUsers?.toString() || "");
+                      if (nextMaxUsers === null) return;
+                      updatePlanMutation.mutate({ id: plan.id, data: { maxUsers: parseNullableLimit(nextMaxUsers) } });
+                    }}
+                    type="button"
+                    variant="ghost"
+                  >
+                    Usuários
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      const nextMaxAccounts = window.prompt(`Novo limite de contas para ${plan.name}`, plan.maxAccounts?.toString() || "");
+                      if (nextMaxAccounts === null) return;
+                      updatePlanMutation.mutate({ id: plan.id, data: { maxAccounts: parseNullableLimit(nextMaxAccounts) } });
+                    }}
+                    type="button"
+                    variant="ghost"
+                  >
+                    Contas
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      const nextMaxCards = window.prompt(`Novo limite de cartões para ${plan.name}`, plan.maxCards?.toString() || "");
+                      if (nextMaxCards === null) return;
+                      updatePlanMutation.mutate({ id: plan.id, data: { maxCards: parseNullableLimit(nextMaxCards) } });
+                    }}
+                    type="button"
+                    variant="ghost"
+                  >
+                    Cartões
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      const nextTrialDays = window.prompt(`Dias de avaliação para ${plan.name}`, String(plan.trialDays));
+                      if (nextTrialDays === null) return;
+                      const parsed = Number(nextTrialDays);
+                      if (Number.isFinite(parsed) && parsed >= 0) {
+                        updatePlanMutation.mutate({ id: plan.id, data: { trialDays: parsed } });
+                      }
+                    }}
+                    type="button"
+                    variant="ghost"
+                  >
+                    Avaliação
+                  </Button>
+                  <Button
+                    onClick={() =>
+                      updatePlanMutation.mutate({
+                        id: plan.id,
+                        data: { whatsappAssistant: !plan.features.whatsappAssistant }
+                      })
+                    }
+                    type="button"
+                    variant="ghost"
+                  >
+                    {plan.features.whatsappAssistant ? "Bloquear WhatsApp" : "Liberar WhatsApp"}
+                  </Button>
+                  <Button
+                    onClick={() =>
+                      updatePlanMutation.mutate({
+                        id: plan.id,
+                        data: { automation: !plan.features.automation }
+                      })
+                    }
+                    type="button"
+                    variant="ghost"
+                  >
+                    {plan.features.automation ? "Bloquear automação" : "Liberar automação"}
+                  </Button>
+                  <Button
+                    onClick={() =>
+                      updatePlanMutation.mutate({
+                        id: plan.id,
+                        data: { pdfExport: !plan.features.pdfExport }
+                      })
+                    }
+                    type="button"
+                    variant="ghost"
+                  >
+                    {plan.features.pdfExport ? "Bloquear PDF" : "Liberar PDF"}
+                  </Button>
+                  {!plan.isDefault ? (
+                    <>
+                      <Button
+                        onClick={() =>
+                          updatePlanMutation.mutate({
+                            id: plan.id,
+                            data: { isActive: !plan.isActive }
+                          })
+                        }
+                        type="button"
+                        variant="ghost"
+                      >
+                        {plan.isActive ? "Desativar" : "Ativar"}
+                      </Button>
+                      <Button
+                        disabled={deletePlanMutation.isPending || plan.tenantsCount > 0}
+                        onClick={() => deletePlanMutation.mutate(plan.id)}
+                        type="button"
+                        variant="ghost"
+                      >
+                        Excluir
+                      </Button>
+                    </>
+                  ) : null}
+                </div>
+              ) : null}
             </article>
           ))}
         </div>
@@ -641,9 +975,13 @@ export function AdminClient() {
                   placeholder="Slug da organização"
                   value={newTenantSlug}
                 />
-                <Select onChange={(event) => setNewTenantPlan(event.target.value as "free" | "pro")} value={newTenantPlan}>
-                  <option value="free">Plano Gratuito</option>
-                  <option value="pro">Plano Premium</option>
+                <Select onChange={(event) => setNewTenantPlanId(event.target.value)} value={newTenantPlanId}>
+                  <option value="">Escolher plano inicial</option>
+                  {plans.filter((item) => item.isActive).map((plan) => (
+                    <option key={plan.id} value={plan.id}>
+                      {plan.name} • {formatPlanLabel(plan.tier)}
+                    </option>
+                  ))}
                 </Select>
               </div>
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
@@ -651,7 +989,7 @@ export function AdminClient() {
                   O plano é da organização. Depois, basta convidar usuários para esse tenant.
                 </p>
                 <Button
-                  disabled={createTenantMutation.isPending || !newTenantName.trim()}
+                  disabled={createTenantMutation.isPending || !newTenantName.trim() || !((newTenantPlanId || plans[0]?.id))}
                   onClick={() => createTenantMutation.mutate()}
                   type="button"
                 >
@@ -686,51 +1024,50 @@ export function AdminClient() {
                   <div className="min-w-0">
                     <p className="font-semibold">{tenant.name}</p>
                     <p className="break-words text-sm text-[var(--color-muted-foreground)]">
-                      Organização {tenant.slug} • Plano {formatPlanLabel(tenant.plan)}
+                      Organização {tenant.slug} • Plano {tenant.planName}
                     </p>
                     <p className="text-xs text-[var(--color-muted-foreground)]">
                       {formatLifecycleLabel(tenant)}
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-semibold">{tenant.activeUsers}/{tenant.maxUsers}</p>
+                    <p className="text-sm font-semibold">
+                      {tenant.activeUsers}/{tenant.maxUsers ?? "livre"}
+                    </p>
                     <p className="text-xs text-[var(--color-muted-foreground)]">usuários ativos / limite</p>
                   </div>
                 </div>
-                <div className="mt-3 flex flex-wrap gap-2">
+                <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
+                  <Select
+                    onChange={(event) =>
+                      setTenantPlanDrafts((current) => ({
+                        ...current,
+                        [tenant.id]: event.target.value
+                      }))
+                    }
+                    value={tenantPlanDrafts[tenant.id] ?? tenant.planId}
+                  >
+                    {plans.filter((item) => item.isActive).map((plan) => (
+                      <option key={plan.id} value={plan.id}>
+                        {plan.name} • {formatPlanLabel(plan.tier)}
+                      </option>
+                    ))}
+                  </Select>
                   <Button
+                    disabled={(tenantPlanDrafts[tenant.id] ?? tenant.planId) === tenant.planId}
                     onClick={() =>
                       updateTenantMutation.mutate({
                         id: tenant.id,
-                        plan: tenant.plan === "free" ? "pro" : "free"
+                        planId: tenantPlanDrafts[tenant.id] ?? tenant.planId
                       })
                     }
                     type="button"
                     variant="secondary"
                   >
-                    Mudar para {tenant.plan === "free" ? "Premium" : "Gratuito"}
+                    Aplicar plano
                   </Button>
-                  <Button
-                    onClick={() => applyPlanPreset(tenant.id, PLAN_PRESETS[0])}
-                    type="button"
-                    variant="ghost"
-                  >
-                    Aplicar Gratuito
-                  </Button>
-                  <Button
-                    onClick={() => applyPlanPreset(tenant.id, PLAN_PRESETS[1])}
-                    type="button"
-                    variant="ghost"
-                  >
-                    Aplicar Premium
-                  </Button>
-                  <Button
-                    onClick={() => applyPlanPreset(tenant.id, PLAN_PRESETS[2])}
-                    type="button"
-                    variant="ghost"
-                  >
-                    Aplicar avaliação 14 dias
-                  </Button>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
                   <Button
                     onClick={() => {
                       const nextTrialDays = window.prompt(`Novos dias de avaliação para ${tenant.name}`, String(tenant.trialDays));
@@ -747,12 +1084,9 @@ export function AdminClient() {
                   </Button>
                   <Button
                     onClick={() => {
-                      const nextMaxUsers = window.prompt(`Novo limite de usuários para ${tenant.name}`, String(tenant.maxUsers));
-                      if (!nextMaxUsers) return;
-                      const parsed = Number(nextMaxUsers);
-                      if (Number.isFinite(parsed) && parsed > 0) {
-                        updateTenantMutation.mutate({ id: tenant.id, maxUsers: parsed });
-                      }
+                      const nextMaxUsers = window.prompt(`Novo limite de usuários para ${tenant.name}`, tenant.maxUsers?.toString() || "");
+                      if (nextMaxUsers === null) return;
+                      updateTenantMutation.mutate({ id: tenant.id, maxUsers: parseNullableLimit(nextMaxUsers) });
                     }}
                     type="button"
                     variant="ghost"
@@ -1008,8 +1342,8 @@ export function AdminClient() {
                   return (
                     <p className="text-xs text-[var(--color-muted-foreground)]">
                       O usuário convidado entrará na organização <strong>{selectedTenant.name}</strong> com plano{" "}
-                      <strong>{formatPlanLabel(selectedTenant.plan)}</strong> e limite atual {selectedTenant.activeUsers}/
-                      {selectedTenant.maxUsers} usuários.
+                      <strong>{selectedTenant.planName}</strong> e limite atual {selectedTenant.activeUsers}/
+                      {selectedTenant.maxUsers ?? "livre"} usuários.
                     </p>
                   );
                 })()}
@@ -1152,6 +1486,9 @@ export function AdminClient() {
               <option value="">Todas as ações</option>
               <option value="user.updated">Usuários atualizados</option>
               <option value="tenant.updated">Organizações atualizadas</option>
+              <option value="plan.created">Planos criados</option>
+              <option value="plan.updated">Planos atualizados</option>
+              <option value="plan.deleted">Planos excluídos</option>
               <option value="invitation.created">Convites criados</option>
               <option value="invitation.revoked">Convites revogados</option>
             </Select>
