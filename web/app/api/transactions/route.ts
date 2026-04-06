@@ -24,7 +24,6 @@ export async function GET(request: Request) {
     });
     const where: Prisma.TransactionWhereInput = {
       tenantId: user.tenantId,
-      userId: user.id,
       ...(filters.type ? { type: filters.type } : {}),
       ...(filters.categoryId ? { categoryId: filters.categoryId } : {}),
       ...(filters.cardId ? { cardId: filters.cardId } : {})
@@ -138,7 +137,6 @@ export async function POST(request: Request) {
     const history = await prisma.transaction.findMany({
       where: {
         tenantId: user.tenantId,
-        userId: user.id,
         type: body.type,
         categoryId: {
           not: null

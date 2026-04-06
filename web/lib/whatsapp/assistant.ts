@@ -236,11 +236,10 @@ async function createExpenseOrIncomeFromText(user: WhatsAppUser, body: string, t
   }
 
   const [accounts, cards, categories, history] = await Promise.all([
-    getAccountsWithComputedBalance(user.tenantId, user.id),
+    getAccountsWithComputedBalance(user.tenantId),
     prisma.card.findMany({
       where: {
         tenantId: user.tenantId,
-        ownerUserId: user.id,
         isActive: true
       },
       orderBy: {
@@ -261,7 +260,6 @@ async function createExpenseOrIncomeFromText(user: WhatsAppUser, body: string, t
     prisma.transaction.findMany({
       where: {
         tenantId: user.tenantId,
-        userId: user.id,
         type,
         categoryId: {
           not: null
@@ -412,13 +410,13 @@ async function createExpenseOrIncomeFromText(user: WhatsAppUser, body: string, t
 }
 
 async function replyWithBalance(user: WhatsAppUser, body: string) {
-  const accounts = (await getAccountsWithComputedBalance(user.tenantId, user.id)).filter((item) => item.isActive);
+  const accounts = (await getAccountsWithComputedBalance(user.tenantId)).filter((item) => item.isActive);
 
   if (!accounts.length) {
     return {
       intent: "balance",
       status: "no_accounts",
-      response: "Nao encontrei contas ativas vinculadas ao seu usuario."
+      response: "Nao encontrei contas ativas nesta carteira compartilhada."
     } satisfies AssistantResult;
   }
 
@@ -455,7 +453,6 @@ async function replyWithCardInfo(user: WhatsAppUser, body: string) {
   const cards = await prisma.card.findMany({
     where: {
       tenantId: user.tenantId,
-      ownerUserId: user.id,
       isActive: true
     },
     orderBy: {
@@ -467,7 +464,7 @@ async function replyWithCardInfo(user: WhatsAppUser, body: string) {
     return {
       intent: "card_info",
       status: "no_cards",
-      response: "Nao encontrei cartoes ativos vinculados ao seu usuario."
+      response: "Nao encontrei cartoes ativos nesta carteira compartilhada."
     } satisfies AssistantResult;
   }
 
@@ -493,7 +490,6 @@ async function replyWithCardInfo(user: WhatsAppUser, body: string) {
   const transactions = await prisma.transaction.findMany({
     where: {
       tenantId: user.tenantId,
-      userId: user.id,
       cardId: card.id,
       date: {
         gte: start,
@@ -593,8 +589,7 @@ export async function processIncomingWhatsAppTextMessage(message: IncomingTextMe
     return {
       handled: true,
       to: formattedPhone,
-      response:
-        "Seu numero ainda nao esta vinculado a um usuario ativo no SavePoint. Atualize seu WhatsApp em Configuracoes."
+      response: "Seu numero ainda nao esta vinculado a uma pessoa ativa no Save Point. Atualize o WhatsApp em Configuracoes."
     };
   }
 
@@ -604,7 +599,7 @@ export async function processIncomingWhatsAppTextMessage(message: IncomingTextMe
     return {
       handled: true,
       to: formattedPhone,
-      response: "A organização vinculada ao seu usuário está com a licença indisponível no momento."
+      response: "A conta vinculada a voce esta com a licenca indisponivel no momento."
     };
   }
 

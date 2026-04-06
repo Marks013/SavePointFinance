@@ -19,8 +19,7 @@ export async function PATCH(request: Request, context: Params) {
     const updated = await prisma.goal.update({
       where: {
         id,
-        tenantId: user.tenantId,
-        userId: user.id
+        tenantId: user.tenantId
       },
       data: {
         accountId: body.accountId || null,
@@ -53,8 +52,7 @@ export async function DELETE(_request: Request, context: Params) {
     await prisma.goal.delete({
       where: {
         id,
-        tenantId: user.tenantId,
-        userId: user.id
+        tenantId: user.tenantId
       }
     });
 

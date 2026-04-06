@@ -119,7 +119,7 @@ export async function DELETE(_: Request, context: Params) {
     }
 
     if (target._count.tenants > 0) {
-      return NextResponse.json({ message: "Remova ou migre as organizações vinculadas antes de excluir o plano" }, { status: 409 });
+      return NextResponse.json({ message: "Remova ou migre as contas vinculadas antes de excluir o plano" }, { status: 409 });
     }
 
     await prisma.plan.delete({

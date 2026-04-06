@@ -158,7 +158,7 @@ function formatLifecycleLabel(tenant: TenantItem) {
     return `Avaliação até ${new Date(tenant.trialExpiresAt).toLocaleDateString("pt-BR")}`;
   }
 
-  return tenant.isActive ? "Sem vencimento configurado" : "Organização inativa";
+  return tenant.isActive ? "Sem vencimento configurado" : "Conta inativa";
 }
 
 function formatUserTenantPlanLabel(user: UserItem) {
@@ -212,7 +212,7 @@ async function getStats() {
 
 async function getTenants(filters: { search?: string; plan?: string; status?: string }) {
   const response = await fetch(`/api/admin/tenants${buildQuery(filters)}`, { cache: "no-store" });
-  if (!response.ok) throw new Error("Falha ao carregar tenants");
+  if (!response.ok) throw new Error("Falha ao carregar contas");
   return (await response.json()) as { items: TenantItem[] };
 }
 
@@ -386,7 +386,7 @@ export function AdminClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isActive })
       });
-      if (!response.ok) throw new Error("Falha ao atualizar usuario");
+      if (!response.ok) throw new Error("Falha ao atualizar pessoa");
     },
     onSuccess: async () => {
       await Promise.all([
@@ -411,7 +411,7 @@ export function AdminClient() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["admin-users"] });
       await queryClient.invalidateQueries({ queryKey: ["admin-audit"] });
-      toast.success("Perfil do usuário atualizado");
+      toast.success("Perfil da pessoa atualizado");
     }
   });
 
@@ -425,7 +425,7 @@ export function AdminClient() {
 
       if (!response.ok) {
         const payload = (await response.json()) as { message?: string };
-        throw new Error(payload.message ?? "Falha ao alterar organização do usuário");
+        throw new Error(payload.message ?? "Falha ao alterar a conta da pessoa");
       }
     },
     onSuccess: async () => {
@@ -435,7 +435,33 @@ export function AdminClient() {
         queryClient.invalidateQueries({ queryKey: ["admin-stats"] }),
         queryClient.invalidateQueries({ queryKey: ["admin-audit"] })
       ]);
-      toast.success("Organização do usuário atualizada");
+      toast.success("Conta da pessoa atualizada");
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    }
+  });
+
+  const deleteUserMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await fetch(`/api/admin/users/${id}`, {
+        method: "DELETE"
+      });
+
+      const payload = (await response.json().catch(() => ({}))) as { message?: string };
+
+      if (!response.ok) {
+        throw new Error(payload.message ?? "Falha ao excluir pessoa");
+      }
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin-users"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-tenants"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-stats"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-audit"] })
+      ]);
+      toast.success("Usuário excluído definitivamente");
     },
     onError: (error) => {
       toast.error(error.message);
@@ -644,7 +670,7 @@ export function AdminClient() {
 
       if (!response.ok) {
         const payload = (await response.json()) as { message?: string };
-        throw new Error(payload.message ?? "Falha ao criar organização");
+        throw new Error(payload.message ?? "Falha ao criar conta");
       }
     },
     onSuccess: async () => {
@@ -656,7 +682,7 @@ export function AdminClient() {
         queryClient.invalidateQueries({ queryKey: ["admin-stats"] }),
         queryClient.invalidateQueries({ queryKey: ["admin-audit"] })
       ]);
-      toast.success("Organização criada");
+      toast.success("Conta criada");
     },
     onError: (error) => {
       toast.error(error.message);
@@ -736,10 +762,10 @@ export function AdminClient() {
         <div className="eyebrow">Administração</div>
         <h1 className="mt-3 text-3xl font-semibold tracking-[-0.03em]">Painel administrativo</h1>
         <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--color-muted-foreground)]">
-          Gerencie organizações, usuários, convites e limites operacionais do ambiente.
+          Gerencie contas, colaboradores, convites e limites operacionais do produto.
         </p>
         <div className="info-banner mt-5">
-          <strong>Planos são aplicados por organização.</strong> Usuários convidados herdam o plano, os limites e os recursos premium do tenant ao qual pertencem.
+          <strong>Planos são aplicados por conta.</strong> Pessoas convidadas herdam o plano, os limites e os recursos premium da conta à qual passam a ter acesso.
         </div>
         {isPlatformAdmin ? (
           <div className="info-banner mt-5">
@@ -784,7 +810,7 @@ export function AdminClient() {
                 type="number"
                 value={newPlanTrialDays}
               />
-              <Input onChange={(event) => setNewPlanMaxUsers(event.target.value)} placeholder="Limite de usuários" value={newPlanMaxUsers} />
+              <Input onChange={(event) => setNewPlanMaxUsers(event.target.value)} placeholder="Limite de pessoas" value={newPlanMaxUsers} />
               <Input onChange={(event) => setNewPlanMaxAccounts(event.target.value)} placeholder="Limite de contas" value={newPlanMaxAccounts} />
               <Input onChange={(event) => setNewPlanMaxCards(event.target.value)} placeholder="Limite de cartões" value={newPlanMaxCards} />
               <Input
@@ -838,13 +864,13 @@ export function AdminClient() {
                   {formatPlanLabel(plan.tier)}
                 </span>
                 <span className="rounded-full border border-[var(--color-border)] px-3 py-1">
-                  {plan.maxUsers === null ? "Usuários livres" : `${plan.maxUsers} usuários`}
+                  {plan.maxUsers === null ? "Pessoas livres" : `${plan.maxUsers} pessoas`}
                 </span>
                 <span className="rounded-full border border-[var(--color-border)] px-3 py-1">
                   {plan.trialDays > 0 ? `${plan.trialDays} dias de avaliação` : "Sem avaliação"}
                 </span>
                 <span className="rounded-full border border-[var(--color-border)] px-3 py-1">
-                  {plan.tenantsCount} organização{plan.tenantsCount === 1 ? "" : "ões"}
+                  {plan.tenantsCount} conta{plan.tenantsCount === 1 ? "" : "s"}
                 </span>
               </div>
               <div className="mt-4 flex flex-wrap gap-2 text-xs text-[var(--color-muted-foreground)]">
@@ -890,14 +916,14 @@ export function AdminClient() {
                   </Button>
                   <Button
                     onClick={() => {
-                      const nextMaxUsers = window.prompt(`Novo limite de usuários para ${plan.name}`, plan.maxUsers?.toString() || "");
+                      const nextMaxUsers = window.prompt(`Novo limite de pessoas para ${plan.name}`, plan.maxUsers?.toString() || "");
                       if (nextMaxUsers === null) return;
                       updatePlanMutation.mutate({ id: plan.id, data: { maxUsers: parseNullableLimit(nextMaxUsers) } });
                     }}
                     type="button"
                     variant="ghost"
                   >
-                    Usuários
+                    Pessoas
                   </Button>
                   <Button
                     onClick={() => {
@@ -1003,12 +1029,12 @@ export function AdminClient() {
       </section>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-        <article className="metric-card"><p className="metric-label">Organizações</p><p className="metric-value">{statsQuery.data?.totalTenants ?? 0}</p></article>
+        <article className="metric-card"><p className="metric-label">Contas</p><p className="metric-value">{statsQuery.data?.totalTenants ?? 0}</p></article>
         <article className="metric-card"><p className="metric-label">Ativos</p><p className="metric-value">{statsQuery.data?.activeTenants ?? 0}</p></article>
         <article className="metric-card"><p className="metric-label">Em avaliação</p><p className="metric-value">{statsQuery.data?.trialTenants ?? 0}</p></article>
         <article className="metric-card"><p className="metric-label">Expirados</p><p className="metric-value">{statsQuery.data?.expiredTenants ?? 0}</p></article>
-        <article className="metric-card"><p className="metric-label">Usuários</p><p className="metric-value">{statsQuery.data?.totalUsers ?? 0}</p></article>
-        <article className="metric-card"><p className="metric-label">Usuários ativos</p><p className="metric-value">{statsQuery.data?.activeUsers ?? 0}</p></article>
+        <article className="metric-card"><p className="metric-label">Pessoas</p><p className="metric-value">{statsQuery.data?.totalUsers ?? 0}</p></article>
+        <article className="metric-card"><p className="metric-label">Pessoas ativas</p><p className="metric-value">{statsQuery.data?.activeUsers ?? 0}</p></article>
         <article className="metric-card"><p className="metric-label">Transações</p><p className="metric-value">{statsQuery.data?.totalTransactions ?? 0}</p></article>
       </div>
 
@@ -1016,9 +1042,9 @@ export function AdminClient() {
         <section className="surface content-section">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h2 className="text-2xl font-semibold tracking-[-0.03em]">Organizações</h2>
+              <h2 className="text-2xl font-semibold tracking-[-0.03em]">Contas</h2>
               <p className="mt-2 text-sm leading-7 text-[var(--color-muted-foreground)]">
-                Ajuste plano, avaliação, capacidade e status operacional de cada ambiente.
+                Ajuste plano, avaliação, capacidade e status operacional de cada conta.
               </p>
             </div>
             <article className="metric-card">
@@ -1030,21 +1056,21 @@ export function AdminClient() {
             <div className="mt-6 rounded-[1.6rem] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-card)_88%,var(--color-muted))] p-4">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
-                  <h3 className="text-lg font-semibold">Nova organização</h3>
+                  <h3 className="text-lg font-semibold">Nova conta</h3>
                   <p className="mt-1 text-sm leading-7 text-[var(--color-muted-foreground)]">
-                    Crie uma nova organização já com plano inicial, slug limpo e categorias padrão prontas para uso.
+                    Crie uma nova conta já com plano inicial, identificador limpo e categorias padrão prontas para uso.
                   </p>
                 </div>
               </div>
               <div className="mt-4 grid gap-3 md:grid-cols-3">
                 <Input
                   onChange={(event) => setNewTenantName(event.target.value)}
-                  placeholder="Nome da organização"
+                  placeholder="Nome da conta"
                   value={newTenantName}
                 />
                 <Input
                   onChange={(event) => setNewTenantSlug(event.target.value)}
-                  placeholder="Slug da organização"
+                  placeholder="Identificador da conta"
                   value={newTenantSlug}
                 />
                 <Select onChange={(event) => setNewTenantPlanId(event.target.value)} value={newTenantPlanId}>
@@ -1058,14 +1084,14 @@ export function AdminClient() {
               </div>
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                 <p className="text-xs text-[var(--color-muted-foreground)]">
-                  O plano é da organização. Depois, basta convidar usuários para esse tenant.
+                  O plano é da conta. Depois, basta convidar colaboradores para compartilhar o mesmo espaço financeiro.
                 </p>
                 <Button
                   disabled={createTenantMutation.isPending || !newTenantName.trim() || !((newTenantPlanId || plans[0]?.id))}
                   onClick={() => createTenantMutation.mutate()}
                   type="button"
                 >
-                  {createTenantMutation.isPending ? "Criando organização..." : "Criar organização"}
+                  {createTenantMutation.isPending ? "Criando conta..." : "Criar conta"}
                 </Button>
               </div>
             </div>
@@ -1074,7 +1100,7 @@ export function AdminClient() {
             <div className="grid gap-3 md:grid-cols-3">
               <Input
                 onChange={(event) => setTenantSearch(event.target.value)}
-                placeholder="Buscar por organização ou slug"
+                placeholder="Buscar por conta ou identificador"
                 value={tenantSearch}
               />
               <Select onChange={(event) => setTenantPlanFilter(event.target.value)} value={tenantPlanFilter}>
@@ -1096,7 +1122,7 @@ export function AdminClient() {
                   <div className="min-w-0">
                     <p className="font-semibold">{tenant.name}</p>
                     <p className="break-words text-sm text-[var(--color-muted-foreground)]">
-                      Organização {tenant.slug} • Plano {tenant.planName}
+                      Conta {tenant.slug} • Plano {tenant.planName}
                     </p>
                     <p className="text-xs text-[var(--color-muted-foreground)]">
                       {formatLifecycleLabel(tenant)}
@@ -1106,7 +1132,7 @@ export function AdminClient() {
                     <p className="text-sm font-semibold">
                       {tenant.activeUsers}/{tenant.maxUsers ?? "livre"}
                     </p>
-                    <p className="text-xs text-[var(--color-muted-foreground)]">usuários ativos / limite</p>
+                    <p className="text-xs text-[var(--color-muted-foreground)]">pessoas ativas / limite</p>
                   </div>
                 </div>
                 <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
@@ -1155,8 +1181,8 @@ export function AdminClient() {
                     Avaliação
                   </Button>
                   <Button
-                    onClick={() => {
-                      const nextMaxUsers = window.prompt(`Novo limite de usuários para ${tenant.name}`, tenant.maxUsers?.toString() || "");
+                      onClick={() => {
+                        const nextMaxUsers = window.prompt(`Novo limite de pessoas para ${tenant.name}`, tenant.maxUsers?.toString() || "");
                       if (nextMaxUsers === null) return;
                       updateTenantMutation.mutate({ id: tenant.id, maxUsers: parseNullableLimit(nextMaxUsers) });
                     }}
@@ -1192,9 +1218,9 @@ export function AdminClient() {
         <section className="surface content-section">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h2 className="text-2xl font-semibold tracking-[-0.03em]">Usuários</h2>
+              <h2 className="text-2xl font-semibold tracking-[-0.03em]">Colaboradores</h2>
               <p className="mt-2 text-sm leading-7 text-[var(--color-muted-foreground)]">
-                Controle perfis, acesso e redefinição de senha dos usuários cadastrados.
+                Controle perfis, acesso e redefinição de senha das pessoas com acesso à conta.
               </p>
             </div>
             <article className="metric-card">
@@ -1209,7 +1235,7 @@ export function AdminClient() {
                   setUserSearch(event.target.value);
                   setUserPage(1);
                 }}
-                placeholder="Buscar por nome, e-mail ou organização"
+                placeholder="Buscar por nome, e-mail ou conta"
                 value={userSearch}
               />
               {isPlatformAdmin ? (
@@ -1220,7 +1246,7 @@ export function AdminClient() {
                   }}
                   value={userTenantFilter}
                 >
-                  <option value="">Todas as organizações</option>
+                  <option value="">Todas as contas</option>
                   {tenants.map((tenant) => (
                     <option key={tenant.id} value={tenant.id}>
                       {tenant.name}
@@ -1278,7 +1304,7 @@ export function AdminClient() {
                 <option value="name_asc">Nome A-Z</option>
               </Select>
               <div className="flex items-center justify-end text-sm text-[var(--color-muted-foreground)]">
-                {usersMeta ? `${usersMeta.total} usuários encontrados` : "Carregando usuários..."}
+                {usersMeta ? `${usersMeta.total} pessoas encontradas` : "Carregando pessoas..."}
               </div>
             </div>
             {users.map((user) => (
@@ -1291,7 +1317,7 @@ export function AdminClient() {
                       {user.isPlatformAdmin ? " • Superadmin" : ""}
                     </p>
                     <p className="text-xs text-[var(--color-muted-foreground)]">
-                      Organização {user.tenant.slug} • {formatUserTenantPlanLabel(user)}
+                      Conta {user.tenant.slug} • {formatUserTenantPlanLabel(user)}
                     </p>
                     <p className="text-xs text-[var(--color-muted-foreground)]">
                       Último login: {user.lastLogin ? new Date(user.lastLogin).toLocaleString("pt-BR") : "Nunca acessou"}
@@ -1326,6 +1352,32 @@ export function AdminClient() {
                     >
                       {user.isActive ? "Desativar" : "Ativar"}
                     </Button>
+                    {!user.isPlatformAdmin ? (
+                      <Button
+                        className="border-[var(--color-destructive)] text-[var(--color-destructive)] hover:bg-[color-mix(in_srgb,var(--color-destructive)_10%,transparent)]"
+                        disabled={deleteUserMutation.isPending}
+                        onClick={() => {
+                          const confirmation = window.prompt(
+                            `Digite ${user.email} para excluir definitivamente esta pessoa e todos os dados vinculados.`
+                          );
+
+                          if (!confirmation) {
+                            return;
+                          }
+
+                          if (confirmation.trim().toLowerCase() !== user.email.trim().toLowerCase()) {
+                            toast.error("O e-mail informado não confere");
+                            return;
+                          }
+
+                          deleteUserMutation.mutate(user.id);
+                        }}
+                        type="button"
+                        variant="ghost"
+                      >
+                        Excluir definitivamente
+                      </Button>
+                    ) : null}
                   </div>
                 </div>
                 {isPlatformAdmin && !user.isPlatformAdmin ? (
@@ -1356,7 +1408,7 @@ export function AdminClient() {
                       type="button"
                       variant="ghost"
                     >
-                      Alterar organização
+                      Alterar conta
                     </Button>
                   </div>
                 ) : null}
@@ -1391,7 +1443,7 @@ export function AdminClient() {
 
       <div className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
         <section className="surface content-section">
-          <h2 className="text-2xl font-semibold tracking-[-0.03em]">Convidar usuário</h2>
+          <h2 className="text-2xl font-semibold tracking-[-0.03em]">Convidar colaborador</h2>
           <form
             className="mt-6 space-y-4"
             onSubmit={invitationForm.handleSubmit(
@@ -1405,9 +1457,9 @@ export function AdminClient() {
           >
             {isPlatformAdmin ? (
               <div className="space-y-2">
-                <Label htmlFor="invite-tenant">Organização</Label>
+                <Label htmlFor="invite-tenant">Conta</Label>
                 <Select id="invite-tenant" onChange={(event) => setInviteTenantId(event.target.value)} value={inviteTenantId}>
-                  <option value="">Usar primeira organização listada</option>
+                  <option value="">Usar a primeira conta listada</option>
                   {tenants.map((tenant) => (
                     <option key={tenant.id} value={tenant.id}>
                       {getTenantLabel(tenant)}
@@ -1420,9 +1472,9 @@ export function AdminClient() {
 
                   return (
                     <p className="text-xs text-[var(--color-muted-foreground)]">
-                      O usuário convidado entrará na organização <strong>{selectedTenant.name}</strong> com plano{" "}
+                      A pessoa convidada entrará na conta <strong>{selectedTenant.name}</strong> com plano{" "}
                       <strong>{selectedTenant.planName}</strong> e limite atual {selectedTenant.activeUsers}/
-                      {selectedTenant.maxUsers ?? "livre"} usuários.
+                      {selectedTenant.maxUsers ?? "livre"} pessoas.
                     </p>
                   );
                 })()}
@@ -1486,7 +1538,7 @@ export function AdminClient() {
               />
               {isPlatformAdmin ? (
                 <Select onChange={(event) => setInvitationTenantFilter(event.target.value)} value={invitationTenantFilter}>
-                  <option value="">Todas as organizações</option>
+                  <option value="">Todas as contas</option>
                   {tenants.map((tenant) => (
                     <option key={tenant.id} value={tenant.id}>
                       {tenant.name}
@@ -1549,7 +1601,7 @@ export function AdminClient() {
           <div>
             <h2 className="text-2xl font-semibold tracking-[-0.03em]">Auditoria administrativa</h2>
             <p className="mt-2 text-sm leading-7 text-[var(--color-muted-foreground)]">
-              Acompanhe alterações sensíveis em usuários, convites e organizações.
+              Acompanhe alterações sensíveis em pessoas, convites, contas e planos.
             </p>
           </div>
           <article className="metric-card">
@@ -1566,7 +1618,7 @@ export function AdminClient() {
             />
             {isPlatformAdmin ? (
               <Select onChange={(event) => setAuditTenantFilter(event.target.value)} value={auditTenantFilter}>
-                <option value="">Todas as organizações</option>
+                <option value="">Todas as contas</option>
                 {tenants.map((tenant) => (
                   <option key={tenant.id} value={tenant.id}>
                     {tenant.name}
@@ -1578,8 +1630,8 @@ export function AdminClient() {
             )}
             <Select onChange={(event) => setAuditActionFilter(event.target.value)} value={auditActionFilter}>
               <option value="">Todas as ações</option>
-              <option value="user.updated">Usuários atualizados</option>
-              <option value="tenant.updated">Organizações atualizadas</option>
+              <option value="user.updated">Pessoas atualizadas</option>
+              <option value="tenant.updated">Contas atualizadas</option>
               <option value="plan.created">Planos criados</option>
               <option value="plan.updated">Planos atualizados</option>
               <option value="plan.deleted">Planos excluídos</option>

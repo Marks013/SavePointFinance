@@ -37,8 +37,8 @@ export default async function LicensePage() {
         <div className="eyebrow">Licença</div>
         <h1 className="mt-3 text-3xl font-semibold tracking-[-0.04em]">Acesso temporariamente indisponível</h1>
         <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--color-muted-foreground)]">
-          O ambiente <strong>{access.tenant.name}</strong> está com a licença bloqueada no momento. Revise o plano,
-          a ativação da organização e a data de expiração para voltar a operar normalmente.
+          A conta <strong>{access.tenant.name}</strong> está com a licença bloqueada no momento. Revise o plano,
+          a ativação da conta e a data de expiração para voltar a operar normalmente.
         </p>
 
         <div className="mt-8 grid gap-4 md:grid-cols-3">
@@ -60,8 +60,8 @@ export default async function LicensePage() {
 
         <div className="mt-8 rounded-[28px] border border-[var(--color-border)] bg-[var(--color-panel)]/82 p-5 text-sm leading-7 text-[var(--color-muted-foreground)]">
           <p>
-            Se você for o administrador, abra a área administrativa do ambiente e revise a ativação, o plano e a data
-            de expiração. Se não for o administrador, entre em contato com o responsável pela organização.
+            Se você for o administrador, abra a área administrativa da conta e revise a ativação, o plano e a data
+            de expiração. Se não for o administrador, entre em contato com o titular da conta.
           </p>
         </div>
 

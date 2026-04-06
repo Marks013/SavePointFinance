@@ -172,7 +172,7 @@ export async function generateSubscriptionTransaction(subscriptionId: string, te
   const transaction = await prisma.transaction.create({
     data: {
       tenantId,
-      userId,
+      userId: subscription.userId ?? userId,
       subscriptionId: subscription.id,
       date: subscription.nextBillingDate,
       amount: subscription.amount,
@@ -206,7 +206,7 @@ export async function generateSubscriptionTransaction(subscriptionId: string, te
   if (subscription.type === "income" && subscription.autoTithe) {
     await syncMonthlyTitheTransaction({
       tenantId,
-      userId,
+      userId: subscription.userId ?? userId,
       monthKey: getMonthKey(subscription.nextBillingDate)
     });
   }
@@ -383,7 +383,6 @@ export async function runRecurringAutomation(tenantId: string, userId: string) {
   const reminderWindowSubscriptions = await prisma.subscription.findMany({
     where: {
       tenantId,
-      userId,
       isActive: true,
       nextBillingDate: {
         gt: now,
@@ -419,7 +418,6 @@ export async function runRecurringAutomation(tenantId: string, userId: string) {
   const cards = await prisma.card.findMany({
     where: {
       tenantId,
-      ownerUserId: userId,
       isActive: true
     },
     orderBy: {
@@ -450,7 +448,7 @@ export async function runRecurringAutomation(tenantId: string, userId: string) {
       continue;
     }
 
-    const report = await getFinanceReport(tenantId, {}, userId);
+    const report = await getFinanceReport(tenantId, {});
     const cardInfo = report.byCard.find((item) => item.id === card.id);
     const statementAmount = cardInfo?.netStatement ?? 0;
 
@@ -545,7 +543,6 @@ export async function runRecurringAutomation(tenantId: string, userId: string) {
     prisma.transaction.findMany({
       where: {
         tenantId,
-        userId,
         type: "expense",
         date: {
           gte: currentMonthStart,
@@ -560,7 +557,6 @@ export async function runRecurringAutomation(tenantId: string, userId: string) {
     prisma.transaction.findMany({
       where: {
         tenantId,
-        userId,
         type: "expense",
         date: {
           gte: previousMonthStart,
@@ -650,8 +646,7 @@ export async function runRecurringAutomation(tenantId: string, userId: string) {
       {
         from: `${monthToken}-01`,
         to: new Date(reportDate.getFullYear(), reportDate.getMonth() + 1, 0).toISOString().slice(0, 10)
-      },
-      userId
+      }
     );
     const message =
       `Resumo do período: receitas ${formatCurrency(report.summary.income)}, ` +

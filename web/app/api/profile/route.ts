@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { requireSessionUser } from "@/lib/auth/session";
 import { serverEnv } from "@/lib/env/server";
 import { prisma } from "@/lib/prisma/client";
+import { deleteUserWithAllData } from "@/lib/users/delete-user";
 import { formatWhatsAppDisplayPhone, formatWhatsAppPhone } from "@/lib/whatsapp/phone";
 
 export async function GET() {
@@ -115,5 +116,31 @@ export async function PATCH(request: Request) {
     }
 
     return NextResponse.json({ message: "Failed to update profile" }, { status: 400 });
+  }
+}
+
+export async function DELETE() {
+  try {
+    const user = await requireSessionUser();
+    const deleted = await deleteUserWithAllData({ userId: user.id });
+
+    return NextResponse.json({
+      success: true,
+      deletedUser: {
+        id: deleted.id,
+        email: deleted.email
+      }
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    }
+
+    return NextResponse.json(
+      {
+        message: error instanceof Error ? error.message : "Falha ao excluir a conta"
+      },
+      { status: 400 }
+    );
   }
 }

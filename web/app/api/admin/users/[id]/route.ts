@@ -6,6 +6,8 @@ import { logAdminAudit } from "@/lib/admin/audit";
 import { requireAdminUser } from "@/lib/auth/admin";
 import { getTenantSeatSummary } from "@/lib/licensing/server";
 import { prisma } from "@/lib/prisma/client";
+import { deleteUserWithAllData, getDeletableUser } from "@/lib/users/delete-user";
+import { assessUserReassignment, buildReassignmentBlockReason } from "@/lib/users/reassign-user";
 
 const adminUserUpdateSchema = z.object({
   isActive: z.boolean().optional(),
@@ -62,7 +64,19 @@ export async function PATCH(request: Request, context: Params) {
 
     if (body.tenantId) {
       if (!admin.isPlatformAdmin) {
-        return NextResponse.json({ message: "Somente o superadmin pode mover usuários entre organizações" }, { status: 403 });
+        return NextResponse.json({ message: "Somente o superadmin pode mover pessoas entre contas" }, { status: 403 });
+      }
+
+      if (body.tenantId !== target.tenantId) {
+        const reassignment = await assessUserReassignment(target.id);
+
+        if (reassignment) {
+          const blockReason = buildReassignmentBlockReason(reassignment);
+
+          if (blockReason) {
+            return NextResponse.json({ message: blockReason }, { status: 409 });
+          }
+        }
       }
 
       const nextTenant = await prisma.tenant.findUnique({
@@ -93,19 +107,19 @@ export async function PATCH(request: Request, context: Params) {
       });
 
       if (!nextTenant) {
-        return NextResponse.json({ message: "Organização de destino não encontrada" }, { status: 404 });
+        return NextResponse.json({ message: "Conta de destino não encontrada" }, { status: 404 });
       }
 
       if (body.tenantId !== target.tenantId) {
         const seatSummary = await getTenantSeatSummary(body.tenantId);
 
         if (!seatSummary?.license.canAccessApp) {
-          return NextResponse.json({ message: "A organização de destino está indisponível" }, { status: 403 });
+          return NextResponse.json({ message: "A conta de destino está indisponível" }, { status: 403 });
         }
 
         if (target.isActive && seatSummary.remainingSeats !== null && seatSummary.remainingSeats <= 0) {
           return NextResponse.json(
-            { message: "O limite de usuários da organização de destino já foi atingido" },
+            { message: "O limite de pessoas da conta de destino já foi atingido" },
             { status: 409 }
           );
         }
@@ -155,5 +169,49 @@ export async function PATCH(request: Request, context: Params) {
     }
 
     return NextResponse.json({ message: "Failed to update user" }, { status: 400 });
+  }
+}
+
+export async function DELETE(_request: Request, context: Params) {
+  try {
+    const admin = await requireAdminUser();
+    const { id } = await context.params;
+    const target = await getDeletableUser(id);
+
+    if (!target) {
+      return NextResponse.json({ message: "Usuário não encontrado" }, { status: 404 });
+    }
+
+    if (!admin.isPlatformAdmin && target.tenantId !== admin.tenantId) {
+      return NextResponse.json({ message: "Usuário não encontrado" }, { status: 404 });
+    }
+
+    const deleted = await deleteUserWithAllData({ userId: target.id });
+
+    await logAdminAudit({
+      actorUserId: admin.id,
+      actorTenantId: admin.tenantId,
+      targetTenantId: deleted.tenantId,
+      action: "user.deleted",
+      entityType: "user",
+      entityId: deleted.id,
+      summary: `Usuário removido definitivamente: ${deleted.email}`,
+      metadata: {
+        email: deleted.email,
+        name: deleted.name
+      }
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.message === "Unauthorized" || error.message === "Forbidden") {
+        return NextResponse.json({ message: error.message }, { status: error.message === "Forbidden" ? 403 : 401 });
+      }
+
+      return NextResponse.json({ message: error.message }, { status: 400 });
+    }
+
+    return NextResponse.json({ message: "Falha ao excluir usuário" }, { status: 400 });
   }
 }

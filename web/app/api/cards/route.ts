@@ -11,8 +11,7 @@ export async function GET() {
     const user = await requireSessionUser();
     const cards = await prisma.card.findMany({
       where: {
-        tenantId: user.tenantId,
-        ownerUserId: user.id
+        tenantId: user.tenantId
       },
       orderBy: {
         name: "asc"
@@ -25,7 +24,6 @@ export async function GET() {
         const transactions = await prisma.transaction.findMany({
           where: {
             tenantId: user.tenantId,
-            userId: user.id,
             cardId: card.id,
             date: {
               gte: start,
@@ -108,7 +106,7 @@ export async function POST(request: Request) {
     const normalizedName = body.name.trim().replace(/\s+/g, " ");
     const existingCard = await prisma.card.findFirst({
       where: {
-        ownerUserId: user.id,
+        tenantId: user.tenantId,
         name: {
           equals: normalizedName,
           mode: "insensitive"

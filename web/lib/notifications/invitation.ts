@@ -9,7 +9,7 @@ export function buildInvitationMessage(token: string, tenantName: string, userNa
     message: [
       greeting,
       "",
-      `Você recebeu um convite para acessar a organização ${tenantName} no Save Point Finança.`,
+      `Você recebeu um convite para acessar a conta ${tenantName} no Save Point Finança.`,
       "Use o link abaixo para concluir o cadastro e definir sua senha:",
       inviteUrl,
       "",

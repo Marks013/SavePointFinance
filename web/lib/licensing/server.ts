@@ -222,7 +222,7 @@ export async function canCreateAccount(tenantId: string, ownerUserId: string) {
   const license = resolveTenantLicenseState(tenant);
   const current = await prisma.financialAccount.count({
     where: {
-      ownerUserId,
+      tenantId,
       isActive: true
     }
   });
@@ -298,7 +298,7 @@ export async function canCreateCard(tenantId: string, ownerUserId: string) {
   const license = resolveTenantLicenseState(tenant);
   const current = await prisma.card.count({
     where: {
-      ownerUserId,
+      tenantId,
       isActive: true
     }
   });

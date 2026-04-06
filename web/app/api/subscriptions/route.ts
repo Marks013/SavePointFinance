@@ -8,7 +8,7 @@ export async function GET() {
   try {
     const user = await requireSessionUser();
     const subscriptions = await prisma.subscription.findMany({
-      where: { tenantId: user.tenantId, userId: user.id },
+      where: { tenantId: user.tenantId },
       include: {
         category: true,
         account: true,

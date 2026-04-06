@@ -227,7 +227,7 @@ model FinancialAccount {
 
   @@index([tenantId])
   @@index([ownerUserId])
-  @@unique([ownerUserId, name])
+  @@unique([tenantId, name])
 }
 
 model Card {
@@ -253,7 +253,7 @@ model Card {
 
   @@index([tenantId])
   @@index([ownerUserId])
-  @@unique([ownerUserId, name])
+  @@unique([tenantId, name])
 }
 
 model Transaction {

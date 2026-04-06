@@ -22,7 +22,7 @@ function formatDate(value: Date | string | null | undefined) {
   }).format(new Date(value));
 }
 
-async function getDashboardData(tenantId: string, userId: string) {
+async function getDashboardData(tenantId: string) {
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
@@ -39,15 +39,14 @@ async function getDashboardData(tenantId: string, userId: string) {
       upcomingGoals,
       activeCards
     ] = await Promise.all([
-      getAccountsWithComputedBalance(tenantId, userId),
+      getAccountsWithComputedBalance(tenantId),
       getFinanceReport(tenantId, {
         from: startOfMonth.toISOString().slice(0, 10),
         to: endOfMonth.toISOString().slice(0, 10)
-      }, userId),
+      }),
       prisma.goal.aggregate({
         where: {
           tenantId,
-          userId,
           isCompleted: false
         },
         _sum: {
@@ -56,8 +55,7 @@ async function getDashboardData(tenantId: string, userId: string) {
       }),
       prisma.transaction.findMany({
         where: {
-          tenantId,
-          userId
+          tenantId
         },
         include: {
           category: true,
@@ -71,7 +69,6 @@ async function getDashboardData(tenantId: string, userId: string) {
       prisma.subscription.findMany({
         where: {
           tenantId,
-          userId,
           isActive: true
         },
         include: {
@@ -86,7 +83,6 @@ async function getDashboardData(tenantId: string, userId: string) {
       prisma.goal.findMany({
         where: {
           tenantId,
-          userId,
           isCompleted: false,
           deadline: {
             not: null,
@@ -102,7 +98,6 @@ async function getDashboardData(tenantId: string, userId: string) {
       prisma.card.findMany({
         where: {
           tenantId,
-          ownerUserId: userId,
           isActive: true
         },
         orderBy: {
@@ -119,7 +114,6 @@ async function getDashboardData(tenantId: string, userId: string) {
         const transactions = await prisma.transaction.findMany({
           where: {
             tenantId,
-            userId,
             cardId: card.id,
             date: {
               gte: statementStart,
@@ -213,7 +207,7 @@ async function getDashboardData(tenantId: string, userId: string) {
 
 export default async function DashboardPage() {
   const user = await requireSessionUser();
-  const data = await getDashboardData(user.tenantId, user.id);
+  const data = await getDashboardData(user.tenantId);
   const monthLabel = new Intl.DateTimeFormat("pt-BR", {
     month: "long",
     year: "numeric"
@@ -400,7 +394,7 @@ export default async function DashboardPage() {
             <div>
               <h2 className="text-xl font-semibold">Movimento recente</h2>
               <p className="mt-1 text-sm text-[var(--color-muted-foreground)]">
-                Últimos lançamentos registrados no ambiente financeiro.
+                Últimos lançamentos registrados na sua conta financeira.
               </p>
             </div>
             <Link className="text-sm font-medium text-[var(--color-primary)]" href="/dashboard/transactions">

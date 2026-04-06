@@ -25,15 +25,13 @@ export async function POST(request: Request, context: Params) {
       prisma.card.findFirst({
         where: {
           id,
-          tenantId: user.tenantId,
-          ownerUserId: user.id
+          tenantId: user.tenantId
         }
       }),
       prisma.financialAccount.findFirst({
         where: {
           id: body.accountId,
           tenantId: user.tenantId,
-          ownerUserId: user.id,
           isActive: true
         }
       })
@@ -65,7 +63,6 @@ export async function POST(request: Request, context: Params) {
     const statementTransactions = await prisma.transaction.findMany({
       where: {
         tenantId: user.tenantId,
-        userId: user.id,
         cardId: id,
         date: {
           gte: start,

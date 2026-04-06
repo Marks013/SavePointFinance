@@ -240,7 +240,7 @@ export function ReportsClient() {
             {data?.isPlatformAdmin ? (
               <p className="attention-copy mt-3 text-sm">
                 Superadmin ignora restrições de plano neste ambiente. Para validar o bloqueio de PDF, use uma conta
-                comum vinculada à organização.
+                comum vinculada a outro perfil.
               </p>
             ) : null}
           </div>

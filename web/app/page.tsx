@@ -177,10 +177,10 @@ export default function HomePage() {
               <span className="text-sm font-semibold uppercase tracking-[0.18em]">Entrada no painel</span>
             </div>
             <h2 className="max-w-md text-[clamp(2rem,4vw,3.4rem)] font-semibold tracking-[-0.06em] text-white">
-              O ambiente interno ja esta pronto para uso diario.
+              Sua conta ja esta pronta para o uso diario.
             </h2>
             <p className="max-w-md text-base leading-8 text-white/82">
-              Entre no painel para testar transacoes, contas, metas, relatorios e administracao no
+              Entre no painel para testar transacoes, contas, metas, relatorios e controle de acesso no
               mesmo fluxo operacional.
             </p>
             <div className="flex flex-wrap gap-3">

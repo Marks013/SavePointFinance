@@ -15,7 +15,7 @@ export async function PATCH(request: Request, context: Params) {
     const body = subscriptionFormSchema.parse(await request.json());
 
     await prisma.subscription.update({
-      where: { id, tenantId: user.tenantId, userId: user.id },
+      where: { id, tenantId: user.tenantId },
       data: {
         name: body.name,
         amount: body.amount,
@@ -46,7 +46,7 @@ export async function DELETE(_request: Request, context: Params) {
     const { id } = await context.params;
 
     await prisma.subscription.delete({
-      where: { id, tenantId: user.tenantId, userId: user.id }
+      where: { id, tenantId: user.tenantId }
     });
 
     return NextResponse.json({ success: true });

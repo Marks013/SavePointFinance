@@ -38,7 +38,7 @@ export async function PATCH(request: Request, context: Params) {
     });
 
     if (!target) {
-      return NextResponse.json({ message: "Organização não encontrada" }, { status: 404 });
+      return NextResponse.json({ message: "Conta não encontrada" }, { status: 404 });
     }
 
     let planUpdate:
@@ -94,7 +94,7 @@ export async function PATCH(request: Request, context: Params) {
       action: "tenant.updated",
       entityType: "tenant",
       entityId: id,
-      summary: `Organização atualizada: ${id}`,
+      summary: `Conta atualizada: ${id}`,
       metadata: {
         changed: Object.keys(body).filter((key) => body[key as keyof typeof body] !== undefined)
       }

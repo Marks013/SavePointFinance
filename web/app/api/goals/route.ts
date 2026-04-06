@@ -9,8 +9,7 @@ export async function GET() {
     const user = await requireSessionUser();
     const goals = await prisma.goal.findMany({
       where: {
-        tenantId: user.tenantId,
-        userId: user.id
+        tenantId: user.tenantId
       },
       include: {
         account: true

@@ -120,7 +120,7 @@ export function AcceptInvitationForm({ initialToken = "" }: AcceptInvitationForm
 
       {invitation ? (
         <div className="muted-panel text-sm text-[var(--color-muted-foreground)]">
-          <p><strong className="text-[var(--color-foreground)]">Organizacao:</strong> {invitation.tenantName}</p>
+          <p><strong className="text-[var(--color-foreground)]">Conta:</strong> {invitation.tenantName}</p>
           <p><strong className="text-[var(--color-foreground)]">E-mail:</strong> {invitation.email}</p>
           <p><strong className="text-[var(--color-foreground)]">Perfil:</strong> {formatRoleLabel(invitation.role)}</p>
         </div>

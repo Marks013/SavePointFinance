@@ -159,7 +159,7 @@ export async function POST(request: Request) {
     });
 
     if (existing) {
-      return NextResponse.json({ message: "Já existe uma organização com esse nome ou slug" }, { status: 409 });
+      return NextResponse.json({ message: "Já existe uma conta com esse nome ou identificador" }, { status: 409 });
     }
 
     await ensureDefaultPlans(prisma);

@@ -6,6 +6,7 @@ import { acceptInvitationSchema } from "@/features/password/schemas/password-sch
 import { normalizeEmail } from "@/lib/auth/normalize-email";
 import { getTenantSeatSummary } from "@/lib/licensing/server";
 import { prisma } from "@/lib/prisma/client";
+import { assessUserReassignment, buildReassignmentBlockReason } from "@/lib/users/reassign-user";
 
 export async function POST(request: Request) {
   try {
@@ -24,7 +25,7 @@ export async function POST(request: Request) {
     const seatSummary = await getTenantSeatSummary(invitation.tenantId);
 
     if (!seatSummary?.license.canAccessApp) {
-      return NextResponse.json({ message: "A organização está com a licença indisponível" }, { status: 403 });
+      return NextResponse.json({ message: "A conta está com a licença indisponível" }, { status: 403 });
     }
 
     if (seatSummary.remainingSeats !== null && seatSummary.remainingSeats <= 0) {
@@ -32,6 +33,7 @@ export async function POST(request: Request) {
     }
 
     const normalizedEmail = normalizeEmail(invitation.email);
+    const passwordHash = await hash(body.password, 10);
 
     const existingUser = await prisma.user.findFirst({
       where: {
@@ -43,10 +45,49 @@ export async function POST(request: Request) {
     });
 
     if (existingUser) {
-      return NextResponse.json({ message: "Ja existe um usuario com este e-mail" }, { status: 409 });
-    }
+      if (existingUser.tenantId === invitation.tenantId) {
+        return NextResponse.json({ message: "Esta pessoa já participa desta conta" }, { status: 409 });
+      }
 
-    const passwordHash = await hash(body.password, 10);
+      const reassignment = await assessUserReassignment(existingUser.id);
+      const blockReason = reassignment ? buildReassignmentBlockReason(reassignment) : null;
+
+      if (blockReason) {
+        return NextResponse.json({ message: blockReason }, { status: 409 });
+      }
+
+      const updatedUser = await prisma.user.update({
+        where: {
+          id: existingUser.id
+        },
+        data: {
+          tenantId: invitation.tenantId,
+          name: body.name,
+          passwordHash,
+          role: invitation.role,
+          isActive: true
+        }
+      });
+
+      await prisma.invitation.update({
+        where: {
+          id: invitation.id
+        },
+        data: {
+          acceptedAt: new Date(),
+          name: body.name
+        }
+      });
+
+      return NextResponse.json({
+        success: true,
+        user: {
+          id: updatedUser.id,
+          email: updatedUser.email,
+          linkedExistingAccount: true
+        }
+      });
+    }
 
     const user = await prisma.user.create({
       data: {

@@ -22,14 +22,14 @@ export async function PATCH(request: Request, context: Params) {
     const existingTransaction = await prisma.transaction.findFirstOrThrow({
       where: {
         id,
-        tenantId: user.tenantId,
-        userId: user.id
+        tenantId: user.tenantId
       },
       select: {
         id: true,
         date: true,
         titheAmount: true,
-        notes: true
+        notes: true,
+        userId: true
       }
     });
 
@@ -51,7 +51,6 @@ export async function PATCH(request: Request, context: Params) {
     const history = await prisma.transaction.findMany({
       where: {
         tenantId: user.tenantId,
-        userId: user.id,
         type: body.type,
         categoryId: {
           not: null
@@ -104,8 +103,7 @@ export async function PATCH(request: Request, context: Params) {
     const updated = await prisma.transaction.update({
       where: {
         id,
-        tenantId: user.tenantId,
-        userId: user.id
+        tenantId: user.tenantId
       },
       data: {
         date: updatedDate,
@@ -129,7 +127,7 @@ export async function PATCH(request: Request, context: Params) {
     if (applyTithe || Number(existingTransaction.titheAmount ?? 0) > 0) {
       await syncTitheForTransactionDates({
         tenantId: user.tenantId,
-        userId: user.id,
+        userId: existingTransaction.userId ?? user.id,
         dates: [existingTransaction.date, updatedDate]
       });
     }
@@ -153,13 +151,13 @@ export async function DELETE(_request: Request, context: Params) {
     const existingTransaction = await prisma.transaction.findFirstOrThrow({
       where: {
         id,
-        tenantId: user.tenantId,
-        userId: user.id
+        tenantId: user.tenantId
       },
       select: {
         date: true,
         titheAmount: true,
-        notes: true
+        notes: true,
+        userId: true
       }
     });
 
@@ -170,15 +168,14 @@ export async function DELETE(_request: Request, context: Params) {
     await prisma.transaction.delete({
       where: {
         id,
-        tenantId: user.tenantId,
-        userId: user.id
+        tenantId: user.tenantId
       }
     });
 
     if (Number(existingTransaction.titheAmount ?? 0) > 0) {
       await syncTitheForTransactionDates({
         tenantId: user.tenantId,
-        userId: user.id,
+        userId: existingTransaction.userId ?? user.id,
         dates: [existingTransaction.date]
       });
     }

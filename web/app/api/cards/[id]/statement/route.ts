@@ -18,8 +18,7 @@ export async function GET(request: Request, context: Params) {
     const card = await prisma.card.findFirst({
       where: {
         id,
-        tenantId: user.tenantId,
-        ownerUserId: user.id
+        tenantId: user.tenantId
       }
     });
 
@@ -32,7 +31,6 @@ export async function GET(request: Request, context: Params) {
     const transactions = await prisma.transaction.findMany({
       where: {
         tenantId: user.tenantId,
-        userId: user.id,
         cardId: id,
         date: {
           gte: start,

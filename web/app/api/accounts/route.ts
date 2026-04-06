@@ -9,7 +9,7 @@ import { prisma } from "@/lib/prisma/client";
 export async function GET() {
   try {
     const user = await requireSessionUser();
-    const accounts = await getAccountsWithComputedBalance(user.tenantId, user.id);
+    const accounts = await getAccountsWithComputedBalance(user.tenantId);
 
     return NextResponse.json({
       items: accounts.map((account) => ({
@@ -57,7 +57,7 @@ export async function POST(request: Request) {
     const normalizedName = body.name.trim().replace(/\s+/g, " ");
     const existingAccount = await prisma.financialAccount.findFirst({
       where: {
-        ownerUserId: user.id,
+        tenantId: user.tenantId,
         name: {
           equals: normalizedName,
           mode: "insensitive"

@@ -34,6 +34,17 @@ function parseCurrencyInputValue(raw: string) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function formatEditableCurrencyValue(value: number | null | undefined) {
+  if (value == null) {
+    return "";
+  }
+
+  return new Intl.NumberFormat("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(value);
+}
+
 type CurrencyInputProps<TFieldValues extends FieldValues> = {
   control: Control<TFieldValues>;
   name: FieldPath<TFieldValues>;
@@ -52,11 +63,20 @@ export function CurrencyInput<TFieldValues extends FieldValues>({
   nullable = false
 }: CurrencyInputProps<TFieldValues>) {
   const { field } = useController({ control, name });
-  const [displayValue, setDisplayValue] = useState(() =>
-    formatCurrencyInputValue(typeof field.value === "number" ? field.value : 0)
-  );
+  const [isFocused, setIsFocused] = useState(false);
+  const [displayValue, setDisplayValue] = useState(() => {
+    if (typeof field.value === "number") {
+      return formatCurrencyInputValue(field.value);
+    }
+
+    return nullable ? "" : formatCurrencyInputValue(0);
+  });
 
   useEffect(() => {
+    if (isFocused) {
+      return;
+    }
+
     if (typeof field.value === "number") {
       setDisplayValue(formatCurrencyInputValue(field.value));
       return;
@@ -64,8 +84,13 @@ export function CurrencyInput<TFieldValues extends FieldValues>({
 
     if (field.value == null && nullable) {
       setDisplayValue("");
+      return;
     }
-  }, [field.value, nullable]);
+
+    if (field.value == null) {
+      setDisplayValue(formatCurrencyInputValue(0));
+    }
+  }, [field.value, isFocused, nullable]);
 
   return (
     <Input
@@ -74,18 +99,42 @@ export function CurrencyInput<TFieldValues extends FieldValues>({
       inputMode="decimal"
       placeholder={placeholder}
       value={displayValue}
-      onBlur={field.onBlur}
+      onBlur={() => {
+        setIsFocused(false);
+        const parsed = parseCurrencyInputValue(displayValue);
+
+        if (parsed === null) {
+          setDisplayValue(nullable ? "" : formatCurrencyInputValue(0));
+          field.onChange(nullable ? null : 0);
+          field.onBlur();
+          return;
+        }
+
+        setDisplayValue(formatCurrencyInputValue(parsed));
+        field.onChange(parsed);
+        field.onBlur();
+      }}
+      onFocus={(event) => {
+        setIsFocused(true);
+        const parsed = parseCurrencyInputValue(displayValue);
+        const nextDisplay =
+          parsed === null ? (nullable ? "" : "0,00") : formatEditableCurrencyValue(parsed);
+        setDisplayValue(nextDisplay);
+        queueMicrotask(() => {
+          event.currentTarget.select();
+        });
+      }}
       onChange={(event) => {
         const raw = event.target.value;
         const parsed = parseCurrencyInputValue(raw);
 
         if (parsed === null) {
-          setDisplayValue("");
+          setDisplayValue(raw.replace(/[^\d,.-]/g, ""));
           field.onChange(nullable ? null : 0);
           return;
         }
 
-        setDisplayValue(formatCurrencyInputValue(parsed));
+        setDisplayValue(raw.replace(/[^\d,.-]/g, ""));
         field.onChange(parsed);
       }}
     />

@@ -109,7 +109,6 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
     prisma.card.findMany({
       where: {
         tenantId,
-        ...(userId ? { ownerUserId: userId } : {}),
         isActive: true
       },
       orderBy: {
@@ -329,12 +328,11 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
     }
 
     const { start, end } = getStatementRange(statementMonth, card.closeDay);
-    const statementTransactions = await prisma.transaction.findMany({
-      where: {
-        tenantId,
-        ...(userId ? { userId } : {}),
-        cardId: card.id,
-        date: {
+      const statementTransactions = await prisma.transaction.findMany({
+        where: {
+          tenantId,
+          cardId: card.id,
+          date: {
           gte: start,
           lte: end
         }

@@ -14,7 +14,7 @@ export async function GET(request: Request) {
       accountId: searchParams.get("accountId"),
       cardId: searchParams.get("cardId"),
       categoryId: searchParams.get("categoryId")
-    }, user.id);
+    });
 
     return NextResponse.json({
       ...report,

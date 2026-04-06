@@ -17,7 +17,7 @@ export default async function AcceptInvitationPage({ searchParams }: AcceptInvit
           <div className="section-stack">
             <BrandMark inverted compact />
             <div className="eyebrow border-white/18 bg-white/8 text-white">Convite</div>
-            <h1 className="text-4xl font-semibold tracking-[-0.05em] text-white">Concluir acesso ao ambiente da sua organizacao.</h1>
+            <h1 className="text-4xl font-semibold tracking-[-0.05em] text-white">Concluir acesso à sua conta compartilhada.</h1>
             <p className="max-w-lg text-base leading-8 text-white/84">
               Revise o convite, crie a sua senha e entre no painel com o perfil liberado para voce.
             </p>

@@ -6,14 +6,18 @@ import { processIncomingWhatsAppTextMessage } from "../lib/whatsapp/assistant";
 import { prisma } from "../lib/prisma/client";
 
 async function main() {
-  const admin = await prisma.user.findUnique({
+  const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase() || "admin@savepoint.local";
+  const admin = await prisma.user.findFirst({
     where: {
-      email: "admin@savepoint.local"
+      email: {
+        equals: adminEmail,
+        mode: "insensitive"
+      }
     }
   });
 
   if (!admin) {
-    throw new Error("Admin user not found.");
+    throw new Error(`Admin user not found for ${adminEmail}.`);
   }
 
   const originalWhatsApp = admin.whatsappNumber;

@@ -18,7 +18,7 @@ export async function PATCH(request: Request, context: Params) {
     const normalizedName = body.name.trim().replace(/\s+/g, " ");
     const existingCard = await prisma.card.findFirst({
       where: {
-        ownerUserId: user.id,
+        tenantId: user.tenantId,
         id: {
           not: id
         },
@@ -39,8 +39,7 @@ export async function PATCH(request: Request, context: Params) {
     const updated = await prisma.card.update({
       where: {
         id,
-        tenantId: user.tenantId,
-        ownerUserId: user.id
+        tenantId: user.tenantId
       },
       data: {
         name: normalizedName,
@@ -96,8 +95,7 @@ export async function DELETE(_request: Request, context: Params) {
     await prisma.card.delete({
       where: {
         id,
-        tenantId: user.tenantId,
-        ownerUserId: user.id
+        tenantId: user.tenantId
       }
     });
 

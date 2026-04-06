@@ -10,6 +10,7 @@ import { getTenantSeatSummary } from "@/lib/licensing/server";
 import { deliverNotification } from "@/lib/notifications/delivery";
 import { buildInvitationMessage } from "@/lib/notifications/invitation";
 import { prisma } from "@/lib/prisma/client";
+import { assessUserReassignment, buildReassignmentBlockReason } from "@/lib/users/reassign-user";
 
 export async function GET(request: Request) {
   try {
@@ -98,7 +99,16 @@ export async function POST(request: Request) {
     });
 
     if (existingUser) {
-      return NextResponse.json({ message: "Ja existe um usuario com este e-mail" }, { status: 409 });
+      if (existingUser.tenantId === targetTenantId) {
+        return NextResponse.json({ message: "Esta pessoa já faz parte desta conta" }, { status: 409 });
+      }
+
+      const reassignment = await assessUserReassignment(existingUser.id);
+      const blockReason = reassignment ? buildReassignmentBlockReason(reassignment) : null;
+
+      if (blockReason) {
+        return NextResponse.json({ message: blockReason }, { status: 409 });
+      }
     }
 
     const activeInvitation = await prisma.invitation.findFirst({
@@ -161,7 +171,8 @@ export async function POST(request: Request) {
       entityId: invitation.id,
       summary: `Convite criado para ${invitation.email}`,
       metadata: {
-        role: invitation.role
+        role: invitation.role,
+        existingUserLinked: Boolean(existingUser)
       }
     });
 

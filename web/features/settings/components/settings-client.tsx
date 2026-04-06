@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { signOut } from "next-auth/react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -255,6 +256,28 @@ export function SettingsClient() {
     }
   });
 
+  const deleteAccountMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch("/api/profile", {
+        method: "DELETE"
+      });
+
+      const payload = (await response.json().catch(() => ({}))) as { message?: string };
+
+      if (!response.ok) {
+        throw new Error(payload.message ?? "Não foi possível excluir a conta");
+      }
+    },
+    onSuccess: async () => {
+      toast.success("Conta excluída definitivamente");
+      await signOut({ redirect: false });
+      window.location.href = "/";
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    }
+  });
+
   return (
     <div className="space-y-6">
       <section className="surface content-section">
@@ -268,7 +291,7 @@ export function SettingsClient() {
         {profileQuery.data?.isPlatformAdmin ? (
           <div className="warning-panel mt-6 text-sm">
             Esta conta é o superadmin da plataforma. Recursos Premium e limites do plano ficam liberados aqui para
-            suporte e auditoria, mesmo que a organização esteja em um plano restritivo.
+            suporte e auditoria, mesmo que a conta vinculada esteja em um plano restritivo.
           </div>
         ) : null}
       </section>
@@ -510,6 +533,46 @@ export function SettingsClient() {
             </p>
           ) : null}
         </div>
+      </section>
+
+      <section className="surface content-section">
+        <div className="eyebrow">Zona de risco</div>
+        <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em]">Excluir conta definitivamente</h2>
+        <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--color-muted-foreground)]">
+          Esta ação apaga o seu login e todos os dados vinculados à sua conta, incluindo contas, cartões,
+          transações, metas, assinaturas e histórico próprio.
+        </p>
+        {profileQuery.data?.isPlatformAdmin ? (
+          <div className="warning-panel mt-6 text-sm">
+            A conta superadmin da plataforma não pode ser excluída por este fluxo.
+          </div>
+        ) : (
+          <div className="mt-6 flex flex-wrap items-center gap-3">
+            <Button
+              className="border-[var(--color-destructive)] text-[var(--color-destructive)] hover:bg-[color-mix(in_srgb,var(--color-destructive)_10%,transparent)]"
+              disabled={deleteAccountMutation.isPending}
+              onClick={() => {
+                const email = profileQuery.data?.email ?? "";
+                const confirmation = window.prompt(`Digite ${email} para confirmar a exclusão definitiva da conta.`);
+
+                if (!confirmation) {
+                  return;
+                }
+
+                if (confirmation.trim().toLowerCase() !== email.trim().toLowerCase()) {
+                  toast.error("O e-mail informado não confere");
+                  return;
+                }
+
+                deleteAccountMutation.mutate();
+              }}
+              type="button"
+              variant="ghost"
+            >
+              {deleteAccountMutation.isPending ? "Excluindo conta..." : "Excluir minha conta"}
+            </Button>
+          </div>
+        )}
       </section>
 
     </div>
