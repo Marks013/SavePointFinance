@@ -3,7 +3,7 @@
 import type { Route } from "next";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { startTransition, useEffect } from "react";
+import { startTransition, useCallback, useEffect } from "react";
 import {
   ChartColumnBig,
   CreditCard,
@@ -44,16 +44,23 @@ export function DashboardSidebarNav({ isAdmin }: DashboardSidebarNavProps) {
   const searchParams = useSearchParams();
   const month = normalizeMonthKey(searchParams.get("month"));
   const items = [...navigation, ...(isAdmin ? [{ href: "/dashboard/admin" as Route, label: "Admin", icon: Settings }] : [])];
+  const replaceWithMonth = useCallback(
+    (nextMonth: string) => {
+      const nextParams = new URLSearchParams(searchParams.toString());
+      nextParams.set("month", nextMonth || getCurrentMonthKey());
+      const nextRoute = `${pathname}?${nextParams.toString()}` as Route;
+      router.replace(nextRoute, { scroll: false });
+    },
+    [pathname, router, searchParams]
+  );
 
   useEffect(() => {
     if (searchParams.get("month")) {
       return;
     }
 
-    const nextParams = new URLSearchParams(searchParams.toString());
-    nextParams.set("month", getCurrentMonthKey());
-    router.replace(`${pathname}?${nextParams.toString()}`, { scroll: false });
-  }, [pathname, router, searchParams]);
+    replaceWithMonth(getCurrentMonthKey());
+  }, [replaceWithMonth, searchParams]);
 
   return (
     <>
@@ -71,10 +78,8 @@ export function DashboardSidebarNav({ isAdmin }: DashboardSidebarNavProps) {
           type="month"
           value={month}
           onChange={(event) => {
-            const nextParams = new URLSearchParams(searchParams.toString());
-            nextParams.set("month", event.target.value || getCurrentMonthKey());
             startTransition(() => {
-              router.replace(`${pathname}?${nextParams.toString()}`, { scroll: false });
+              replaceWithMonth(event.target.value);
             });
           }}
         />
