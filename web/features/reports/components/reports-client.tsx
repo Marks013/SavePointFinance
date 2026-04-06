@@ -394,30 +394,36 @@ export function ReportsClient() {
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <article className="metric-card">
           <p className="metric-label">Saldo operacional</p>
-          <p className="metric-value">{formatCurrency(data?.summary.balance ?? 0)}</p>
+          <p className={`metric-value ${(data?.summary.balance ?? 0) < 0 ? "amount-negative" : "amount-positive"}`}>
+            {formatCurrency(data?.summary.balance ?? 0)}
+          </p>
         </article>
         <article className="metric-card">
           <p className="metric-label">Receitas</p>
-          <p className="metric-value">{formatCurrency(data?.summary.income ?? 0)}</p>
+          <p className="metric-value amount-positive">{formatCurrency(data?.summary.income ?? 0)}</p>
         </article>
         <article className="metric-card">
           <p className="metric-label">Despesas</p>
-          <p className="metric-value">{formatCurrency(data?.summary.expense ?? 0)}</p>
+          <p className="metric-value amount-negative">{formatCurrency(data?.summary.expense ?? 0)}</p>
         </article>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <article className="metric-card">
           <p className="metric-label">Saldo atual consolidado</p>
-          <p className="metric-value">{formatCurrency(data?.projection.currentBalance ?? 0)}</p>
+          <p className={`metric-value ${(data?.projection.currentBalance ?? 0) < 0 ? "amount-negative" : "amount-positive"}`}>
+            {formatCurrency(data?.projection.currentBalance ?? 0)}
+          </p>
         </article>
         <article className="metric-card">
           <p className="metric-label">Faturas a vencer</p>
-          <p className="metric-value">{formatCurrency(data?.projection.cardPayments ?? 0)}</p>
+          <p className="metric-value amount-negative">{formatCurrency(data?.projection.cardPayments ?? 0)}</p>
         </article>
         <article className="metric-card">
           <p className="metric-label">Saldo projetado ao fim do mês</p>
-          <p className="metric-value">{formatCurrency(data?.projection.net ?? 0)}</p>
+          <p className={`metric-value ${(data?.projection.net ?? 0) < 0 ? "amount-negative" : "amount-positive"}`}>
+            {formatCurrency(data?.projection.net ?? 0)}
+          </p>
         </article>
       </div>
 
@@ -549,7 +555,9 @@ export function ReportsClient() {
                         {item.brand} • {item.transactions} lançamentos • Estorno {formatCurrency(item.refunds)}
                       </p>
                     </div>
-                    <p className="font-semibold">{formatCurrency(item.netStatement)}</p>
+                    <p className={`font-semibold ${item.netStatement < 0 ? "amount-negative" : "amount-positive"}`}>
+                      {formatCurrency(item.netStatement)}
+                    </p>
                   </div>
                 </article>
               ))
@@ -578,7 +586,17 @@ export function ReportsClient() {
                     {item.destinationAccount ? ` → ${item.destinationAccount}` : ""}
                   </p>
                 </div>
-                <p className="font-semibold">{formatCurrency(item.amount)}</p>
+                <p
+                  className={`font-semibold ${
+                    item.type === "expense"
+                      ? "amount-negative"
+                      : item.type === "income"
+                        ? "amount-positive"
+                        : "text-[var(--color-foreground)]"
+                  }`}
+                >
+                  {formatCurrency(item.amount)}
+                </p>
               </div>
             </article>
           ))}
@@ -630,7 +648,7 @@ export function ReportsClient() {
                       {item.items} lançamentos • {Math.round(item.share * 100)}% do total de despesas
                     </p>
                   </div>
-                  <p className="font-semibold">{formatCurrency(item.total)}</p>
+                  <p className="font-semibold amount-negative">{formatCurrency(item.total)}</p>
                 </div>
               </article>
             ))
