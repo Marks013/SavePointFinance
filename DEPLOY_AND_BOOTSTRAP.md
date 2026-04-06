@@ -46,10 +46,10 @@ Arquivo: [`.env`](/C:/Users/samue/Desktop/SavePoint/SavePoint/.env)
 - `ADMIN_NAME`
 - `ADMIN_TENANT_NAME`
 - `ADMIN_TENANT_SLUG`
-- `HAIKU_ENABLED`
-- `HAIKU_API_KEY`
-- `HAIKU_MODEL`
-- `HAIKU_BASE_URL`
+- `GEMINI_ENABLED`
+- `GEMINI_API_KEY`
+- `GEMINI_MODEL`
+- `GEMINI_BASE_URL`
 - `EMAIL_PROVIDER`
 - `EMAIL_FROM`
 - `EMAIL_FROM_NAME`
@@ -190,11 +190,11 @@ O template [`.env.server.example`](/C:/Users/samue/Desktop/SavePoint/SavePoint/.
 - remetente `no-reply`
 - conta administrativa inicial via `bootstrap-admin`
 
-Para classificacao contextual opcional com Haiku:
+Para classificacao contextual opcional com Gemini:
 
-- defina `HAIKU_ENABLED=true`
-- informe `HAIKU_API_KEY`
-- ajuste `HAIKU_MODEL` e `HAIKU_BASE_URL` se necessario
+- defina `GEMINI_ENABLED=true`
+- informe `GEMINI_API_KEY`
+- ajuste `GEMINI_MODEL` e `GEMINI_BASE_URL` se necessario
 
 Sem isso, a classificacao continua funcionando apenas com a base brasileira padrao do sistema.
 

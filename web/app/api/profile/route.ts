@@ -43,7 +43,9 @@ export async function GET() {
           serverEnv.WHATSAPP_PHONE_NUMBER_ID &&
           serverEnv.WHATSAPP_ACCESS_TOKEN
         ),
-        whatsappWebhookPath: "/api/integrations/whatsapp/webhook"
+        whatsappWebhookPath: "/api/integrations/whatsapp/webhook",
+        smartClassificationEnabled:
+          serverEnv.GEMINI_ENABLED === "true" && Boolean(serverEnv.GEMINI_API_KEY?.trim())
       },
       preferences: {
         currency: profile.preferences?.currency ?? "BRL",

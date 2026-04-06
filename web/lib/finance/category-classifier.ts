@@ -346,45 +346,140 @@ function mapAiCategoryName(
   return categories.find((item) => normalizeText(item.name) === normalizedLabel) ?? null;
 }
 
-async function refineWithHaiku(
+function extractGeminiText(payload: unknown) {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
+  const candidates = (payload as { candidates?: unknown }).candidates;
+  if (!Array.isArray(candidates)) {
+    return null;
+  }
+
+  for (const candidate of candidates) {
+    if (!candidate || typeof candidate !== "object") {
+      continue;
+    }
+
+    const content = (candidate as { content?: unknown }).content;
+    if (!content || typeof content !== "object") {
+      continue;
+    }
+
+    const parts = (content as { parts?: unknown }).parts;
+    if (!Array.isArray(parts)) {
+      continue;
+    }
+
+    for (const part of parts) {
+      if (!part || typeof part !== "object") {
+        continue;
+      }
+
+      const text = (part as { text?: unknown }).text;
+      if (typeof text === "string" && text.trim()) {
+        return text.trim();
+      }
+    }
+  }
+
+  return null;
+}
+
+async function refineWithGemini(
   input: ClassifyTransactionInput,
   candidates: Array<{ id: string; name: string; score: number }>
 ) {
-  const apiKey = process.env.HAIKU_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey) {
     return null;
   }
 
-  const model = process.env.HAIKU_MODEL || "claude-3-5-haiku-latest";
-  const baseUrl = process.env.HAIKU_BASE_URL || "https://api.anthropic.com/v1/messages";
-  const candidateText = candidates.map((item) => `- ${item.name}`).join("\n");
+  const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+  const baseUrl =
+    process.env.GEMINI_BASE_URL ||
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+  const candidateText = candidates
+    .map((item) => {
+      const category = input.categories.find((categoryItem) => categoryItem.id === item.id);
+      const keywords = dedupeKeywords(category?.keywords ?? []).slice(0, 8);
+      return `- ${item.name} | sinais: ${keywords.length ? keywords.join(", ") : "sem palavras-chave"} | score inicial: ${item.score}`;
+    })
+    .join("\n");
+  const historyText = (input.history ?? [])
+    .filter((item) => !item.aiClassified)
+    .slice(0, 6)
+    .map((item) => {
+      const categoryName =
+        input.categories.find((category) => category.id === item.categoryId)?.name ?? item.categoryId;
+      return `- ${item.description}${item.notes ? ` | obs: ${item.notes}` : ""} => ${categoryName}`;
+    })
+    .join("\n");
+  const candidateNames = candidates.map((item) => item.name);
 
   try {
     const response = await fetch(baseUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01"
+        "x-goog-api-key": apiKey
       },
       body: JSON.stringify({
-        model,
-        max_tokens: 180,
-        temperature: 0.1,
-        system:
-          "Você classifica lançamentos financeiros brasileiros. Responda apenas JSON válido com chaves category, confidence e rationale.",
-        messages: [
+        contents: [
           {
-            role: "user",
-            content: [
+            parts: [
               {
-                type: "text",
-                text: `Classifique este lançamento em uma categoria existente.\nTipo: ${input.type}\nDescrição: ${input.description}\nObservações: ${input.notes ?? "sem observações"}\nForma de pagamento: ${input.paymentMethod}\nCategorias possíveis:\n${candidateText}\nRetorne JSON: {"category":"...","confidence":0.0-1.0,"rationale":"..."}.`
+                text: [
+                  "Você é um classificador de lançamentos financeiros de um app brasileiro de finanças pessoais.",
+                  "Escolha exatamente uma categoria já existente para o lançamento informado.",
+                  "Nunca invente categoria, nunca responda texto fora do JSON e nunca explique além dos campos pedidos.",
+                  "",
+                  "Regras obrigatórias:",
+                  "1. Escolha somente entre as categorias fornecidas.",
+                  "2. Considere português do Brasil, com e sem acento, maiúsculas/minúsculas e nomes abreviados.",
+                  "3. Priorize nesta ordem: estabelecimento/marca, item ou serviço comprado, contexto semântico, histórico manual da carteira e forma de pagamento apenas como desempate.",
+                  "4. Se a descrição sugerir assinatura, streaming, mercado, farmácia, padaria, transporte, combustível ou contas da casa, use o contexto do gasto real e não palavras genéricas.",
+                  "5. Se houver duas opções parecidas, escolha a mais específica para o consumo descrito.",
+                  "6. A confiança deve ficar entre 0.51 e 0.98.",
+                  "",
+                  "Saída obrigatória em JSON válido:",
+                  '{"category":"nome exato da categoria","confidence":0.78,"rationale":"motivo curto e objetivo"}',
+                  "",
+                  `Tipo do lançamento: ${input.type}`,
+                  `Descrição: ${input.description}`,
+                  `Observações: ${input.notes ?? "sem observações"}`,
+                  `Forma de pagamento: ${input.paymentMethod}`,
+                  "",
+                  "Categorias candidatas:",
+                  candidateText,
+                  "",
+                  "Histórico manual relevante da carteira:",
+                  historyText || "- sem histórico manual relevante"
+                ].join("\n")
               }
             ]
           }
-        ]
+        ],
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseJsonSchema: {
+            type: "object",
+            properties: {
+              category: {
+                type: "string",
+                enum: candidateNames
+              },
+              confidence: {
+                type: "number"
+              },
+              rationale: {
+                type: "string"
+              }
+            },
+            required: ["category", "confidence", "rationale"]
+          }
+        }
       })
     });
 
@@ -392,10 +487,8 @@ async function refineWithHaiku(
       return null;
     }
 
-    const payload = (await response.json()) as {
-      content?: Array<{ type?: string; text?: string }>;
-    };
-    const text = payload.content?.find((item) => item.type === "text")?.text?.trim();
+    const payload = await response.json();
+    const text = extractGeminiText(payload);
 
     if (!text) {
       return null;
@@ -476,8 +569,11 @@ export async function classifyTransactionCategory(
 
   const fallback = typedCategories.find((item) => item.name === getFallbackCategoryName(typedType));
   const aiResult =
-    serverEnv.HAIKU_ENABLED === "true"
-      ? await refineWithHaiku(input, ranked.slice(0, 8).map((item) => ({ id: item.id, name: item.name, score: item.score })))
+    serverEnv.GEMINI_ENABLED === "true"
+      ? await refineWithGemini(
+          input,
+          ranked.slice(0, 8).map((item) => ({ id: item.id, name: item.name, score: item.score }))
+        )
       : null;
 
   if (aiResult) {

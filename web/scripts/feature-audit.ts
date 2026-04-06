@@ -272,7 +272,7 @@ async function run() {
       "PDF premium não retornou application/pdf"
     );
     assertCondition(
-      premiumWhatsApp.response.includes("Nao encontrei contas ativas") ||
+      premiumWhatsApp.response.includes("Não encontrei contas ativas") ||
         premiumWhatsApp.response.includes("Saldo consolidado") ||
         premiumWhatsApp.response.includes("Saldo atual"),
       `WhatsApp no premium não avançou além do bloqueio de licença: ${premiumWhatsApp.response}`

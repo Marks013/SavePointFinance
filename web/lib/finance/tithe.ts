@@ -79,11 +79,10 @@ export async function syncMonthlyTitheTransaction({
   const notesTag = `[AUTO_TITHE:${monthKey}]`;
   const title = `Dízimo consolidado ${monthLabel(monthKey)}`;
 
-  const [incomeTransactions, existingAutoTithe] = await Promise.all([
+  const [incomeTransactions, existingAutoTithes] = await Promise.all([
     client.transaction.findMany({
       where: {
         tenantId,
-        userId,
         type: "income",
         date: {
           gte: start,
@@ -101,16 +100,17 @@ export async function syncMonthlyTitheTransaction({
         date: true
       }
     }),
-    client.transaction.findFirst({
+    client.transaction.findMany({
       where: {
         tenantId,
-        userId,
         type: "expense",
         notes: notesTag
       },
       select: {
-        id: true
-      }
+        id: true,
+        userId: true
+      },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }]
     })
   ]);
 
@@ -119,25 +119,39 @@ export async function syncMonthlyTitheTransaction({
   }, 0);
 
   if (total <= 0) {
-    if (existingAutoTithe) {
-      await client.transaction.delete({
+    if (existingAutoTithes.length > 0) {
+      await client.transaction.deleteMany({
         where: {
-          id: existingAutoTithe.id
+          id: {
+            in: existingAutoTithes.map((item) => item.id)
+          }
         }
       });
     }
     return null;
   }
 
+  const primaryAutoTithe = existingAutoTithes[0] ?? null;
+  const duplicateIds = existingAutoTithes.slice(1).map((item) => item.id);
   const preferredAccountId =
     incomeTransactions.find((transaction) => transaction.accountId)?.accountId ?? null;
   const dueDate = new Date(`${monthKey}-01T12:00:00`);
   dueDate.setMonth(dueDate.getMonth() + 1, 0);
 
-  if (existingAutoTithe) {
+  if (duplicateIds.length > 0) {
+    await client.transaction.deleteMany({
+      where: {
+        id: {
+          in: duplicateIds
+        }
+      }
+    });
+  }
+
+  if (primaryAutoTithe) {
     return client.transaction.update({
       where: {
-        id: existingAutoTithe.id
+        id: primaryAutoTithe.id
       },
       data: {
         date: dueDate,
@@ -148,6 +162,7 @@ export async function syncMonthlyTitheTransaction({
         paymentMethod: preferredAccountId ? "pix" : "money",
         categoryId: titheCategoryId,
         titheCategoryId,
+        userId: userId ?? primaryAutoTithe.userId ?? null,
         accountId: preferredAccountId,
         cardId: null,
         destinationAccountId: null,
@@ -159,7 +174,7 @@ export async function syncMonthlyTitheTransaction({
   return client.transaction.create({
     data: {
       tenantId,
-      userId,
+      userId: userId ?? null,
       date: dueDate,
       amount: new Prisma.Decimal(total.toFixed(2)),
       description: title,

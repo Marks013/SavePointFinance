@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { requireSessionUser } from "@/lib/auth/session";
-import { getStatementCloseDate, getStatementPaymentDate, getStatementRange } from "@/lib/cards/statement";
+import { getCardStatementSnapshot } from "@/lib/cards/statement";
 import { prisma } from "@/lib/prisma/client";
 
 type Params = {
@@ -26,15 +26,20 @@ export async function GET(request: Request, context: Params) {
       return NextResponse.json({ message: "Card not found" }, { status: 404 });
     }
 
-    const { start, end } = getStatementRange(month, card.closeDay);
+    const statement = await getCardStatementSnapshot({
+      tenantId: user.tenantId,
+      card,
+      month,
+      client: prisma
+    });
 
     const transactions = await prisma.transaction.findMany({
       where: {
         tenantId: user.tenantId,
         cardId: id,
         date: {
-          gte: start,
-          lte: end
+          gte: statement.start,
+          lte: statement.end
         }
       },
       include: {
@@ -43,23 +48,9 @@ export async function GET(request: Request, context: Params) {
       orderBy: [{ date: "desc" }, { createdAt: "desc" }]
     });
 
-    const totalAmount = transactions.reduce((sum, item) => {
-      const amount = Number(item.amount);
-
-      if (item.type === "expense") {
-        return sum + amount;
-      }
-
-      if (item.type === "income") {
-        return sum - amount;
-      }
-
-      return sum;
-    }, 0);
     const installmentItems = transactions.filter(
       (item) => item.type === "expense" && item.installmentsTotal > 1
     ).length;
-    const availableLimit = Number(card.limitAmount) - totalAmount;
     const payment = await prisma.statementPayment.findUnique({
       where: {
         tenantId_cardId_month: {
@@ -85,14 +76,14 @@ export async function GET(request: Request, context: Params) {
       },
       month,
       summary: {
-        totalAmount,
-        availableLimit,
+        totalAmount: statement.totalAmount,
+        availableLimit: statement.availableLimit,
         installmentItems,
         transactions: transactions.length,
-        cycleStart: start.toISOString(),
-        cycleEnd: end.toISOString(),
-        closeDate: getStatementCloseDate(month, card.closeDay).toISOString(),
-        dueDate: getStatementPaymentDate(month, card.dueDay).toISOString()
+        cycleStart: statement.start.toISOString(),
+        cycleEnd: statement.end.toISOString(),
+        closeDate: statement.closeDate.toISOString(),
+        dueDate: statement.dueDate.toISOString()
       },
       payment: payment
         ? {

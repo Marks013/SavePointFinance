@@ -1,7 +1,7 @@
 import { NotificationChannel, PaymentMethod, TransactionSource, TransactionType } from "@prisma/client";
 
 import { deliverNotification } from "@/lib/notifications/delivery";
-import { getCurrentStatementMonth, getStatementPaymentDate } from "@/lib/cards/statement";
+import { getCardStatementSnapshot, getCurrentStatementMonth, getStatementPaymentDate } from "@/lib/cards/statement";
 import { getFinanceReport } from "@/lib/finance/reports";
 import { ensureTitheCategory, getMonthKey, syncMonthlyTitheTransaction } from "@/lib/finance/tithe";
 import { prisma } from "@/lib/prisma/client";
@@ -448,9 +448,13 @@ export async function runRecurringAutomation(tenantId: string, userId: string) {
       continue;
     }
 
-    const report = await getFinanceReport(tenantId, {});
-    const cardInfo = report.byCard.find((item) => item.id === card.id);
-    const statementAmount = cardInfo?.netStatement ?? 0;
+    const statement = await getCardStatementSnapshot({
+      tenantId,
+      card,
+      month: statementMonth,
+      client: prisma
+    });
+    const statementAmount = statement.totalAmount;
 
     if (statementAmount <= 0) {
       continue;

@@ -37,6 +37,7 @@ type ProfilePayload = {
     whatsappAssistantEnabled: boolean;
     whatsappConfigured: boolean;
     whatsappWebhookPath: string;
+    smartClassificationEnabled: boolean;
   };
   preferences: {
     currency: string;
@@ -462,6 +463,16 @@ export function SettingsClient() {
                 </p>
                 <p className="mt-2 break-all text-sm">
                   {whatsappEnabledForPlan ? profileQuery.data?.integrations.whatsappWebhookPath : "Recurso indisponível no plano atual"}
+                </p>
+              </div>
+              <div className="muted-panel md:col-span-2">
+                <p className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">
+                  Classificação inteligente
+                </p>
+                <p className="mt-2 text-sm">
+                  {profileQuery.data?.integrations.smartClassificationEnabled
+                    ? "Ativa para interpretar descrições e ajudar na categoria dos lançamentos."
+                    : "Desativada no ambiente. O sistema usa apenas regras locais e memória do histórico."}
                 </p>
               </div>
             </div>

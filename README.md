@@ -120,7 +120,7 @@ Bloqueios aplicados:
 O projeto ja possui classificacao automatica de categorias em dois niveis:
 
 - base brasileira por regras contextuais e palavras-chave
-- refinamento contextual opcional com Haiku, quando configurado por ambiente
+- refinamento contextual opcional com Gemini, quando configurado por ambiente
 
 As categorias padrao do tenant sao provisionadas automaticamente no bootstrap inicial e podem ser restauradas sob demanda pela interface.
 

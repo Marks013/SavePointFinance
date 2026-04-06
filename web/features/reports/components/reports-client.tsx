@@ -481,9 +481,9 @@ export function ReportsClient() {
         <section className="surface content-section">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <h2 className="text-xl font-semibold">Impacto por conta</h2>
+              <h2 className="text-xl font-semibold">Movimentação por conta</h2>
               <p className="mt-1 text-sm text-[var(--color-muted-foreground)]">
-                Saldo líquido por conta considerando entradas, saídas e transferências.
+                Impacto líquido do período por conta, considerando entradas, saídas e transferências.
               </p>
             </div>
             <p className="text-sm font-medium text-[var(--color-muted-foreground)]">

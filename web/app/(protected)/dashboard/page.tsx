@@ -3,7 +3,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { ArrowRight, BellRing, CreditCard, Landmark, Target } from "lucide-react";
 
-import { getCurrentStatementMonth, getStatementCloseDate, getStatementPaymentDate, getStatementRange } from "@/lib/cards/statement";
+import { getCardStatementSnapshot } from "@/lib/cards/statement";
 import { SummaryCards } from "@/features/dashboard/components/summary-cards";
 import { requireSessionUser } from "@/lib/auth/session";
 import { getAccountsWithComputedBalance } from "@/lib/finance/accounts";
@@ -109,44 +109,19 @@ async function getDashboardData(tenantId: string) {
 
     const cardsWithStatement = await Promise.all(
       activeCards.map(async (card) => {
-        const statementMonth = getCurrentStatementMonth(card.closeDay, now);
-        const { start: statementStart, end: statementEnd } = getStatementRange(statementMonth, card.closeDay);
-        const transactions = await prisma.transaction.findMany({
-          where: {
-            tenantId,
-            cardId: card.id,
-            date: {
-              gte: statementStart,
-              lte: statementEnd
-            }
-          },
-          select: {
-            amount: true,
-            type: true
-          }
+        const statement = await getCardStatementSnapshot({
+          tenantId,
+          card,
+          client: prisma
         });
-
-        const statementAmount = transactions.reduce((sum, item) => {
-          const amount = Number(item.amount);
-
-          if (item.type === "expense") {
-            return sum + amount;
-          }
-
-          if (item.type === "income") {
-            return sum - amount;
-          }
-
-          return sum;
-        }, 0);
 
         return {
           ...card,
-          statementMonth,
-          closeDate: getStatementCloseDate(statementMonth, card.closeDay),
-          dueDate: getStatementPaymentDate(statementMonth, card.dueDay),
-          statementAmount,
-          availableLimit: Number(card.limitAmount) - statementAmount
+          statementMonth: statement.month,
+          closeDate: statement.closeDate,
+          dueDate: statement.dueDate,
+          statementAmount: statement.totalAmount,
+          availableLimit: statement.availableLimit
         };
       })
     );

@@ -20,6 +20,8 @@ type Stats = {
   totalUsers: number;
   activeUsers: number;
   totalTransactions: number;
+  currentTenantUsers: number;
+  currentTenantActiveUsers: number;
 };
 
 type TenantItem = {
@@ -1033,8 +1035,26 @@ export function AdminClient() {
         <article className="metric-card"><p className="metric-label">Ativos</p><p className="metric-value">{statsQuery.data?.activeTenants ?? 0}</p></article>
         <article className="metric-card"><p className="metric-label">Em avaliação</p><p className="metric-value">{statsQuery.data?.trialTenants ?? 0}</p></article>
         <article className="metric-card"><p className="metric-label">Expirados</p><p className="metric-value">{statsQuery.data?.expiredTenants ?? 0}</p></article>
-        <article className="metric-card"><p className="metric-label">Pessoas</p><p className="metric-value">{statsQuery.data?.totalUsers ?? 0}</p></article>
-        <article className="metric-card"><p className="metric-label">Pessoas ativas</p><p className="metric-value">{statsQuery.data?.activeUsers ?? 0}</p></article>
+        <article className="metric-card">
+          <p className="metric-label">{isPlatformAdmin ? "Pessoas da plataforma" : "Pessoas da conta"}</p>
+          <p className="metric-value">{statsQuery.data?.totalUsers ?? 0}</p>
+        </article>
+        <article className="metric-card">
+          <p className="metric-label">{isPlatformAdmin ? "Pessoas ativas da plataforma" : "Pessoas ativas"}</p>
+          <p className="metric-value">{statsQuery.data?.activeUsers ?? 0}</p>
+        </article>
+        {isPlatformAdmin ? (
+          <>
+            <article className="metric-card">
+              <p className="metric-label">Pessoas nesta conta</p>
+              <p className="metric-value">{statsQuery.data?.currentTenantUsers ?? 0}</p>
+            </article>
+            <article className="metric-card">
+              <p className="metric-label">Pessoas ativas nesta conta</p>
+              <p className="metric-value">{statsQuery.data?.currentTenantActiveUsers ?? 0}</p>
+            </article>
+          </>
+        ) : null}
         <article className="metric-card"><p className="metric-label">Transações</p><p className="metric-value">{statsQuery.data?.totalTransactions ?? 0}</p></article>
       </div>
 

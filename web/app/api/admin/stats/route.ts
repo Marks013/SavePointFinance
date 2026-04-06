@@ -9,9 +9,20 @@ export async function GET() {
     const tenantScope = admin.isPlatformAdmin ? {} : { id: admin.tenantId };
     const userScope = admin.isPlatformAdmin ? {} : { tenantId: admin.tenantId };
     const transactionScope = admin.isPlatformAdmin ? {} : { tenantId: admin.tenantId };
+    const currentTenantUserScope = { tenantId: admin.tenantId };
 
     const now = new Date();
-    const [tenants, activeTenants, trialTenants, expiredTenants, users, activeUsers, transactions] = await Promise.all([
+    const [
+      tenants,
+      activeTenants,
+      trialTenants,
+      expiredTenants,
+      users,
+      activeUsers,
+      transactions,
+      currentTenantUsers,
+      currentTenantActiveUsers
+    ] = await Promise.all([
       prisma.tenant.count({ where: tenantScope }),
       prisma.tenant.count({ where: { ...tenantScope, isActive: true } }),
       prisma.tenant.count({
@@ -38,7 +49,9 @@ export async function GET() {
       }),
       prisma.user.count({ where: userScope }),
       prisma.user.count({ where: { ...userScope, isActive: true } }),
-      prisma.transaction.count({ where: transactionScope })
+      prisma.transaction.count({ where: transactionScope }),
+      prisma.user.count({ where: currentTenantUserScope }),
+      prisma.user.count({ where: { ...currentTenantUserScope, isActive: true } })
     ]);
 
     return NextResponse.json({
@@ -48,7 +61,9 @@ export async function GET() {
       expiredTenants,
       totalUsers: users,
       activeUsers,
-      totalTransactions: transactions
+      totalTransactions: transactions,
+      currentTenantUsers,
+      currentTenantActiveUsers
     });
   } catch (error) {
     if (error instanceof Error && (error.message === "Unauthorized" || error.message === "Forbidden")) {

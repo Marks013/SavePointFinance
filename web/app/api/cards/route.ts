@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { cardFormSchema } from "@/features/cards/schemas/card-schema";
 import { requireSessionUser } from "@/lib/auth/session";
-import { getCurrentStatementMonth, getStatementCloseDate, getStatementPaymentDate, getStatementRange } from "@/lib/cards/statement";
+import { getCardStatementSnapshot } from "@/lib/cards/statement";
 import { canCreateCard } from "@/lib/licensing/server";
 import { prisma } from "@/lib/prisma/client";
 
@@ -19,36 +19,11 @@ export async function GET() {
     });
     const items = await Promise.all(
       cards.map(async (card) => {
-        const statementMonth = getCurrentStatementMonth(card.closeDay);
-        const { start, end } = getStatementRange(statementMonth, card.closeDay);
-        const transactions = await prisma.transaction.findMany({
-          where: {
-            tenantId: user.tenantId,
-            cardId: card.id,
-            date: {
-              gte: start,
-              lte: end
-            }
-          },
-          select: {
-            amount: true,
-            type: true
-          }
+        const statement = await getCardStatementSnapshot({
+          tenantId: user.tenantId,
+          card,
+          client: prisma
         });
-
-        const statementAmount = transactions.reduce((sum, item) => {
-          const amount = Number(item.amount);
-
-          if (item.type === "expense") {
-            return sum + amount;
-          }
-
-          if (item.type === "income") {
-            return sum - amount;
-          }
-
-          return sum;
-        }, 0);
 
         return {
           id: card.id,
@@ -56,11 +31,11 @@ export async function GET() {
           brand: card.brand,
           last4: card.last4,
           limitAmount: Number(card.limitAmount),
-          availableLimit: Number(card.limitAmount) - statementAmount,
-          statementAmount,
-          statementMonth,
-          closeDate: getStatementCloseDate(statementMonth, card.closeDay).toISOString(),
-          dueDate: getStatementPaymentDate(statementMonth, card.dueDay).toISOString(),
+          availableLimit: statement.availableLimit,
+          statementAmount: statement.totalAmount,
+          statementMonth: statement.month,
+          closeDate: statement.closeDate.toISOString(),
+          dueDate: statement.dueDate.toISOString(),
           dueDay: card.dueDay,
           closeDay: card.closeDay,
           color: card.color,

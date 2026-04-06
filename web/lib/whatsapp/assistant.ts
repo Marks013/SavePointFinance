@@ -230,8 +230,8 @@ async function createExpenseOrIncomeFromText(user: WhatsAppUser, body: string, t
       status: "needs_amount",
       response:
         type === "income"
-          ? "Nao encontrei o valor da entrada. Exemplo: recebi 3200 salario no Itau."
-          : "Nao encontrei o valor da despesa. Exemplo: gastei 42,50 mercado na Nubank."
+          ? "Não encontrei o valor da entrada. Exemplo: recebi 3200 salário no Itaú."
+          : "Não encontrei o valor da despesa. Exemplo: gastei 42,50 mercado na Nubank."
     } satisfies AssistantResult;
   }
 
@@ -308,7 +308,7 @@ async function createExpenseOrIncomeFromText(user: WhatsAppUser, body: string, t
     return {
       intent: "launch_income",
       status: "unsupported_target",
-      response: "Entradas pelo WhatsApp precisam ser vinculadas a uma conta, nao a um cartao."
+      response: "Entradas pelo WhatsApp precisam ser vinculadas a uma conta, não a um cartão."
     } satisfies AssistantResult;
   }
 
@@ -316,7 +316,7 @@ async function createExpenseOrIncomeFromText(user: WhatsAppUser, body: string, t
     return {
       intent: "launch_expense",
       status: "needs_card",
-      response: "Informe qual cartao usar. Exemplo: gastei 120 farmacia no Nubank Visa."
+      response: "Informe qual cartão usar. Exemplo: gastei 120 farmácia no Nubank Visa."
     } satisfies AssistantResult;
   }
 
@@ -328,7 +328,7 @@ async function createExpenseOrIncomeFromText(user: WhatsAppUser, body: string, t
       status: "needs_account",
       response:
         accounts.length > 1
-          ? "Informe a conta do lancamento. Exemplo: recebi 3200 salario no Itau."
+          ? "Informe a conta do lançamento. Exemplo: recebi 3200 salário no Itaú."
           : "Cadastre ao menos uma conta ativa para usar o assistente no WhatsApp."
     } satisfies AssistantResult;
   }
@@ -393,7 +393,7 @@ async function createExpenseOrIncomeFromText(user: WhatsAppUser, body: string, t
   }
 
   const targetLabel = selectedCard
-    ? `cartao ${selectedCard.name}`
+    ? `cartão ${selectedCard.name}`
     : `conta ${account?.name ?? "informada"}`;
   const category = classification.categoryId
     ? categories.find((item) => item.id === classification.categoryId)?.name ?? "Categoria sugerida"
@@ -416,7 +416,7 @@ async function replyWithBalance(user: WhatsAppUser, body: string) {
     return {
       intent: "balance",
       status: "no_accounts",
-      response: "Nao encontrei contas ativas nesta carteira compartilhada."
+      response: "Não encontrei contas ativas nesta carteira compartilhada."
     } satisfies AssistantResult;
   }
 
@@ -464,7 +464,7 @@ async function replyWithCardInfo(user: WhatsAppUser, body: string) {
     return {
       intent: "card_info",
       status: "no_cards",
-      response: "Nao encontrei cartoes ativos nesta carteira compartilhada."
+      response: "Não encontrei cartões ativos nesta carteira compartilhada."
     } satisfies AssistantResult;
   }
 
@@ -481,7 +481,7 @@ async function replyWithCardInfo(user: WhatsAppUser, body: string) {
     return {
       intent: "card_info",
       status: "needs_card",
-      response: "Informe qual cartao consultar. Exemplo: fatura Nubank Visa ou limite Mastercard."
+      response: "Informe qual cartão consultar. Exemplo: fatura Nubank Visa ou limite Mastercard."
     } satisfies AssistantResult;
   }
 
@@ -517,8 +517,8 @@ async function replyWithCardInfo(user: WhatsAppUser, body: string) {
     intent: "card_info",
     status: "ok",
     response:
-      `Cartao ${card.name}. Fatura atual: ${formatCurrency(statementAmount)}. ` +
-      `Limite disponivel: ${formatCurrency(availableLimit)} de ${formatCurrency(Number(card.limitAmount))}. ` +
+      `Cartão ${card.name}. Fatura atual: ${formatCurrency(statementAmount)}. ` +
+      `Limite disponível: ${formatCurrency(availableLimit)} de ${formatCurrency(Number(card.limitAmount))}. ` +
       `Fecha em ${formatDate(getStatementCloseDate(month, card.closeDay))} e vence em ${formatDate(
         getStatementPaymentDate(month, card.dueDay)
       )}.`
@@ -529,7 +529,7 @@ function buildHelpResponse() {
   return (
     "Comandos do assistente:\n" +
     "- gastei 42,50 mercado na Nubank\n" +
-    "- gastei 320 farmacia no cartao Visa 3x\n" +
+    "- gastei 320 farmácia no cartão Visa 3x\n" +
     "- recebi 3200 salario no Itau\n" +
     "- saldo\n" +
     "- saldo Nubank\n" +
@@ -577,7 +577,7 @@ async function handleAssistantCommand(user: WhatsAppUser, body: string) {
     intent: "fallback",
     status: "unknown_command",
     response:
-      "Nao entendi o comando. Envie 'ajuda' para ver exemplos de lancamento, saldo, fatura e limite."
+      "Não entendi o comando. Envie 'ajuda' para ver exemplos de lançamento, saldo, fatura e limite."
   } satisfies AssistantResult;
 }
 
@@ -589,7 +589,7 @@ export async function processIncomingWhatsAppTextMessage(message: IncomingTextMe
     return {
       handled: true,
       to: formattedPhone,
-      response: "Seu numero ainda nao esta vinculado a uma pessoa ativa no Save Point. Atualize o WhatsApp em Configuracoes."
+      response: "Seu número ainda não está vinculado a uma pessoa ativa no Save Point. Atualize o WhatsApp em Configurações."
     };
   }
 
@@ -599,7 +599,7 @@ export async function processIncomingWhatsAppTextMessage(message: IncomingTextMe
     return {
       handled: true,
       to: formattedPhone,
-      response: "A conta vinculada a voce esta com a licenca indisponivel no momento."
+      response: "A conta vinculada a você está com a licença indisponível no momento."
     };
   }
 
