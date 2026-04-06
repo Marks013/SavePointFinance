@@ -12,7 +12,8 @@ type DashboardShellProps = {
 
 export async function DashboardShell({ children }: DashboardShellProps) {
   const session = await auth();
-  const isAdmin = session?.user?.role === "admin";
+  const isAdmin = session?.user?.role === "admin" || session?.user?.isPlatformAdmin;
+  const isPlatformAdmin = Boolean(session?.user?.isPlatformAdmin);
 
   return (
     <div className="page-shell flex h-screen flex-col gap-5 overflow-hidden py-4 md:py-5 lg:grid lg:grid-cols-[256px_minmax(0,1fr)] lg:gap-5 xl:grid-cols-[264px_minmax(0,1fr)] xl:gap-6">
@@ -29,7 +30,7 @@ export async function DashboardShell({ children }: DashboardShellProps) {
           </p>
         </div>
 
-        <DashboardSidebarNav isAdmin={Boolean(isAdmin)} />
+        <DashboardSidebarNav isAdmin={Boolean(isAdmin)} isPlatformAdmin={isPlatformAdmin} />
 
         <div className="mt-6 rounded-[24px] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-muted)_48%,var(--color-card))] p-4">
           <p className="text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">

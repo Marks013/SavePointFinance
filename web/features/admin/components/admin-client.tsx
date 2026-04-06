@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -774,6 +775,14 @@ export function AdminClient() {
             <strong>Superadmin ativo.</strong> A conta principal possui acesso global, recursos Premium e bypass de licença.
           </div>
         ) : null}
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-[1.4rem] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-card)_88%,var(--color-muted))] px-4 py-4">
+          <p className="text-sm leading-7 text-[var(--color-muted-foreground)]">
+            Para compartilhar a mesma carteira com cônjuge ou familiar, use a área dedicada de compartilhamento.
+          </p>
+          <Button asChild variant="secondary">
+            <Link href="/dashboard/sharing">Abrir compartilhamento</Link>
+          </Button>
+        </div>
       </section>
 
       <section className="surface content-section">

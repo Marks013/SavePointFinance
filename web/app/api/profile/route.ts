@@ -26,7 +26,12 @@ export async function GET() {
       id: profile.id,
       name: profile.name,
       email: profile.email,
+      role: user.role,
       isPlatformAdmin: user.isPlatformAdmin,
+      tenant: {
+        id: user.tenantId,
+        name: user.tenant.name
+      },
       whatsappNumber: formatWhatsAppDisplayPhone(profile.whatsappNumber),
       license: {
         plan: user.license.plan,

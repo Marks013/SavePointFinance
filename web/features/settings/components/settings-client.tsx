@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { signOut } from "next-auth/react";
 import { useState } from "react";
@@ -15,7 +16,12 @@ type ProfilePayload = {
   id: string;
   name: string;
   email: string;
+  role: "admin" | "member";
   isPlatformAdmin: boolean;
+  tenant: {
+    id?: string;
+    name?: string;
+  };
   whatsappNumber: string;
   license: {
     plan: "free" | "pro";
@@ -173,6 +179,7 @@ export function SettingsClient() {
   const notifications = notificationsQuery.data?.items ?? [];
   const deliveredNotifications = notifications.filter((item) => item.status === "sent").length;
   const failedNotifications = notifications.filter((item) => item.status === "failed").length;
+  const canManageSharing = profileQuery.data?.role === "admin" || profileQuery.data?.isPlatformAdmin;
   const form = useForm<SettingsFormValues>({
     defaultValues: {
       name: "",
@@ -281,6 +288,24 @@ export function SettingsClient() {
 
   return (
     <div className="space-y-6">
+      {canManageSharing ? (
+        <section className="surface content-section">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <div className="eyebrow">Conta compartilhada</div>
+              <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em]">Pessoas e convites</h2>
+              <p className="mt-2 max-w-3xl text-sm leading-7 text-[var(--color-muted-foreground)]">
+                Convide cônjuge, familiar ou alguém de confiança para usar a mesma carteira financeira da conta{" "}
+                {profileQuery.data?.tenant.name ?? "principal"}.
+              </p>
+            </div>
+            <Button asChild>
+              <Link href="/dashboard/sharing">Abrir compartilhamento</Link>
+            </Button>
+          </div>
+        </section>
+      ) : null}
+
       <section className="surface content-section">
         <div className="page-intro">
           <div className="eyebrow">Configurações</div>

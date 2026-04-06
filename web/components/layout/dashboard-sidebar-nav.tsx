@@ -10,6 +10,8 @@ import {
   FolderTree,
   Landmark,
   LayoutDashboard,
+  ShieldCheck,
+  UsersRound,
   ReceiptText,
   RefreshCcw,
   Settings,
@@ -17,7 +19,7 @@ import {
   Target
 } from "lucide-react";
 
-import { DatePickerInput } from "@/components/ui/date-picker-input";
+import { Input } from "@/components/ui/input";
 import { formatMonthKeyLabel, getCurrentMonthKey, normalizeMonthKey } from "@/lib/month";
 import { cn } from "@/lib/utils";
 
@@ -36,14 +38,19 @@ const navigation = [
 
 type DashboardSidebarNavProps = {
   isAdmin: boolean;
+  isPlatformAdmin: boolean;
 };
 
-export function DashboardSidebarNav({ isAdmin }: DashboardSidebarNavProps) {
+export function DashboardSidebarNav({ isAdmin, isPlatformAdmin }: DashboardSidebarNavProps) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
   const month = normalizeMonthKey(searchParams.get("month"));
-  const items = [...navigation, ...(isAdmin ? [{ href: "/dashboard/admin" as Route, label: "Admin", icon: Settings }] : [])];
+  const items = [
+    ...navigation,
+    ...(isAdmin ? [{ href: "/dashboard/sharing" as Route, label: "Compartilhamento", icon: UsersRound }] : []),
+    ...(isPlatformAdmin ? [{ href: "/dashboard/admin" as Route, label: "Admin", icon: ShieldCheck }] : [])
+  ];
   const replaceWithMonth = useCallback(
     (nextMonth: string) => {
       const nextParams = new URLSearchParams(searchParams.toString());
@@ -72,7 +79,7 @@ export function DashboardSidebarNav({ isAdmin }: DashboardSidebarNavProps) {
         <p className="mt-1 text-xs leading-6 text-[var(--color-muted-foreground)]">
           Painel, transações, assinaturas e parcelas seguem este mês durante a navegação.
         </p>
-        <DatePickerInput
+        <Input
           className="mt-4"
           id="global-month"
           type="month"
