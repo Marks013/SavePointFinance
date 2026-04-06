@@ -85,6 +85,7 @@ export async function GET(request: Request) {
           id: root.id,
           description: root.description.replace(/\s\(\d+\/\d+\)$/, ""),
           totalAmount,
+          installmentAmount: installments[0] ? Number(installments[0].amount) : 0,
           installmentsTotal: root.installmentsTotal,
           installmentsPaid: settledInstallments,
           installmentsRemaining: root.installmentsTotal - settledInstallments,

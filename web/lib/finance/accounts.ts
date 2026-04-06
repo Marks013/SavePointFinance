@@ -30,7 +30,8 @@ export async function getAccountsWithComputedBalance(tenantId: string, ownerUser
     }),
     prisma.transaction.findMany({
       where: {
-        tenantId
+        tenantId,
+        ...(ownerUserId ? { userId: ownerUserId } : {})
       },
       select: {
         accountId: true,

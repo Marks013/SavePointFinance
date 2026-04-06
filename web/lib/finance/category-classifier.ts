@@ -116,6 +116,14 @@ const contextualAliases: Record<string, string[]> = {
   celular: ["internet", "telefone", "banda larga"],
   recarga: ["internet", "telefone", "banda larga"],
   aluguel: ["aluguel", "moradia"],
+  financiamento: ["moradia", "financiamento habitacional", "financiamento imobiliario", "prestacao casa"],
+  habitacional: ["moradia", "financiamento habitacional", "credito habitacional"],
+  imobiliario: ["moradia", "financiamento imobiliario", "credito habitacional"],
+  imovel: ["moradia", "prestacao casa", "financiamento imobiliario"],
+  apartamento: ["moradia", "prestacao casa", "financiamento imobiliario"],
+  casa: ["moradia", "prestacao casa", "financiamento habitacional"],
+  hipoteca: ["moradia", "credito habitacional", "financiamento imobiliario"],
+  consorcio: ["moradia", "consorcio imobiliario", "financiamento imobiliario"],
   condominio: ["condominio", "moradia"],
   condomínio: ["condominio", "moradia"],
   gas: ["moradia", "gas cozinha", "botijao"],
@@ -181,6 +189,45 @@ const merchantSignals: Array<{ terms: string[]; category: string; boost?: number
   { terms: ["latam", "gol", "azul", "booking", "airbnb"], category: "Viagem", boost: 12 },
   { terms: ["udemy", "alura", "senac", "senai", "kumon"], category: "Educação", boost: 10 }
 ];
+
+const semanticSignals: Array<{ terms: string[]; category: string; boost?: number }> = [
+  {
+    terms: [
+      "financiamento de casa",
+      "financiamento da casa",
+      "financiamento do apartamento",
+      "financiamento habitacional",
+      "financiamento imobiliario",
+      "credito habitacional",
+      "prestacao da casa",
+      "prestacao do apartamento",
+      "parcela da casa",
+      "consorcio imobiliario"
+    ],
+    category: "Moradia",
+    boost: 14
+  }
+];
+
+const merchantSignalsByCategory = new Map<string, Array<{ terms: string[]; boost?: number }>>();
+for (const signal of merchantSignals) {
+  const current = merchantSignalsByCategory.get(signal.category) ?? [];
+  current.push({
+    terms: signal.terms,
+    boost: signal.boost
+  });
+  merchantSignalsByCategory.set(signal.category, current);
+}
+
+const semanticSignalsByCategory = new Map<string, Array<{ terms: string[]; boost?: number }>>();
+for (const signal of semanticSignals) {
+  const current = semanticSignalsByCategory.get(signal.category) ?? [];
+  current.push({
+    terms: signal.terms.map((term) => normalizeText(term)),
+    boost: signal.boost
+  });
+  semanticSignalsByCategory.set(signal.category, current);
+}
 
 function normalizeText(value: string) {
   return value
@@ -286,14 +333,22 @@ function scoreCategory(
     score += 1;
   }
 
-  const merchantBoost = merchantSignals
-    .filter((signal) => signal.category === category.name)
+  const merchantBoost = (merchantSignalsByCategory.get(category.name) ?? [])
     .reduce((sum, signal) => {
       return sum + (signal.terms.some((term) => hasNormalizedTerm(haystack, term, contextSet)) ? signal.boost ?? 10 : 0);
     }, 0);
   if (merchantBoost > 0) {
     score += merchantBoost;
     matchedKeywords.push("estabelecimento");
+  }
+
+  const semanticBoost = (semanticSignalsByCategory.get(category.name) ?? [])
+    .reduce((sum, signal) => {
+      return sum + (signal.terms.some((term) => haystack.includes(term)) ? signal.boost ?? 10 : 0);
+    }, 0);
+  if (semanticBoost > 0) {
+    score += semanticBoost;
+    matchedKeywords.push("contexto semantico");
   }
 
   const normalizedDescription = haystack;
@@ -417,6 +472,8 @@ async function refineWithGemini(
     })
     .join("\n");
   const candidateNames = candidates.map((item) => item.name);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 1200);
 
   try {
     const response = await fetch(baseUrl, {
@@ -425,6 +482,7 @@ async function refineWithGemini(
         "Content-Type": "application/json",
         "x-goog-api-key": apiKey
       },
+      signal: controller.signal,
       body: JSON.stringify({
         contents: [
           {
@@ -483,6 +541,8 @@ async function refineWithGemini(
       })
     });
 
+    clearTimeout(timeout);
+
     if (!response.ok) {
       return null;
     }
@@ -516,6 +576,7 @@ async function refineWithGemini(
       reason: parsed.rationale?.trim() || "Classificação contextual por IA"
     } satisfies ClassificationResult;
   } catch {
+    clearTimeout(timeout);
     return null;
   }
 }
@@ -555,6 +616,15 @@ export async function classifyTransactionCategory(
 
   const best = ranked[0];
   const second = ranked[1];
+
+  if (best && best.matchedKeywords.includes("contexto semantico") && best.score >= 4) {
+    return {
+      categoryId: best.id,
+      confidence: Math.min(0.92, 0.52 + best.score / 24),
+      aiClassified: false,
+      reason: "Correspondencia semantica forte"
+    };
+  }
 
   if (best && best.score >= 6 && best.score >= (second?.score ?? 0) + 2) {
     return {

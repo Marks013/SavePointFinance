@@ -2,6 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -17,6 +18,7 @@ import {
   subscriptionServicePresets,
   type SubscriptionServicePreset
 } from "@/lib/finance/presets";
+import { formatMonthKeyLabel, normalizeMonthKey } from "@/lib/month";
 import { formatCurrency } from "@/lib/utils";
 
 type RefItem = { id: string; name: string };
@@ -34,8 +36,8 @@ type SubscriptionItem = {
   card: RefItem | null;
 };
 
-async function getSubscriptions() {
-  const response = await fetch("/api/subscriptions", { cache: "no-store" });
+async function getSubscriptions(month: string) {
+  const response = await fetch(`/api/subscriptions?month=${month}`, { cache: "no-store" });
   if (!response.ok) throw new Error("Falha ao carregar assinaturas");
   return (await response.json()) as { items: SubscriptionItem[] };
 }
@@ -100,8 +102,13 @@ function SubscriptionServiceCard({
 
 export function SubscriptionsClient() {
   const queryClient = useQueryClient();
+  const searchParams = useSearchParams();
+  const month = normalizeMonthKey(searchParams.get("month"));
   const [editingId, setEditingId] = useState<string | null>(null);
-  const subscriptionsQuery = useQuery({ queryKey: ["subscriptions"], queryFn: getSubscriptions });
+  const subscriptionsQuery = useQuery({
+    queryKey: ["subscriptions", month],
+    queryFn: () => getSubscriptions(month)
+  });
   const categoriesQuery = useQuery({ queryKey: ["categories"], queryFn: getCategories });
   const accountsQuery = useQuery({ queryKey: ["accounts"], queryFn: getAccounts });
   const cardsQuery = useQuery({ queryKey: ["cards"], queryFn: getCards });
@@ -253,6 +260,9 @@ export function SubscriptionsClient() {
           Use recorrências para registrar despesas e receitas que se repetem todo mês e manter o dashboard coerente com
           a rotina financeira.
         </p>
+        <p className="mt-3 text-sm font-medium text-[var(--color-primary)]">
+          Competência ativa: {formatMonthKeyLabel(month)}
+        </p>
         <div className="mt-6 space-y-3">
           <Label>Serviços populares</Label>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -284,7 +294,7 @@ export function SubscriptionsClient() {
               <Input id="sub-day" type="number" {...form.register("billingDay")} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="sub-next">Próxima cobrança</Label>
+              <Label htmlFor="sub-next">{selectedType === "income" ? "Próximo recebimento" : "Próxima cobrança"}</Label>
               <Input id="sub-next" type="date" {...form.register("nextBillingDate")} />
             </div>
           </div>
@@ -352,7 +362,7 @@ export function SubscriptionsClient() {
           <div>
             <h2 className="text-2xl font-semibold tracking-[-0.03em]">Assinaturas ativas</h2>
             <p className="mt-2 text-sm leading-7 text-[var(--color-muted-foreground)]">
-              Controle o custo fixo mensal e a próxima cobrança de cada serviço recorrente.
+              Controle o custo fixo mensal e o próximo lançamento previsto de cada recorrência no mês selecionado.
             </p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -393,7 +403,7 @@ export function SubscriptionsClient() {
                       <p className="font-semibold">{item.name}</p>
                     )}
                     <p className="text-sm text-[var(--color-muted-foreground)]">
-                      {item.category?.name ?? "Sem categoria"} • próxima em{" "}
+                      {item.category?.name ?? "Sem categoria"} • {item.type === "income" ? "próximo recebimento em " : "próxima cobrança em "}
                       {new Date(item.nextBillingDate).toLocaleDateString("pt-BR")}
                     </p>
                     <p className="text-sm text-[var(--color-muted-foreground)]">

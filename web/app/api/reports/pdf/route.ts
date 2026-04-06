@@ -4,14 +4,18 @@ import type { ReactElement } from "react";
 import { SummaryDocument } from "@/features/reports/pdf/summary-document";
 import { requireSessionUser } from "@/lib/auth/session";
 import { getFinanceReport } from "@/lib/finance/reports";
+import { getMonthRange, normalizeMonthKey } from "@/lib/month";
 
 export async function GET(request: Request) {
   try {
     const user = await requireSessionUser({ feature: "pdfExport" });
     const { searchParams } = new URL(request.url);
+    const month = searchParams.get("month");
+    const resolvedMonth = month ? normalizeMonthKey(month) : null;
+    const monthRange = resolvedMonth ? getMonthRange(resolvedMonth) : null;
     const report = await getFinanceReport(user.tenantId, {
-      from: searchParams.get("from"),
-      to: searchParams.get("to"),
+      from: searchParams.get("from") ?? monthRange?.from ?? null,
+      to: searchParams.get("to") ?? monthRange?.to ?? null,
       type: searchParams.get("type"),
       accountId: searchParams.get("accountId"),
       cardId: searchParams.get("cardId"),

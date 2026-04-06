@@ -1,7 +1,15 @@
 import { Prisma, TransactionType } from "@prisma/client";
 
-import { getCurrentStatementMonth, getStatementPaymentDate, getStatementRange } from "@/lib/cards/statement";
+import { getAccountsWithComputedBalance } from "@/lib/finance/accounts";
+import { getCurrentMonthKey, getMonthRange } from "@/lib/month";
+import {
+  calculateStatementTotal,
+  getCardExpenseDueDate,
+  getStatementPaymentDate,
+  getStatementRange
+} from "@/lib/cards/statement";
 import { prisma } from "@/lib/prisma/client";
+import { addMonthsClamped } from "@/lib/utils";
 
 export type FinanceReportFilters = {
   from?: string | null;
@@ -34,6 +42,32 @@ function monthLabel(date: Date) {
     month: "short",
     year: "2-digit"
   }).format(date);
+}
+
+function getFilterRange(filters: FinanceReportFilters) {
+  if (filters.from && filters.to) {
+    return {
+      start: new Date(`${filters.from}T00:00:00`),
+      end: new Date(`${filters.to}T23:59:59`)
+    };
+  }
+
+  const month = getCurrentMonthKey();
+  const { start, end } = getMonthRange(month);
+  return { start, end };
+}
+
+function listStatementMonthsBetween(start: Date, end: Date) {
+  const months: string[] = [];
+  const cursor = new Date(start.getFullYear(), start.getMonth(), 1, 12, 0, 0, 0);
+  const limit = new Date(end.getFullYear(), end.getMonth(), 1, 12, 0, 0, 0);
+
+  while (cursor <= limit) {
+    months.push(`${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}`);
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+
+  return months;
 }
 
 function buildTransactionWhere(
@@ -77,18 +111,45 @@ function buildTransactionWhere(
 }
 
 export async function getFinanceReport(tenantId: string, filters: FinanceReportFilters, userId?: string) {
-  const now = new Date();
-  const projectionEnd = new Date(now);
-  projectionEnd.setDate(projectionEnd.getDate() + 30);
+  const { start: projectionStart, end: projectionEnd } = getFilterRange(filters);
 
-  const [transactions, subscriptions, cards, goals] = await Promise.all([
+  const [transactions, subscriptions, cards, goals, accounts] = await Promise.all([
     prisma.transaction.findMany({
       where: buildTransactionWhere(tenantId, filters, userId),
-      include: {
-        category: true,
-        financialAccount: true,
-        destinationAccount: true,
-        card: true
+      select: {
+        id: true,
+        amount: true,
+        date: true,
+        description: true,
+        type: true,
+        categoryId: true,
+        accountId: true,
+        destinationAccountId: true,
+        cardId: true,
+        aiClassified: true,
+        aiConfidence: true,
+        category: {
+          select: {
+            id: true,
+            name: true
+          }
+        },
+        financialAccount: {
+          select: {
+            name: true
+          }
+        },
+        destinationAccount: {
+          select: {
+            name: true
+          }
+        },
+        card: {
+          select: {
+            name: true,
+            brand: true
+          }
+        }
       },
       orderBy: [{ date: "asc" }, { createdAt: "asc" }]
     }),
@@ -96,10 +157,20 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
       where: {
         tenantId,
         ...(userId ? { userId } : {}),
-        isActive: true,
-        nextBillingDate: {
-          gte: now,
-          lte: projectionEnd
+        isActive: true
+      },
+      select: {
+        id: true,
+        name: true,
+        amount: true,
+        type: true,
+        nextBillingDate: true,
+        card: {
+          select: {
+            id: true,
+            closeDay: true,
+            dueDay: true
+          }
         }
       },
       orderBy: {
@@ -109,6 +180,13 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
     prisma.card.findMany({
       where: {
         tenantId,
+        isActive: true
+      },
+      select: {
+        id: true,
+        name: true,
+        dueDay: true,
+        closeDay: true,
         isActive: true
       },
       orderBy: {
@@ -122,14 +200,22 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
         isCompleted: false,
         deadline: {
           not: null,
-          gte: now,
+          gte: projectionStart,
           lte: projectionEnd
         }
+      },
+      select: {
+        id: true,
+        name: true,
+        targetAmount: true,
+        currentAmount: true,
+        deadline: true
       },
       orderBy: {
         deadline: "asc"
       }
-    })
+    }),
+    getAccountsWithComputedBalance(tenantId, userId)
   ]);
 
   const monthlyMap = new Map<string, { income: number; expense: number; transfer: number }>();
@@ -287,8 +373,8 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
   }
 
   summary.balance = summary.income - summary.expense;
-  const filterStart = filters.from ? new Date(`${filters.from}T00:00:00`) : transactions[0]?.date ?? now;
-  const filterEnd = filters.to ? new Date(`${filters.to}T23:59:59`) : transactions.at(-1)?.date ?? now;
+  const filterStart = filters.from ? new Date(`${filters.from}T00:00:00`) : transactions[0]?.date ?? projectionStart;
+  const filterEnd = filters.to ? new Date(`${filters.to}T23:59:59`) : transactions.at(-1)?.date ?? projectionEnd;
   const totalDays = Math.max(
     1,
     Math.ceil((filterEnd.getTime() - filterStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
@@ -296,75 +382,133 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
   summary.averageDailyExpense = summary.expense / totalDays;
   summary.savingsRate = summary.income > 0 ? summary.balance / summary.income : 0;
 
-  const upcoming: ProjectionEvent[] = subscriptions.map((subscription) => ({
-    date: subscription.nextBillingDate.toISOString(),
-    label: subscription.name,
-    amount: Number(subscription.amount),
-    type: subscription.type === "income" ? "income" : "expense",
-    source: "subscription",
-    reference: subscription.id
-  }));
+  const upcoming: ProjectionEvent[] = [];
+  for (const subscription of subscriptions) {
+    let occurrenceDate = new Date(subscription.nextBillingDate);
 
-  for (const card of cards) {
-    const statementMonth = getCurrentStatementMonth(card.closeDay, now);
-    const dueDate = getStatementPaymentDate(statementMonth, card.dueDay);
-
-    if (dueDate < now || dueDate > projectionEnd) {
-      continue;
+    while (
+      (subscription.card ? getCardExpenseDueDate(subscription.card, occurrenceDate) : occurrenceDate) < projectionStart
+    ) {
+      occurrenceDate = addMonthsClamped(occurrenceDate, 1);
     }
 
-    const payment = await prisma.statementPayment.findUnique({
-      where: {
-        tenantId_cardId_month: {
-          tenantId,
-          cardId: card.id,
-          month: statementMonth
-        }
-      }
-    });
+    while (occurrenceDate <= projectionEnd) {
+      const projectedDate = subscription.card
+        ? getCardExpenseDueDate(subscription.card, occurrenceDate)
+        : occurrenceDate;
 
-    if (payment) {
-      continue;
-    }
-
-    const { start, end } = getStatementRange(statementMonth, card.closeDay);
-      const statementTransactions = await prisma.transaction.findMany({
-        where: {
-          tenantId,
-          cardId: card.id,
-          date: {
-          gte: start,
-          lte: end
-        }
-      },
-      select: {
-        amount: true,
-        type: true
+      if (projectedDate > projectionEnd) {
+        break;
       }
-    });
 
-    const statementAmount = statementTransactions.reduce((sum, item) => {
-      const amount = Number(item.amount);
-      if (item.type === TransactionType.expense) {
-        return sum + amount;
-      }
-      if (item.type === TransactionType.income) {
-        return sum - amount;
-      }
-      return sum;
-    }, 0);
-
-    if (statementAmount > 0) {
       upcoming.push({
-        date: dueDate.toISOString(),
-        label: `Fatura ${card.name}`,
-        amount: statementAmount,
-        type: "expense",
-        source: "card_statement",
-        reference: card.id
+        date: projectedDate.toISOString(),
+        label: subscription.name,
+        amount: Number(subscription.amount),
+        type: subscription.type === "income" ? "income" : "expense",
+        source: "subscription",
+        reference: `${subscription.id}-${occurrenceDate.toISOString().slice(0, 10)}`
       });
+
+      occurrenceDate = addMonthsClamped(occurrenceDate, 1);
     }
   }
+
+  const statementMonths = listStatementMonthsBetween(projectionStart, projectionEnd);
+  const cardsWithStatements = cards.filter((card) => card.isActive);
+  const earliestStatementStart = new Date(projectionStart);
+  earliestStatementStart.setMonth(earliestStatementStart.getMonth() - 1);
+  earliestStatementStart.setDate(1);
+  earliestStatementStart.setHours(0, 0, 0, 0);
+
+  const [statementPayments, statementTransactions] =
+    cardsWithStatements.length > 0 && statementMonths.length > 0
+      ? await Promise.all([
+          prisma.statementPayment.findMany({
+            where: {
+              tenantId,
+              cardId: {
+                in: cardsWithStatements.map((card) => card.id)
+              },
+              month: {
+                in: statementMonths
+              }
+            },
+            select: {
+              cardId: true,
+              month: true
+            }
+          }),
+          prisma.transaction.findMany({
+            where: {
+              tenantId,
+              ...(userId ? { userId } : {}),
+              cardId: {
+                in: cardsWithStatements.map((card) => card.id)
+              },
+              date: {
+                gte: earliestStatementStart,
+                lte: projectionEnd
+              }
+            },
+            select: {
+              cardId: true,
+              date: true,
+              amount: true,
+              type: true
+            }
+          })
+        ])
+      : [[], []];
+
+  const paidStatementSet = new Set(statementPayments.map((item) => `${item.cardId}:${item.month}`));
+  const transactionsByCard = new Map<string, typeof statementTransactions>();
+
+  for (const transaction of statementTransactions) {
+    if (!transaction.cardId) {
+      continue;
+    }
+
+    const current = transactionsByCard.get(transaction.cardId) ?? [];
+    current.push(transaction);
+    transactionsByCard.set(transaction.cardId, current);
+  }
+
+  const cardStatementEvents = cardsWithStatements.flatMap((card) =>
+    statementMonths
+      .map((statementMonth) => {
+        const dueDate = getStatementPaymentDate(statementMonth, card.dueDay);
+
+        if (dueDate < projectionStart || dueDate > projectionEnd) {
+          return null;
+        }
+
+        if (paidStatementSet.has(`${card.id}:${statementMonth}`)) {
+          return null;
+        }
+
+        const { start, end } = getStatementRange(statementMonth, card.closeDay);
+        const statementAmount = calculateStatementTotal(
+          (transactionsByCard.get(card.id) ?? []).filter((item) => item.date >= start && item.date <= end)
+        );
+
+        if (statementAmount <= 0) {
+          return null;
+        }
+
+        return {
+          date: dueDate.toISOString(),
+          label: `Fatura ${card.name}`,
+          amount: statementAmount,
+          type: "expense" as const,
+          source: "card_statement" as const,
+          reference: `${card.id}-${statementMonth}`
+        };
+      })
+      .filter((item): item is NonNullable<typeof item> => item !== null)
+  );
+
+  upcoming.push(...cardStatementEvents);
 
   for (const goal of goals) {
     if (!goal.deadline) {
@@ -392,7 +536,7 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
     (acc, item) => {
       if (item.type === "income") {
         acc.income += item.amount;
-      } else {
+      } else if (item.source !== "goal_deadline") {
         acc.expense += item.amount;
         if (item.source === "card_statement") {
           acc.cardPayments += item.amount;
@@ -416,6 +560,9 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
     share: item.total / totalExpenseBase
   }));
   const topCategory = categoryInsights[0] ?? null;
+  const currentBalance = accounts
+    .filter((account) => account.isActive)
+    .reduce((sum, account) => sum + account.currentBalance, 0);
 
   return {
     summary,
@@ -444,11 +591,12 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
       categoryBreakdown: categoryInsights
     },
     projection: {
-      horizonDays: 30,
+      horizonDays: Math.max(1, Math.ceil((projectionEnd.getTime() - projectionStart.getTime()) / (1000 * 60 * 60 * 24)) + 1),
+      currentBalance,
       income: projection.income,
       expense: projection.expense,
       cardPayments: projection.cardPayments,
-      net: projection.income - projection.expense
+      net: currentBalance + projection.income - projection.expense
     },
     filters,
     monthly: Array.from(monthlyMap.entries()).map(([label, values]) => ({

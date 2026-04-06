@@ -91,11 +91,15 @@ export async function PATCH(request: Request, context: Params) {
       installments.map((installment) =>
         prisma.transaction.update({
           where: {
-            id: installment.id,
-            tenantId: user.tenantId
+            id: installment.id
           },
           data: {
             description: `${body.description} (${installment.installmentNumber}/${installment.installmentsTotal})`,
+            ...(typeof body.amount === "number"
+              ? {
+                  amount: body.amount
+                }
+              : {}),
             categoryId: body.categoryId || null,
             notes: body.notes?.trim() || null
           }

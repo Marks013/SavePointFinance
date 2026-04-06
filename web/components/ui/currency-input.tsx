@@ -118,10 +118,12 @@ export function CurrencyInput<TFieldValues extends FieldValues>({
         setIsFocused(true);
         const parsed = parseCurrencyInputValue(displayValue);
         const nextDisplay =
-          parsed === null ? (nullable ? "" : "0,00") : formatEditableCurrencyValue(parsed);
+          parsed === null || (!nullable && parsed === 0) ? "" : formatEditableCurrencyValue(parsed);
         setDisplayValue(nextDisplay);
         queueMicrotask(() => {
-          event.currentTarget.select();
+          if (nextDisplay) {
+            event.currentTarget.select();
+          }
         });
       }}
       onChange={(event) => {

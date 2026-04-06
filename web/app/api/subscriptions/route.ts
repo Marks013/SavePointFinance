@@ -2,13 +2,23 @@ import { NextResponse } from "next/server";
 
 import { subscriptionFormSchema } from "@/features/subscriptions/schemas/subscription-schema";
 import { requireSessionUser } from "@/lib/auth/session";
+import { getMonthRange, normalizeMonthKey } from "@/lib/month";
 import { prisma } from "@/lib/prisma/client";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const user = await requireSessionUser();
+    const { searchParams } = new URL(request.url);
+    const month = normalizeMonthKey(searchParams.get("month"));
+    const { start, end } = getMonthRange(month);
     const subscriptions = await prisma.subscription.findMany({
-      where: { tenantId: user.tenantId },
+      where: {
+        tenantId: user.tenantId,
+        nextBillingDate: {
+          gte: start,
+          lte: end
+        }
+      },
       include: {
         category: true,
         account: true,

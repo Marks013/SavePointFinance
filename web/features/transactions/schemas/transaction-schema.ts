@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const transactionTypeValues = ["income", "expense", "transfer"] as const;
 export const paymentMethodValues = ["pix", "money", "credit_card", "debit_card", "transfer"] as const;
+export const transactionEditScopeValues = ["single", "group"] as const;
 
 export const transactionFormSchema = z
   .object({
@@ -123,5 +124,10 @@ export const transactionFiltersSchema = z.object({
   cardId: z.string().optional().nullable()
 });
 
+export const transactionUpdateSchema = transactionFormSchema.extend({
+  editScope: z.enum(transactionEditScopeValues).optional().default("single")
+});
+
 export type TransactionFormValues = z.infer<typeof transactionFormSchema>;
 export type TransactionFiltersValues = z.infer<typeof transactionFiltersSchema>;
+export type TransactionUpdateValues = z.infer<typeof transactionUpdateSchema>;

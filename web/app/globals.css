@@ -332,8 +332,7 @@ button {
   letter-spacing: -0.035em;
   line-height: 1.15;
   font-variant-numeric: tabular-nums;
-  overflow-wrap: anywhere;
-  text-wrap: pretty;
+  white-space: nowrap;
 }
 
 .subtle-metric-value {
@@ -341,6 +340,7 @@ button {
   font-weight: 500;
   letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .metric-footnote {

@@ -229,7 +229,7 @@ async function run() {
     createdTenantIds.push(memberAuditTenant.id);
     const memberPassword = "Auditoria123!";
     const memberEmail = `membro-${unique}@savepoint.local`;
-    const member = await createUser({
+    await createUser({
       tenantId: memberAuditTenant.id,
       email: memberEmail,
       name: "Pessoa Auditoria",

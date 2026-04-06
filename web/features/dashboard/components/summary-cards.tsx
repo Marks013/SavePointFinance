@@ -66,7 +66,7 @@ export function SummaryCards({ data }: SummaryCardsProps) {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="metric-label">{card.title}</p>
-                <p className="mt-4 text-[clamp(1.45rem,2vw,1.92rem)] font-medium tracking-[-0.04em] text-[var(--color-foreground)]">
+                <p className="mt-4 whitespace-nowrap text-[clamp(1.45rem,2vw,1.92rem)] font-medium tracking-[-0.04em] text-[var(--color-foreground)]">
                   {formatCurrency(value)}
                 </p>
                 <p className="mt-3 text-sm leading-6 text-[var(--color-ink-700)]">{card.note}</p>

@@ -2,18 +2,21 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { CurrencyInput } from "@/components/ui/currency-input";
+import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PresetChip } from "@/components/ui/preset-chip";
 import { Select } from "@/components/ui/select";
 import { cardFormSchema, type CardFormValues } from "@/features/cards/schemas/card-schema";
 import { brazilianInstitutions, cardBrandPresets, cardColorPresets, findPreset } from "@/lib/finance/presets";
+import { formatMonthKeyLabel, normalizeMonthKey } from "@/lib/month";
 import { formatCurrency } from "@/lib/utils";
 
 type CardItem = {
@@ -59,6 +62,11 @@ type StatementPayload = {
     closeDate: string;
     dueDate: string;
   };
+  itemsMeta: {
+    returned: number;
+    limit: number;
+    hasMore: boolean;
+  };
   payment: {
     id: string;
     amount: number;
@@ -80,8 +88,11 @@ type StatementPayload = {
   }>;
 };
 
-async function getCards() {
-  const response = await fetch("/api/cards", { cache: "no-store" });
+const invalidFieldClassName =
+  "border-[var(--color-destructive)] focus:border-[var(--color-destructive)] focus:ring-[var(--color-destructive)]/12";
+
+async function getCards(month: string) {
+  const response = await fetch(`/api/cards?month=${month}`, { cache: "no-store" });
   if (!response.ok) throw new Error("Falha ao carregar cartões");
   return (await response.json()) as { items: CardItem[] };
 }
@@ -151,26 +162,44 @@ async function payStatement(cardId: string, month: string, accountId: string) {
 
 export function CardsClient() {
   const queryClient = useQueryClient();
+  const searchParams = useSearchParams();
+  const month = normalizeMonthKey(searchParams.get("month"));
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedStatementCardId, setSelectedStatementCardId] = useState<string>("");
-  const [statementMonth, setStatementMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [statementMonth, setStatementMonth] = useState(month);
   const [statementPaymentAccountId, setStatementPaymentAccountId] = useState<string>("");
-  const cardsQuery = useQuery({ queryKey: ["cards"], queryFn: getCards });
-  const accountsQuery = useQuery({ queryKey: ["accounts"], queryFn: getAccounts });
+  const [statementItemsLimit, setStatementItemsLimit] = useState<string>("50");
+  const cardsQuery = useQuery({
+    queryKey: ["cards", month],
+    queryFn: () => getCards(month),
+    staleTime: 30_000,
+    placeholderData: (previousData) => previousData
+  });
+  const accountsQuery = useQuery({ queryKey: ["accounts"], queryFn: getAccounts, staleTime: 30_000 });
   const cards = useMemo(() => cardsQuery.data?.items ?? [], [cardsQuery.data?.items]);
-  const totalLimit = cards.reduce((sum, card) => sum + card.limitAmount, 0);
-  const totalStatement = cards.reduce((sum, card) => sum + card.statementAmount, 0);
-  const totalAvailable = cards.reduce((sum, card) => sum + card.availableLimit, 0);
+  const accounts = useMemo(() => accountsQuery.data?.items ?? [], [accountsQuery.data?.items]);
+  const { totalLimit, totalStatement } = useMemo(
+    () => ({
+      totalLimit: cards.reduce((sum, card) => sum + card.limitAmount, 0),
+      totalStatement: cards.reduce((sum, card) => sum + card.statementAmount, 0)
+    }),
+    [cards]
+  );
   const statementQuery = useQuery({
-    queryKey: ["card-statement", selectedStatementCardId, statementMonth],
+    queryKey: ["card-statement", selectedStatementCardId, statementMonth, statementItemsLimit],
     queryFn: async () => {
-      const response = await fetch(`/api/cards/${selectedStatementCardId}/statement?month=${statementMonth}`, {
-        cache: "no-store"
-      });
+      const response = await fetch(
+        `/api/cards/${selectedStatementCardId}/statement?month=${statementMonth}&limit=${statementItemsLimit}`,
+        {
+          cache: "no-store"
+        }
+      );
       if (!response.ok) throw new Error("Falha ao carregar fatura");
       return (await response.json()) as StatementPayload;
     },
-    enabled: Boolean(selectedStatementCardId)
+    enabled: Boolean(selectedStatementCardId),
+    staleTime: 15_000,
+    placeholderData: (previousData) => previousData
   });
   const payStatementMutation = useMutation({
     mutationFn: async () => {
@@ -279,15 +308,8 @@ export function CardsClient() {
   const selectedColor = form.watch("color");
 
   useEffect(() => {
-    if (!selectedStatementCardId) {
-      return;
-    }
-
-    const selectedCard = cards.find((item) => item.id === selectedStatementCardId);
-    if (selectedCard && selectedCard.statementMonth !== statementMonth) {
-      setStatementMonth(selectedCard.statementMonth);
-    }
-  }, [cards, selectedStatementCardId, statementMonth]);
+    setStatementMonth(month);
+  }, [month]);
 
   return (
     <div className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
@@ -300,16 +322,33 @@ export function CardsClient() {
           Cadastre cartões usados no crédito para controlar limite, competência, pagamento de fatura e impacto nos
           relatórios.
         </p>
+        <p className="mt-3 text-sm font-medium text-[var(--color-primary)]">
+          Competência global ativa: {formatMonthKeyLabel(month)}
+        </p>
 
-        <form className="mt-8 space-y-5" onSubmit={form.handleSubmit((values) => saveMutation.mutate(values))}>
+        <form
+          className="mt-8 space-y-5"
+          onSubmit={form.handleSubmit(
+            (values) => saveMutation.mutate(values),
+            (errors) => {
+              const firstError = Object.values(errors).find((error) => error?.message)?.message;
+              toast.error(firstError ?? "Revise os campos obrigatÃ³rios antes de continuar");
+            }
+          )}
+        >
           <div className="space-y-2">
             <Label htmlFor="card-name">Nome</Label>
-            <Input id="card-name" {...form.register("name")} />
+            <Input
+              className={form.formState.errors.name ? invalidFieldClassName : undefined}
+              id="card-name"
+              placeholder="Ex.: Nubank principal"
+              {...form.register("name")}
+            />
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="card-brand">Bandeira</Label>
-              <Select id="card-brand" {...form.register("brand")}>
+              <Select className={form.formState.errors.brand ? invalidFieldClassName : undefined} id="card-brand" {...form.register("brand")}>
                 {cardBrandPresets.map((brand) => (
                   <option key={brand.value} value={brand.value}>
                     {brand.label}
@@ -319,7 +358,14 @@ export function CardsClient() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="card-last4">Final</Label>
-              <Input id="card-last4" maxLength={4} {...form.register("last4")} />
+              <Input
+                className={form.formState.errors.last4 ? invalidFieldClassName : undefined}
+                id="card-last4"
+                inputMode="numeric"
+                maxLength={4}
+                placeholder="1234"
+                {...form.register("last4")}
+              />
             </div>
           </div>
           <div className="grid gap-4 lg:grid-cols-3">
@@ -329,17 +375,35 @@ export function CardsClient() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="card-due">Vencimento</Label>
-              <Input id="card-due" type="number" {...form.register("dueDay")} />
+              <Input
+                className={form.formState.errors.dueDay ? invalidFieldClassName : undefined}
+                id="card-due"
+                max={31}
+                min={1}
+                type="number"
+                {...form.register("dueDay")}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="card-close">Fechamento</Label>
-              <Input id="card-close" type="number" {...form.register("closeDay")} />
+              <Input
+                className={form.formState.errors.closeDay ? invalidFieldClassName : undefined}
+                id="card-close"
+                max={31}
+                min={1}
+                type="number"
+                {...form.register("closeDay")}
+              />
             </div>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="card-institution">Instituição</Label>
-              <Select id="card-institution" {...form.register("institution")}>
+              <Select
+                className={form.formState.errors.institution ? invalidFieldClassName : undefined}
+                id="card-institution"
+                {...form.register("institution")}
+              >
                 {brazilianInstitutions.map((institution) => (
                   <option key={institution.value} value={institution.value}>
                     {institution.label}
@@ -400,6 +464,24 @@ export function CardsClient() {
             O limite e os dias de fechamento e vencimento são usados para acompanhar a fatura mensal e o limite
             disponível em tempo real.
           </p>
+          {form.formState.errors.name ? (
+            <p className="text-sm text-[var(--color-destructive)]">{form.formState.errors.name.message}</p>
+          ) : null}
+          {form.formState.errors.brand ? (
+            <p className="text-sm text-[var(--color-destructive)]">{form.formState.errors.brand.message}</p>
+          ) : null}
+          {form.formState.errors.last4 ? (
+            <p className="text-sm text-[var(--color-destructive)]">{form.formState.errors.last4.message}</p>
+          ) : null}
+          {form.formState.errors.limitAmount ? (
+            <p className="text-sm text-[var(--color-destructive)]">{form.formState.errors.limitAmount.message}</p>
+          ) : null}
+          {form.formState.errors.dueDay ? (
+            <p className="text-sm text-[var(--color-destructive)]">{form.formState.errors.dueDay.message}</p>
+          ) : null}
+          {form.formState.errors.closeDay ? (
+            <p className="text-sm text-[var(--color-destructive)]">{form.formState.errors.closeDay.message}</p>
+          ) : null}
           <Button className="w-full" disabled={saveMutation.isPending} type="submit">
             {saveMutation.isPending ? "Salvando..." : isEditing ? "Salvar cartão" : "Criar cartão"}
           </Button>
@@ -419,7 +501,7 @@ export function CardsClient() {
               Acompanhe o limite total, a soma das faturas abertas e a utilização consolidada.
             </p>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             <article className="metric-card">
               <p className="metric-label">Limite total</p>
               <p className="metric-value">{formatCurrency(totalLimit)}</p>
@@ -427,10 +509,6 @@ export function CardsClient() {
             <article className="metric-card">
               <p className="metric-label">Fatura aberta</p>
               <p className="metric-value">{formatCurrency(totalStatement)}</p>
-            </article>
-            <article className="metric-card">
-              <p className="metric-label">Disponível</p>
-              <p className="metric-value">{formatCurrency(totalAvailable)}</p>
             </article>
           </div>
         </div>
@@ -463,15 +541,36 @@ export function CardsClient() {
                 </div>
                 <p className="font-semibold">{formatCurrency(card.limitAmount)}</p>
               </div>
-              <div className="mt-3 grid gap-2 text-sm text-[var(--color-muted-foreground)]">
-                <p>Fecha dia {card.closeDay}, vence dia {card.dueDay}</p>
-                <p>Competência atual: {new Date(`${card.statementMonth}-01T12:00:00`).toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}</p>
-                <p>Fecha em: {new Date(card.closeDate).toLocaleDateString("pt-BR")}</p>
-                <p>Vence em: {new Date(card.dueDate).toLocaleDateString("pt-BR")}</p>
-                <p>Fatura atual: {formatCurrency(card.statementAmount)}</p>
-                <p>Limite disponível: {formatCurrency(card.availableLimit)}</p>
-                {card.institution ? <p>Instituição: {card.institution}</p> : null}
+              <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                <div className="rounded-[1rem] border border-[var(--color-border)]/60 bg-[var(--color-muted)]/20 px-3 py-3">
+                  <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted-foreground)]">
+                    Fatura
+                  </p>
+                  <p className="mt-2 whitespace-nowrap text-sm font-semibold text-[var(--color-foreground)]">
+                    {formatCurrency(card.statementAmount)}
+                  </p>
+                </div>
+                <div className="rounded-[1rem] border border-[var(--color-border)]/60 bg-[var(--color-muted)]/20 px-3 py-3">
+                  <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted-foreground)]">
+                    Disponível
+                  </p>
+                  <p className="mt-2 whitespace-nowrap text-sm font-semibold text-[var(--color-foreground)]">
+                    {formatCurrency(card.availableLimit)}
+                  </p>
+                </div>
+                <div className="rounded-[1rem] border border-[var(--color-border)]/60 bg-[var(--color-muted)]/20 px-3 py-3">
+                  <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted-foreground)]">
+                    Vencimento
+                  </p>
+                  <p className="mt-2 whitespace-nowrap text-sm font-semibold text-[var(--color-foreground)]">
+                    {new Date(card.dueDate).toLocaleDateString("pt-BR")}
+                  </p>
+                </div>
               </div>
+              <p className="mt-3 text-sm text-[var(--color-muted-foreground)]">
+                Fecha dia {card.closeDay}, vence dia {card.dueDay}
+                {card.institution ? ` • ${card.institution}` : ""}
+              </p>
               <div className="mt-3 h-2 overflow-hidden rounded-full bg-[rgba(214,199,172,0.6)]">
                 <div
                   className="h-full rounded-full bg-[var(--color-coral-500)]"
@@ -526,15 +625,45 @@ export function CardsClient() {
               <option value="">Selecione um cartão</option>
               {cards.map((card) => (
                 <option key={card.id} value={card.id}>
-                  {card.name}
+                  {card.name} {card.last4 ? `• ${card.last4}` : ""}
                 </option>
               ))}
             </Select>
           </div>
           <div className="min-w-0 flex-1 space-y-2">
             <Label htmlFor="statement-month">Competência</Label>
-            <Input id="statement-month" type="month" value={statementMonth} onChange={(event) => setStatementMonth(event.target.value)} />
+            <DatePickerInput
+              id="statement-month"
+              onChange={(event) => setStatementMonth(event.target.value)}
+              type="month"
+              value={statementMonth}
+            />
           </div>
+        </div>
+        <div className="muted-panel mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-[var(--color-muted-foreground)]">
+          <p>
+            {selectedStatementCardId
+              ? `Cartão selecionado: ${cards.find((item) => item.id === selectedStatementCardId)?.name ?? "Cartão"}.`
+              : "Nenhum cartão selecionado."}
+          </p>
+          <p>{`Competência em análise: ${new Date(`${statementMonth}-01T12:00:00`).toLocaleDateString("pt-BR", {
+            month: "long",
+            year: "numeric"
+          })}.`}</p>
+        </div>
+        <div className="mt-4">
+          <Button
+            onClick={() => {
+              setSelectedStatementCardId("");
+              setStatementPaymentAccountId("");
+              setStatementMonth(month);
+              setStatementItemsLimit("50");
+            }}
+            type="button"
+            variant="ghost"
+          >
+            Limpar seleção
+          </Button>
         </div>
 
         {!selectedStatementCardId ? (
@@ -543,8 +672,44 @@ export function CardsClient() {
           </div>
         ) : null}
 
+        {selectedStatementCardId && statementQuery.isLoading ? (
+          <div className="mt-6 grid gap-3">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <div
+                key={`statement-loading-${index}`}
+                className="muted-panel border border-dashed px-4 py-5 text-sm text-[var(--color-muted-foreground)]"
+              >
+                Carregando dados da fatura selecionada...
+              </div>
+            ))}
+          </div>
+        ) : null}
+
         {statementQuery.data ? (
           <div className="mt-6 space-y-6">
+            {statementQuery.isFetching ? (
+              <p className="text-sm text-[var(--color-muted-foreground)]">
+                Atualizando valores e lançamentos da fatura...
+              </p>
+            ) : null}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-[var(--color-muted-foreground)]">
+                {statementQuery.data.summary.transactions} lançamento
+                {statementQuery.data.summary.transactions === 1 ? "" : "s"} nesta competência.
+              </p>
+              <div className="flex items-center gap-3">
+                <Label htmlFor="statement-items-limit">Exibir</Label>
+                <Select
+                  id="statement-items-limit"
+                  value={statementItemsLimit}
+                  onChange={(event) => setStatementItemsLimit(event.target.value)}
+                >
+                  <option value="25">25 itens</option>
+                  <option value="50">50 itens</option>
+                  <option value="100">100 itens</option>
+                </Select>
+              </div>
+            </div>
             <div className="grid gap-4 md:grid-cols-4">
               <article className="metric-card">
                 <p className="text-sm text-[var(--color-muted-foreground)]">Total da fatura</p>
@@ -605,7 +770,7 @@ export function CardsClient() {
                       onChange={(event) => setStatementPaymentAccountId(event.target.value)}
                     >
                       <option value="">Selecione a conta pagadora</option>
-                      {(accountsQuery.data?.items ?? []).map((account) => (
+                      {accounts.map((account) => (
                         <option key={account.id} value={account.id}>
                           {account.name}
                         </option>
@@ -624,6 +789,11 @@ export function CardsClient() {
             </div>
 
             <div className="space-y-3">
+              {statementQuery.data.itemsMeta.hasMore ? (
+                <p className="text-sm text-[var(--color-muted-foreground)]">
+                  Mostrando {statementQuery.data.itemsMeta.returned} de {statementQuery.data.summary.transactions} itens da competência.
+                </p>
+              ) : null}
               {statementQuery.data.items.map((item) => (
                 <article key={item.id} className="data-card p-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">

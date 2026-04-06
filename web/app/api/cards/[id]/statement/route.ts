@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
+import { z } from "zod";
 
 import { requireSessionUser } from "@/lib/auth/session";
 import { getCardStatementSnapshot } from "@/lib/cards/statement";
@@ -8,12 +10,21 @@ type Params = {
   params: Promise<{ id: string }>;
 };
 
+const statementQuerySchema = z.object({
+  month: z.string().optional(),
+  limit: z.coerce.number().int().min(10).max(200).default(50)
+});
+
 export async function GET(request: Request, context: Params) {
   try {
     const user = await requireSessionUser();
     const { id } = await context.params;
     const { searchParams } = new URL(request.url);
-    const month = searchParams.get("month") ?? new Date().toISOString().slice(0, 7);
+    const query = statementQuerySchema.parse({
+      month: searchParams.get("month") ?? new Date().toISOString().slice(0, 7),
+      limit: searchParams.get("limit") ?? 50
+    });
+    const month = query.month ?? new Date().toISOString().slice(0, 7);
 
     const card = await prisma.card.findFirst({
       where: {
@@ -33,36 +44,60 @@ export async function GET(request: Request, context: Params) {
       client: prisma
     });
 
-    const transactions = await prisma.transaction.findMany({
-      where: {
-        tenantId: user.tenantId,
-        cardId: id,
-        date: {
-          gte: statement.start,
-          lte: statement.end
-        }
-      },
-      include: {
-        category: true
-      },
-      orderBy: [{ date: "desc" }, { createdAt: "desc" }]
-    });
-
-    const installmentItems = transactions.filter(
-      (item) => item.type === "expense" && item.installmentsTotal > 1
-    ).length;
-    const payment = await prisma.statementPayment.findUnique({
-      where: {
-        tenantId_cardId_month: {
-          tenantId: user.tenantId,
-          cardId: id,
-          month
-        }
-      },
-      include: {
-        account: true
+    const statementItemsWhere: Prisma.TransactionWhereInput = {
+      tenantId: user.tenantId,
+      cardId: id,
+      date: {
+        gte: statement.start,
+        lte: statement.end
       }
-    });
+    };
+
+    const [transactions, transactionsCount, installmentItems, payment] = await Promise.all([
+      prisma.transaction.findMany({
+        where: statementItemsWhere,
+        select: {
+          id: true,
+          date: true,
+          description: true,
+          amount: true,
+          type: true,
+          installmentNumber: true,
+          installmentsTotal: true,
+          category: {
+            select: {
+              name: true
+            }
+          }
+        },
+        orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+        take: query.limit
+      }),
+      prisma.transaction.count({
+        where: statementItemsWhere
+      }),
+      prisma.transaction.count({
+        where: {
+          ...statementItemsWhere,
+          type: "expense",
+          installmentsTotal: {
+            gt: 1
+          }
+        }
+      }),
+      prisma.statementPayment.findUnique({
+        where: {
+          tenantId_cardId_month: {
+            tenantId: user.tenantId,
+            cardId: id,
+            month
+          }
+        },
+        include: {
+          account: true
+        }
+      })
+    ]);
 
     return NextResponse.json({
       card: {
@@ -79,11 +114,16 @@ export async function GET(request: Request, context: Params) {
         totalAmount: statement.totalAmount,
         availableLimit: statement.availableLimit,
         installmentItems,
-        transactions: transactions.length,
+        transactions: transactionsCount,
         cycleStart: statement.start.toISOString(),
         cycleEnd: statement.end.toISOString(),
         closeDate: statement.closeDate.toISOString(),
         dueDate: statement.dueDate.toISOString()
+      },
+      itemsMeta: {
+        returned: transactions.length,
+        limit: query.limit,
+        hasMore: transactionsCount > transactions.length
       },
       payment: payment
         ? {

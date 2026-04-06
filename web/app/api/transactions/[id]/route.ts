@@ -2,11 +2,13 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 import { requireSessionUser } from "@/lib/auth/session";
+import { getCardExpenseDueDate } from "@/lib/cards/statement";
 import { classifyTransactionCategory } from "@/lib/finance/category-classifier";
 import { ensureFallbackCategory } from "@/lib/finance/default-categories";
 import { ensureTitheCategory, syncTitheForTransactionDates } from "@/lib/finance/tithe";
 import { prisma } from "@/lib/prisma/client";
-import { transactionFormSchema } from "@/features/transactions/schemas/transaction-schema";
+import { addMonthsClamped } from "@/lib/utils";
+import { transactionUpdateSchema } from "@/features/transactions/schemas/transaction-schema";
 
 type Params = {
   params: Promise<{
@@ -14,11 +16,15 @@ type Params = {
   }>;
 };
 
+function buildInstallmentDescription(description: string, installmentNumber: number, installmentsTotal: number) {
+  return installmentsTotal > 1 ? `${description} (${installmentNumber}/${installmentsTotal})` : description;
+}
+
 export async function PATCH(request: Request, context: Params) {
   try {
     const user = await requireSessionUser();
     const { id } = await context.params;
-    const body = transactionFormSchema.parse(await request.json());
+    const body = transactionUpdateSchema.parse(await request.json());
     const existingTransaction = await prisma.transaction.findFirstOrThrow({
       where: {
         id,
@@ -29,13 +35,17 @@ export async function PATCH(request: Request, context: Params) {
         date: true,
         titheAmount: true,
         notes: true,
-        userId: true
+        userId: true,
+        installmentsTotal: true,
+        installmentNumber: true,
+        parentId: true
       }
     });
 
     if (existingTransaction.notes?.startsWith("[AUTO_TITHE:")) {
       return NextResponse.json({ message: "O dízimo consolidado é gerado automaticamente" }, { status: 400 });
     }
+
     const notes = body.notes?.trim() || null;
     const categories = await prisma.category.findMany({
       where: {
@@ -67,7 +77,7 @@ export async function PATCH(request: Request, context: Params) {
         aiConfidence: true
       },
       orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-      take: 250
+      take: 120
     });
     const classification =
       body.categoryId || body.type === "transfer"
@@ -99,16 +109,111 @@ export async function PATCH(request: Request, context: Params) {
     const applyTithe = body.type === "income" && body.applyTithe;
     const titheCategoryId = applyTithe ? await ensureTitheCategory(user.tenantId) : null;
     const updatedDate = new Date(`${body.date}T12:00:00`);
+    const selectedCard =
+      body.paymentMethod === "credit_card" && body.cardId
+        ? await prisma.card.findFirst({
+            where: {
+              id: body.cardId,
+              tenantId: user.tenantId,
+              isActive: true
+            },
+            select: {
+              id: true,
+              closeDay: true,
+              dueDay: true
+            }
+          })
+        : null;
+
+    if (body.paymentMethod === "credit_card" && body.cardId && !selectedCard) {
+      return NextResponse.json({ message: "Cartão selecionado não foi encontrado" }, { status: 404 });
+    }
+
+    const groupRootId = existingTransaction.parentId ?? (existingTransaction.installmentsTotal > 1 ? existingTransaction.id : null);
+    const updateWholeGroup = body.editScope === "group" && Boolean(groupRootId);
+
+    if (updateWholeGroup && groupRootId) {
+      const installments = await prisma.transaction.findMany({
+        where: {
+          tenantId: user.tenantId,
+          OR: [{ id: groupRootId }, { parentId: groupRootId }]
+        },
+        orderBy: {
+          installmentNumber: "asc"
+        }
+      });
+
+      if (!installments.length) {
+        return NextResponse.json({ message: "Grupo de parcelas não encontrado" }, { status: 404 });
+      }
+
+      const affectedDatesBefore = installments.map((installment) => installment.date);
+
+      await prisma.$transaction(
+        installments.map((installment) => {
+          const monthOffset = installment.installmentNumber - existingTransaction.installmentNumber;
+          const nextDate =
+            selectedCard && body.cardId
+              ? getCardExpenseDueDate(selectedCard, updatedDate, installment.installmentNumber - 1)
+              : addMonthsClamped(updatedDate, monthOffset);
+
+          return prisma.transaction.update({
+            where: {
+              id: installment.id
+            },
+            data: {
+              date: nextDate,
+              amount: new Prisma.Decimal(body.amount.toFixed(2)),
+              description: buildInstallmentDescription(body.description, installment.installmentNumber, installment.installmentsTotal),
+              type: body.type,
+              paymentMethod: body.paymentMethod,
+              categoryId,
+              accountId: body.accountId || null,
+              destinationAccountId: body.destinationAccountId || null,
+              cardId: body.cardId || null,
+              notes,
+              titheAmount: applyTithe ? new Prisma.Decimal((body.amount * 0.1).toFixed(2)) : null,
+              titheCategoryId,
+              aiClassified: classification.aiClassified,
+              aiConfidence:
+                classification.confidence !== null ? new Prisma.Decimal(classification.confidence.toFixed(2)) : null
+            }
+          });
+        })
+      );
+
+      if (applyTithe || installments.some((installment) => Number(installment.titheAmount ?? 0) > 0)) {
+        await syncTitheForTransactionDates({
+          tenantId: user.tenantId,
+          userId: existingTransaction.userId ?? user.id,
+          dates: [
+            ...affectedDatesBefore,
+            ...installments.map((installment) =>
+              selectedCard && body.cardId
+                ? getCardExpenseDueDate(selectedCard, updatedDate, installment.installmentNumber - 1)
+                : addMonthsClamped(updatedDate, installment.installmentNumber - existingTransaction.installmentNumber)
+            )
+          ]
+        });
+      }
+
+      return NextResponse.json({
+        id,
+        scope: "group"
+      });
+    }
 
     const updated = await prisma.transaction.update({
       where: {
-        id,
-        tenantId: user.tenantId
+        id
       },
       data: {
-        date: updatedDate,
-        amount: body.amount,
-        description: body.description,
+        date:
+          selectedCard && body.cardId
+            ? getCardExpenseDueDate(selectedCard, updatedDate, existingTransaction.installmentNumber - 1)
+            : updatedDate,
+        amount: new Prisma.Decimal(body.amount.toFixed(2)),
+        description: buildInstallmentDescription(body.description, existingTransaction.installmentNumber, existingTransaction.installmentsTotal),
         type: body.type,
         paymentMethod: body.paymentMethod,
         categoryId,
@@ -133,14 +238,15 @@ export async function PATCH(request: Request, context: Params) {
     }
 
     return NextResponse.json({
-      id: updated.id
+      id: updated.id,
+      scope: "single"
     });
   } catch (error) {
     if (error instanceof Error && error.message === "Unauthorized") {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
-    return NextResponse.json({ message: "Failed to update transaction" }, { status: 400 });
+    return NextResponse.json({ message: error instanceof Error ? error.message : "Failed to update transaction" }, { status: 400 });
   }
 }
 
@@ -167,8 +273,7 @@ export async function DELETE(_request: Request, context: Params) {
 
     await prisma.transaction.delete({
       where: {
-        id,
-        tenantId: user.tenantId
+        id
       }
     });
 

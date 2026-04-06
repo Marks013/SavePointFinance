@@ -1,13 +1,15 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { Bar, BarChart, CartesianGrid, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell } from "recharts";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { formatMonthKeyLabel, getMonthRange, normalizeMonthKey } from "@/lib/month";
 import { formatCurrency } from "@/lib/utils";
 
 type ReportResponse = {
@@ -58,6 +60,7 @@ type ReportResponse = {
   };
   projection: {
     horizonDays: number;
+    currentBalance: number;
     income: number;
     expense: number;
     cardPayments: number;
@@ -169,6 +172,7 @@ async function getOptions<T>(url: string) {
 }
 
 async function getReportSummary(filters: {
+  month: string;
   from: string;
   to: string;
   type: string;
@@ -177,6 +181,7 @@ async function getReportSummary(filters: {
   categoryId: string;
 }) {
   const searchParams = new URLSearchParams();
+  if (filters.month) searchParams.set("month", filters.month);
   if (filters.from) searchParams.set("from", filters.from);
   if (filters.to) searchParams.set("to", filters.to);
   if (filters.type) searchParams.set("type", filters.type);
@@ -190,42 +195,77 @@ async function getReportSummary(filters: {
 }
 
 export function ReportsClient() {
+  const searchParams = useSearchParams();
+  const month = normalizeMonthKey(searchParams.get("month"));
+  const monthLabel = formatMonthKeyLabel(month);
+  const monthRange = useMemo(() => getMonthRange(month), [month]);
   const [filters, setFilters] = useState({
-    from: "",
-    to: "",
     type: "",
     accountId: "",
     cardId: "",
     categoryId: ""
   });
+  const effectiveFilters = useMemo(
+    () => ({
+      month,
+      from: monthRange.from,
+      to: monthRange.to,
+      type: filters.type,
+      accountId: filters.accountId,
+      cardId: filters.cardId,
+      categoryId: filters.categoryId
+    }),
+    [filters.accountId, filters.cardId, filters.categoryId, filters.type, month, monthRange.from, monthRange.to]
+  );
   const accountsQuery = useQuery({
     queryKey: ["accounts-options"],
-    queryFn: () => getOptions<OptionItem>("/api/accounts")
+    queryFn: () => getOptions<OptionItem>("/api/accounts"),
+    staleTime: 30_000
   });
   const cardsQuery = useQuery({
     queryKey: ["cards-options"],
-    queryFn: () => getOptions<OptionItem>("/api/cards")
+    queryFn: () => getOptions<OptionItem>(`/api/cards?month=${month}`),
+    staleTime: 30_000
   });
   const categoriesQuery = useQuery({
     queryKey: ["categories-options"],
-    queryFn: () => getOptions<OptionItem>("/api/categories")
+    queryFn: () => getOptions<OptionItem>("/api/categories"),
+    staleTime: 30_000
   });
   const reportsQuery = useQuery({
-    queryKey: ["reports-summary", filters],
-    queryFn: () => getReportSummary(filters)
+    queryKey: ["reports-summary", month, filters],
+    queryFn: () => getReportSummary(effectiveFilters),
+    staleTime: 15_000,
+    placeholderData: (previousData) => previousData
   });
   const data = reportsQuery.data;
+  const selectedReportAccount = (accountsQuery.data ?? []).find((item) => item.id === filters.accountId);
+  const selectedReportCard = (cardsQuery.data ?? []).find((item) => item.id === filters.cardId);
+  const selectedReportCategory = (categoriesQuery.data ?? []).find((item) => item.id === filters.categoryId);
+  const activeRefinements = [
+    filters.type
+      ? filters.type === "income"
+        ? "Receitas"
+        : filters.type === "expense"
+          ? "Despesas"
+          : "Transferências"
+      : null,
+    selectedReportAccount ? `Conta: ${selectedReportAccount.name}` : null,
+    selectedReportCard ? `Cartão: ${selectedReportCard.name}` : null,
+    selectedReportCategory ? `Categoria: ${selectedReportCategory.name}` : null
+  ].filter(Boolean) as string[];
   const pdfHref = useMemo(() => {
     const searchParams = new URLSearchParams();
-    if (filters.from) searchParams.set("from", filters.from);
-    if (filters.to) searchParams.set("to", filters.to);
+    searchParams.set("month", month);
+    searchParams.set("from", monthRange.from);
+    searchParams.set("to", monthRange.to);
     if (filters.type) searchParams.set("type", filters.type);
     if (filters.accountId) searchParams.set("accountId", filters.accountId);
     if (filters.cardId) searchParams.set("cardId", filters.cardId);
     if (filters.categoryId) searchParams.set("categoryId", filters.categoryId);
     const query = searchParams.toString();
     return query ? `/api/reports/pdf?${query}` : "/api/reports/pdf";
-  }, [filters]);
+  }, [filters, month, monthRange.from, monthRange.to]);
 
   return (
     <div className="space-y-6">
@@ -233,9 +273,9 @@ export function ReportsClient() {
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="page-intro">
             <div className="eyebrow">Relatórios</div>
-            <h1 className="text-3xl font-semibold tracking-[-0.04em]">Leitura financeira por período</h1>
+            <h1 className="text-3xl font-semibold tracking-[-0.04em]">{`Leitura financeira de ${monthLabel}`}</h1>
             <p className="text-sm leading-7 text-[var(--color-muted-foreground)]">
-              Cruze contas, cartões, categorias e competência mensal a partir da mesma base de lançamentos usada no painel.
+              A competência mensal vem da navegação global. Os filtros abaixo refinam a leitura apenas dentro deste mês.
             </p>
             {data?.isPlatformAdmin ? (
               <p className="attention-copy mt-3 text-sm">
@@ -259,20 +299,22 @@ export function ReportsClient() {
         <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
           <div className="space-y-2">
             <Label htmlFor="reports-filter-from">De</Label>
-            <Input
+            <DatePickerInput
               id="reports-filter-from"
               type="date"
-              value={filters.from}
-              onChange={(event) => setFilters((current) => ({ ...current, from: event.target.value }))}
+              disabled
+              readOnly
+              value={monthRange.from}
             />
           </div>
           <div className="space-y-2">
             <Label htmlFor="reports-filter-to">Até</Label>
-            <Input
+            <DatePickerInput
               id="reports-filter-to"
               type="date"
-              value={filters.to}
-              onChange={(event) => setFilters((current) => ({ ...current, to: event.target.value }))}
+              disabled
+              readOnly
+              value={monthRange.to}
             />
           </div>
           <div className="space-y-2">
@@ -310,7 +352,7 @@ export function ReportsClient() {
               value={filters.cardId}
               onChange={(event) => setFilters((current) => ({ ...current, cardId: event.target.value }))}
             >
-              <option value="">Todos</option>
+              <option value="">Todos os cartões</option>
               {(cardsQuery.data ?? []).map((item) => (
                 <option key={item.id} value={item.id}>
                   {item.name}
@@ -335,19 +377,25 @@ export function ReportsClient() {
           </div>
           <div className="flex items-end md:col-span-2 xl:col-span-3 2xl:col-span-1">
             <Button
-              onClick={() =>
-                setFilters({ from: "", to: "", type: "", accountId: "", cardId: "", categoryId: "" })
-              }
+              onClick={() => setFilters({ type: "", accountId: "", cardId: "", categoryId: "" })}
               type="button"
               variant="ghost"
             >
-              Limpar filtros
+              Limpar refinamentos
             </Button>
           </div>
         </div>
+        <div className="muted-panel mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-[var(--color-muted-foreground)]">
+          <p>{`Mês ativo: ${monthLabel}.`}</p>
+          <p>{activeRefinements.length > 0 ? activeRefinements.join(" • ") : "Sem refinamentos adicionais."}</p>
+        </div>
       </section>
 
-      <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <article className="metric-card">
+          <p className="metric-label">Saldo operacional</p>
+          <p className="metric-value">{formatCurrency(data?.summary.balance ?? 0)}</p>
+        </article>
         <article className="metric-card">
           <p className="metric-label">Receitas</p>
           <p className="metric-value">{formatCurrency(data?.summary.income ?? 0)}</p>
@@ -356,50 +404,19 @@ export function ReportsClient() {
           <p className="metric-label">Despesas</p>
           <p className="metric-value">{formatCurrency(data?.summary.expense ?? 0)}</p>
         </article>
-        <article className="metric-card">
-          <p className="metric-label">Saldo operacional</p>
-          <p className="metric-value">{formatCurrency(data?.summary.balance ?? 0)}</p>
-        </article>
-        <article className="metric-card">
-          <p className="metric-label">Transferências</p>
-          <p className="metric-value">{formatCurrency(data?.summary.transfer ?? 0)}</p>
-        </article>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <article className="metric-card">
-          <p className="metric-label">Despesa média por dia</p>
-          <p className="metric-value">{formatCurrency(data?.summary.averageDailyExpense ?? 0)}</p>
-        </article>
-        <article className="metric-card">
-          <p className="metric-label">Taxa de folga</p>
-          <p className="metric-value">{`${Math.round((data?.summary.savingsRate ?? 0) * 100)}%`}</p>
-        </article>
-        <article className="metric-card">
-          <p className="metric-label">Classificação coberta</p>
-          <p className="metric-value">{`${Math.round((data?.classification.coverage ?? 0) * 100)}%`}</p>
-        </article>
-        <article className="metric-card">
-          <p className="metric-label">Despesas sem categoria</p>
-          <p className="metric-value">{formatCurrency(data?.summary.uncategorizedExpense ?? 0)}</p>
-        </article>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
-        <article className="metric-card">
-          <p className="metric-label">Entradas em {data?.projection.horizonDays ?? 30} dias</p>
-          <p className="metric-value">{formatCurrency(data?.projection.income ?? 0)}</p>
-        </article>
-        <article className="metric-card">
-          <p className="metric-label">Saídas em {data?.projection.horizonDays ?? 30} dias</p>
-          <p className="metric-value">{formatCurrency(data?.projection.expense ?? 0)}</p>
+          <p className="metric-label">Saldo atual consolidado</p>
+          <p className="metric-value">{formatCurrency(data?.projection.currentBalance ?? 0)}</p>
         </article>
         <article className="metric-card">
           <p className="metric-label">Faturas a vencer</p>
           <p className="metric-value">{formatCurrency(data?.projection.cardPayments ?? 0)}</p>
         </article>
         <article className="metric-card">
-          <p className="metric-label">Resultado projetado</p>
+          <p className="metric-label">Saldo projetado ao fim do mês</p>
           <p className="metric-value">{formatCurrency(data?.projection.net ?? 0)}</p>
         </article>
       </div>
@@ -445,7 +462,7 @@ export function ReportsClient() {
             <div>
               <h2 className="text-xl font-semibold">Leitura de gasto</h2>
               <p className="mt-1 text-sm text-[var(--color-muted-foreground)]">
-                Síntese para entender peso de gastos fixos, estilo de vida e maior pressão do período.
+                {`Síntese para entender peso de gastos fixos, estilo de vida e maior pressão dentro de ${monthLabel}.`}
               </p>
             </div>
           </div>
@@ -594,7 +611,7 @@ export function ReportsClient() {
             ))
           ) : (
             <div className="muted-panel border border-dashed px-4 py-6 text-sm text-[var(--color-muted-foreground)]">
-              Nenhum vencimento relevante foi encontrado para os próximos 30 dias.
+              {`Nenhum vencimento relevante foi encontrado em ${monthLabel}.`}
             </div>
           )}
         </div>

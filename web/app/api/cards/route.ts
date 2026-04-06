@@ -6,9 +6,11 @@ import { getCardStatementSnapshot } from "@/lib/cards/statement";
 import { canCreateCard } from "@/lib/licensing/server";
 import { prisma } from "@/lib/prisma/client";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const user = await requireSessionUser();
+    const { searchParams } = new URL(request.url);
+    const month = searchParams.get("month") ?? undefined;
     const cards = await prisma.card.findMany({
       where: {
         tenantId: user.tenantId
@@ -22,6 +24,7 @@ export async function GET() {
         const statement = await getCardStatementSnapshot({
           tenantId: user.tenantId,
           card,
+          month,
           client: prisma
         });
 

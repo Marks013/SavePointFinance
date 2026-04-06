@@ -35,6 +35,13 @@ async function main() {
     }
   ];
 
+  expenseCategories.push({
+    id: "cat-moradia",
+    name: "Moradia",
+    type: "expense" as const,
+    keywords: ["aluguel", "condominio", "financiamento habitacional", "prestacao casa"]
+  });
+
   const results: string[] = [];
 
   const breadCase = await classifyTransactionCategory({
@@ -86,6 +93,16 @@ async function main() {
   assertCondition(memoryCase.aiClassified === false, "Memória local não deveria marcar classificação por IA");
   assertCondition(/histórico/i.test(memoryCase.reason), "Classificação por memória não registrou motivo de histórico");
   results.push("Memória local reforça descrições parecidas já classificadas manualmente");
+
+  const housingCase = await classifyTransactionCategory({
+    type: "expense",
+    description: "Financiamento de casa",
+    paymentMethod: PaymentMethod.transfer,
+    categories: expenseCategories
+  });
+  assertCondition(housingCase.categoryId === "cat-moradia", "Financiamento de casa nao caiu em Moradia");
+  assertCondition(housingCase.aiClassified === false, "Financiamento de casa nao deveria depender de IA");
+  results.push("Contexto de financiamento residencial classifica 'Financiamento de casa' como Moradia");
 
   const geminiEnabled = process.env.GEMINI_ENABLED === "true";
   const geminiKeyPresent = Boolean(process.env.GEMINI_API_KEY?.trim());

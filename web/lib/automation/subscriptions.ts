@@ -1,7 +1,12 @@
 import { NotificationChannel, PaymentMethod, TransactionSource, TransactionType } from "@prisma/client";
 
 import { deliverNotification } from "@/lib/notifications/delivery";
-import { getCardStatementSnapshot, getCurrentStatementMonth, getStatementPaymentDate } from "@/lib/cards/statement";
+import {
+  getCardExpenseDueDate,
+  getCardStatementSnapshot,
+  getCurrentStatementMonth,
+  getStatementPaymentDate
+} from "@/lib/cards/statement";
 import { getFinanceReport } from "@/lib/finance/reports";
 import { ensureTitheCategory, getMonthKey, syncMonthlyTitheTransaction } from "@/lib/finance/tithe";
 import { prisma } from "@/lib/prisma/client";
@@ -143,6 +148,15 @@ export async function generateSubscriptionTransaction(subscriptionId: string, te
     where: {
       id: subscriptionId,
       tenantId
+    },
+    include: {
+      card: {
+        select: {
+          id: true,
+          closeDay: true,
+          dueDay: true
+        }
+      }
     }
   });
 
@@ -154,7 +168,9 @@ export async function generateSubscriptionTransaction(subscriptionId: string, te
     where: {
       tenantId,
       subscriptionId: subscription.id,
-      date: subscription.nextBillingDate
+      date: subscription.card
+        ? getCardExpenseDueDate(subscription.card, subscription.nextBillingDate)
+        : subscription.nextBillingDate
     },
     select: {
       id: true
@@ -174,7 +190,9 @@ export async function generateSubscriptionTransaction(subscriptionId: string, te
       tenantId,
       userId: subscription.userId ?? userId,
       subscriptionId: subscription.id,
-      date: subscription.nextBillingDate,
+      date: subscription.card
+        ? getCardExpenseDueDate(subscription.card, subscription.nextBillingDate)
+        : subscription.nextBillingDate,
       amount: subscription.amount,
       description: `Assinatura: ${subscription.name}`,
       type: subscription.type === "income" ? TransactionType.income : TransactionType.expense,

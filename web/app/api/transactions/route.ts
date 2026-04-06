@@ -2,6 +2,7 @@ import { Prisma, Transaction, TransactionSource } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 import { requireSessionUser } from "@/lib/auth/session";
+import { getCardExpenseDueDate } from "@/lib/cards/statement";
 import { classifyTransactionCategory } from "@/lib/finance/category-classifier";
 import { ensureFallbackCategory } from "@/lib/finance/default-categories";
 import { ensureTitheCategory, syncTitheForTransactionDates } from "@/lib/finance/tithe";
@@ -123,6 +124,25 @@ export async function POST(request: Request) {
     const cardId = body.cardId || null;
     const notes = body.notes?.trim() || null;
     const installmentAmounts = splitAmountIntoInstallments(body.amount, body.installments);
+    const selectedCard =
+      body.paymentMethod === "credit_card" && cardId
+        ? await prisma.card.findFirst({
+            where: {
+              id: cardId,
+              tenantId: user.tenantId,
+              isActive: true
+            },
+            select: {
+              id: true,
+              closeDay: true,
+              dueDay: true
+            }
+          })
+        : null;
+
+    if (body.paymentMethod === "credit_card" && cardId && !selectedCard) {
+      return NextResponse.json({ message: "Cartão selecionado não foi encontrado" }, { status: 404 });
+    }
     const categories = await prisma.category.findMany({
       where: {
         tenantId: user.tenantId
@@ -150,7 +170,7 @@ export async function POST(request: Request) {
         aiConfidence: true
       },
       orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-      take: 250
+      take: 120
     });
     const classification =
       body.categoryId || body.type === "transfer"
@@ -187,7 +207,10 @@ export async function POST(request: Request) {
     let firstTransactionId: string | null = null;
 
     for (let index = 0; index < body.installments; index += 1) {
-      const transactionDate = addMonthsClamped(parsedDate, index);
+      const transactionDate =
+        selectedCard && cardId
+          ? getCardExpenseDueDate(selectedCard, parsedDate, index)
+          : addMonthsClamped(parsedDate, index);
       affectedDates.push(transactionDate);
       const created: Transaction = await prisma.transaction.create({
         data: {

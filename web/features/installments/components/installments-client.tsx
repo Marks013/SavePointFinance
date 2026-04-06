@@ -1,12 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { CurrencyInput } from "@/components/ui/currency-input";
+import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
@@ -14,12 +17,14 @@ import {
   installmentGroupUpdateSchema,
   type InstallmentGroupUpdateValues
 } from "@/features/installments/schemas/installment-schema";
+import { formatMonthKeyLabel, getMonthRange, normalizeMonthKey } from "@/lib/month";
 import { formatCurrency } from "@/lib/utils";
 
 type InstallmentGroup = {
   id: string;
   description: string;
   totalAmount: number;
+  installmentAmount?: number;
   installmentsTotal: number;
   installmentsPaid: number;
   installmentsRemaining: number;
@@ -66,10 +71,13 @@ async function getCategories() {
 
 export function InstallmentsClient() {
   const queryClient = useQueryClient();
+  const searchParams = useSearchParams();
+  const month = normalizeMonthKey(searchParams.get("month"));
+  const monthRange = getMonthRange(month);
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
   const [filters, setFilters] = useState({
-    from: "",
-    to: "",
+    from: monthRange.from,
+    to: monthRange.to,
     cardId: ""
   });
   const installmentsQuery = useQuery({
@@ -79,6 +87,7 @@ export function InstallmentsClient() {
   const cardsQuery = useQuery({ queryKey: ["cards"], queryFn: getCards });
   const categoriesQuery = useQuery({ queryKey: ["categories"], queryFn: getCategories });
   const groups = installmentsQuery.data?.items ?? [];
+  const selectedFilterCard = (cardsQuery.data?.items ?? []).find((card) => card.id === filters.cardId);
   const totalAmount = groups.reduce((sum, item) => sum + item.totalAmount, 0);
   const overdueItems = groups.reduce((sum, item) => sum + item.overdueOpenInstallments, 0);
   const remainingInstallments = groups.reduce((sum, item) => sum + item.installmentsRemaining, 0);
@@ -86,10 +95,20 @@ export function InstallmentsClient() {
     resolver: zodResolver(installmentGroupUpdateSchema),
     defaultValues: {
       description: "",
+      amount: undefined,
       categoryId: "",
       notes: ""
     }
   });
+
+  useEffect(() => {
+    setFilters((current) => ({
+      ...current,
+      from: monthRange.from,
+      to: monthRange.to
+    }));
+  }, [monthRange.from, monthRange.to]);
+
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       const response = await fetch(`/api/installments/${id}`, {
@@ -128,13 +147,17 @@ export function InstallmentsClient() {
         body: JSON.stringify(values)
       });
 
-      if (!response.ok) throw new Error("Falha ao atualizar parcelamento");
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { message?: string } | null;
+        throw new Error(payload?.message ?? "Falha ao atualizar parcelamento");
+      }
     },
     onSuccess: async () => {
       toast.success("Grupo de parcelamento atualizado");
       setEditingGroupId(null);
       form.reset({
         description: "",
+        amount: undefined,
         categoryId: "",
         notes: ""
       });
@@ -146,8 +169,8 @@ export function InstallmentsClient() {
         queryClient.invalidateQueries({ queryKey: ["cards"] })
       ]);
     },
-    onError: () => {
-      toast.error("Não foi possível atualizar o parcelamento");
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : "Não foi possível atualizar o parcelamento");
     }
   });
   const reconcileMutation = useMutation({
@@ -186,6 +209,7 @@ export function InstallmentsClient() {
     setEditingGroupId(item.id);
     form.reset({
       description: item.description,
+      amount: item.installmentAmount,
       categoryId: item.category?.id ?? "",
       notes: item.notes ?? ""
     });
@@ -195,6 +219,7 @@ export function InstallmentsClient() {
     setEditingGroupId(null);
     form.reset({
       description: "",
+      amount: undefined,
       categoryId: "",
       notes: ""
     });
@@ -208,23 +233,28 @@ export function InstallmentsClient() {
         <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--color-muted-foreground)]">
           Esta visão agrega automaticamente compras parceladas registradas em transações com mais de uma parcela.
         </p>
+        <p className="mt-3 text-sm font-medium text-[var(--color-primary)]">
+          Competência ativa: {formatMonthKeyLabel(month)}
+        </p>
         <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <div className="space-y-2">
             <Label htmlFor="installments-filter-from">De</Label>
-            <Input
+            <DatePickerInput
+              disabled
               id="installments-filter-from"
+              readOnly
               type="date"
               value={filters.from}
-              onChange={(event) => setFilters((current) => ({ ...current, from: event.target.value }))}
             />
           </div>
           <div className="space-y-2">
             <Label htmlFor="installments-filter-to">Até</Label>
-            <Input
+            <DatePickerInput
+              disabled
               id="installments-filter-to"
+              readOnly
               type="date"
               value={filters.to}
-              onChange={(event) => setFilters((current) => ({ ...current, to: event.target.value }))}
             />
           </div>
           <div className="space-y-2">
@@ -234,7 +264,7 @@ export function InstallmentsClient() {
               value={filters.cardId}
               onChange={(event) => setFilters((current) => ({ ...current, cardId: event.target.value }))}
             >
-              <option value="">Todos</option>
+              <option value="">Todos os cartões</option>
               {(cardsQuery.data?.items ?? []).map((card) => (
                 <option key={card.id} value={card.id}>
                   {card.name}
@@ -242,6 +272,15 @@ export function InstallmentsClient() {
               ))}
             </Select>
           </div>
+        </div>
+        <div className="muted-panel mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-[var(--color-muted-foreground)]">
+          <p>{`Mês ativo: ${formatMonthKeyLabel(month)}.`}</p>
+          <p>{selectedFilterCard ? `Refinando por cartão: ${selectedFilterCard.name}.` : "Mostrando todos os cartões."}</p>
+        </div>
+        <div className="mt-4">
+          <Button onClick={() => setFilters({ from: monthRange.from, to: monthRange.to, cardId: "" })} type="button" variant="ghost">
+            Limpar refinamentos
+          </Button>
         </div>
       </section>
 
@@ -255,6 +294,10 @@ export function InstallmentsClient() {
             <div className="space-y-2">
               <Label htmlFor="installment-description">Descrição base</Label>
               <Input id="installment-description" {...form.register("description")} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="installment-amount">Valor da parcela</Label>
+              <CurrencyInput control={form.control} id="installment-amount" name="amount" nullable />
             </div>
             <div className="space-y-2">
               <Label htmlFor="installment-category">Categoria</Label>
@@ -308,6 +351,9 @@ export function InstallmentsClient() {
               {item.category?.name ?? "Sem categoria"} • {item.card?.name ?? "Sem cartão"}
             </p>
             <p className="mt-4 text-2xl font-semibold">{formatCurrency(item.totalAmount)}</p>
+            <p className="mt-2 text-sm text-[var(--color-muted-foreground)]">
+              Parcela base: {formatCurrency(item.installmentAmount ?? 0)}
+            </p>
             <p className="mt-2 text-sm text-[var(--color-muted-foreground)]">
               {item.installmentsPaid}/{item.installmentsTotal} conciliadas
             </p>
