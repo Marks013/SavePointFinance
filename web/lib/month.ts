@@ -1,4 +1,4 @@
-const monthKeyPattern = /^\d{4}-\d{2}$/;
+const monthKeyPattern = /^\d{4}-(0[1-9]|1[0-2])$/;
 
 export function getCurrentMonthKey(referenceDate = new Date()) {
   const year = referenceDate.getFullYear();
@@ -37,4 +37,12 @@ export function formatMonthKeyLabel(monthKey: string) {
     month: "long",
     year: "numeric"
   }).format(new Date(year, (month ?? 1) - 1, 1));
+}
+
+export function addMonthsToMonthKey(monthKey: string, offset: number) {
+  const normalizedMonth = normalizeMonthKey(monthKey);
+  const [year, month] = normalizedMonth.split("-").map(Number);
+  const nextDate = new Date(year ?? 0, ((month ?? 1) - 1) + offset, 1);
+
+  return getCurrentMonthKey(nextDate);
 }

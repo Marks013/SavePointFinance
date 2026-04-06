@@ -3,24 +3,27 @@
 import type { Route } from "next";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { startTransition, useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ChartColumnBig,
+  ChevronLeft,
+  ChevronRight,
   CreditCard,
   FolderTree,
   Landmark,
   LayoutDashboard,
-  ShieldCheck,
-  UsersRound,
   ReceiptText,
   RefreshCcw,
   Settings,
+  ShieldCheck,
   Split,
-  Target
+  Target,
+  UsersRound
 } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { formatMonthKeyLabel, getCurrentMonthKey, normalizeMonthKey } from "@/lib/month";
+import { addMonthsToMonthKey, formatMonthKeyLabel, getCurrentMonthKey, isValidMonthKey, normalizeMonthKey } from "@/lib/month";
 import { cn } from "@/lib/utils";
 
 const navigation = [
@@ -46,11 +49,13 @@ export function DashboardSidebarNav({ isAdmin, isPlatformAdmin }: DashboardSideb
   const router = useRouter();
   const searchParams = useSearchParams();
   const month = normalizeMonthKey(searchParams.get("month"));
+  const [draftMonth, setDraftMonth] = useState(month);
   const items = [
     ...navigation,
     ...(isAdmin ? [{ href: "/dashboard/sharing" as Route, label: "Compartilhamento", icon: UsersRound }] : []),
     ...(isPlatformAdmin ? [{ href: "/dashboard/admin" as Route, label: "Admin", icon: ShieldCheck }] : [])
   ];
+
   const replaceWithMonth = useCallback(
     (nextMonth: string) => {
       const nextParams = new URLSearchParams(searchParams.toString());
@@ -61,6 +66,22 @@ export function DashboardSidebarNav({ isAdmin, isPlatformAdmin }: DashboardSideb
     [pathname, router, searchParams]
   );
 
+  const commitMonth = useCallback(
+    (nextMonth: string) => {
+      if (!isValidMonthKey(nextMonth)) {
+        setDraftMonth(month);
+        return;
+      }
+
+      if (nextMonth === month) {
+        return;
+      }
+
+      replaceWithMonth(nextMonth);
+    },
+    [month, replaceWithMonth]
+  );
+
   useEffect(() => {
     if (searchParams.get("month")) {
       return;
@@ -68,6 +89,10 @@ export function DashboardSidebarNav({ isAdmin, isPlatformAdmin }: DashboardSideb
 
     replaceWithMonth(getCurrentMonthKey());
   }, [replaceWithMonth, searchParams]);
+
+  useEffect(() => {
+    setDraftMonth(month);
+  }, [month]);
 
   return (
     <>
@@ -79,17 +104,59 @@ export function DashboardSidebarNav({ isAdmin, isPlatformAdmin }: DashboardSideb
         <p className="mt-1 text-xs leading-6 text-[var(--color-muted-foreground)]">
           Painel, transações, assinaturas e parcelas seguem este mês durante a navegação.
         </p>
-        <Input
-          className="mt-4"
-          id="global-month"
-          type="month"
-          value={month}
-          onChange={(event) => {
-            startTransition(() => {
-              replaceWithMonth(event.target.value);
-            });
+        <div className="mt-4 flex items-center gap-2">
+          <Button
+            aria-label="Competência anterior"
+            className="h-12 w-12 rounded-[1.15rem] px-0"
+            type="button"
+            variant="secondary"
+            onClick={() => {
+              commitMonth(addMonthsToMonthKey(month, -1));
+            }}
+          >
+            <ChevronLeft className="size-4" />
+          </Button>
+          <Input
+            id="global-month"
+            type="month"
+            value={draftMonth}
+            onBlur={() => {
+              if (!isValidMonthKey(draftMonth)) {
+                setDraftMonth(month);
+              }
+            }}
+            onChange={(event) => {
+              setDraftMonth(event.target.value);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                commitMonth(draftMonth);
+              }
+            }}
+          />
+          <Button
+            aria-label="Próxima competência"
+            className="h-12 w-12 rounded-[1.15rem] px-0"
+            type="button"
+            variant="secondary"
+            onClick={() => {
+              commitMonth(addMonthsToMonthKey(month, 1));
+            }}
+          >
+            <ChevronRight className="size-4" />
+          </Button>
+        </div>
+        <Button
+          className="mt-3 h-11 w-full rounded-[1.15rem]"
+          type="button"
+          variant="secondary"
+          disabled={!isValidMonthKey(draftMonth) || draftMonth === month}
+          onClick={() => {
+            commitMonth(draftMonth);
           }}
-        />
+        >
+          Aplicar competência
+        </Button>
       </div>
 
       <div className="mb-3 flex items-center justify-between gap-3 px-1">
