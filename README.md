@@ -177,6 +177,7 @@ Sem provedor configurado, o sistema registra a tentativa e marca como `skipped`.
 Guia completo:
 
 - [WHATSAPP_ASSISTANT.md](/C:/Users/samue/Desktop/SavePoint/SavePoint/WHATSAPP_ASSISTANT.md)
+- [EMAIL_WEBHOOK_RESEND.md](/C:/Users/samue/Desktop/SavePoint/SavePoint/EMAIL_WEBHOOK_RESEND.md)
 
 ## Desenvolvimento local
 
@@ -209,3 +210,4 @@ O ambiente local usa [web/.env.example](/C:/Users/samue/Desktop/SavePoint/SavePo
 - deploy, bootstrap e operacao: [DEPLOY_AND_BOOTSTRAP.md](/C:/Users/samue/Desktop/SavePoint/SavePoint/DEPLOY_AND_BOOTSTRAP.md)
 - historico da migracao: [STACK_MIGRATION_PLAN.md](/C:/Users/samue/Desktop/SavePoint/SavePoint/STACK_MIGRATION_PLAN.md)
 - assistente virtual no WhatsApp: [WHATSAPP_ASSISTANT.md](/C:/Users/samue/Desktop/SavePoint/SavePoint/WHATSAPP_ASSISTANT.md)
+- exemplo de webhook de e-mail com Resend: [EMAIL_WEBHOOK_RESEND.md](/C:/Users/samue/Desktop/SavePoint/SavePoint/EMAIL_WEBHOOK_RESEND.md)

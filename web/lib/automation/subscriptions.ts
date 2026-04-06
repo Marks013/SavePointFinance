@@ -476,6 +476,49 @@ export async function runRecurringAutomation(tenantId: string, userId: string) {
         dedupeSince: startOfDay(now)
       }))
     );
+
+    const limitAmount = Number(card.limitAmount);
+    const utilization = limitAmount > 0 ? statementAmount / limitAmount : 0;
+
+    if (limitAmount > 0 && statementAmount >= limitAmount) {
+      const subject = `Limite excedido: ${card.name}`;
+      const message =
+        `O cartão ${card.name} alcançou ${formatCurrency(statementAmount)} em fatura aberta, ` +
+        `acima do limite de ${formatCurrency(limitAmount)}.`;
+
+      notificationDeliveries.push(
+        ...(await sendUserNotifications({
+          tenantId,
+          userId: tenantUser.id,
+          email: tenantUser.email,
+          whatsappNumber: tenantUser.whatsappNumber,
+          sendEmail: Boolean(tenantUser.preferences?.emailNotifications && tenantUser.preferences?.budgetAlerts),
+          sendWhatsApp: Boolean(tenantUser.preferences?.budgetAlerts),
+          subject,
+          message,
+          dedupeSince: startOfDay(now)
+        }))
+      );
+    } else if (limitAmount > 0 && utilization >= 0.8) {
+      const subject = `Uso alto do limite: ${card.name}`;
+      const message =
+        `O cartão ${card.name} está usando ${Math.round(utilization * 100)}% do limite. ` +
+        `Fatura atual: ${formatCurrency(statementAmount)} de ${formatCurrency(limitAmount)}.`;
+
+      notificationDeliveries.push(
+        ...(await sendUserNotifications({
+          tenantId,
+          userId: tenantUser.id,
+          email: tenantUser.email,
+          whatsappNumber: tenantUser.whatsappNumber,
+          sendEmail: Boolean(tenantUser.preferences?.emailNotifications && tenantUser.preferences?.budgetAlerts),
+          sendWhatsApp: Boolean(tenantUser.preferences?.budgetAlerts),
+          subject,
+          message,
+          dedupeSince: startOfDay(now)
+        }))
+      );
+    }
   }
 
   const currentMonthStart = startOfMonth(now);

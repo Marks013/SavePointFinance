@@ -2,6 +2,7 @@ import { NotificationChannel, NotificationStatus } from "@prisma/client";
 
 import { serverEnv } from "@/lib/env/server";
 import { prisma } from "@/lib/prisma/client";
+import { sendWhatsAppTextMessage } from "@/lib/whatsapp/cloud-api";
 
 type NotificationInput = {
   tenantId: string;
@@ -150,6 +151,30 @@ async function sendViaWebhook(input: NotificationInput, attemptedAt: Date) {
   } satisfies DeliveryResult;
 }
 
+async function sendWithWhatsAppCloud(input: NotificationInput) {
+  if (
+    serverEnv.WHATSAPP_ASSISTANT_ENABLED !== "true" ||
+    !serverEnv.WHATSAPP_ACCESS_TOKEN ||
+    !serverEnv.WHATSAPP_PHONE_NUMBER_ID
+  ) {
+    return {
+      ok: false,
+      skipped: false,
+      status: 0,
+      error: "WhatsApp Cloud API nao configurada. Defina o token, o numero e ative a integração."
+    } satisfies DeliveryResult;
+  }
+
+  const response = await sendWhatsAppTextMessage(input.target, `${input.subject}\n\n${input.message}`);
+
+  return {
+    ok: response.ok,
+    skipped: false,
+    status: response.status,
+    error: response.ok ? null : "Falha ao entregar via WhatsApp Cloud API."
+  } satisfies DeliveryResult;
+}
+
 export async function deliverNotification(input: NotificationInput) {
   const attemptedAt = new Date();
 
@@ -159,7 +184,9 @@ export async function deliverNotification(input: NotificationInput) {
         ? await sendWithResend(input)
         : input.channel === NotificationChannel.email && serverEnv.EMAIL_PROVIDER === "brevo"
           ? await sendWithBrevo(input)
-          : await sendViaWebhook(input, attemptedAt);
+          : input.channel === NotificationChannel.whatsapp
+            ? await sendWithWhatsAppCloud(input)
+            : await sendViaWebhook(input, attemptedAt);
 
     return prisma.notificationDelivery.create({
       data: {

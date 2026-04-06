@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
@@ -15,6 +15,7 @@ import { loginSchema, type LoginSchema } from "@/features/auth/schemas/login-sch
 export function LoginForm() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [authError, setAuthError] = useState<string | null>(null);
   const {
     register,
     handleSubmit,
@@ -29,14 +30,17 @@ export function LoginForm() {
 
   const onSubmit = handleSubmit((values) => {
     startTransition(async () => {
+      setAuthError(null);
       const result = await signIn("credentials", {
         ...values,
         redirect: false
       });
 
-      if (result?.error) {
+      if (!result?.ok || result.error) {
+        const message = "E-mail, senha ou status da conta invalido.";
+        setAuthError(message);
         toast.error("Falha ao autenticar", {
-          description: "Verifique seu e-mail, senha e o status da conta."
+          description: message
         });
         return;
       }
@@ -66,6 +70,12 @@ export function LoginForm() {
       <Button className="w-full" disabled={isPending} type="submit">
         {isPending ? "Entrando..." : "Entrar no painel"}
       </Button>
+
+      {authError ? (
+        <p className="text-sm text-[var(--color-destructive)]" role="alert">
+          {authError}
+        </p>
+      ) : null}
     </form>
   );
 }

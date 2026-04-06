@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { acceptInvitationSchema } from "@/features/password/schemas/password-schema";
+import { normalizeEmail } from "@/lib/auth/normalize-email";
 import { getTenantSeatSummary } from "@/lib/licensing/server";
 import { prisma } from "@/lib/prisma/client";
 
@@ -30,9 +31,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "O limite de usuários do plano atual foi atingido" }, { status: 409 });
     }
 
-    const existingUser = await prisma.user.findUnique({
+    const normalizedEmail = normalizeEmail(invitation.email);
+
+    const existingUser = await prisma.user.findFirst({
       where: {
-        email: invitation.email
+        email: {
+          equals: normalizedEmail,
+          mode: "insensitive"
+        }
       }
     });
 
@@ -45,7 +51,7 @@ export async function POST(request: Request) {
     const user = await prisma.user.create({
       data: {
         tenantId: invitation.tenantId,
-        email: invitation.email,
+        email: normalizedEmail,
         name: body.name,
         passwordHash,
         role: invitation.role,

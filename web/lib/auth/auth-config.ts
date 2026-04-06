@@ -5,6 +5,7 @@ import { compare } from "bcryptjs";
 
 import { loginSchema } from "@/features/auth/schemas/login-schema";
 import { baseAuthConfig } from "@/lib/auth/base-config";
+import { normalizeEmail } from "@/lib/auth/normalize-email";
 import { resolveTenantLicenseState } from "@/lib/licensing/policy";
 import { prisma } from "@/lib/prisma/client";
 
@@ -28,9 +29,14 @@ export const authConfig = {
           return null;
         }
 
-        const user = await prisma.user.findUnique({
+        const normalizedEmail = normalizeEmail(parsed.data.email);
+
+        const user = await prisma.user.findFirst({
           where: {
-            email: parsed.data.email
+            email: {
+              equals: normalizedEmail,
+              mode: "insensitive"
+            }
           },
           include: {
             tenant: {

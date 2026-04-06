@@ -1,10 +1,14 @@
+import { NotificationChannel } from "@prisma/client";
 import crypto from "node:crypto";
 import { NextResponse } from "next/server";
 
 import { invitationSchema, type InvitationValues } from "@/features/password/schemas/password-schema";
 import { logAdminAudit } from "@/lib/admin/audit";
 import { requireAdminUser } from "@/lib/auth/admin";
+import { normalizeEmail } from "@/lib/auth/normalize-email";
 import { getTenantSeatSummary } from "@/lib/licensing/server";
+import { deliverNotification } from "@/lib/notifications/delivery";
+import { buildInvitationMessage } from "@/lib/notifications/invitation";
 import { prisma } from "@/lib/prisma/client";
 
 export async function GET(request: Request) {
@@ -68,6 +72,7 @@ export async function POST(request: Request) {
     const admin = await requireAdminUser();
     const payload = (await request.json()) as InvitationValues & { tenantId?: string };
     const body = invitationSchema.parse(payload);
+    const normalizedEmail = normalizeEmail(body.email);
     const targetTenantId =
       admin.isPlatformAdmin && payload.tenantId ? payload.tenantId.trim() : admin.tenantId;
     const seatSummary = await getTenantSeatSummary(targetTenantId);
@@ -83,9 +88,12 @@ export async function POST(request: Request) {
       );
     }
 
-    const existingUser = await prisma.user.findUnique({
+    const existingUser = await prisma.user.findFirst({
       where: {
-        email: body.email
+        email: {
+          equals: normalizedEmail,
+          mode: "insensitive"
+        }
       }
     });
 
@@ -96,7 +104,10 @@ export async function POST(request: Request) {
     const activeInvitation = await prisma.invitation.findFirst({
       where: {
         tenantId: targetTenantId,
-        email: body.email,
+        email: {
+          equals: normalizedEmail,
+          mode: "insensitive"
+        },
         acceptedAt: null,
         revokedAt: null,
         expiresAt: {
@@ -116,12 +127,29 @@ export async function POST(request: Request) {
       data: {
         tenantId: targetTenantId,
         invitedByUserId: admin.id,
-        email: body.email,
+        email: normalizedEmail,
         name: body.name,
         role: body.role,
         token,
         expiresAt
+      },
+      include: {
+        tenant: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
       }
+    });
+
+    const invitationMessage = buildInvitationMessage(token, invitation.tenant.name, invitation.name);
+    const delivery = await deliverNotification({
+      tenantId: invitation.tenant.id,
+      channel: NotificationChannel.email,
+      target: invitation.email,
+      subject: invitationMessage.subject,
+      message: invitationMessage.message
     });
 
     await logAdminAudit({
@@ -144,7 +172,12 @@ export async function POST(request: Request) {
         name: invitation.name,
         role: invitation.role,
         inviteUrl: `/accept-invitation?token=${invitation.token}`,
-        expiresAt: invitation.expiresAt.toISOString()
+        expiresAt: invitation.expiresAt.toISOString(),
+        emailDelivery: {
+          status: delivery.status,
+          errorMessage: delivery.errorMessage,
+          attemptedAt: delivery.attemptedAt?.toISOString() ?? null
+        }
       },
       { status: 201 }
     );

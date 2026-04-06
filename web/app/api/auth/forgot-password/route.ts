@@ -3,6 +3,7 @@ import { NotificationChannel } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 import { forgotPasswordSchema } from "@/features/password/schemas/password-schema";
+import { normalizeEmail } from "@/lib/auth/normalize-email";
 import { deliverNotification } from "@/lib/notifications/delivery";
 import { buildPasswordResetMessage } from "@/lib/notifications/password-reset";
 import { prisma } from "@/lib/prisma/client";
@@ -10,8 +11,14 @@ import { prisma } from "@/lib/prisma/client";
 export async function POST(request: Request) {
   try {
     const body = forgotPasswordSchema.parse(await request.json());
-    const user = await prisma.user.findUnique({
-      where: { email: body.email }
+    const normalizedEmail = normalizeEmail(body.email);
+    const user = await prisma.user.findFirst({
+      where: {
+        email: {
+          equals: normalizedEmail,
+          mode: "insensitive"
+        }
+      }
     });
 
     if (!user) {

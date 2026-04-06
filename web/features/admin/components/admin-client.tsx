@@ -82,6 +82,15 @@ type InvitationItem = {
   revokedAt: string | null;
 };
 
+type InvitationCreateResponse = {
+  inviteUrl: string;
+  emailDelivery?: {
+    status: "pending" | "sent" | "failed" | "skipped";
+    errorMessage: string | null;
+    attemptedAt: string | null;
+  };
+};
+
 type AuditItem = {
   id: string;
   action: string;
@@ -670,13 +679,27 @@ export function AdminClient() {
         throw new Error(payload.message ?? "Falha ao criar convite");
       }
 
-      return (await response.json()) as { inviteUrl: string };
+      return (await response.json()) as InvitationCreateResponse;
     },
     onSuccess: async (payload) => {
       invitationForm.reset();
       await queryClient.invalidateQueries({ queryKey: ["admin-invitations"] });
       await queryClient.invalidateQueries({ queryKey: ["admin-audit"] });
       const absoluteInviteUrl = toAbsoluteInviteUrl(payload.inviteUrl);
+      if (payload.emailDelivery?.status === "sent") {
+        toast.success("Convite criado e enviado por e-mail", {
+          description: `Link do convite: ${absoluteInviteUrl}`
+        });
+        return;
+      }
+
+      if (payload.emailDelivery?.status === "failed" || payload.emailDelivery?.status === "skipped") {
+        toast.warning("Convite criado sem envio de e-mail", {
+          description: payload.emailDelivery.errorMessage ?? `Link do convite: ${absoluteInviteUrl}`
+        });
+        return;
+      }
+
       toast.success("Convite criado", {
         description: `Link do convite: ${absoluteInviteUrl}`
       });

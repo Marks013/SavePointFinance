@@ -25,7 +25,7 @@ function normalizeTokenValue(value: unknown) {
 }
 
 export const forgotPasswordSchema = z.object({
-  email: z.email("Informe um e-mail valido")
+  email: z.string().trim().email("Informe um e-mail valido")
 });
 
 export const resetPasswordSchema = z
@@ -40,7 +40,7 @@ export const resetPasswordSchema = z
   });
 
 export const invitationSchema = z.object({
-  email: z.email("Informe um e-mail valido"),
+  email: z.string().trim().email("Informe um e-mail valido"),
   name: z.string().min(2, "Informe o nome do usuario"),
   role: z.enum(["admin", "member"])
 });
