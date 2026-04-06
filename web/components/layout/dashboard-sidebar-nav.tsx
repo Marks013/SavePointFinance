@@ -3,7 +3,7 @@
 import type { Route } from "next";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useTransition } from "react";
 import {
   ChartColumnBig,
   ChevronLeft,
@@ -50,20 +50,22 @@ export function DashboardSidebarNav({ isAdmin, isPlatformAdmin }: DashboardSideb
   const searchParams = useSearchParams();
   const month = normalizeMonthKey(searchParams.get("month"));
   const [draftMonth, setDraftMonth] = useState(month);
+  const [isPending, startTransition] = useTransition();
   const items = [
     ...navigation,
     ...(isAdmin ? [{ href: "/dashboard/sharing" as Route, label: "Compartilhamento", icon: UsersRound }] : []),
     ...(isPlatformAdmin ? [{ href: "/dashboard/admin" as Route, label: "Admin", icon: ShieldCheck }] : [])
   ];
 
-  const replaceWithMonth = useCallback(
+  const buildMonthRoute = useCallback(
     (nextMonth: string) => {
       const nextParams = new URLSearchParams(searchParams.toString());
       nextParams.set("month", nextMonth || getCurrentMonthKey());
-      const nextRoute = `${pathname}?${nextParams.toString()}` as Route;
-      router.replace(nextRoute, { scroll: false });
+      const query = nextParams.toString();
+
+      return `${pathname}${query ? `?${query}` : ""}` as Route;
     },
-    [pathname, router, searchParams]
+    [pathname, searchParams]
   );
 
   const commitMonth = useCallback(
@@ -73,13 +75,15 @@ export function DashboardSidebarNav({ isAdmin, isPlatformAdmin }: DashboardSideb
         return;
       }
 
-      if (nextMonth === month) {
-        return;
-      }
+      const normalizedMonth = normalizeMonthKey(nextMonth);
+      setDraftMonth(normalizedMonth);
 
-      replaceWithMonth(nextMonth);
+      startTransition(() => {
+        router.replace(buildMonthRoute(normalizedMonth), { scroll: false });
+        router.refresh();
+      });
     },
-    [month, replaceWithMonth]
+    [buildMonthRoute, month, router]
   );
 
   useEffect(() => {
@@ -87,8 +91,8 @@ export function DashboardSidebarNav({ isAdmin, isPlatformAdmin }: DashboardSideb
       return;
     }
 
-    replaceWithMonth(getCurrentMonthKey());
-  }, [replaceWithMonth, searchParams]);
+    commitMonth(getCurrentMonthKey());
+  }, [commitMonth, searchParams]);
 
   useEffect(() => {
     setDraftMonth(month);
@@ -96,68 +100,84 @@ export function DashboardSidebarNav({ isAdmin, isPlatformAdmin }: DashboardSideb
 
   return (
     <>
-      <div className="mb-5 rounded-[24px] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-muted)_48%,var(--color-card))] p-4">
-        <p className="text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">
-          Competência global
-        </p>
-        <p className="mt-2 text-sm font-semibold text-[var(--color-foreground)]">{formatMonthKeyLabel(month)}</p>
-        <p className="mt-1 text-xs leading-6 text-[var(--color-muted-foreground)]">
-          Painel, transações, assinaturas e parcelas seguem este mês durante a navegação.
-        </p>
-        <div className="mt-4 flex items-center gap-2">
-          <Button
-            aria-label="Competência anterior"
-            className="h-12 w-12 rounded-[1.15rem] px-0"
-            type="button"
-            variant="secondary"
-            onClick={() => {
-              commitMonth(addMonthsToMonthKey(month, -1));
-            }}
-          >
-            <ChevronLeft className="size-4" />
-          </Button>
-          <Input
-            id="global-month"
-            type="month"
-            value={draftMonth}
-            onBlur={() => {
-              if (!isValidMonthKey(draftMonth)) {
-                setDraftMonth(month);
-              }
-            }}
-            onChange={(event) => {
-              setDraftMonth(event.target.value);
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                commitMonth(draftMonth);
-              }
-            }}
-          />
-          <Button
-            aria-label="Próxima competência"
-            className="h-12 w-12 rounded-[1.15rem] px-0"
-            type="button"
-            variant="secondary"
-            onClick={() => {
-              commitMonth(addMonthsToMonthKey(month, 1));
-            }}
-          >
-            <ChevronRight className="size-4" />
-          </Button>
+      <section className="mb-5 rounded-[22px] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-muted)_48%,var(--color-card))] p-3.5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-[var(--color-muted-foreground)]">
+              Competência global
+            </p>
+            <p aria-live="polite" className="mt-1 truncate text-sm font-semibold text-[var(--color-foreground)]">
+              {formatMonthKeyLabel(month)}
+            </p>
+          </div>
+          <span className="shrink-0 rounded-full border border-[var(--color-border)] px-2.5 py-1 text-[0.68rem] font-semibold text-[var(--color-muted-foreground)]">
+            Global
+          </span>
         </div>
-        <Button
-          className="mt-3 h-11 w-full rounded-[1.15rem]"
-          type="button"
-          variant="secondary"
-          disabled={!isValidMonthKey(draftMonth) || draftMonth === month}
-          onClick={() => {
+
+        <p className="mt-2 text-xs leading-5 text-[var(--color-muted-foreground)]">
+          Aplica o mês ativo ao painel, transações, assinaturas, parcelas e relatórios.
+        </p>
+
+        <form
+          className="mt-3 grid gap-2"
+          onSubmit={(event) => {
+            event.preventDefault();
             commitMonth(draftMonth);
           }}
         >
-          Aplicar competência
-        </Button>
-      </div>
+          <div className="grid grid-cols-[2.65rem_minmax(0,1fr)_2.65rem] items-center gap-2">
+            <Button
+              aria-label="Competência anterior"
+              className="h-11 w-11 rounded-[1rem] px-0"
+              disabled={isPending}
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                commitMonth(addMonthsToMonthKey(month, -1));
+              }}
+            >
+              <ChevronLeft className="size-4" />
+            </Button>
+            <Input
+              aria-label="Selecionar competência global"
+              className="min-w-0 px-2 text-center text-[0.82rem]"
+              id="global-month"
+              type="month"
+              value={draftMonth}
+              onBlur={() => {
+                if (!isValidMonthKey(draftMonth)) {
+                  setDraftMonth(month);
+                }
+              }}
+              onChange={(event) => {
+                setDraftMonth(event.target.value);
+              }}
+            />
+            <Button
+              aria-label="Próxima competência"
+              className="h-11 w-11 rounded-[1rem] px-0"
+              disabled={isPending}
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                commitMonth(addMonthsToMonthKey(month, 1));
+              }}
+            >
+              <ChevronRight className="size-4" />
+            </Button>
+          </div>
+
+          <Button
+            className="h-10 w-full rounded-[1rem] px-3 text-xs"
+            disabled={!isValidMonthKey(draftMonth) || isPending}
+            type="submit"
+            variant="secondary"
+          >
+            {isPending ? "Aplicando..." : draftMonth === month ? "Atualizar competência" : "Aplicar competência"}
+          </Button>
+        </form>
+      </section>
 
       <div className="mb-3 flex items-center justify-between gap-3 px-1">
         <p className="text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">
