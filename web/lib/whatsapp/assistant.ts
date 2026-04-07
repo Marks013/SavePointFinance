@@ -481,8 +481,8 @@ async function replyWithCardInfo(user: WhatsAppUser, body: string) {
     } satisfies AssistantResult;
   }
 
-  const month = getCurrentStatementMonth(card.closeDay, new Date());
-  const { start, end } = getStatementRange(month, card.closeDay);
+  const month = getCurrentStatementMonth(card, new Date());
+  const { start, end } = getStatementRange(month, card.closeDay, card.dueDay);
   const transactions = await prisma.transaction.findMany({
     where: {
       tenantId: user.tenantId,
@@ -515,7 +515,7 @@ async function replyWithCardInfo(user: WhatsAppUser, body: string) {
     response:
       `Cartão ${card.name}. Fatura atual: ${formatCurrency(statementAmount)}. ` +
       `Limite disponível: ${formatCurrency(availableLimit)} de ${formatCurrency(Number(card.limitAmount))}. ` +
-      `Fecha em ${formatDate(getStatementCloseDate(month, card.closeDay))} e vence em ${formatDate(
+      `Fecha em ${formatDate(getStatementCloseDate(month, card.closeDay, card.dueDay))} e vence em ${formatDate(
         getStatementPaymentDate(month, card.dueDay)
       )}.`
   } satisfies AssistantResult;

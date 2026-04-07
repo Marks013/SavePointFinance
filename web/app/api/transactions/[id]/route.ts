@@ -2,7 +2,6 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 import { requireSessionUser } from "@/lib/auth/session";
-import { getCardExpenseDueDate } from "@/lib/cards/statement";
 import { classifyTransactionCategory } from "@/lib/finance/category-classifier";
 import { ensureFallbackCategory } from "@/lib/finance/default-categories";
 import { assertTenantTransactionReferences, TenantReferenceError } from "@/lib/finance/tenant-reference-guard";
@@ -162,10 +161,7 @@ export async function PATCH(request: Request, context: Params) {
       await prisma.$transaction(
         installments.map((installment) => {
           const monthOffset = installment.installmentNumber - existingTransaction.installmentNumber;
-          const nextDate =
-            selectedCard && body.cardId
-              ? getCardExpenseDueDate(selectedCard, updatedDate, installment.installmentNumber - 1)
-              : addMonthsClamped(updatedDate, monthOffset);
+          const nextDate = addMonthsClamped(updatedDate, monthOffset);
 
           return prisma.transaction.update({
             where: {
@@ -199,9 +195,7 @@ export async function PATCH(request: Request, context: Params) {
           dates: [
             ...affectedDatesBefore,
             ...installments.map((installment) =>
-              selectedCard && body.cardId
-                ? getCardExpenseDueDate(selectedCard, updatedDate, installment.installmentNumber - 1)
-                : addMonthsClamped(updatedDate, installment.installmentNumber - existingTransaction.installmentNumber)
+              addMonthsClamped(updatedDate, installment.installmentNumber - existingTransaction.installmentNumber)
             )
           ]
         });
@@ -218,10 +212,7 @@ export async function PATCH(request: Request, context: Params) {
         id
       },
       data: {
-        date:
-          selectedCard && body.cardId
-            ? getCardExpenseDueDate(selectedCard, updatedDate, existingTransaction.installmentNumber - 1)
-            : updatedDate,
+        date: updatedDate,
         amount: new Prisma.Decimal(body.amount.toFixed(2)),
         description: buildInstallmentDescription(body.description, existingTransaction.installmentNumber, existingTransaction.installmentsTotal),
         type: body.type,

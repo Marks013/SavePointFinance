@@ -444,7 +444,7 @@ export async function runRecurringAutomation(tenantId: string, userId: string) {
   });
 
   for (const card of cards) {
-    const statementMonth = getCurrentStatementMonth(card.closeDay, now);
+    const statementMonth = getCurrentStatementMonth(card, now);
     const dueDate = getStatementPaymentDate(statementMonth, card.dueDay);
 
     if (dueDate <= now || dueDate > reminderWindow) {

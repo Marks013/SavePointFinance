@@ -59,7 +59,7 @@ export async function POST(request: Request, context: Params) {
       return NextResponse.json({ message: "Statement already paid" }, { status: 409 });
     }
 
-    const { start, end } = getStatementRange(body.month, card.closeDay);
+    const { start, end } = getStatementRange(body.month, card.closeDay, card.dueDay);
     const statementTransactions = await prisma.transaction.findMany({
       where: {
         tenantId: user.tenantId,

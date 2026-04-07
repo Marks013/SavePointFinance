@@ -487,7 +487,7 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
           return null;
         }
 
-        const { start, end } = getStatementRange(statementMonth, card.closeDay);
+        const { start, end } = getStatementRange(statementMonth, card.closeDay, card.dueDay);
         const statementAmount = calculateStatementTotal(
           (transactionsByCard.get(card.id) ?? []).filter((item) => item.date >= start && item.date <= end)
         );

@@ -2,7 +2,6 @@ import { Prisma, Transaction, TransactionSource } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 import { requireSessionUser } from "@/lib/auth/session";
-import { getCardExpenseDueDate } from "@/lib/cards/statement";
 import { classifyTransactionCategory } from "@/lib/finance/category-classifier";
 import { ensureFallbackCategory } from "@/lib/finance/default-categories";
 import { assertTenantTransactionReferences, TenantReferenceError } from "@/lib/finance/tenant-reference-guard";
@@ -217,10 +216,7 @@ export async function POST(request: Request) {
     let firstTransactionId: string | null = null;
 
     for (let index = 0; index < body.installments; index += 1) {
-      const transactionDate =
-        selectedCard && cardId
-          ? getCardExpenseDueDate(selectedCard, parsedDate, index)
-          : addMonthsClamped(parsedDate, index);
+      const transactionDate = addMonthsClamped(parsedDate, index);
       affectedDates.push(transactionDate);
       const created: Transaction = await prisma.transaction.create({
         data: {
