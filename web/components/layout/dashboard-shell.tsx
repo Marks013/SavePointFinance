@@ -5,6 +5,7 @@ import { BrandMark } from "@/components/layout/brand-mark";
 import { DashboardSidebarNav } from "@/components/layout/dashboard-sidebar-nav";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { Button } from "@/components/ui/button";
+import { getSharingAuthority } from "@/lib/sharing/access";
 
 type DashboardShellProps = {
   children: ReactNode;
@@ -12,8 +13,17 @@ type DashboardShellProps = {
 
 export async function DashboardShell({ children }: DashboardShellProps) {
   const session = await auth();
-  const isAdmin = session?.user?.role === "admin" || session?.user?.isPlatformAdmin;
   const isPlatformAdmin = Boolean(session?.user?.isPlatformAdmin);
+  const canManageSharing = session?.user?.id && session.user.tenantId
+    ? (
+        await getSharingAuthority({
+          id: session.user.id,
+          tenantId: session.user.tenantId,
+          role: session.user.role === "admin" ? "admin" : "member",
+          isPlatformAdmin
+        })
+      ).canManage
+    : false;
 
   return (
     <div className="page-shell flex h-screen flex-col gap-5 overflow-hidden py-4 md:py-5 lg:grid lg:grid-cols-[256px_minmax(0,1fr)] lg:gap-5 xl:grid-cols-[264px_minmax(0,1fr)] xl:gap-6">
@@ -30,7 +40,7 @@ export async function DashboardShell({ children }: DashboardShellProps) {
           </p>
         </div>
 
-        <DashboardSidebarNav isAdmin={Boolean(isAdmin)} isPlatformAdmin={isPlatformAdmin} />
+        <DashboardSidebarNav canManageSharing={Boolean(canManageSharing)} isPlatformAdmin={isPlatformAdmin} />
 
         <div className="mt-6 rounded-[24px] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-muted)_48%,var(--color-card))] p-4">
           <p className="text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">

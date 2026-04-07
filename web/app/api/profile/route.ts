@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { requireSessionUser } from "@/lib/auth/session";
 import { serverEnv } from "@/lib/env/server";
 import { prisma } from "@/lib/prisma/client";
+import { getSharingAuthority } from "@/lib/sharing/access";
 import { deleteUserWithAllData } from "@/lib/users/delete-user";
 import { formatWhatsAppDisplayPhone, formatWhatsAppPhone } from "@/lib/whatsapp/phone";
 
@@ -22,6 +23,8 @@ export async function GET() {
       return NextResponse.json({ message: "User not found" }, { status: 404 });
     }
 
+    const sharingAuthority = await getSharingAuthority(user);
+
     return NextResponse.json({
       id: profile.id,
       name: profile.name,
@@ -31,6 +34,9 @@ export async function GET() {
       tenant: {
         id: user.tenantId,
         name: user.tenant.name
+      },
+      sharing: {
+        canManage: sharingAuthority.canManage
       },
       whatsappNumber: formatWhatsAppDisplayPhone(profile.whatsappNumber),
       license: {

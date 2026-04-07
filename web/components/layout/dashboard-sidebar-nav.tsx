@@ -40,11 +40,11 @@ const navigation = [
 ];
 
 type DashboardSidebarNavProps = {
-  isAdmin: boolean;
+  canManageSharing: boolean;
   isPlatformAdmin: boolean;
 };
 
-export function DashboardSidebarNav({ isAdmin, isPlatformAdmin }: DashboardSidebarNavProps) {
+export function DashboardSidebarNav({ canManageSharing, isPlatformAdmin }: DashboardSidebarNavProps) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -53,7 +53,7 @@ export function DashboardSidebarNav({ isAdmin, isPlatformAdmin }: DashboardSideb
   const [isPending, startTransition] = useTransition();
   const items = [
     ...navigation,
-    ...(isAdmin ? [{ href: "/dashboard/sharing" as Route, label: "Convidar parentes", icon: UsersRound }] : []),
+    ...(canManageSharing ? [{ href: "/dashboard/sharing" as Route, label: "Convidar parentes", icon: UsersRound }] : []),
     ...(isPlatformAdmin ? [{ href: "/dashboard/admin" as Route, label: "Admin", icon: ShieldCheck }] : [])
   ];
 

@@ -22,6 +22,9 @@ type ProfilePayload = {
     id?: string;
     name?: string;
   };
+  sharing: {
+    canManage: boolean;
+  };
   whatsappNumber: string;
   license: {
     plan: "free" | "pro";
@@ -179,7 +182,7 @@ export function SettingsClient() {
   const notifications = notificationsQuery.data?.items ?? [];
   const deliveredNotifications = notifications.filter((item) => item.status === "sent").length;
   const failedNotifications = notifications.filter((item) => item.status === "failed").length;
-  const canManageSharing = profileQuery.data?.role === "admin" || profileQuery.data?.isPlatformAdmin;
+  const canManageSharing = Boolean(profileQuery.data?.sharing.canManage);
   const form = useForm<SettingsFormValues>({
     defaultValues: {
       name: "",
