@@ -69,7 +69,7 @@ export async function DashboardShell({ children }: DashboardShellProps) {
         </div>
       </aside>
 
-      <main className="min-h-0 min-w-0 overflow-y-auto pb-8 pr-1 lg:pb-10">{children}</main>
+      <main id="main-content" className="min-h-0 min-w-0 overflow-y-auto pb-8 pr-1 lg:pb-10">{children}</main>
     </div>
   );
 }

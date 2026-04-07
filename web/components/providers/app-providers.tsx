@@ -10,9 +10,10 @@ import { ThemeProvider } from "@/components/providers/theme-provider";
 
 type AppProvidersProps = {
   children: ReactNode;
+  initialTheme?: "light" | "dark";
 };
 
-export function AppProviders({ children }: AppProvidersProps) {
+export function AppProviders({ children, initialTheme }: AppProvidersProps) {
   const [queryClient] = useState(
     () =>
       new QueryClient({
@@ -26,7 +27,7 @@ export function AppProviders({ children }: AppProvidersProps) {
   );
 
   return (
-    <ThemeProvider>
+    <ThemeProvider initialTheme={initialTheme}>
       <SessionProvider>
         <QueryClientProvider client={queryClient}>
           {children}

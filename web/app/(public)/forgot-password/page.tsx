@@ -3,7 +3,7 @@ import { BrandMark } from "@/components/layout/brand-mark";
 
 export default function ForgotPasswordPage() {
   return (
-    <main className="page-shell grid min-h-screen items-center py-8">
+    <main id="main-content" className="page-shell grid min-h-screen items-center py-8">
       <section className="section-stack">
         <div className="surface-strong rounded-[36px] p-8 md:p-10">
           <div className="section-stack">

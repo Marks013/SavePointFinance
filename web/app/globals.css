@@ -95,6 +95,27 @@ body {
     color 240ms ease;
 }
 
+.skip-link {
+  position: fixed;
+  left: 1rem;
+  top: 1rem;
+  z-index: 999;
+  transform: translateY(-150%);
+  border-radius: 999px;
+  background: var(--color-primary);
+  color: var(--color-primary-foreground);
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  transition: transform 160ms ease;
+}
+
+.skip-link:focus-visible {
+  transform: translateY(0);
+  outline: 3px solid color-mix(in_srgb, var(--color-ring) 42%, transparent);
+  outline-offset: 3px;
+}
+
 :root[data-theme="light"] body {
   background:
     radial-gradient(circle at top left, rgba(217, 123, 85, 0.16), transparent 22%),

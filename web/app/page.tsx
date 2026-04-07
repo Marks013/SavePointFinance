@@ -26,7 +26,7 @@ const highlights = ["Fluxo unico para contas, cartoes e metas", "Leitura objetiv
 
 export default function HomePage() {
   return (
-    <main className="page-shell py-6 md:py-10">
+    <main id="main-content" className="page-shell py-6 md:py-10">
       <section className="surface-strong overflow-hidden rounded-[42px] px-7 py-8 md:px-12 md:py-12">
         <div className="grid gap-8 xl:grid-cols-[1.08fr_0.92fr]">
           <div className="section-stack">

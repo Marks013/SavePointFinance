@@ -653,13 +653,17 @@ export function AdminClient() {
 
   const createTenantMutation = useMutation({
     mutationFn: async () => {
+      if (!newTenantPlanId) {
+        throw new Error("Selecione o plano inicial da conta");
+      }
+
       const response = await fetch("/api/admin/tenants", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: newTenantName,
           slug: newTenantSlug,
-          planId: newTenantPlanId || plans[0]?.id
+          planId: newTenantPlanId
         })
       });
 
@@ -1096,7 +1100,7 @@ export function AdminClient() {
                   O plano é da conta. Depois, basta convidar colaboradores para compartilhar o mesmo espaço financeiro.
                 </p>
                 <Button
-                  disabled={createTenantMutation.isPending || !newTenantName.trim() || !((newTenantPlanId || plans[0]?.id))}
+                  disabled={createTenantMutation.isPending || !newTenantName.trim() || !newTenantPlanId}
                   onClick={() => createTenantMutation.mutate()}
                   type="button"
                 >

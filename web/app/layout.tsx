@@ -39,8 +39,11 @@ export default async function RootLayout({ children }: RootLayoutProps) {
   return (
     <html data-theme={initialTheme} lang="pt-BR" suppressHydrationWarning>
       <body>
+        <a className="skip-link" href="#main-content">
+          Pular para o conteudo principal
+        </a>
         <script dangerouslySetInnerHTML={{ __html: themeBootstrapScript }} />
-        <AppProviders>
+        <AppProviders initialTheme={initialTheme}>
           <div className="grain" />
           <GlobalThemeToggle />
           {children}

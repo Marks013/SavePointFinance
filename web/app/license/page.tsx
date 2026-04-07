@@ -32,7 +32,7 @@ export default async function LicensePage() {
   }
 
   return (
-    <main className="page-shell">
+    <main id="main-content" className="page-shell">
       <section className="surface content-section mx-auto max-w-3xl py-10 sm:py-14">
         <div className="eyebrow">Licença</div>
         <h1 className="mt-3 text-3xl font-semibold tracking-[-0.04em]">Acesso temporariamente indisponível</h1>

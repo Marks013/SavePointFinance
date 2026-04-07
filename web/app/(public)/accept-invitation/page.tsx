@@ -11,7 +11,7 @@ export default async function AcceptInvitationPage({ searchParams }: AcceptInvit
   const params = await searchParams;
 
   return (
-    <main className="page-shell grid min-h-screen items-center py-8">
+    <main id="main-content" className="page-shell grid min-h-screen items-center py-8">
       <section className="grid gap-6 lg:grid-cols-[1.08fr_0.92fr]">
         <div className="surface-strong rounded-[36px] p-8 md:p-10">
           <div className="section-stack">

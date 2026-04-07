@@ -16,6 +16,14 @@ function slugify(value: string) {
     .replace(/-{2,}/g, "-");
 }
 
+function normalizeOptionalLimit(value: number | null | undefined) {
+  if (typeof value !== "number") {
+    return null;
+  }
+
+  return Number.isFinite(value) && value > 0 ? Math.floor(value) : null;
+}
+
 export async function GET(request: Request) {
   try {
     const admin = await requireAdminUser();
@@ -132,8 +140,8 @@ export async function POST(request: Request) {
         slug,
         tier,
         description: body.description?.trim() || null,
-        maxAccounts: body.maxAccounts ?? null,
-        maxCards: body.maxCards ?? null,
+        maxAccounts: normalizeOptionalLimit(body.maxAccounts),
+        maxCards: normalizeOptionalLimit(body.maxCards),
         trialDays: Math.max(0, body.trialDays ?? 0),
         whatsappAssistant: Boolean(body.whatsappAssistant),
         automation: Boolean(body.automation),

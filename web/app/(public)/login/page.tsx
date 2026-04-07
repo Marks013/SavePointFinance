@@ -3,7 +3,7 @@ import { BrandMark } from "@/components/layout/brand-mark";
 
 export default function LoginPage() {
   return (
-    <main className="page-shell grid min-h-screen items-center py-8">
+    <main id="main-content" className="page-shell grid min-h-screen items-center py-8">
       <section className="mx-auto grid w-full max-w-[980px] gap-4 xl:grid-cols-[0.82fr_1fr] xl:items-center">
         <div className="surface-strong hidden rounded-[30px] p-6 xl:block">
           <div className="section-stack">

@@ -8,6 +8,14 @@ type Params = {
   params: Promise<{ id: string }>;
 };
 
+function normalizeOptionalLimit(value: number | null | undefined) {
+  if (typeof value !== "number") {
+    return null;
+  }
+
+  return Number.isFinite(value) && value > 0 ? Math.floor(value) : null;
+}
+
 export async function PATCH(request: Request, context: Params) {
   try {
     const admin = await requireAdminUser();
@@ -53,8 +61,8 @@ export async function PATCH(request: Request, context: Params) {
         ...(body.name ? { name: body.name.trim() } : {}),
         ...(body.description !== undefined ? { description: body.description?.trim() || null } : {}),
         ...(body.tier ? { tier: body.tier } : {}),
-        ...(body.maxAccounts !== undefined ? { maxAccounts: body.maxAccounts } : {}),
-        ...(body.maxCards !== undefined ? { maxCards: body.maxCards } : {}),
+        ...(body.maxAccounts !== undefined ? { maxAccounts: normalizeOptionalLimit(body.maxAccounts) } : {}),
+        ...(body.maxCards !== undefined ? { maxCards: normalizeOptionalLimit(body.maxCards) } : {}),
         ...(typeof body.trialDays === "number" ? { trialDays: Math.max(0, body.trialDays) } : {}),
         ...(typeof body.whatsappAssistant === "boolean" ? { whatsappAssistant: body.whatsappAssistant } : {}),
         ...(typeof body.automation === "boolean" ? { automation: body.automation } : {}),

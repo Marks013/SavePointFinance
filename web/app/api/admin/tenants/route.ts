@@ -161,21 +161,18 @@ export async function POST(request: Request) {
     }
 
     await ensureDefaultPlans(prisma);
+    const requestedPlanId = body.planId?.trim();
 
-    const plan = body.planId
-      ? await prisma.plan.findFirst({
-          where: {
-            id: body.planId,
-            isActive: true
-          }
-        })
-      : await prisma.plan.findFirst({
-          where: {
-            isDefault: true,
-            isActive: true
-          },
-          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }]
-        });
+    if (!requestedPlanId) {
+      return NextResponse.json({ message: "Selecione o plano inicial da conta" }, { status: 400 });
+    }
+
+    const plan = await prisma.plan.findFirst({
+      where: {
+        id: requestedPlanId,
+        isActive: true
+      }
+    });
 
     if (!plan) {
       return NextResponse.json({ message: "Nenhum plano ativo foi encontrado" }, { status: 400 });
