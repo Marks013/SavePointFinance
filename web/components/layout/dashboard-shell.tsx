@@ -24,6 +24,13 @@ export async function DashboardShell({ children }: DashboardShellProps) {
         })
       ).canManage
     : false;
+  const accessDescription = isPlatformAdmin
+    ? "Administrador da plataforma"
+    : canManageSharing
+      ? "Titular da carteira familiar"
+      : session?.user?.role === "admin"
+        ? "Administrador da conta"
+        : "Membro da carteira compartilhada";
 
   return (
     <div className="page-shell flex h-screen flex-col gap-5 overflow-hidden py-4 md:py-5 lg:grid lg:grid-cols-[256px_minmax(0,1fr)] lg:gap-5 xl:grid-cols-[264px_minmax(0,1fr)] xl:gap-6">
@@ -47,9 +54,7 @@ export async function DashboardShell({ children }: DashboardShellProps) {
             Sessão ativa
           </p>
           <p className="mt-2 text-sm font-semibold">{session?.user?.name ?? session?.user?.email ?? "Usuário"}</p>
-          <p className="mt-1 text-xs leading-6 text-[var(--color-muted-foreground)]">
-            {session?.user?.role === "admin" ? "Acesso administrativo liberado" : "Acesso operacional"}
-          </p>
+          <p className="mt-1 text-xs leading-6 text-[var(--color-muted-foreground)]">{accessDescription}</p>
           <form
             aria-label="Encerrar sessão"
             action={async () => {
