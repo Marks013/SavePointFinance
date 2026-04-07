@@ -164,14 +164,12 @@ export async function getTenantSeatSummary(tenantId: string) {
   ]);
 
   const license = resolveTenantLicenseState(tenant);
-  const remainingSeats = null;
 
   return {
     tenant,
     license,
     activeUsers,
     activeInvitations,
-    remainingSeats
   };
 }
 
