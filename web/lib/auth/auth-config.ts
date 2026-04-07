@@ -76,6 +76,18 @@ export const authConfig = {
           return null;
         }
 
+        await prisma.user.update({
+          where: {
+            id: user.id
+          },
+          data: {
+            lastLogin: new Date(),
+            loginCount: {
+              increment: 1
+            }
+          }
+        });
+
         return {
           id: user.id,
           email: user.email,

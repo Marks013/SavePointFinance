@@ -323,7 +323,8 @@ button {
   letter-spacing: 0.005em;
   color: var(--color-ink-800);
   line-height: 1.5;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
+  word-break: normal;
   text-wrap: pretty;
 }
 
