@@ -368,7 +368,7 @@ export function SubscriptionsClient() {
           <div className="grid gap-3 sm:grid-cols-2">
             <article className="metric-card">
               <p className="metric-label">Saídas mensais</p>
-              <p className="metric-value">{formatCurrency(monthlyExpenses)}</p>
+              <p className="metric-value amount-negative">{formatCurrency(monthlyExpenses)}</p>
             </article>
             <article className="metric-card">
               <p className="metric-label">Entradas mensais</p>
@@ -416,7 +416,7 @@ export function SubscriptionsClient() {
                     </p>
                   ) : null}
                 </div>
-                  <p className="font-semibold">{formatCurrency(item.amount)}</p>
+                  <p className={item.type === "expense" ? "font-semibold amount-negative" : "font-semibold"}>{formatCurrency(item.amount)}</p>
                 </div>
                 <div className="mt-4 flex flex-wrap gap-3">
                   <Button onClick={() => startEditing(item)} type="button" variant="secondary">

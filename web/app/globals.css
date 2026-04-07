@@ -16,6 +16,7 @@
   --color-emerald-500: #136f4f;
   --color-emerald-600: #0e5c41;
   --color-coral-500: #cb684c;
+  --color-negative: #b42318;
   --color-sky-500: #4688c7;
   --color-gold-500: #af7e20;
   --color-gold-200: #f1dfad;
@@ -65,6 +66,7 @@
   --color-secondary-foreground: #dde7e1;
   --color-accent: #293740;
   --color-accent-foreground: #f0dca7;
+  --color-negative: #ff6b6b;
   --color-destructive: #d46c6c;
   --color-destructive-foreground: #fff7f7;
 }
@@ -348,7 +350,7 @@ button {
 }
 
 .amount-negative {
-  color: var(--color-coral-500);
+  color: var(--color-negative) !important;
 }
 
 .metric-footnote {
@@ -665,8 +667,8 @@ button {
 }
 
 .type-badge-expense {
-  background: color-mix(in srgb, var(--color-coral-500) 18%, transparent);
-  color: var(--color-coral-500);
+  background: color-mix(in srgb, var(--color-negative) 18%, transparent);
+  color: var(--color-negative);
 }
 
 .type-badge-transfer {

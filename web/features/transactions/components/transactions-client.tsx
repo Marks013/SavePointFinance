@@ -761,7 +761,7 @@ export function TransactionsClient() {
           </article>
           <article className="metric-card">
             <p className="metric-label">Despesas filtradas</p>
-            <p className="metric-value">{formatCurrency(expenseTotal)}</p>
+            <p className="metric-value amount-negative">{formatCurrency(expenseTotal)}</p>
           </article>
           <article className="metric-card">
             <p className="metric-label">Transferências filtradas</p>
@@ -1082,7 +1082,7 @@ export function TransactionsClient() {
                       transaction.type === "income"
                         ? "text-[var(--color-primary)]"
                         : transaction.type === "expense"
-                          ? "text-[var(--color-coral-500)]"
+                          ? "amount-negative"
                           : "text-[var(--color-foreground)]"
                     )}
                   >

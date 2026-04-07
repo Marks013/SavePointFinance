@@ -726,7 +726,7 @@ export function CardsClient() {
               </article>
               <article className="metric-card">
                 <p className="text-sm text-[var(--color-muted-foreground)]">Limite disponível</p>
-                <p className="mt-2 text-2xl font-semibold">{formatCurrency(statementQuery.data.summary.availableLimit)}</p>
+                <p className={`mt-2 text-2xl font-semibold ${statementQuery.data.summary.availableLimit < 0 ? "amount-negative" : ""}`}>{formatCurrency(statementQuery.data.summary.availableLimit)}</p>
               </article>
               <article className="metric-card">
                 <p className="text-sm text-[var(--color-muted-foreground)]">Lançamentos</p>

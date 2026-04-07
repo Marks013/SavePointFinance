@@ -156,7 +156,7 @@ function ChartTooltipContent({
               <span className="size-2.5 rounded-full" style={{ backgroundColor: item.color }} />
               <span className="text-[var(--color-muted-foreground)]">{item.name}</span>
             </div>
-            <span className="font-medium text-[var(--color-foreground)]">{formatCurrency(Number(item.value ?? 0))}</span>
+            <span className={`font-medium ${Number(item.value ?? 0) < 0 ? "amount-negative" : "text-[var(--color-foreground)]"}`}>{formatCurrency(Number(item.value ?? 0))}</span>
           </div>
         ))}
       </div>
@@ -526,7 +526,7 @@ export function ReportsClient() {
                     </div>
                     <p
                       className={`font-semibold ${
-                        item.net >= 0 ? "text-[var(--color-emerald-600)]" : "text-[var(--color-coral-500)]"
+                        item.net >= 0 ? "text-[var(--color-emerald-600)]" : "amount-negative"
                       }`}
                     >
                       {formatCurrency(item.net)}
@@ -621,7 +621,7 @@ export function ReportsClient() {
                           : "Prazo de meta"}
                     </p>
                   </div>
-                  <p className={item.type === "income" ? "font-semibold text-[var(--color-primary)]" : "font-semibold text-[var(--color-coral-500)]"}>
+                  <p className={item.type === "income" ? "font-semibold text-[var(--color-primary)]" : "font-semibold amount-negative"}>
                     {formatCurrency(item.amount)}
                   </p>
                 </div>

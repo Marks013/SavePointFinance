@@ -266,11 +266,11 @@ export function AccountsClient() {
           <div className="grid gap-3 sm:grid-cols-2">
             <article className="metric-card">
               <p className="metric-label">Saldo atual total</p>
-              <p className="metric-value">{formatCurrency(activeBalance)}</p>
+              <p className={`metric-value ${activeBalance < 0 ? "amount-negative" : ""}`}>{formatCurrency(activeBalance)}</p>
             </article>
             <article className="metric-card">
               <p className="metric-label">Base cadastrada</p>
-              <p className="metric-value">{formatCurrency(openingBalance)}</p>
+              <p className={`metric-value ${openingBalance < 0 ? "amount-negative" : ""}`}>{formatCurrency(openingBalance)}</p>
             </article>
           </div>
         </div>
@@ -294,7 +294,7 @@ export function AccountsClient() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="font-semibold">{formatCurrency(account.balance)}</p>
+                  <p className={`font-semibold ${account.balance < 0 ? "amount-negative" : ""}`}>{formatCurrency(account.balance)}</p>
                   <p className="text-xs text-[var(--color-muted-foreground)]">Saldo atual</p>
                 </div>
               </div>
@@ -303,7 +303,7 @@ export function AccountsClient() {
                 Saldo de referência: {formatCurrency(account.openingBalance)}
               </p>
               <p className="mt-2 text-sm text-[var(--color-muted-foreground)]">
-                Variação operacional: {formatCurrency(account.balance - account.openingBalance)}
+                Variação operacional: <span className={(account.balance - account.openingBalance) < 0 ? "amount-negative" : undefined}>{formatCurrency(account.balance - account.openingBalance)}</span>
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button onClick={() => startEditing(account)} type="button" variant="secondary">

@@ -209,7 +209,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                 <p className="metric-label">Resultado do mês</p>
                 <p
                   className={`mt-3 whitespace-nowrap text-lg font-semibold tracking-[-0.04em] ${
-                    netMonth >= 0 ? "text-[var(--color-emerald-600)]" : "text-[var(--color-coral-500)]"
+                    netMonth >= 0 ? "text-[var(--color-emerald-600)]" : "amount-negative"
                   }`}
                 >
                   {formatCurrency(netMonth)}
@@ -245,7 +245,11 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           <div className="section-stack">
             <div>
               <p className="metric-label text-white/78">Foco imediato</p>
-              <h2 className="mt-4 whitespace-nowrap text-[clamp(2rem,4vw,3.2rem)] font-semibold tracking-[-0.07em] text-white">
+              <h2
+                className={`mt-4 whitespace-nowrap text-[clamp(2rem,4vw,3.2rem)] font-semibold tracking-[-0.07em] ${
+                  data.balance < 0 ? "amount-negative" : "text-white"
+                }`}
+              >
                 {formatCurrency(data.balance)}
               </h2>
               <p className="mt-3 max-w-sm text-sm leading-7 text-white/80">
@@ -263,7 +267,11 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               </div>
               <div className="rounded-[24px] border border-white/12 bg-white/8 px-4 py-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-white/66">Projeção do mês</p>
-                <p className="mt-2 whitespace-nowrap text-2xl font-semibold tracking-[-0.05em] text-white">
+                <p
+                  className={`mt-2 whitespace-nowrap text-2xl font-semibold tracking-[-0.05em] ${
+                    data.projection.net < 0 ? "amount-negative" : "text-white"
+                  }`}
+                >
                   {formatCurrency(data.projection.net)}
                 </p>
               </div>
@@ -380,7 +388,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                       transaction.type === "income"
                         ? "text-[var(--color-emerald-600)]"
                         : transaction.type === "expense"
-                          ? "text-[var(--color-coral-500)]"
+                          ? "amount-negative"
                           : "text-[var(--color-foreground)]"
                     }`}
                   >
@@ -412,7 +420,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                       <p className="text-sm font-medium">{item.label}</p>
                       <p
                         className={`whitespace-nowrap text-sm font-semibold ${
-                          item.type === "income" ? "text-[var(--color-primary)]" : "text-[var(--color-coral-500)]"
+                          item.type === "income" ? "text-[var(--color-primary)]" : "amount-negative"
                         }`}
                       >
                         {formatCurrency(Number(item.amount))}
@@ -494,7 +502,11 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             </div>
             <div className="data-card px-4 py-4">
               <p className="metric-label">Maior saldo</p>
-              <p className="mt-3 whitespace-nowrap text-2xl font-semibold tracking-[-0.05em] text-[var(--color-foreground)]">
+              <p
+                className={`mt-3 whitespace-nowrap text-2xl font-semibold tracking-[-0.05em] ${
+                  (data.activeAccounts[0]?.currentBalance ?? 0) < 0 ? "amount-negative" : "text-[var(--color-foreground)]"
+                }`}
+              >
                 {formatCurrency(data.activeAccounts[0]?.currentBalance ?? 0)}
               </p>
               <p className="mt-2 text-sm text-[var(--color-muted-foreground)]">
@@ -577,7 +589,11 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                         <p className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-[var(--color-muted-foreground)]">
                           Limite disponível
                         </p>
-                        <p className="mt-2 whitespace-nowrap text-sm font-medium text-[var(--color-foreground)]">
+                        <p
+                          className={`mt-2 whitespace-nowrap text-sm font-medium ${
+                            Number(card.availableLimit) < 0 ? "amount-negative" : "text-[var(--color-foreground)]"
+                          }`}
+                        >
                           {formatCurrency(Number(card.availableLimit))}
                         </p>
                       </div>
