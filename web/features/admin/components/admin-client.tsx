@@ -780,7 +780,7 @@ export function AdminClient() {
             Para compartilhar a mesma carteira com cônjuge ou familiar, use a área dedicada de compartilhamento.
           </p>
           <Button asChild variant="secondary">
-            <Link href="/dashboard/sharing">Abrir compartilhamento</Link>
+            <Link href="/dashboard/sharing">Abrir convites</Link>
           </Button>
         </div>
       </section>

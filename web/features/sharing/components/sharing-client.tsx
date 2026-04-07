@@ -215,8 +215,8 @@ export function SharingClient() {
   return (
     <div className="space-y-6">
       <section className="surface content-section">
-        <div className="eyebrow">Compartilhamento</div>
-        <h1 className="mt-3 text-3xl font-semibold tracking-[-0.03em]">Carteira compartilhada</h1>
+        <div className="eyebrow">Convidar parentes</div>
+        <h1 className="mt-3 text-3xl font-semibold tracking-[-0.03em]">Compartilhamento familiar</h1>
         <p className="mt-4 max-w-3xl text-sm leading-7 text-[var(--color-muted-foreground)]">
           Este espaço é exclusivo para dividir a mesma carteira financeira com uma única pessoa da família. O controle
           fica com o titular da conta e o convidado não pode reenviar convites nem administrar acessos.

@@ -53,7 +53,7 @@ export function DashboardSidebarNav({ isAdmin, isPlatformAdmin }: DashboardSideb
   const [isPending, startTransition] = useTransition();
   const items = [
     ...navigation,
-    ...(isAdmin ? [{ href: "/dashboard/sharing" as Route, label: "Compartilhamento", icon: UsersRound }] : []),
+    ...(isAdmin ? [{ href: "/dashboard/sharing" as Route, label: "Convidar parentes", icon: UsersRound }] : []),
     ...(isPlatformAdmin ? [{ href: "/dashboard/admin" as Route, label: "Admin", icon: ShieldCheck }] : [])
   ];
 

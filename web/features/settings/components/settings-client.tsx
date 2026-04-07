@@ -292,15 +292,15 @@ export function SettingsClient() {
         <section className="surface content-section">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <div className="eyebrow">Conta compartilhada</div>
-              <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em]">Pessoas e convites</h2>
+              <div className="eyebrow">Convidar parentes</div>
+              <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em]">Compartilhamento familiar</h2>
               <p className="mt-2 max-w-3xl text-sm leading-7 text-[var(--color-muted-foreground)]">
                 Convide cônjuge, familiar ou alguém de confiança para usar a mesma carteira financeira da conta{" "}
                 {profileQuery.data?.tenant.name ?? "principal"}.
               </p>
             </div>
             <Button asChild>
-              <Link href="/dashboard/sharing">Abrir compartilhamento</Link>
+              <Link href="/dashboard/sharing">Abrir convites</Link>
             </Button>
           </div>
         </section>
