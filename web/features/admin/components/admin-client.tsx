@@ -283,7 +283,7 @@ export function AdminClient() {
   const [userLastLoginFilter, setUserLastLoginFilter] = useState("");
   const [userSort, setUserSort] = useState("created_desc");
   const [userPage, setUserPage] = useState(1);
-  const [inviteTenantId, setInviteTenantId] = useState("");
+  const [invitePlanId, setInvitePlanId] = useState("");
   const [invitationSearch, setInvitationSearch] = useState("");
   const [invitationTenantFilter, setInvitationTenantFilter] = useState("");
   const [auditSearch, setAuditSearch] = useState("");
@@ -686,9 +686,11 @@ export function AdminClient() {
 
   const createInvitationMutation = useMutation({
     mutationFn: async (values: InvitationValues) => {
-      const payload = isPlatformAdmin
-        ? { ...values, tenantId: inviteTenantId || tenants[0]?.id }
-        : values;
+      if (isPlatformAdmin && !invitePlanId) {
+        throw new Error("Selecione o plano inicial do usuario");
+      }
+
+      const payload = isPlatformAdmin ? { ...values, planId: invitePlanId } : values;
       const response = await fetch("/api/admin/invitations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -704,6 +706,7 @@ export function AdminClient() {
     },
     onSuccess: async (payload) => {
       invitationForm.reset();
+      setInvitePlanId("");
       await queryClient.invalidateQueries({ queryKey: ["admin-invitations"] });
       await queryClient.invalidateQueries({ queryKey: ["admin-audit"] });
       const absoluteInviteUrl = toAbsoluteInviteUrl(payload.inviteUrl);
@@ -1436,7 +1439,10 @@ export function AdminClient() {
 
       <div className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
         <section className="surface content-section">
-          <h2 className="text-2xl font-semibold tracking-[-0.03em]">Convidar colaborador</h2>
+          <h2 className="text-2xl font-semibold tracking-[-0.03em]">Convidar novo usuário isolado</h2>
+          <p className="mt-2 text-sm leading-7 text-[var(--color-muted-foreground)]">
+            Este convite cria uma nova carteira vazia para a pessoa. Para compartilhar a sua própria carteira, use o módulo Compartilhamento.
+          </p>
           <form
             className="mt-6 space-y-4"
             onSubmit={invitationForm.handleSubmit(
@@ -1450,18 +1456,30 @@ export function AdminClient() {
           >
             {isPlatformAdmin ? (
               <div className="space-y-2">
-                <Label htmlFor="invite-tenant">Conta</Label>
-                <Select id="invite-tenant" onChange={(event) => setInviteTenantId(event.target.value)} value={inviteTenantId}>
-                  <option value="">Usar a primeira conta listada</option>
-                  {tenants.map((tenant) => (
-                    <option key={tenant.id} value={tenant.id}>
-                      {getTenantLabel(tenant)}
+                <Label htmlFor="invite-plan">Plano inicial</Label>
+                <Select id="invite-plan" onChange={(event) => setInvitePlanId(event.target.value)} value={invitePlanId}>
+                  <option value="">Selecione o plano inicial</option>
+                  {plans.map((plan) => (
+                    <option key={plan.id} value={plan.id}>
+                      {plan.name}
                     </option>
                   ))}
                 </Select>
                 {(() => {
-                  const selectedTenant = tenants.find((tenant) => tenant.id === inviteTenantId) ?? tenants[0];
-                  if (!selectedTenant) return null;
+                  const selectedPlan = plans.find((plan) => plan.id === invitePlanId);
+
+                  if (!selectedPlan) {
+                    return (
+                      <p className="text-xs text-[var(--color-muted-foreground)]">
+                        Selecione explicitamente se o usuario entrara no plano gratuito, premium ou outro plano ativo.
+                      </p>
+                    );
+                  }
+
+                  const selectedTenant = {
+                    name: "uma carteira nova e vazia",
+                    planName: selectedPlan.name
+                  };
 
                   return (
                     <p className="text-xs text-[var(--color-muted-foreground)]">
