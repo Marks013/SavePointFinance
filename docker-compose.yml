@@ -83,6 +83,26 @@ services:
     networks:
       - savepoint
 
+  audit-invitations:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+      target: tools
+    profiles: ["ops"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      web:
+        condition: service_started
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-savepoint}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-savepoint}
+      AUDIT_BASE_URL: ${AUDIT_BASE_URL:-http://web:3000}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@savepoint.local}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-change-me-admin}
+    command: ["npm", "run", "audit:invitations"]
+    networks:
+      - savepoint
+
   postgres:
     image: postgres:17-alpine
     container_name: savepoint_db
