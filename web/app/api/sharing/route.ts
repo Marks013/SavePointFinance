@@ -17,51 +17,89 @@ const sharingInviteSchema = z.object({
   email: z.string().trim().email("Informe um e-mail valido")
 });
 
+async function getFamilySharingInvitationIds(ownerUserId?: string) {
+  if (!ownerUserId) {
+    return [];
+  }
+
+  const sharingAudits = await prisma.adminAuditLog.findMany({
+    where: {
+      actorUserId: ownerUserId,
+      action: "sharing.invitation.created",
+      entityType: "invitation",
+      entityId: {
+        not: null
+      }
+    },
+    select: {
+      entityId: true
+    }
+  });
+
+  return sharingAudits.flatMap((audit) => (audit.entityId ? [audit.entityId] : []));
+}
+
+async function getFamilySharingInvitations(ownerUserId: string | undefined, tenantId: string) {
+  const familyInvitationIds = await getFamilySharingInvitationIds(ownerUserId);
+
+  if (familyInvitationIds.length === 0) {
+    return [];
+  }
+
+  return prisma.invitation.findMany({
+    where: {
+      id: {
+        in: familyInvitationIds
+      },
+      tenantId
+    },
+    orderBy: {
+      createdAt: "desc"
+    },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      expiresAt: true,
+      acceptedAt: true,
+      revokedAt: true,
+      token: true
+    }
+  });
+}
+
+function getActiveFamilyInvitationEmails(invitations: Awaited<ReturnType<typeof getFamilySharingInvitations>>) {
+  return invitations.flatMap((invitation) => (invitation.acceptedAt && !invitation.revokedAt ? [invitation.email] : []));
+}
+
 export async function GET() {
   try {
     const user = await requireSessionUser();
     const authority = await getSharingAuthority(user);
-
-    const [members, invitations] = await Promise.all([
-      prisma.user.findMany({
-        where: {
-          tenantId: user.tenantId,
-          id: {
-            not: authority.primaryAdmin?.id ?? user.id
+    const invitations = await getFamilySharingInvitations(authority.primaryAdmin?.id, user.tenantId);
+    const activeFamilyEmails = getActiveFamilyInvitationEmails(invitations);
+    const members = activeFamilyEmails.length
+      ? await prisma.user.findMany({
+          where: {
+            tenantId: user.tenantId,
+            email: {
+              in: activeFamilyEmails
+            },
+            isPlatformAdmin: false
           },
-          isPlatformAdmin: false
-        },
-        orderBy: [{ isActive: "desc" }, { createdAt: "asc" }],
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          role: true,
-          isActive: true,
-          createdAt: true,
-          lastLogin: true
-        }
-      }),
-      prisma.invitation.findMany({
-        where: {
-          tenantId: user.tenantId,
-          ...(authority.primaryAdmin ? { invitedByUserId: authority.primaryAdmin.id } : {})
-        },
-        orderBy: {
-          createdAt: "desc"
-        },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          role: true,
-          expiresAt: true,
-          acceptedAt: true,
-          revokedAt: true,
-          token: true
-        }
-      })
-    ]);
+          orderBy: [{ isActive: "desc" }, { createdAt: "asc" }],
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+            isActive: true,
+            createdAt: true,
+            lastLogin: true
+          }
+        })
+      : [];
 
     return NextResponse.json({
       canManage: authority.canManage,
@@ -109,28 +147,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "Licenca indisponivel para compartilhar a carteira" }, { status: 403 });
     }
 
-    const activeMembersCount = await prisma.user.count({
-      where: {
-        tenantId: user.tenantId,
-        id: {
-          not: authority.primaryAdmin.id
-        },
-        isPlatformAdmin: false,
-        isActive: true
-      }
-    });
+    const familyInvitations = await getFamilySharingInvitations(authority.primaryAdmin.id, user.tenantId);
+    const activeFamilyEmails = getActiveFamilyInvitationEmails(familyInvitations);
+    const activeMembersCount = activeFamilyEmails.length
+      ? await prisma.user.count({
+          where: {
+            tenantId: user.tenantId,
+            email: {
+              in: activeFamilyEmails
+            },
+            isPlatformAdmin: false,
+            isActive: true
+          }
+        })
+      : 0;
 
-    const activeInvitationsCount = await prisma.invitation.count({
-      where: {
-        tenantId: user.tenantId,
-        invitedByUserId: authority.primaryAdmin.id,
-        acceptedAt: null,
-        revokedAt: null,
-        expiresAt: {
-          gt: new Date()
-        }
-      }
-    });
+    const now = new Date();
+    const activeInvitationsCount = familyInvitations.filter(
+      (invitation) => !invitation.acceptedAt && !invitation.revokedAt && invitation.expiresAt > now
+    ).length;
 
     if (activeMembersCount > 0 || activeInvitationsCount > 0) {
       return NextResponse.json(
@@ -234,13 +269,18 @@ export async function DELETE(request: Request) {
     }
 
     const body = (await request.json()) as { invitationId?: string; memberId?: string };
+    const familyInvitations = await getFamilySharingInvitations(authority.primaryAdmin.id, user.tenantId);
+    const familyInvitationIds = new Set(familyInvitations.map((invitation) => invitation.id));
 
     if (body.invitationId) {
+      if (!familyInvitationIds.has(body.invitationId)) {
+        return NextResponse.json({ message: "Convite nao encontrado" }, { status: 404 });
+      }
+
       const invitation = await prisma.invitation.findFirst({
         where: {
           id: body.invitationId,
-          tenantId: user.tenantId,
-          invitedByUserId: authority.primaryAdmin.id
+          tenantId: user.tenantId
         },
         select: {
           id: true,
@@ -269,17 +309,11 @@ export async function DELETE(request: Request) {
     }
 
     if (body.memberId) {
+      const activeFamilyEmails = new Set(getActiveFamilyInvitationEmails(familyInvitations));
       const member = await prisma.user.findFirst({
         where: {
           tenantId: user.tenantId,
-          AND: [
-            { id: body.memberId },
-            {
-              id: {
-                not: authority.primaryAdmin.id
-              }
-            }
-          ],
+          id: body.memberId,
           isPlatformAdmin: false
         },
         select: {
@@ -289,7 +323,7 @@ export async function DELETE(request: Request) {
         }
       });
 
-      if (!member) {
+      if (!member || !activeFamilyEmails.has(member.email)) {
         return NextResponse.json({ message: "Pessoa convidada nao encontrada" }, { status: 404 });
       }
 
