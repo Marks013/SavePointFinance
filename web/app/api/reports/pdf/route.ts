@@ -3,6 +3,7 @@ import type { ReactElement } from "react";
 
 import { SummaryDocument } from "@/features/reports/pdf/summary-document";
 import { requireSessionUser } from "@/lib/auth/session";
+import { formatDateTimeDisplay } from "@/lib/date";
 import { getFinanceReport } from "@/lib/finance/reports";
 import { getMonthRange, normalizeMonthKey } from "@/lib/month";
 
@@ -28,7 +29,7 @@ export async function GET(request: Request) {
     ].filter(Boolean);
 
     const document = SummaryDocument({
-        generatedAt: new Date().toLocaleString("pt-BR"),
+        generatedAt: formatDateTimeDisplay(new Date()),
         periodLabel: periodParts.length > 0 ? `Período: ${periodParts.join(" • ")}` : "Período: consolidado geral",
         recent: report.recent,
         summary: report.summary,

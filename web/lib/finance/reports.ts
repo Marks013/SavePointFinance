@@ -8,6 +8,7 @@ import {
   getStatementPaymentDate,
   getStatementRange
 } from "@/lib/cards/statement";
+import { formatDateKey } from "@/lib/date";
 import { prisma } from "@/lib/prisma/client";
 import { addMonthsClamped } from "@/lib/utils";
 
@@ -407,7 +408,7 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
         amount: Number(subscription.amount),
         type: subscription.type === "income" ? "income" : "expense",
         source: "subscription",
-        reference: `${subscription.id}-${occurrenceDate.toISOString().slice(0, 10)}`
+        reference: `${subscription.id}-${formatDateKey(occurrenceDate)}`
       });
 
       occurrenceDate = addMonthsClamped(occurrenceDate, 1);

@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { PresetChip } from "@/components/ui/preset-chip";
 import { Select } from "@/components/ui/select";
 import { cardFormSchema, type CardFormValues } from "@/features/cards/schemas/card-schema";
+import { formatDateDisplay } from "@/lib/date";
 import { brazilianInstitutions, cardBrandPresets, cardColorPresets, findPreset } from "@/lib/finance/presets";
 import { formatMonthKeyLabel, normalizeMonthKey } from "@/lib/month";
 import { formatCurrency } from "@/lib/utils";
@@ -572,7 +573,7 @@ export function CardsClient() {
                     Ciclo
                   </p>
                   <p className="mt-2 whitespace-nowrap text-sm font-semibold text-[var(--color-foreground)]">
-                    Fecha dia {card.closeDay} • vence dia {card.dueDay} • {new Date(card.dueDate).toLocaleDateString("pt-BR")}
+                    Fecha dia {card.closeDay} • vence dia {card.dueDay} • {formatDateDisplay(card.dueDate)}
                   </p>
                 </div>
               </div>
@@ -740,12 +741,12 @@ export function CardsClient() {
 
             <div className="muted-panel text-sm text-[var(--color-muted-foreground)]">
               <p>
-                Ciclo da fatura: {new Date(statementQuery.data.summary.cycleStart).toLocaleDateString("pt-BR")} até{" "}
-                {new Date(statementQuery.data.summary.cycleEnd).toLocaleDateString("pt-BR")}.
+                Ciclo da fatura: {formatDateDisplay(statementQuery.data.summary.cycleStart)} até{" "}
+                {formatDateDisplay(statementQuery.data.summary.cycleEnd)}.
               </p>
               <p className="mt-2">
-                Fechamento em {new Date(statementQuery.data.summary.closeDate).toLocaleDateString("pt-BR")} e
-                vencimento em {new Date(statementQuery.data.summary.dueDate).toLocaleDateString("pt-BR")}.
+                Fechamento em {formatDateDisplay(statementQuery.data.summary.closeDate)} e
+                vencimento em {formatDateDisplay(statementQuery.data.summary.dueDate)}.
               </p>
             </div>
 
@@ -756,7 +757,7 @@ export function CardsClient() {
                   {statementIsPaid ? (
                     <>
                       <p className="mt-2 text-lg font-semibold">
-                        Pago em {new Date(statementQuery.data.payment!.paidAt).toLocaleDateString("pt-BR")}
+                        Pago em {formatDateDisplay(statementQuery.data.payment!.paidAt)}
                       </p>
                       <p className="mt-1 text-sm text-[var(--color-muted-foreground)]">
                         Conta de origem: {statementQuery.data.payment!.account.name}
@@ -809,7 +810,7 @@ export function CardsClient() {
                     <div>
                       <p className="font-semibold">{item.description}</p>
                       <p className="text-sm text-[var(--color-muted-foreground)]">
-                        {item.category} • {new Date(item.date).toLocaleDateString("pt-BR")}
+                        {item.category} • {formatDateDisplay(item.date)}
                         {item.installmentLabel ? ` • ${item.installmentLabel}` : ""}
                       </p>
                     </div>

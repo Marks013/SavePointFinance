@@ -30,3 +30,51 @@ export function formatDateKey(date: Date) {
 
   return `${year}-${month}-${day}`;
 }
+
+function toDisplayDate(value: Date | string) {
+  if (typeof value !== "string") {
+    return value;
+  }
+
+  const dateKey = value.slice(0, 10);
+  if (isRealDateKey(dateKey)) {
+    return new Date(`${dateKey}T12:00:00`);
+  }
+
+  return new Date(value);
+}
+
+export function formatDateDisplay(value: Date | string) {
+  const date = toDisplayDate(value);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${day}-${month}-${year}`;
+}
+
+export function formatDateTimeDisplay(value: Date | string) {
+  const date = typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) ? toDisplayDate(value) : new Date(value);
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+
+  return `${formatDateDisplay(date)} ${hours}:${minutes}`;
+}
+
+export function parseBrazilianDateToDateKey(value: string) {
+  const trimmed = value.trim();
+
+  if (dateKeyPattern.test(trimmed) && isRealDateKey(trimmed)) {
+    return trimmed;
+  }
+
+  const match = /^(\d{2})[-/](\d{2})[-/](\d{4})$/.exec(trimmed);
+  if (!match) {
+    return null;
+  }
+
+  const [, day, month, year] = match;
+  const dateKey = `${year}-${month}-${day}`;
+
+  return isRealDateKey(dateKey) ? dateKey : null;
+}

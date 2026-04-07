@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { PresetChip } from "@/components/ui/preset-chip";
 import { Select } from "@/components/ui/select";
 import { goalFormSchema, type GoalFormValues } from "@/features/goals/schemas/goal-schema";
-import { formatDateKey } from "@/lib/date";
+import { formatDateDisplay, formatDateKey } from "@/lib/date";
 import { categoryColorPresets, findPreset } from "@/lib/finance/presets";
 import { formatCurrency } from "@/lib/utils";
 
@@ -319,7 +319,7 @@ export function GoalsClient() {
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-[var(--color-muted-foreground)]">
                 <span>{goal.account?.name ?? "Sem conta vinculada"}</span>
                 <span>
-                  {goal.deadline ? new Date(goal.deadline).toLocaleDateString("pt-BR") : "Sem prazo"}
+                  {goal.deadline ? formatDateDisplay(goal.deadline) : "Sem prazo"}
                 </span>
               </div>
               <div className="mt-4 flex flex-wrap gap-2">

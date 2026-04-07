@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { formatDateDisplay } from "@/lib/date";
 import { formatMonthKeyLabel, getMonthRange, normalizeMonthKey } from "@/lib/month";
 import { formatCurrency } from "@/lib/utils";
 
@@ -579,7 +580,7 @@ export function ReportsClient() {
                 <div>
                   <p className="font-semibold">{item.description}</p>
                   <p className="text-sm text-[var(--color-muted-foreground)]">
-                    {item.category} • {new Date(item.date).toLocaleDateString("pt-BR")}
+                    {item.category} • {formatDateDisplay(item.date)}
                   </p>
                   <p className="text-sm text-[var(--color-muted-foreground)]">
                     {item.card ?? item.account ?? "Sem origem"}
@@ -613,7 +614,7 @@ export function ReportsClient() {
                   <div>
                     <p className="font-semibold">{item.label}</p>
                     <p className="text-sm text-[var(--color-muted-foreground)]">
-                      {new Date(item.date).toLocaleDateString("pt-BR")} •{" "}
+                      {formatDateDisplay(item.date)} •{" "}
                       {item.source === "subscription"
                         ? "Recorrência"
                         : item.source === "card_statement"

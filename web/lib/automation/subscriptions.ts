@@ -9,7 +9,7 @@ import {
 import { getFinanceReport } from "@/lib/finance/reports";
 import { ensureTitheCategory, getMonthKey, syncMonthlyTitheTransaction } from "@/lib/finance/tithe";
 import { prisma } from "@/lib/prisma/client";
-import { formatDateKey } from "@/lib/date";
+import { formatDateDisplay, formatDateKey } from "@/lib/date";
 import { addMonthsClamped, formatCurrency } from "@/lib/utils";
 
 function startOfDay(date: Date) {
@@ -412,7 +412,7 @@ export async function runRecurringAutomation(tenantId: string, userId: string) {
     const subject = `Assinatura próxima: ${subscription.name}`;
     const message =
       `${subscription.type === "income" ? "Receita" : "Despesa"} recorrente prevista para ` +
-      `${subscription.nextBillingDate.toLocaleDateString("pt-BR")}: ${formatCurrency(Number(subscription.amount))}.`;
+      `${formatDateDisplay(subscription.nextBillingDate)}: ${formatCurrency(Number(subscription.amount))}.`;
 
     notificationDeliveries.push(
       ...(await sendUserNotifications({
@@ -476,7 +476,7 @@ export async function runRecurringAutomation(tenantId: string, userId: string) {
 
     const subject = `Fatura próxima do vencimento: ${card.name}`;
     const message =
-      `A fatura do cartão ${card.name} vence em ${dueDate.toLocaleDateString("pt-BR")} ` +
+      `A fatura do cartão ${card.name} vence em ${formatDateDisplay(dueDate)} ` +
       `no valor atual de ${formatCurrency(statementAmount)}.`;
 
     notificationDeliveries.push(

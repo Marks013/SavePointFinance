@@ -13,7 +13,7 @@ import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { formatDateKey } from "@/lib/date";
+import { formatDateDisplay, formatDateKey } from "@/lib/date";
 import { formatMonthKeyLabel, getMonthRange, normalizeMonthKey } from "@/lib/month";
 import { cn, formatCurrency } from "@/lib/utils";
 import {
@@ -795,7 +795,7 @@ export function TransactionsClient() {
                       <div className="min-w-0">
                         <p className="text-sm font-semibold">{transaction.description}</p>
                         <p className="mt-1 text-xs text-[var(--color-muted-foreground)]">
-                          {new Date(transaction.date).toLocaleDateString("pt-BR")} • {formatCurrency(transaction.amount)} •{" "}
+                          {formatDateDisplay(transaction.date)} • {formatCurrency(transaction.amount)} •{" "}
                           {transaction.account?.name ?? transaction.card?.name ?? "Sem origem"}
                         </p>
                         <p className="mt-2 text-xs text-[var(--color-muted-foreground)]">
@@ -1049,7 +1049,7 @@ export function TransactionsClient() {
                       {formatTransactionTypeLabel(transaction.type)}
                     </span>
                     <span className="text-xs text-[var(--color-muted-foreground)]">
-                      {new Date(transaction.date).toLocaleDateString("pt-BR")}
+                      {formatDateDisplay(transaction.date)}
                     </span>
                   </div>
                   <p className="mt-3 text-base font-semibold">{transaction.description}</p>

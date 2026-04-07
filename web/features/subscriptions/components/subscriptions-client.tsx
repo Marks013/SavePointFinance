@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { subscriptionFormSchema, type SubscriptionFormValues } from "@/features/subscriptions/schemas/subscription-schema";
-import { formatDateKey } from "@/lib/date";
+import { formatDateDisplay, formatDateKey } from "@/lib/date";
 import {
   findSubscriptionServicePreset,
   subscriptionServicePresets,
@@ -427,7 +427,7 @@ export function SubscriptionsClient() {
                     )}
                     <p className="text-sm text-[var(--color-muted-foreground)]">
                       {item.category?.name ?? "Sem categoria"} • {item.type === "income" ? "próximo recebimento em " : "próxima cobrança em "}
-                      {new Date(item.nextBillingDate).toLocaleDateString("pt-BR")}
+                      {formatDateDisplay(item.nextBillingDate)}
                     </p>
                     <p className="text-sm text-[var(--color-muted-foreground)]">
                     {item.card?.name ?? item.account?.name ?? "Sem origem financeira"} •{" "}

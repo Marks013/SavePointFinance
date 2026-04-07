@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { invitationSchema } from "@/features/password/schemas/password-schema";
+import { formatDateDisplay } from "@/lib/date";
 
 type SharingProfile = {
   id: string;
@@ -305,7 +306,7 @@ export function SharingClient() {
                     <p className="mt-1 break-words text-sm text-[var(--color-muted-foreground)]">{member.email}</p>
                     <p className="mt-2 text-xs text-[var(--color-muted-foreground)]">
                       {member.lastLogin
-                        ? `Último acesso em ${new Date(member.lastLogin).toLocaleDateString("pt-BR")}`
+                        ? `Último acesso em ${formatDateDisplay(member.lastLogin)}`
                         : "Ainda sem acesso registrado"}
                     </p>
                   </div>
@@ -350,7 +351,7 @@ export function SharingClient() {
                     <p className="font-semibold">{invitation.name}</p>
                     <p className="mt-1 break-words text-sm text-[var(--color-muted-foreground)]">{invitation.email}</p>
                     <p className="mt-2 text-xs text-[var(--color-muted-foreground)]">
-                      Expira em {new Date(invitation.expiresAt).toLocaleDateString("pt-BR")}
+                      Expira em {formatDateDisplay(invitation.expiresAt)}
                     </p>
                   </div>
                   <div className="text-right">
@@ -396,4 +397,3 @@ export function SharingClient() {
     </div>
   );
 }
-

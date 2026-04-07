@@ -17,6 +17,7 @@ import {
   installmentGroupUpdateSchema,
   type InstallmentGroupUpdateValues
 } from "@/features/installments/schemas/installment-schema";
+import { formatDateDisplay } from "@/lib/date";
 import { formatMonthKeyLabel, getMonthRange, normalizeMonthKey } from "@/lib/month";
 import { formatCurrency } from "@/lib/utils";
 
@@ -364,7 +365,7 @@ export function InstallmentsClient() {
               />
             </div>
             <p className="mt-4 text-sm text-[var(--color-muted-foreground)]">
-              Próxima: {item.nextInstallmentDate ? new Date(item.nextInstallmentDate).toLocaleDateString("pt-BR") : "Finalizado"}
+              Próxima: {item.nextInstallmentDate ? formatDateDisplay(item.nextInstallmentDate) : "Finalizado"}
             </p>
             <p className="mt-2 text-sm text-[var(--color-muted-foreground)]">
               Em atraso e abertas: {item.overdueOpenInstallments}

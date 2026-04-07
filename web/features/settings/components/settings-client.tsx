@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { formatDateTimeDisplay } from "@/lib/date";
 
 type ProfilePayload = {
   id: string;
@@ -554,9 +555,9 @@ export function SettingsClient() {
                 </div>
                 <p className="text-sm text-[var(--color-muted-foreground)]">
                   {item.deliveredAt
-                    ? new Date(item.deliveredAt).toLocaleString("pt-BR")
+                    ? formatDateTimeDisplay(item.deliveredAt)
                     : item.attemptedAt
-                      ? new Date(item.attemptedAt).toLocaleString("pt-BR")
+                      ? formatDateTimeDisplay(item.attemptedAt)
                       : "Pendente"}
                 </p>
               </div>

@@ -1,5 +1,7 @@
 import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 
+import { formatDateDisplay } from "@/lib/date";
+
 type SummaryDocumentProps = {
   generatedAt: string;
   periodLabel: string;
@@ -283,7 +285,7 @@ export function SummaryDocument({ generatedAt, periodLabel, summary, recent, byA
                   <View>
                     <Text style={styles.rowTitle}>{item.description}</Text>
                     <Text style={styles.rowMeta}>
-                      {item.category} • {new Date(item.date).toLocaleDateString("pt-BR")}
+                      {item.category} • {formatDateDisplay(item.date)}
                     </Text>
                     <Text style={styles.rowMeta}>
                       {item.card ?? item.account ?? "Sem origem"}

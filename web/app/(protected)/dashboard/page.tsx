@@ -6,6 +6,7 @@ import { ArrowRight, BellRing, CreditCard, Landmark, Target } from "lucide-react
 import { SummaryCards } from "@/features/dashboard/components/summary-cards";
 import { requireSessionUser } from "@/lib/auth/session";
 import { getCardStatementSnapshots } from "@/lib/cards/statement";
+import { formatDateDisplay } from "@/lib/date";
 import { getAccountsWithComputedBalance } from "@/lib/finance/accounts";
 import { getFinanceReport } from "@/lib/finance/reports";
 import { formatMonthKeyLabel, getMonthRange, normalizeMonthKey } from "@/lib/month";
@@ -17,10 +18,7 @@ function formatDate(value: Date | string | null | undefined) {
     return "Sem data";
   }
 
-  return new Intl.DateTimeFormat("pt-BR", {
-    day: "2-digit",
-    month: "short"
-  }).format(new Date(value));
+  return formatDateDisplay(value);
 }
 
 async function getDashboardData(tenantId: string, month: string) {

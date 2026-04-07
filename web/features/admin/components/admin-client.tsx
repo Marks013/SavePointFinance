@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { invitationSchema, type InvitationValues } from "@/features/password/schemas/password-schema";
+import { formatDateDisplay, formatDateTimeDisplay, parseBrazilianDateToDateKey } from "@/lib/date";
 
 type Stats = {
   totalTenants: number;
@@ -152,11 +153,11 @@ function formatPlanLabel(plan: string) {
 
 function formatLifecycleLabel(tenant: TenantItem) {
   if (tenant.expiresAt) {
-    return `Expira em ${new Date(tenant.expiresAt).toLocaleDateString("pt-BR")}`;
+    return `Expira em ${formatDateDisplay(tenant.expiresAt)}`;
   }
 
   if (tenant.planTier === "pro" && tenant.trialExpiresAt) {
-    return `Avaliação até ${new Date(tenant.trialExpiresAt).toLocaleDateString("pt-BR")}`;
+    return `Avaliação até ${formatDateDisplay(tenant.trialExpiresAt)}`;
   }
 
   return tenant.isActive ? "Sem vencimento configurado" : "Conta inativa";
@@ -1193,9 +1194,21 @@ export function AdminClient() {
                   </Button>
                   <Button
                     onClick={() => {
-                      const nextExpiresAt = window.prompt(`Nova data de expiração AAAA-MM-DD para ${tenant.name}`, tenant.expiresAt ? tenant.expiresAt.slice(0, 10) : "");
+                      const nextExpiresAt = window.prompt(
+                        `Nova data de expiração DD-MM-AAAA para ${tenant.name}`,
+                        tenant.expiresAt ? formatDateDisplay(tenant.expiresAt) : ""
+                      );
                       if (nextExpiresAt === null) return;
-                      updateTenantMutation.mutate({ id: tenant.id, expiresAt: nextExpiresAt || null });
+                      if (!nextExpiresAt.trim()) {
+                        updateTenantMutation.mutate({ id: tenant.id, expiresAt: null });
+                        return;
+                      }
+                      const parsedExpiresAt = parseBrazilianDateToDateKey(nextExpiresAt);
+                      if (!parsedExpiresAt) {
+                        toast.error("Informe a data no formato DD-MM-AAAA");
+                        return;
+                      }
+                      updateTenantMutation.mutate({ id: tenant.id, expiresAt: parsedExpiresAt });
                     }}
                     type="button"
                     variant="ghost"
@@ -1320,7 +1333,7 @@ export function AdminClient() {
                       Conta {user.tenant.slug} • {formatUserTenantPlanLabel(user)}
                     </p>
                     <p className="text-xs text-[var(--color-muted-foreground)]">
-                      Último login: {user.lastLogin ? new Date(user.lastLogin).toLocaleString("pt-BR") : "Nunca acessou"}
+                      Último login: {user.lastLogin ? formatDateTimeDisplay(user.lastLogin) : "Nunca acessou"}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -1665,7 +1678,7 @@ export function AdminClient() {
                   </p>
                 </div>
                 <p className="text-xs text-[var(--color-muted-foreground)]">
-                  {new Date(item.createdAt).toLocaleString("pt-BR")}
+                  {formatDateTimeDisplay(item.createdAt)}
                 </p>
               </div>
             </article>

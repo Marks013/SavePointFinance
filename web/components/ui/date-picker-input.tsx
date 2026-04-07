@@ -5,6 +5,7 @@ import { forwardRef, useMemo, useRef } from "react";
 import type { InputHTMLAttributes } from "react";
 
 import { cn } from "@/lib/utils";
+import { formatDateDisplay } from "@/lib/date";
 
 type DatePickerInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type"> & {
   type?: "date" | "month";
@@ -22,11 +23,7 @@ function formatDisplayValue(type: "date" | "month", value?: string) {
     }).format(new Date(`${value}-01T12:00:00`));
   }
 
-  return new Intl.DateTimeFormat("pt-BR", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric"
-  }).format(new Date(`${value}T12:00:00`));
+  return formatDateDisplay(new Date(`${value}T12:00:00`));
 }
 
 export const DatePickerInput = forwardRef<HTMLInputElement, DatePickerInputProps>(function DatePickerInput(
