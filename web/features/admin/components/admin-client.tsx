@@ -33,7 +33,6 @@ type TenantItem = {
   planName: string;
   planSlug: string;
   planTier: "free" | "pro";
-  maxUsers: number | null;
   isActive: boolean;
   activeUsers: number;
   trialStart: string | null;
@@ -129,7 +128,6 @@ type PlanItem = {
   slug: string;
   tier: "free" | "pro";
   description: string | null;
-  maxUsers: number | null;
   maxAccounts: number | null;
   maxCards: number | null;
   trialDays: number;
@@ -1655,5 +1653,3 @@ export function AdminClient() {
     </div>
   );
 }
-
-

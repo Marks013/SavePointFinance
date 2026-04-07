@@ -81,7 +81,6 @@ model Tenant {
   name           String
   slug           String             @unique
   planId         String
-  maxUsers       Int?
   isActive       Boolean            @default(true)
   trialStart     DateTime?
   trialDays      Int                @default(31)
@@ -113,7 +112,6 @@ model Plan {
   slug              String      @unique
   tier              TenantPlan  @default(free)
   description       String?
-  maxUsers          Int?
   maxAccounts       Int?
   maxCards          Int?
   whatsappAssistant Boolean     @default(false)

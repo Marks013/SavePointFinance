@@ -21,7 +21,6 @@ export async function PATCH(request: Request, context: Params) {
       name?: string;
       description?: string | null;
       tier?: "free" | "pro";
-      maxUsers?: number | null;
       maxAccounts?: number | null;
       maxCards?: number | null;
       trialDays?: number;
@@ -54,7 +53,6 @@ export async function PATCH(request: Request, context: Params) {
         ...(body.name ? { name: body.name.trim() } : {}),
         ...(body.description !== undefined ? { description: body.description?.trim() || null } : {}),
         ...(body.tier ? { tier: body.tier } : {}),
-        ...(body.maxUsers !== undefined ? { maxUsers: body.maxUsers } : {}),
         ...(body.maxAccounts !== undefined ? { maxAccounts: body.maxAccounts } : {}),
         ...(body.maxCards !== undefined ? { maxCards: body.maxCards } : {}),
         ...(typeof body.trialDays === "number" ? { trialDays: Math.max(0, body.trialDays) } : {}),

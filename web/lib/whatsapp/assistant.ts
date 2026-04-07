@@ -18,7 +18,6 @@ type WhatsAppUser = {
   isPlatformAdmin: boolean;
   isActive: boolean;
   tenant: {
-    maxUsers: number | null;
     isActive: boolean;
     trialExpiresAt: Date | null;
     expiresAt: Date | null;
@@ -27,7 +26,6 @@ type WhatsAppUser = {
       name: string;
       slug: string;
       tier: "free" | "pro";
-      maxUsers: number | null;
       maxAccounts: number | null;
       maxCards: number | null;
       whatsappAssistant: boolean;
@@ -195,7 +193,6 @@ async function findUserByPhoneNumber(phoneNumber: string) {
       isActive: true,
       tenant: {
         select: {
-          maxUsers: true,
           isActive: true,
           trialExpiresAt: true,
           expiresAt: true,
@@ -205,7 +202,6 @@ async function findUserByPhoneNumber(phoneNumber: string) {
               name: true,
               slug: true,
               tier: true,
-              maxUsers: true,
               maxAccounts: true,
               maxCards: true,
               whatsappAssistant: true,

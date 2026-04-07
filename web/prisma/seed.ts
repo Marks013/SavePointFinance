@@ -38,7 +38,6 @@ async function main() {
       name: "SavePoint",
       slug: "savepoint",
       planId: bootstrapPlan.id,
-      maxUsers: bootstrapPlan.maxUsers ?? 5,
       isActive: true,
       trialStart: null,
       trialDays: 0,
@@ -49,7 +48,6 @@ async function main() {
       name: "SavePoint",
       slug: "savepoint",
       planId: bootstrapPlan.id,
-      maxUsers: bootstrapPlan.maxUsers ?? 5,
       trialDays: 0
     }
   });

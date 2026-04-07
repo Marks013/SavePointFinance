@@ -42,7 +42,6 @@ export const authConfig = {
             tenant: {
               select: {
                 id: true,
-                maxUsers: true,
                 isActive: true,
                 trialExpiresAt: true,
                 expiresAt: true,
@@ -52,7 +51,6 @@ export const authConfig = {
                     name: true,
                     slug: true,
                     tier: true,
-                    maxUsers: true,
                     maxAccounts: true,
                     maxCards: true,
                     whatsappAssistant: true,

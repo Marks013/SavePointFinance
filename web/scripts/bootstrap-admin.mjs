@@ -24,7 +24,6 @@ const DEFAULT_PLANS = [
     name: "Gratuito Essencial",
     tier: "free",
     description: "Plano base com limites reduzidos e recursos premium desativados.",
-    maxUsers: 1,
     maxAccounts: 1,
     maxCards: 1,
     whatsappAssistant: false,
@@ -38,7 +37,6 @@ const DEFAULT_PLANS = [
     name: "Premium Completo",
     tier: "pro",
     description: "Plano completo com WhatsApp, automações e exportação em PDF.",
-    maxUsers: 10,
     maxAccounts: null,
     maxCards: null,
     whatsappAssistant: true,
@@ -52,7 +50,6 @@ const DEFAULT_PLANS = [
     name: "Avaliação Premium 14 dias",
     tier: "pro",
     description: "Versão de avaliação com recursos premium liberados por 14 dias.",
-    maxUsers: 10,
     maxAccounts: null,
     maxCards: null,
     whatsappAssistant: true,
@@ -83,17 +80,16 @@ async function ensurePlans(client) {
     await client.query(
       `
         INSERT INTO "Plan" (
-          "id", "name", "slug", "tier", "description", "maxUsers", "maxAccounts", "maxCards",
+          "id", "name", "slug", "tier", "description", "maxAccounts", "maxCards",
           "whatsappAssistant", "automation", "pdfExport", "trialDays", "isDefault", "isActive",
           "sortOrder", "createdAt", "updatedAt"
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, true, true, $13, NOW(), NOW())
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, true, true, $12, NOW(), NOW())
         ON CONFLICT ("slug")
         DO UPDATE SET
           "name" = EXCLUDED."name",
           "tier" = EXCLUDED."tier",
           "description" = EXCLUDED."description",
-          "maxUsers" = EXCLUDED."maxUsers",
           "maxAccounts" = EXCLUDED."maxAccounts",
           "maxCards" = EXCLUDED."maxCards",
           "whatsappAssistant" = EXCLUDED."whatsappAssistant",
@@ -111,7 +107,6 @@ async function ensurePlans(client) {
         plan.slug,
         plan.tier,
         plan.description,
-        plan.maxUsers,
         plan.maxAccounts,
         plan.maxCards,
         plan.whatsappAssistant,
@@ -128,7 +123,7 @@ async function ensureAdmin(client) {
   const passwordHash = await bcrypt.hash(ADMIN_PASSWORD, 10);
   await ensurePlans(client);
   const bootstrapPlanResult = await client.query(
-    'SELECT "id", "maxUsers" FROM "Plan" WHERE "slug" = $1 LIMIT 1',
+    'SELECT "id" FROM "Plan" WHERE "slug" = $1 LIMIT 1',
     ["premium-completo"]
   );
   const bootstrapPlan = bootstrapPlanResult.rows[0];
@@ -139,17 +134,16 @@ async function ensureAdmin(client) {
 
   await client.query(
     `
-      INSERT INTO "Tenant" ("id", "name", "slug", "planId", "maxUsers", "isActive", "trialDays", "createdAt", "updatedAt")
-      VALUES ('tenant-bootstrap', $1, $2, $3, $4, true, 0, NOW(), NOW())
+      INSERT INTO "Tenant" ("id", "name", "slug", "planId", "isActive", "trialDays", "createdAt", "updatedAt")
+      VALUES ('tenant-bootstrap', $1, $2, $3, true, 0, NOW(), NOW())
       ON CONFLICT ("slug")
       DO UPDATE SET
         "name" = EXCLUDED."name",
         "planId" = EXCLUDED."planId",
-        "maxUsers" = EXCLUDED."maxUsers",
         "isActive" = true,
         "updatedAt" = NOW()
     `,
-    [ADMIN_TENANT_NAME, ADMIN_TENANT_SLUG, bootstrapPlan.id, bootstrapPlan.maxUsers]
+    [ADMIN_TENANT_NAME, ADMIN_TENANT_SLUG, bootstrapPlan.id]
   );
 
   const tenantResult = await client.query('SELECT "id" FROM "Tenant" WHERE "slug" = $1 LIMIT 1', [ADMIN_TENANT_SLUG]);

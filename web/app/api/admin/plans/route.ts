@@ -60,7 +60,6 @@ export async function GET(request: Request) {
         slug: plan.slug,
         tier: plan.tier,
         description: plan.description,
-        maxUsers: plan.maxUsers,
         maxAccounts: plan.maxAccounts,
         maxCards: plan.maxCards,
         trialDays: plan.trialDays,
@@ -97,7 +96,6 @@ export async function POST(request: Request) {
       slug?: string;
       tier?: "free" | "pro";
       description?: string;
-      maxUsers?: number | null;
       maxAccounts?: number | null;
       maxCards?: number | null;
       trialDays?: number;
@@ -134,7 +132,6 @@ export async function POST(request: Request) {
         slug,
         tier,
         description: body.description?.trim() || null,
-        maxUsers: body.maxUsers ?? null,
         maxAccounts: body.maxAccounts ?? null,
         maxCards: body.maxCards ?? null,
         trialDays: Math.max(0, body.trialDays ?? 0),

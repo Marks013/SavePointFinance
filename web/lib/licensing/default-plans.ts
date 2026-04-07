@@ -5,7 +5,6 @@ type PlanDefinition = {
   name: string;
   tier: TenantPlan;
   description: string;
-  maxUsers: number | null;
   maxAccounts: number | null;
   maxCards: number | null;
   whatsappAssistant: boolean;
@@ -23,7 +22,6 @@ export const DEFAULT_PLAN_DEFINITIONS: PlanDefinition[] = [
     name: "Gratuito Essencial",
     tier: "free",
     description: "Plano base com limites reduzidos e recursos premium desativados.",
-    maxUsers: null,
     maxAccounts: 1,
     maxCards: 1,
     whatsappAssistant: false,
@@ -37,7 +35,6 @@ export const DEFAULT_PLAN_DEFINITIONS: PlanDefinition[] = [
     name: "Premium Completo",
     tier: "pro",
     description: "Plano completo com WhatsApp, automações e exportação em PDF.",
-    maxUsers: null,
     maxAccounts: null,
     maxCards: null,
     whatsappAssistant: true,
@@ -51,7 +48,6 @@ export const DEFAULT_PLAN_DEFINITIONS: PlanDefinition[] = [
     name: "Avaliação Premium 14 dias",
     tier: "pro",
     description: "Versão de avaliação com recursos premium liberados por 14 dias.",
-    maxUsers: null,
     maxAccounts: null,
     maxCards: null,
     whatsappAssistant: true,
@@ -83,7 +79,6 @@ export async function ensureDefaultPlans(prisma: PlanClient) {
         name: definition.name,
         tier: definition.tier,
         description: definition.description,
-        maxUsers: definition.maxUsers,
         maxAccounts: definition.maxAccounts,
         maxCards: definition.maxCards,
         whatsappAssistant: definition.whatsappAssistant,
@@ -117,7 +112,6 @@ export async function getPreferredBootstrapPlan(prisma: PlanClient) {
 
 export function applyPlanDefaultsToTenant(plan: {
   id: string;
-  maxUsers: number | null;
   trialDays: number;
 }) {
   const now = new Date();
@@ -125,10 +119,8 @@ export function applyPlanDefaultsToTenant(plan: {
 
   return {
     planId: plan.id,
-    maxUsers: null,
     trialStart: hasTrial ? now : null,
     trialDays: plan.trialDays,
     trialExpiresAt: hasTrial ? new Date(now.getTime() + plan.trialDays * 24 * 60 * 60 * 1000) : null
   };
 }
-

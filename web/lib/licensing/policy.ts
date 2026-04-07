@@ -3,7 +3,6 @@ import type { TenantPlan } from "@prisma/client";
 export type LicenseFeature = "whatsappAssistant" | "automation" | "pdfExport";
 
 export type TenantLicenseTarget = {
-  maxUsers: number | null;
   isActive: boolean;
   trialExpiresAt: Date | null;
   expiresAt: Date | null;
@@ -12,7 +11,6 @@ export type TenantLicenseTarget = {
     name: string;
     slug: string;
     tier: TenantPlan;
-    maxUsers: number | null;
     maxAccounts: number | null;
     maxCards: number | null;
     whatsappAssistant: boolean;
@@ -101,4 +99,3 @@ export function getLicenseBlockedReason(license: TenantLicenseState) {
 
   return null;
 }
-

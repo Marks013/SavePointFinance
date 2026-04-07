@@ -16,7 +16,6 @@ export async function PATCH(request: Request, context: Params) {
     const body = (await request.json()) as {
       name?: string;
       planId?: string;
-      maxUsers?: number | null;
       isActive?: boolean;
       trialDays?: number;
       trialExpiresAt?: string | null;
@@ -44,7 +43,6 @@ export async function PATCH(request: Request, context: Params) {
     let planUpdate:
       | {
           planId: string;
-          maxUsers: number | null;
           trialStart: Date | null;
           trialDays: number;
           trialExpiresAt: Date | null;
@@ -60,7 +58,6 @@ export async function PATCH(request: Request, context: Params) {
         select: {
           id: true,
           tier: true,
-          maxUsers: true,
           trialDays: true
         }
       });
@@ -79,7 +76,6 @@ export async function PATCH(request: Request, context: Params) {
       data: {
         ...(body.name ? { name: body.name.trim() } : {}),
         ...(planUpdate ?? {}),
-        ...(body.maxUsers !== undefined ? { maxUsers: body.maxUsers } : {}),
         ...(typeof body.isActive === "boolean" ? { isActive: body.isActive } : {}),
         ...(typeof body.trialDays === "number" ? { trialDays: body.trialDays } : {}),
         ...(body.trialExpiresAt !== undefined ? { trialExpiresAt: body.trialExpiresAt ? new Date(`${body.trialExpiresAt}T12:00:00`) : null } : {}),

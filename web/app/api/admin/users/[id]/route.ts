@@ -83,7 +83,6 @@ export async function PATCH(request: Request, context: Params) {
         where: { id: body.tenantId },
         select: {
           id: true,
-          maxUsers: true,
           isActive: true,
           trialExpiresAt: true,
           expiresAt: true,
@@ -93,7 +92,6 @@ export async function PATCH(request: Request, context: Params) {
               name: true,
               slug: true,
               tier: true,
-              maxUsers: true,
               maxAccounts: true,
               maxCards: true,
               whatsappAssistant: true,
@@ -201,4 +199,3 @@ export async function DELETE(_request: Request, context: Params) {
     return NextResponse.json({ message: "Falha ao excluir usuário" }, { status: 400 });
   }
 }
-

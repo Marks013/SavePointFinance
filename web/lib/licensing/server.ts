@@ -35,7 +35,6 @@ export async function getCurrentTenantAccess(options: CurrentAccessOptions = {})
           id: true,
           name: true,
           slug: true,
-          maxUsers: true,
           isActive: true,
           trialDays: true,
           trialExpiresAt: true,
@@ -46,7 +45,6 @@ export async function getCurrentTenantAccess(options: CurrentAccessOptions = {})
               name: true,
               slug: true,
               tier: true,
-              maxUsers: true,
               maxAccounts: true,
               maxCards: true,
               whatsappAssistant: true,
@@ -117,7 +115,6 @@ export async function getTenantSeatSummary(tenantId: string) {
       id: true,
       name: true,
       slug: true,
-      maxUsers: true,
       isActive: true,
       trialExpiresAt: true,
       expiresAt: true,
@@ -127,7 +124,6 @@ export async function getTenantSeatSummary(tenantId: string) {
           name: true,
           slug: true,
           tier: true,
-          maxUsers: true,
           maxAccounts: true,
           maxCards: true,
           whatsappAssistant: true,
@@ -189,7 +185,6 @@ export async function canCreateAccount(tenantId: string, ownerUserId: string) {
     },
     select: {
       id: true,
-      maxUsers: true,
       isActive: true,
       trialExpiresAt: true,
       expiresAt: true,
@@ -199,7 +194,6 @@ export async function canCreateAccount(tenantId: string, ownerUserId: string) {
           name: true,
           slug: true,
           tier: true,
-          maxUsers: true,
           maxAccounts: true,
           maxCards: true,
           whatsappAssistant: true,
@@ -265,7 +259,6 @@ export async function canCreateCard(tenantId: string, ownerUserId: string) {
     },
     select: {
       id: true,
-      maxUsers: true,
       isActive: true,
       trialExpiresAt: true,
       expiresAt: true,
@@ -275,7 +268,6 @@ export async function canCreateCard(tenantId: string, ownerUserId: string) {
           name: true,
           slug: true,
           tier: true,
-          maxUsers: true,
           maxAccounts: true,
           maxCards: true,
           whatsappAssistant: true,
@@ -324,4 +316,3 @@ export async function canCreateCard(tenantId: string, ownerUserId: string) {
     allowed: license.canAccessApp && (limit === null || current < limit)
   };
 }
-

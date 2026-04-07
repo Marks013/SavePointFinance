@@ -30,7 +30,6 @@ export async function POST(request: Request) {
             name: true,
             slug: true,
             tier: true,
-            maxUsers: true,
             maxAccounts: true,
             maxCards: true,
             whatsappAssistant: true,
