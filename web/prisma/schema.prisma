@@ -71,6 +71,11 @@ enum NotificationStatus {
   skipped
 }
 
+enum InvitationKind {
+  admin_isolated
+  shared_wallet
+}
+
 enum WhatsAppMessageDirection {
   inbound
   outbound
@@ -417,6 +422,7 @@ model Invitation {
   email           String
   name            String
   role            UserRole  @default(member)
+  kind            InvitationKind @default(admin_isolated)
   token           String    @unique
   expiresAt       DateTime
   acceptedAt      DateTime?
@@ -428,6 +434,7 @@ model Invitation {
 
   @@index([tenantId, email])
   @@index([tenantId, expiresAt])
+  @@index([tenantId, kind])
 }
 
 model NotificationDelivery {

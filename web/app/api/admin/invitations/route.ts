@@ -1,4 +1,4 @@
-import { NotificationChannel } from "@prisma/client";
+import { InvitationKind, NotificationChannel } from "@prisma/client";
 import crypto from "node:crypto";
 import { NextResponse } from "next/server";
 
@@ -55,6 +55,7 @@ export async function GET(request: Request) {
 
     const invitations = await prisma.invitation.findMany({
       where: {
+        kind: InvitationKind.admin_isolated,
         ...(admin.isPlatformAdmin ? (tenantId ? { tenantId } : {}) : { tenantId: admin.tenantId }),
         ...(search
           ? {
@@ -86,6 +87,7 @@ export async function GET(request: Request) {
         email: invitation.email,
         name: invitation.name,
         role: invitation.role,
+        kind: invitation.kind,
         inviteUrl: `/accept-invitation?token=${invitation.token}`,
         expiresAt: invitation.expiresAt.toISOString(),
         acceptedAt: invitation.acceptedAt?.toISOString() ?? null,
@@ -193,6 +195,7 @@ export async function POST(request: Request) {
         email: normalizedEmail,
         name: body.name,
         role: body.role,
+        kind: InvitationKind.admin_isolated,
         token,
         expiresAt
       },

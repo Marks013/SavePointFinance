@@ -1,4 +1,5 @@
 import { hash } from "bcryptjs";
+import { InvitationKind } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -7,21 +8,6 @@ import { normalizeEmail } from "@/lib/auth/normalize-email";
 import { getTenantSeatSummary } from "@/lib/licensing/server";
 import { prisma } from "@/lib/prisma/client";
 import { assessUserReassignment, buildReassignmentBlockReason } from "@/lib/users/reassign-user";
-
-async function isSharingInvitation(invitationId: string) {
-  const audit = await prisma.adminAuditLog.findFirst({
-    where: {
-      action: "sharing.invitation.created",
-      entityType: "invitation",
-      entityId: invitationId
-    },
-    select: {
-      id: true
-    }
-  });
-
-  return Boolean(audit);
-}
 
 async function tenantHasFinancialData(tenantId: string) {
   const [accounts, cards, transactions, goals, subscriptions, statementPayments] = await Promise.all([
@@ -56,7 +42,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "A conta está com a licença indisponível" }, { status: 403 });
     }
 
-    if (!(await isSharingInvitation(invitation.id)) && await tenantHasFinancialData(invitation.tenantId)) {
+    if (invitation.kind !== InvitationKind.shared_wallet && await tenantHasFinancialData(invitation.tenantId)) {
       return NextResponse.json(
         { message: "Este convite administrativo aponta para uma carteira com dados financeiros. Gere um novo convite isolado pelo Admin." },
         { status: 409 }

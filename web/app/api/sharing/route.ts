@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { NotificationChannel } from "@prisma/client";
+import { InvitationKind, NotificationChannel } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -17,41 +17,16 @@ const sharingInviteSchema = z.object({
   email: z.string().trim().email("Informe um e-mail valido")
 });
 
-async function getFamilySharingInvitationIds(ownerUserId?: string) {
-  if (!ownerUserId) {
-    return [];
-  }
-
-  const sharingAudits = await prisma.adminAuditLog.findMany({
-    where: {
-      actorUserId: ownerUserId,
-      action: "sharing.invitation.created",
-      entityType: "invitation",
-      entityId: {
-        not: null
-      }
-    },
-    select: {
-      entityId: true
-    }
-  });
-
-  return sharingAudits.flatMap((audit) => (audit.entityId ? [audit.entityId] : []));
-}
-
 async function getFamilySharingInvitations(ownerUserId: string | undefined, tenantId: string) {
-  const familyInvitationIds = await getFamilySharingInvitationIds(ownerUserId);
-
-  if (familyInvitationIds.length === 0) {
+  if (!ownerUserId) {
     return [];
   }
 
   return prisma.invitation.findMany({
     where: {
-      id: {
-        in: familyInvitationIds
-      },
-      tenantId
+      tenantId,
+      invitedByUserId: ownerUserId,
+      kind: InvitationKind.shared_wallet
     },
     orderBy: {
       createdAt: "desc"
@@ -203,6 +178,7 @@ export async function POST(request: Request) {
         email: normalizedEmail,
         name: body.name,
         role: "member",
+        kind: InvitationKind.shared_wallet,
         token,
         expiresAt
       }
@@ -276,7 +252,8 @@ export async function DELETE(request: Request) {
       const invitation = await prisma.invitation.findFirst({
         where: {
           id: body.invitationId,
-          tenantId: user.tenantId
+          tenantId: user.tenantId,
+          kind: InvitationKind.shared_wallet
         },
         select: {
           id: true,
@@ -359,4 +336,3 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ message: "Failed to update sharing access" }, { status: 400 });
   }
 }
-

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { InvitationKind } from "@prisma/client";
 
 import { logAdminAudit } from "@/lib/admin/audit";
 import { requireAdminUser } from "@/lib/auth/admin";
@@ -16,6 +17,7 @@ export async function PATCH(_request: Request, context: Params) {
     const target = await prisma.invitation.findFirst({
       where: {
         id,
+        kind: InvitationKind.admin_isolated,
         ...(admin.isPlatformAdmin ? {} : { tenantId: admin.tenantId })
       },
       select: {
@@ -39,6 +41,7 @@ export async function PATCH(_request: Request, context: Params) {
       where: {
         id: target.id,
         tenantId: target.tenantId,
+        kind: InvitationKind.admin_isolated,
         acceptedAt: null,
         revokedAt: null
       },

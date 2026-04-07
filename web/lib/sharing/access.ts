@@ -1,3 +1,5 @@
+import { InvitationKind } from "@prisma/client";
+
 import { prisma } from "@/lib/prisma/client";
 
 type SharingSessionUser = {
@@ -25,21 +27,6 @@ function toSharingOwner(user: SharingOwner) {
     name: user.name,
     email: user.email
   };
-}
-
-async function hasFamilySharingInvitation(invitationId: string) {
-  const sharingAudit = await prisma.adminAuditLog.findFirst({
-    where: {
-      entityType: "invitation",
-      entityId: invitationId,
-      action: "sharing.invitation.created"
-    },
-    select: {
-      id: true
-    }
-  });
-
-  return Boolean(sharingAudit);
 }
 
 async function findCurrentUserAsAccountOwner(user: SharingSessionUser) {
@@ -81,6 +68,7 @@ async function findCurrentUserAsAccountOwner(user: SharingSessionUser) {
     },
     select: {
       id: true,
+      kind: true,
       invitedBy: {
         select: {
           isPlatformAdmin: true
@@ -89,12 +77,8 @@ async function findCurrentUserAsAccountOwner(user: SharingSessionUser) {
     }
   });
 
-  if (acceptedInvitation && !acceptedInvitation.invitedBy?.isPlatformAdmin) {
-    const isFamilyInvite = await hasFamilySharingInvitation(acceptedInvitation.id);
-
-    if (isFamilyInvite) {
-      return null;
-    }
+  if (acceptedInvitation?.kind === InvitationKind.shared_wallet && !acceptedInvitation.invitedBy?.isPlatformAdmin) {
+    return null;
   }
 
   return toSharingOwner(currentUser);
@@ -107,6 +91,7 @@ async function findPlatformInvitedOwner(user: SharingSessionUser) {
       acceptedAt: {
         not: null
       },
+      kind: InvitationKind.admin_isolated,
       invitedBy: {
         isPlatformAdmin: true
       }
