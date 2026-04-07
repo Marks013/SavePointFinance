@@ -5,6 +5,7 @@ import { requireSessionUser } from "@/lib/auth/session";
 import { getCardExpenseDueDate } from "@/lib/cards/statement";
 import { classifyTransactionCategory } from "@/lib/finance/category-classifier";
 import { ensureFallbackCategory } from "@/lib/finance/default-categories";
+import { assertTenantTransactionReferences, TenantReferenceError } from "@/lib/finance/tenant-reference-guard";
 import { ensureTitheCategory, syncTitheForTransactionDates } from "@/lib/finance/tithe";
 import { prisma } from "@/lib/prisma/client";
 import { addMonthsClamped, splitAmountIntoInstallments } from "@/lib/utils";
@@ -124,6 +125,15 @@ export async function POST(request: Request) {
     const cardId = body.cardId || null;
     const notes = body.notes?.trim() || null;
     const installmentAmounts = splitAmountIntoInstallments(body.amount, body.installments);
+
+    await assertTenantTransactionReferences({
+      tenantId: user.tenantId,
+      accountId,
+      destinationAccountId,
+      cardId,
+      categoryId: body.categoryId
+    });
+
     const selectedCard =
       body.paymentMethod === "credit_card" && cardId
         ? await prisma.card.findFirst({
@@ -301,6 +311,10 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof Error && error.message === "Unauthorized") {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    }
+
+    if (error instanceof TenantReferenceError) {
+      return NextResponse.json({ message: error.message }, { status: 404 });
     }
 
     return NextResponse.json({ message: "Failed to create transaction" }, { status: 400 });

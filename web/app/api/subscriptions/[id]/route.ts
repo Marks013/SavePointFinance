@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { subscriptionFormSchema } from "@/features/subscriptions/schemas/subscription-schema";
 import { requireSessionUser } from "@/lib/auth/session";
+import { assertTenantTransactionReferences, TenantReferenceError } from "@/lib/finance/tenant-reference-guard";
 import { prisma } from "@/lib/prisma/client";
 
 type Params = {
@@ -13,6 +14,13 @@ export async function PATCH(request: Request, context: Params) {
     const user = await requireSessionUser();
     const { id } = await context.params;
     const body = subscriptionFormSchema.parse(await request.json());
+
+    await assertTenantTransactionReferences({
+      tenantId: user.tenantId,
+      accountId: body.accountId,
+      cardId: body.cardId,
+      categoryId: body.categoryId
+    });
 
     await prisma.subscription.update({
       where: { id, tenantId: user.tenantId },
@@ -34,6 +42,10 @@ export async function PATCH(request: Request, context: Params) {
   } catch (error) {
     if (error instanceof Error && error.message === "Unauthorized") {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    }
+
+    if (error instanceof TenantReferenceError) {
+      return NextResponse.json({ message: error.message }, { status: 404 });
     }
 
     return NextResponse.json({ message: "Failed to update subscription" }, { status: 400 });

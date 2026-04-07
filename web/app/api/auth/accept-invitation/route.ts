@@ -8,6 +8,34 @@ import { getTenantSeatSummary } from "@/lib/licensing/server";
 import { prisma } from "@/lib/prisma/client";
 import { assessUserReassignment, buildReassignmentBlockReason } from "@/lib/users/reassign-user";
 
+async function isSharingInvitation(invitationId: string) {
+  const audit = await prisma.adminAuditLog.findFirst({
+    where: {
+      action: "sharing.invitation.created",
+      entityType: "invitation",
+      entityId: invitationId
+    },
+    select: {
+      id: true
+    }
+  });
+
+  return Boolean(audit);
+}
+
+async function tenantHasFinancialData(tenantId: string) {
+  const [accounts, cards, transactions, goals, subscriptions, statementPayments] = await Promise.all([
+    prisma.financialAccount.count({ where: { tenantId } }),
+    prisma.card.count({ where: { tenantId } }),
+    prisma.transaction.count({ where: { tenantId } }),
+    prisma.goal.count({ where: { tenantId } }),
+    prisma.subscription.count({ where: { tenantId } }),
+    prisma.statementPayment.count({ where: { tenantId } })
+  ]);
+
+  return accounts + cards + transactions + goals + subscriptions + statementPayments > 0;
+}
+
 export async function POST(request: Request) {
   try {
     const body = acceptInvitationSchema.parse(await request.json());
@@ -26,6 +54,13 @@ export async function POST(request: Request) {
 
     if (!seatSummary?.license.canAccessApp) {
       return NextResponse.json({ message: "A conta está com a licença indisponível" }, { status: 403 });
+    }
+
+    if (!(await isSharingInvitation(invitation.id)) && await tenantHasFinancialData(invitation.tenantId)) {
+      return NextResponse.json(
+        { message: "Este convite administrativo aponta para uma carteira com dados financeiros. Gere um novo convite isolado pelo Admin." },
+        { status: 409 }
+      );
     }
 
     const normalizedEmail = normalizeEmail(invitation.email);
@@ -124,4 +159,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Failed to accept invitation" }, { status: 400 });
   }
 }
-

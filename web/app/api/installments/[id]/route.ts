@@ -5,6 +5,7 @@ import {
   installmentReconcileSchema
 } from "@/features/installments/schemas/installment-schema";
 import { requireSessionUser } from "@/lib/auth/session";
+import { assertTenantCategoryReference, TenantReferenceError } from "@/lib/finance/tenant-reference-guard";
 import { prisma } from "@/lib/prisma/client";
 
 type Params = {
@@ -77,6 +78,9 @@ export async function PATCH(request: Request, context: Params) {
     }
 
     const body = installmentGroupUpdateSchema.parse(payload);
+
+    await assertTenantCategoryReference(user.tenantId, body.categoryId);
+
     const installments = await prisma.transaction.findMany({
       where: {
         tenantId: user.tenantId,
@@ -111,6 +115,10 @@ export async function PATCH(request: Request, context: Params) {
   } catch (error) {
     if (error instanceof Error && error.message === "Unauthorized") {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    }
+
+    if (error instanceof TenantReferenceError) {
+      return NextResponse.json({ message: error.message }, { status: 404 });
     }
 
     return NextResponse.json({ message: "Failed to update installment group" }, { status: 400 });

@@ -5,6 +5,7 @@ import { requireSessionUser } from "@/lib/auth/session";
 import { getCardExpenseDueDate } from "@/lib/cards/statement";
 import { classifyTransactionCategory } from "@/lib/finance/category-classifier";
 import { ensureFallbackCategory } from "@/lib/finance/default-categories";
+import { assertTenantTransactionReferences, TenantReferenceError } from "@/lib/finance/tenant-reference-guard";
 import { ensureTitheCategory, syncTitheForTransactionDates } from "@/lib/finance/tithe";
 import { prisma } from "@/lib/prisma/client";
 import { addMonthsClamped } from "@/lib/utils";
@@ -47,6 +48,15 @@ export async function PATCH(request: Request, context: Params) {
     }
 
     const notes = body.notes?.trim() || null;
+
+    await assertTenantTransactionReferences({
+      tenantId: user.tenantId,
+      accountId: body.accountId,
+      destinationAccountId: body.destinationAccountId,
+      cardId: body.cardId,
+      categoryId: body.categoryId
+    });
+
     const categories = await prisma.category.findMany({
       where: {
         tenantId: user.tenantId
@@ -244,6 +254,10 @@ export async function PATCH(request: Request, context: Params) {
   } catch (error) {
     if (error instanceof Error && error.message === "Unauthorized") {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    }
+
+    if (error instanceof TenantReferenceError) {
+      return NextResponse.json({ message: error.message }, { status: 404 });
     }
 
     return NextResponse.json({ message: error instanceof Error ? error.message : "Failed to update transaction" }, { status: 400 });

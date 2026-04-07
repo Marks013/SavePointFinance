@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { goalFormSchema } from "@/features/goals/schemas/goal-schema";
 import { requireSessionUser } from "@/lib/auth/session";
+import { assertTenantAccountReference, TenantReferenceError } from "@/lib/finance/tenant-reference-guard";
 import { prisma } from "@/lib/prisma/client";
 
 export async function GET() {
@@ -50,6 +51,8 @@ export async function POST(request: Request) {
     const user = await requireSessionUser();
     const body = goalFormSchema.parse(await request.json());
 
+    await assertTenantAccountReference(user.tenantId, body.accountId);
+
     const goal = await prisma.goal.create({
       data: {
         tenantId: user.tenantId,
@@ -76,6 +79,10 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof Error && error.message === "Unauthorized") {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    }
+
+    if (error instanceof TenantReferenceError) {
+      return NextResponse.json({ message: error.message }, { status: 404 });
     }
 
     return NextResponse.json({ message: "Failed to create goal" }, { status: 400 });
