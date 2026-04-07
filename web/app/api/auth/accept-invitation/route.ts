@@ -28,10 +28,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "A conta está com a licença indisponível" }, { status: 403 });
     }
 
-    if (seatSummary.remainingSeats !== null && seatSummary.remainingSeats <= 0) {
-      return NextResponse.json({ message: "O limite de usuários do plano atual foi atingido" }, { status: 409 });
-    }
-
     const normalizedEmail = normalizeEmail(invitation.email);
     const passwordHash = await hash(body.password, 10);
 
@@ -128,3 +124,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Failed to accept invitation" }, { status: 400 });
   }
 }
+

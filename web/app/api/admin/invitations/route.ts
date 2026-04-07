@@ -82,13 +82,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "Licença indisponível para convidar usuários" }, { status: 403 });
     }
 
-    if (!admin.isPlatformAdmin && seatSummary && seatSummary.remainingSeats !== null && seatSummary.remainingSeats <= 0) {
-      return NextResponse.json(
-        { message: "O limite de usuários do plano atual já foi atingido" },
-        { status: 409 }
-      );
-    }
-
     const existingUser = await prisma.user.findFirst({
       where: {
         email: {
@@ -200,3 +193,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Failed to create invitation" }, { status: 400 });
   }
 }
+

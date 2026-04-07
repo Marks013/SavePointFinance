@@ -117,13 +117,6 @@ export async function PATCH(request: Request, context: Params) {
           return NextResponse.json({ message: "A conta de destino está indisponível" }, { status: 403 });
         }
 
-        if (target.isActive && seatSummary.remainingSeats !== null && seatSummary.remainingSeats <= 0) {
-          return NextResponse.json(
-            { message: "O limite de pessoas da conta de destino já foi atingido" },
-            { status: 409 }
-          );
-        }
-
         data.tenantId = body.tenantId;
       }
     }
@@ -133,13 +126,6 @@ export async function PATCH(request: Request, context: Params) {
 
       if (!admin.isPlatformAdmin && !seatSummary?.license.canAccessApp) {
         return NextResponse.json({ message: "Licença indisponível para ativar usuários" }, { status: 403 });
-      }
-
-      if (!admin.isPlatformAdmin && seatSummary && seatSummary.remainingSeats !== null && seatSummary.remainingSeats <= 0) {
-        return NextResponse.json(
-          { message: "O limite de usuários do plano atual já foi atingido" },
-          { status: 409 }
-        );
       }
     }
 
@@ -215,3 +201,4 @@ export async function DELETE(_request: Request, context: Params) {
     return NextResponse.json({ message: "Falha ao excluir usuário" }, { status: 400 });
   }
 }
+

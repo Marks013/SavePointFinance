@@ -164,8 +164,7 @@ export async function getTenantSeatSummary(tenantId: string) {
   ]);
 
   const license = resolveTenantLicenseState(tenant);
-  const userLimit = license.effectiveLimits.users;
-  const remainingSeats = userLimit === null ? null : Math.max(0, userLimit - activeUsers - activeInvitations);
+  const remainingSeats = null;
 
   return {
     tenant,
@@ -327,3 +326,4 @@ export async function canCreateCard(tenantId: string, ownerUserId: string) {
     allowed: license.canAccessApp && (limit === null || current < limit)
   };
 }
+

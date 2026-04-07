@@ -22,9 +22,6 @@ type SharingProfile = {
   };
   license: {
     planLabel: string;
-    limits: {
-      users: number | null;
-    };
   };
 };
 
@@ -136,9 +133,6 @@ export function SharingClient() {
   const activeMembers = members.filter((member) => member.isActive);
   const activeInvitation = invitations.find((item) => !item.acceptedAt && !item.revokedAt);
   const canManage = Boolean(sharingQuery.data?.canManage);
-  const seatLimit = profileQuery.data?.license.limits.users ?? null;
-  const usedSeats = owner ? 1 + activeMembers.length : activeMembers.length;
-  const availableSeats = seatLimit === null ? null : Math.max(0, seatLimit - usedSeats);
 
   const createInvitationMutation = useMutation({
     mutationFn: async (values: SharingInviteValues) => {
@@ -235,8 +229,8 @@ export function SharingClient() {
             </p>
           </article>
           <article className="metric-card">
-            <p className="metric-label">Vagas do plano</p>
-            <p className="metric-value">{seatLimit === null ? "Livre" : availableSeats}</p>
+            <p className="metric-label">Plano da carteira</p>
+            <p className="metric-value">Sem limite</p>
             <p className="metric-footnote">{profileQuery.data?.license.planLabel ?? "Plano atual"}</p>
           </article>
         </div>
@@ -402,3 +396,4 @@ export function SharingClient() {
     </div>
   );
 }
+

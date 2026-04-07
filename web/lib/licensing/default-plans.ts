@@ -23,7 +23,7 @@ export const DEFAULT_PLAN_DEFINITIONS: PlanDefinition[] = [
     name: "Gratuito Essencial",
     tier: "free",
     description: "Plano base com limites reduzidos e recursos premium desativados.",
-    maxUsers: 1,
+    maxUsers: null,
     maxAccounts: 1,
     maxCards: 1,
     whatsappAssistant: false,
@@ -37,7 +37,7 @@ export const DEFAULT_PLAN_DEFINITIONS: PlanDefinition[] = [
     name: "Premium Completo",
     tier: "pro",
     description: "Plano completo com WhatsApp, automações e exportação em PDF.",
-    maxUsers: 10,
+    maxUsers: null,
     maxAccounts: null,
     maxCards: null,
     whatsappAssistant: true,
@@ -51,7 +51,7 @@ export const DEFAULT_PLAN_DEFINITIONS: PlanDefinition[] = [
     name: "Avaliação Premium 14 dias",
     tier: "pro",
     description: "Versão de avaliação com recursos premium liberados por 14 dias.",
-    maxUsers: 10,
+    maxUsers: null,
     maxAccounts: null,
     maxCards: null,
     whatsappAssistant: true,
@@ -125,9 +125,10 @@ export function applyPlanDefaultsToTenant(plan: {
 
   return {
     planId: plan.id,
-    maxUsers: plan.maxUsers,
+    maxUsers: null,
     trialStart: hasTrial ? now : null,
     trialDays: plan.trialDays,
     trialExpiresAt: hasTrial ? new Date(now.getTime() + plan.trialDays * 24 * 60 * 60 * 1000) : null
   };
 }
+

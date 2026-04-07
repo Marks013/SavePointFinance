@@ -174,10 +174,6 @@ export async function POST(request: Request) {
       );
     }
 
-    if (seatSummary.remainingSeats !== null && seatSummary.remainingSeats <= 0) {
-      return NextResponse.json({ message: "O limite de usuarios do plano atual foi atingido" }, { status: 409 });
-    }
-
     const body = sharingInviteSchema.parse(await request.json());
     const normalizedEmail = normalizeEmail(body.email);
     const existingUser = await prisma.user.findFirst({
@@ -363,3 +359,4 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ message: "Failed to update sharing access" }, { status: 400 });
   }
 }
+

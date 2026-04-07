@@ -44,18 +44,6 @@ export type TenantLicenseState = {
   features: Record<LicenseFeature, boolean>;
 };
 
-function resolveEffectiveUsers(tenantLimit: number | null, planLimit: number | null) {
-  if (tenantLimit === null || tenantLimit === undefined) {
-    return planLimit;
-  }
-
-  if (planLimit === null || planLimit === undefined) {
-    return Math.max(1, tenantLimit);
-  }
-
-  return Math.max(1, Math.min(planLimit, tenantLimit));
-}
-
 export function resolveTenantLicenseState(tenant: TenantLicenseTarget, now = new Date()): TenantLicenseState {
   const tier = tenant.planConfig.tier;
   const isExpired = Boolean(tenant.expiresAt && tenant.expiresAt < now);
@@ -90,7 +78,7 @@ export function resolveTenantLicenseState(tenant: TenantLicenseTarget, now = new
     isPremium: tier === "pro",
     isTrial,
     effectiveLimits: {
-      users: resolveEffectiveUsers(tenant.maxUsers, tenant.planConfig.maxUsers),
+      users: null,
       accounts: tenant.planConfig.maxAccounts,
       cards: tenant.planConfig.maxCards
     },
@@ -113,3 +101,4 @@ export function getLicenseBlockedReason(license: TenantLicenseState) {
 
   return null;
 }
+

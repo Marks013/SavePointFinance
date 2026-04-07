@@ -266,7 +266,6 @@ export function AdminClient() {
   const [newPlanSlug, setNewPlanSlug] = useState("");
   const [newPlanTier, setNewPlanTier] = useState<"free" | "pro">("free");
   const [newPlanDescription, setNewPlanDescription] = useState("");
-  const [newPlanMaxUsers, setNewPlanMaxUsers] = useState("");
   const [newPlanMaxAccounts, setNewPlanMaxAccounts] = useState("");
   const [newPlanMaxCards, setNewPlanMaxCards] = useState("");
   const [newPlanTrialDays, setNewPlanTrialDays] = useState("0");
@@ -481,7 +480,6 @@ export function AdminClient() {
           slug: newPlanSlug,
           tier: newPlanTier,
           description: newPlanDescription,
-          maxUsers: parseNullableLimit(newPlanMaxUsers),
           maxAccounts: parseNullableLimit(newPlanMaxAccounts),
           maxCards: parseNullableLimit(newPlanMaxCards),
           trialDays: Number(newPlanTrialDays) || 0,
@@ -501,7 +499,6 @@ export function AdminClient() {
       setNewPlanSlug("");
       setNewPlanTier("free");
       setNewPlanDescription("");
-      setNewPlanMaxUsers("");
       setNewPlanMaxAccounts("");
       setNewPlanMaxCards("");
       setNewPlanTrialDays("0");
@@ -562,7 +559,6 @@ export function AdminClient() {
                     ? { description: data.description === null ? null : String(data.description) }
                     : {}),
                   ...(data.tier !== undefined ? { tier: data.tier as "free" | "pro" } : {}),
-                  ...(data.maxUsers !== undefined ? { maxUsers: data.maxUsers as number | null } : {}),
                   ...(data.maxAccounts !== undefined ? { maxAccounts: data.maxAccounts as number | null } : {}),
                   ...(data.maxCards !== undefined ? { maxCards: data.maxCards as number | null } : {}),
                   ...(data.trialDays !== undefined ? { trialDays: Number(data.trialDays) } : {}),
@@ -628,7 +624,6 @@ export function AdminClient() {
     mutationFn: async ({
       id,
       planId,
-      maxUsers,
       isActive,
       trialDays,
       trialExpiresAt,
@@ -636,7 +631,6 @@ export function AdminClient() {
     }: {
       id: string;
       planId?: string;
-      maxUsers?: number | null;
       isActive?: boolean;
       trialDays?: number;
       trialExpiresAt?: string | null;
@@ -645,7 +639,7 @@ export function AdminClient() {
       const response = await fetch(`/api/admin/tenants/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planId, maxUsers, isActive, trialDays, trialExpiresAt, expiresAt })
+        body: JSON.stringify({ planId, isActive, trialDays, trialExpiresAt, expiresAt })
       });
       if (!response.ok) throw new Error("Falha ao atualizar tenant");
     },
@@ -821,7 +815,6 @@ export function AdminClient() {
                 type="number"
                 value={newPlanTrialDays}
               />
-              <Input onChange={(event) => setNewPlanMaxUsers(event.target.value)} placeholder="Limite de pessoas" value={newPlanMaxUsers} />
               <Input onChange={(event) => setNewPlanMaxAccounts(event.target.value)} placeholder="Limite de contas" value={newPlanMaxAccounts} />
               <Input onChange={(event) => setNewPlanMaxCards(event.target.value)} placeholder="Limite de cartões" value={newPlanMaxCards} />
               <Input
@@ -846,7 +839,7 @@ export function AdminClient() {
             </div>
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
               <p className="text-xs text-[var(--color-muted-foreground)]">
-                Limites vazios significam operação sem teto específico naquele item.
+                Limites vazios deixam contas e cartões sem teto específico; pessoas não têm limite por plano.
               </p>
               <Button
                 disabled={createPlanMutation.isPending || !newPlanName.trim()}
@@ -873,9 +866,6 @@ export function AdminClient() {
               <div className="mt-4 flex flex-wrap gap-2 text-xs text-[var(--color-muted-foreground)]">
                 <span className="rounded-full border border-[var(--color-border)] px-3 py-1">
                   {formatPlanLabel(plan.tier)}
-                </span>
-                <span className="rounded-full border border-[var(--color-border)] px-3 py-1">
-                  {plan.maxUsers === null ? "Pessoas livres" : `${plan.maxUsers} pessoas`}
                 </span>
                 <span className="rounded-full border border-[var(--color-border)] px-3 py-1">
                   {plan.trialDays > 0 ? `${plan.trialDays} dias de avaliação` : "Sem avaliação"}
@@ -924,17 +914,6 @@ export function AdminClient() {
                     variant="ghost"
                   >
                     Descrição
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      const nextMaxUsers = window.prompt(`Novo limite de pessoas para ${plan.name}`, plan.maxUsers?.toString() || "");
-                      if (nextMaxUsers === null) return;
-                      updatePlanMutation.mutate({ id: plan.id, data: { maxUsers: parseNullableLimit(nextMaxUsers) } });
-                    }}
-                    type="button"
-                    variant="ghost"
-                  >
-                    Pessoas
                   </Button>
                   <Button
                     onClick={() => {
@@ -1158,10 +1137,8 @@ export function AdminClient() {
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-semibold">
-                      {tenant.activeUsers}/{tenant.maxUsers ?? "livre"}
-                    </p>
-                    <p className="text-xs text-[var(--color-muted-foreground)]">pessoas ativas / limite</p>
+                    <p className="text-sm font-semibold">{tenant.activeUsers}</p>
+                    <p className="text-xs text-[var(--color-muted-foreground)]">pessoas ativas</p>
                   </div>
                 </div>
                 <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
@@ -1208,17 +1185,6 @@ export function AdminClient() {
                     variant="ghost"
                   >
                     Avaliação
-                  </Button>
-                  <Button
-                      onClick={() => {
-                        const nextMaxUsers = window.prompt(`Novo limite de pessoas para ${tenant.name}`, tenant.maxUsers?.toString() || "");
-                      if (nextMaxUsers === null) return;
-                      updateTenantMutation.mutate({ id: tenant.id, maxUsers: parseNullableLimit(nextMaxUsers) });
-                    }}
-                    type="button"
-                    variant="ghost"
-                  >
-                    Limite
                   </Button>
                   <Button
                     onClick={() => {
@@ -1502,8 +1468,7 @@ export function AdminClient() {
                   return (
                     <p className="text-xs text-[var(--color-muted-foreground)]">
                       A pessoa convidada entrará na conta <strong>{selectedTenant.name}</strong> com plano{" "}
-                      <strong>{selectedTenant.planName}</strong> e limite atual {selectedTenant.activeUsers}/
-                      {selectedTenant.maxUsers ?? "livre"} pessoas.
+                      <strong>{selectedTenant.planName}</strong>. Pessoas não têm limite por plano.
                     </p>
                   );
                 })()}
@@ -1690,3 +1655,5 @@ export function AdminClient() {
     </div>
   );
 }
+
+
