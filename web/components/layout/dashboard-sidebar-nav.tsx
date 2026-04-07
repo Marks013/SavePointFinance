@@ -101,35 +101,44 @@ export function DashboardSidebarNav({ isAdmin, isPlatformAdmin }: DashboardSideb
   return (
     <>
       <section className="mb-5 rounded-[22px] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-muted)_48%,var(--color-card))] p-3.5">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-[var(--color-muted-foreground)]">
-              Competência global
-            </p>
-            <p aria-live="polite" className="mt-1 truncate text-sm font-semibold text-[var(--color-foreground)]">
-              {formatMonthKeyLabel(month)}
-            </p>
-          </div>
-          <span className="shrink-0 rounded-full border border-[var(--color-border)] px-2.5 py-1 text-[0.68rem] font-semibold text-[var(--color-muted-foreground)]">
-            Global
-          </span>
-        </div>
+        <p className="text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-[var(--color-muted-foreground)]">
+          Competência global
+        </p>
+        <p aria-live="polite" className="mt-1 text-sm font-semibold leading-5 text-[var(--color-foreground)]">
+          {formatMonthKeyLabel(month)}
+        </p>
 
         <p className="mt-2 text-xs leading-5 text-[var(--color-muted-foreground)]">
           Aplica o mês ativo ao painel, transações, assinaturas, parcelas e relatórios.
         </p>
 
-        <form
-          className="mt-3 grid gap-2"
-          onSubmit={(event) => {
-            event.preventDefault();
-            commitMonth(draftMonth);
-          }}
-        >
-          <div className="grid grid-cols-[2.65rem_minmax(0,1fr)_2.65rem] items-center gap-2">
+        <div className="mt-3 grid gap-2">
+          <Input
+            aria-label="Selecionar competência global"
+            className="h-11 w-full min-w-0 px-3 text-center text-[0.9rem]"
+            disabled={isPending}
+            id="global-month"
+            type="month"
+            value={draftMonth}
+            onBlur={() => {
+              if (!isValidMonthKey(draftMonth)) {
+                setDraftMonth(month);
+              }
+            }}
+            onChange={(event) => {
+              const nextMonth = event.target.value;
+              setDraftMonth(nextMonth);
+
+              if (isValidMonthKey(nextMonth)) {
+                commitMonth(nextMonth);
+              }
+            }}
+          />
+
+          <div className="grid grid-cols-2 gap-2">
             <Button
               aria-label="Competência anterior"
-              className="h-11 w-11 rounded-[1rem] px-0"
+              className="h-10 rounded-[1rem] px-0"
               disabled={isPending}
               type="button"
               variant="secondary"
@@ -139,24 +148,9 @@ export function DashboardSidebarNav({ isAdmin, isPlatformAdmin }: DashboardSideb
             >
               <ChevronLeft className="size-4" />
             </Button>
-            <Input
-              aria-label="Selecionar competência global"
-              className="min-w-0 px-2 text-center text-[0.82rem]"
-              id="global-month"
-              type="month"
-              value={draftMonth}
-              onBlur={() => {
-                if (!isValidMonthKey(draftMonth)) {
-                  setDraftMonth(month);
-                }
-              }}
-              onChange={(event) => {
-                setDraftMonth(event.target.value);
-              }}
-            />
             <Button
               aria-label="Próxima competência"
-              className="h-11 w-11 rounded-[1rem] px-0"
+              className="h-10 rounded-[1rem] px-0"
               disabled={isPending}
               type="button"
               variant="secondary"
@@ -167,16 +161,7 @@ export function DashboardSidebarNav({ isAdmin, isPlatformAdmin }: DashboardSideb
               <ChevronRight className="size-4" />
             </Button>
           </div>
-
-          <Button
-            className="h-10 w-full rounded-[1rem] px-3 text-xs"
-            disabled={!isValidMonthKey(draftMonth) || isPending}
-            type="submit"
-            variant="secondary"
-          >
-            {isPending ? "Aplicando..." : draftMonth === month ? "Atualizar competência" : "Aplicar competência"}
-          </Button>
-        </form>
+        </div>
       </section>
 
       <div className="mb-3 flex items-center justify-between gap-3 px-1">
