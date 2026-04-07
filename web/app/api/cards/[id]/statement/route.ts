@@ -3,7 +3,7 @@ import { Prisma } from "@prisma/client";
 import { z } from "zod";
 
 import { requireSessionUser } from "@/lib/auth/session";
-import { getCardStatementSnapshot } from "@/lib/cards/statement";
+import { getCardStatementSnapshot, statementMonthSchema } from "@/lib/cards/statement";
 import { prisma } from "@/lib/prisma/client";
 
 type Params = {
@@ -11,7 +11,7 @@ type Params = {
 };
 
 const statementQuerySchema = z.object({
-  month: z.string().optional(),
+  month: statementMonthSchema.optional(),
   limit: z.coerce.number().int().min(10).max(200).default(50)
 });
 
@@ -21,10 +21,9 @@ export async function GET(request: Request, context: Params) {
     const { id } = await context.params;
     const { searchParams } = new URL(request.url);
     const query = statementQuerySchema.parse({
-      month: searchParams.get("month") ?? new Date().toISOString().slice(0, 7),
+      month: searchParams.get("month") ?? undefined,
       limit: searchParams.get("limit") ?? 50
     });
-    const month = query.month ?? new Date().toISOString().slice(0, 7);
 
     const card = await prisma.card.findFirst({
       where: {
@@ -40,7 +39,7 @@ export async function GET(request: Request, context: Params) {
     const statement = await getCardStatementSnapshot({
       tenantId: user.tenantId,
       card,
-      month,
+      month: query.month,
       client: prisma
     });
 
@@ -90,7 +89,7 @@ export async function GET(request: Request, context: Params) {
           tenantId_cardId_month: {
             tenantId: user.tenantId,
             cardId: id,
-            month
+            month: statement.month
           }
         },
         include: {
@@ -109,7 +108,7 @@ export async function GET(request: Request, context: Params) {
         closeDay: card.closeDay,
         dueDay: card.dueDay
       },
-      month,
+      month: statement.month,
       summary: {
         totalAmount: statement.totalAmount,
         availableLimit: statement.availableLimit,

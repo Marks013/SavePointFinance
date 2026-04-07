@@ -2,7 +2,6 @@ import { NotificationChannel, PaymentMethod, TransactionSource, TransactionType 
 
 import { deliverNotification } from "@/lib/notifications/delivery";
 import {
-  getCardExpenseDueDate,
   getCardStatementSnapshot,
   getCurrentStatementMonth,
   getStatementPaymentDate
@@ -168,9 +167,7 @@ export async function generateSubscriptionTransaction(subscriptionId: string, te
     where: {
       tenantId,
       subscriptionId: subscription.id,
-      date: subscription.card
-        ? getCardExpenseDueDate(subscription.card, subscription.nextBillingDate)
-        : subscription.nextBillingDate
+      date: subscription.nextBillingDate
     },
     select: {
       id: true
@@ -190,9 +187,7 @@ export async function generateSubscriptionTransaction(subscriptionId: string, te
       tenantId,
       userId: subscription.userId ?? userId,
       subscriptionId: subscription.id,
-      date: subscription.card
-        ? getCardExpenseDueDate(subscription.card, subscription.nextBillingDate)
-        : subscription.nextBillingDate,
+      date: subscription.nextBillingDate,
       amount: subscription.amount,
       description: `Assinatura: ${subscription.name}`,
       type: subscription.type === "income" ? TransactionType.income : TransactionType.expense,
