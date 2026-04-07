@@ -9,6 +9,7 @@ import {
 import { getFinanceReport } from "@/lib/finance/reports";
 import { ensureTitheCategory, getMonthKey, syncMonthlyTitheTransaction } from "@/lib/finance/tithe";
 import { prisma } from "@/lib/prisma/client";
+import { formatDateKey } from "@/lib/date";
 import { addMonthsClamped, formatCurrency } from "@/lib/utils";
 
 function startOfDay(date: Date) {
@@ -656,13 +657,13 @@ export async function runRecurringAutomation(tenantId: string, userId: string) {
 
   if (tenantUser.preferences?.monthlyReports) {
     const reportDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const monthToken = reportDate.toISOString().slice(0, 7);
+    const monthToken = formatDateKey(reportDate).slice(0, 7);
     const subject = `Relatório mensal ${reportDate.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}`;
     const report = await getFinanceReport(
       tenantId,
       {
         from: `${monthToken}-01`,
-        to: new Date(reportDate.getFullYear(), reportDate.getMonth() + 1, 0).toISOString().slice(0, 10)
+        to: formatDateKey(new Date(reportDate.getFullYear(), reportDate.getMonth() + 1, 0))
       }
     );
     const message =

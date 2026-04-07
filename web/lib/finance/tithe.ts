@@ -2,11 +2,12 @@ import { Prisma, type PrismaClient } from "@prisma/client";
 
 import { buildCategoryKeywords, defaultCategories } from "@/lib/finance/default-categories";
 import { prisma } from "@/lib/prisma/client";
+import { formatDateKey } from "@/lib/date";
 
 type TitheClient = Pick<PrismaClient, "category" | "transaction">;
 
 export function getMonthKey(date: Date) {
-  return date.toISOString().slice(0, 7);
+  return formatDateKey(date).slice(0, 7);
 }
 
 function getMonthRange(monthKey: string) {

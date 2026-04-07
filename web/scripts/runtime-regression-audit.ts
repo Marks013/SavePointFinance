@@ -199,12 +199,14 @@ async function createUser(data: {
 
 async function run() {
   const { prisma } = await import("@/lib/prisma/client");
-  const { ensureDefaultPlans } = await import("@/lib/licensing/default-plans");
+  const { ensureDefaultPlans, getDefaultPlanBySlug } = await import("@/lib/licensing/default-plans");
   assertCondition(adminEmail, "ADMIN_EMAIL não definido");
   assertCondition(adminPassword, "ADMIN_PASSWORD não definido");
 
   await prisma.$connect();
   await ensureDefaultPlans(prisma);
+  const premiumPlan = await getDefaultPlanBySlug(prisma, "premium-completo");
+  assertCondition(premiumPlan, "Plano premium padrao nao encontrado");
 
   const unique = Date.now().toString(36);
   const createdTenantIds: string[] = [];
@@ -390,7 +392,8 @@ async function run() {
         tenantId: memberAuditTenant.id,
         email: invitationEmail,
         name: "Pessoa Convidada",
-        role: "member"
+        role: "member",
+        planId: premiumPlan.id
       })
     });
     assertCondition(invitationCreate.status === 201, `Criação de convite respondeu ${invitationCreate.status}`);
@@ -423,7 +426,19 @@ async function run() {
       })
     });
     assertCondition(validAccept.status === 200, `Aceite válido do convite respondeu ${validAccept.status}`);
-    results.push("Convite informa erro de senha divergente e aceita senha correta");
+    const acceptedInvitation = await prisma.invitation.findUniqueOrThrow({
+      where: { token: token! },
+      select: { kind: true, tenantId: true }
+    });
+    createdTenantIds.push(acceptedInvitation.tenantId);
+    assertCondition(acceptedInvitation.kind === "admin_isolated", "Convite do Admin nao foi criado como carteira isolada");
+
+    const invitedUserJar = await signIn(invitationEmail, "Senha123!");
+    const isolatedAccounts = await getJson<{ items: Array<{ id: string }> }>(invitedUserJar, "/api/accounts");
+    const isolatedCards = await getJson<{ items: Array<{ id: string }> }>(invitedUserJar, "/api/cards");
+    assertCondition(isolatedAccounts.status === 200 && isolatedAccounts.payload.items.length === 0, "Convite do Admin herdou contas indevidamente");
+    assertCondition(isolatedCards.status === 200 && isolatedCards.payload.items.length === 0, "Convite do Admin herdou cartoes indevidamente");
+    results.push("Convite do Admin exige senha valida e cria carteira isolada vazia");
 
     const existingUserTenant = await createTenant(`Conta existente ${unique}`, `conta-existente-${unique}`);
     createdTenantIds.push(existingUserTenant.id);
@@ -441,7 +456,8 @@ async function run() {
         tenantId: memberAuditTenant.id,
         email: existingUser.email,
         name: "Pessoa Existente",
-        role: "member"
+        role: "member",
+        planId: premiumPlan.id
       })
     });
     assertCondition(
@@ -468,31 +484,32 @@ async function run() {
     assertCondition(existingAccept.status === 200, `Aceite para usuário existente respondeu ${existingAccept.status}`);
     assertCondition(
       existingAcceptPayload.user?.linkedExistingAccount === true,
-      "Usuário existente não foi vinculado à conta compartilhada"
+      "Usuario existente nao foi vinculado ao convite administrativo"
     );
     const existingUserAfterAccept = await prisma.user.findUniqueOrThrow({
       where: { id: existingUser.id },
       select: { tenantId: true }
     });
     assertCondition(
-      existingUserAfterAccept.tenantId === memberAuditTenant.id,
+      existingUserAfterAccept.tenantId !== memberAuditTenant.id,
       "Usuário existente não foi movido para a conta convidada"
     );
-    results.push("Usuário já existente sem carteira própria pode entrar em conta compartilhada");
+    results.push("Usuario ja existente sem carteira propria entra em carteira isolada pelo Admin");
 
+    createdTenantIds.push(existingUserAfterAccept.tenantId);
     const existingUserJar = await signIn(existingUser.email, "NovaSenha123!");
     const sharedAccounts = await getJson<{ items: Array<{ id: string; name: string }> }>(existingUserJar, "/api/accounts");
     assertCondition(sharedAccounts.status === 200, `Listagem de contas compartilhadas respondeu ${sharedAccounts.status}`);
     assertCondition(
-      sharedAccounts.payload.items.some((item) => item.id === accountCreate.payload.id),
-      "Colaborador não enxerga a conta já existente da carteira compartilhada"
+      !sharedAccounts.payload.items.some((item) => item.id === accountCreate.payload.id),
+      "Usuario convidado pelo Admin enxergou conta de outra carteira"
     );
 
     const sharedCards = await getJson<{ items: Array<{ id: string; name: string }> }>(existingUserJar, "/api/cards");
     assertCondition(sharedCards.status === 200, `Listagem de cartões compartilhados respondeu ${sharedCards.status}`);
     assertCondition(
-      sharedCards.payload.items.some((item) => item.id === cardCreate.payload.id),
-      "Colaborador não enxerga o cartão já existente da carteira compartilhada"
+      !sharedCards.payload.items.some((item) => item.id === cardCreate.payload.id),
+      "Usuario convidado pelo Admin enxergou cartao de outra carteira"
     );
 
     const sharedTransactions = await getJson<{ items: Array<{ id: string; description: string }> }>(
@@ -501,8 +518,8 @@ async function run() {
     );
     assertCondition(sharedTransactions.status === 200, `Listagem de transações compartilhadas respondeu ${sharedTransactions.status}`);
     assertCondition(
-      sharedTransactions.payload.items.some((item) => item.id === decimalAmount.payload.id),
-      "Colaborador não enxerga transações já registradas na carteira compartilhada"
+      !sharedTransactions.payload.items.some((item) => item.id === decimalAmount.payload.id),
+      "Usuario convidado pelo Admin enxergou transacao de outra carteira"
     );
 
     const collaboratorAccount = await getJson<{ id: string }>(existingUserJar, "/api/accounts", {
@@ -521,8 +538,8 @@ async function run() {
 
     const ownerVisibleAccounts = await getJson<{ items: Array<{ id: string; name: string }> }>(memberJar, "/api/accounts");
     assertCondition(
-      ownerVisibleAccounts.payload.items.some((item) => item.id === collaboratorAccount.payload.id),
-      "Titular não enxerga conta criada pelo colaborador"
+      !ownerVisibleAccounts.payload.items.some((item) => item.id === collaboratorAccount.payload.id),
+      "Titular enxergou conta criada em carteira isolada do convidado"
     );
 
     const collaboratorGoal = await getJson<{ id: string }>(existingUserJar, "/api/goals", {
@@ -542,10 +559,10 @@ async function run() {
 
     const ownerGoals = await getJson<{ items: Array<{ id: string; name: string }> }>(memberJar, "/api/goals");
     assertCondition(
-      ownerGoals.payload.items.some((item) => item.id === collaboratorGoal.payload.id),
-      "Titular não enxerga meta criada pelo colaborador"
+      !ownerGoals.payload.items.some((item) => item.id === collaboratorGoal.payload.id),
+      "Titular enxergou meta criada em carteira isolada do convidado"
     );
-    results.push("Titular e colaborador enxergam a mesma carteira financeira compartilhada");
+    results.push("Convite administrativo nao compartilha contas, cartoes, transacoes ou metas de outra carteira");
 
     const blockedUserTenant = await createTenant(`Conta bloqueada ${unique}`, `conta-bloqueada-${unique}`);
     createdTenantIds.push(blockedUserTenant.id);
@@ -574,7 +591,8 @@ async function run() {
         tenantId: memberAuditTenant.id,
         email: blockedUser.email,
         name: "Pessoa Bloqueada",
-        role: "member"
+        role: "member",
+        planId: premiumPlan.id
       })
     });
     assertCondition(blockedInvite.status === 409, `Convite para usuário com dados próprios respondeu ${blockedInvite.status}`);

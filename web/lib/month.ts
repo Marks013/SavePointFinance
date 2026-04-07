@@ -1,5 +1,13 @@
 const monthKeyPattern = /^\d{4}-(0[1-9]|1[0-2])$/;
 
+function formatDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
 export function getCurrentMonthKey(referenceDate = new Date()) {
   const year = referenceDate.getFullYear();
   const month = String(referenceDate.getMonth() + 1).padStart(2, "0");
@@ -24,8 +32,8 @@ export function getMonthRange(monthKey: string) {
   return {
     start,
     end,
-    from: start.toISOString().slice(0, 10),
-    to: end.toISOString().slice(0, 10)
+    from: formatDateKey(start),
+    to: formatDateKey(end)
   };
 }
 

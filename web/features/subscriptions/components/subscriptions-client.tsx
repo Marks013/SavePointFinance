@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { subscriptionFormSchema, type SubscriptionFormValues } from "@/features/subscriptions/schemas/subscription-schema";
+import { formatDateKey } from "@/lib/date";
 import {
   findSubscriptionServicePreset,
   subscriptionServicePresets,
@@ -130,7 +131,7 @@ export function SubscriptionsClient() {
       categoryId: "",
       accountId: "",
       cardId: "",
-      nextBillingDate: new Date().toISOString().slice(0, 10),
+      nextBillingDate: formatDateKey(new Date()),
       type: "expense",
       isActive: true,
       autoTithe: false
@@ -206,7 +207,7 @@ export function SubscriptionsClient() {
       categoryId: item.category?.id ?? "",
       accountId: item.account?.id ?? "",
       cardId: item.card?.id ?? "",
-      nextBillingDate: new Date(item.nextBillingDate).toISOString().slice(0, 10),
+      nextBillingDate: formatDateKey(new Date(item.nextBillingDate)),
       type: item.type,
       isActive: item.isActive,
       autoTithe: item.autoTithe
@@ -222,7 +223,7 @@ export function SubscriptionsClient() {
       categoryId: "",
       accountId: "",
       cardId: "",
-      nextBillingDate: new Date().toISOString().slice(0, 10),
+      nextBillingDate: formatDateKey(new Date()),
       type: "expense",
       isActive: true,
       autoTithe: false
@@ -230,6 +231,8 @@ export function SubscriptionsClient() {
   };
 
   const selectedType = form.watch("type");
+  const selectedAccountId = form.watch("accountId");
+  const selectedCardId = form.watch("cardId");
   const filteredCategories = (categoriesQuery.data?.items ?? []).filter((item) => item.type === selectedType);
   const isEditing = editingId !== null;
   const selectedName = form.watch("name");
@@ -237,6 +240,17 @@ export function SubscriptionsClient() {
     (categoriesQuery.data?.items ?? []).find(
       (item) => item.type === "expense" && item.name === "Streaming e assinaturas"
     )?.id ?? "";
+
+  useEffect(() => {
+    if (selectedType === "income" && selectedCardId) {
+      form.setValue("cardId", "");
+      return;
+    }
+
+    if (selectedCardId && selectedAccountId) {
+      form.setValue("accountId", "");
+    }
+  }, [form, selectedAccountId, selectedCardId, selectedType]);
 
   const applyServicePreset = (preset: SubscriptionServicePreset) => {
     const currentValues = form.getValues();
@@ -296,6 +310,9 @@ export function SubscriptionsClient() {
             <div className="space-y-2">
               <Label htmlFor="sub-next">{selectedType === "income" ? "Próximo recebimento" : "Próxima cobrança"}</Label>
               <Input id="sub-next" type="date" {...form.register("nextBillingDate")} />
+              {form.formState.errors.nextBillingDate ? (
+                <p className="text-sm text-[var(--color-destructive)]">{form.formState.errors.nextBillingDate.message}</p>
+              ) : null}
             </div>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
@@ -325,6 +342,9 @@ export function SubscriptionsClient() {
                   <option key={item.id} value={item.id}>{item.name}</option>
                 ))}
               </Select>
+              {form.formState.errors.accountId ? (
+                <p className="text-sm text-[var(--color-destructive)]">{form.formState.errors.accountId.message}</p>
+              ) : null}
             </div>
             <div className="space-y-2">
               <Label htmlFor="sub-card">Cartão</Label>
@@ -334,6 +354,9 @@ export function SubscriptionsClient() {
                   <option key={item.id} value={item.id}>{item.name}</option>
                 ))}
               </Select>
+              {form.formState.errors.cardId ? (
+                <p className="text-sm text-[var(--color-destructive)]">{form.formState.errors.cardId.message}</p>
+              ) : null}
             </div>
           </div>
           {selectedType === "income" ? (

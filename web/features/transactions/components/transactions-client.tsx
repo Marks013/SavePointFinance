@@ -13,6 +13,7 @@ import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { formatDateKey } from "@/lib/date";
 import { formatMonthKeyLabel, getMonthRange, normalizeMonthKey } from "@/lib/month";
 import { cn, formatCurrency } from "@/lib/utils";
 import {
@@ -246,7 +247,7 @@ export function TransactionsClient() {
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionFormSchema),
     defaultValues: {
-      date: new Date().toISOString().slice(0, 10),
+      date: formatDateKey(new Date()),
       amount: 0,
       description: "",
       type: "expense",
@@ -284,7 +285,7 @@ export function TransactionsClient() {
       setEditingScope("single");
       setEditingInstallmentsTotal(1);
       form.reset({
-        date: new Date().toISOString().slice(0, 10),
+        date: formatDateKey(new Date()),
         amount: 0,
         description: "",
         type: "expense",
@@ -325,7 +326,7 @@ export function TransactionsClient() {
       if (editingId) {
         setEditingId(null);
         form.reset({
-          date: new Date().toISOString().slice(0, 10),
+          date: formatDateKey(new Date()),
           amount: 0,
           description: "",
           type: "expense",
@@ -387,7 +388,7 @@ export function TransactionsClient() {
     setEditingScope("single");
     setEditingInstallmentsTotal(transaction.installmentsTotal);
     form.reset({
-      date: new Date(transaction.date).toISOString().slice(0, 10),
+      date: formatDateKey(new Date(transaction.date)),
       amount: transaction.amount,
       description: getBaseInstallmentDescription(transaction.description),
       type: transaction.type,
@@ -407,7 +408,7 @@ export function TransactionsClient() {
     setEditingScope("single");
     setEditingInstallmentsTotal(1);
     form.reset({
-      date: new Date().toISOString().slice(0, 10),
+      date: formatDateKey(new Date()),
       amount: 0,
       description: "",
       type: "expense",

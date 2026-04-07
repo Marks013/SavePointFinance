@@ -1,12 +1,14 @@
 import { z } from "zod";
 
+import { dateKeySchema, optionalDateKeySchema } from "@/lib/date";
+
 export const transactionTypeValues = ["income", "expense", "transfer"] as const;
 export const paymentMethodValues = ["pix", "money", "credit_card", "debit_card", "transfer"] as const;
 export const transactionEditScopeValues = ["single", "group"] as const;
 
 export const transactionFormSchema = z
   .object({
-    date: z.string().min(1, "Informe a data"),
+    date: dateKeySchema,
     amount: z.coerce.number().positive("Informe um valor maior que zero"),
     description: z.string().trim().min(3, "Informe uma descricao"),
     type: z.enum(transactionTypeValues),
@@ -116,8 +118,8 @@ export const transactionFormSchema = z
 
 export const transactionFiltersSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
-  from: z.string().optional().nullable(),
-  to: z.string().optional().nullable(),
+  from: optionalDateKeySchema,
+  to: optionalDateKeySchema,
   type: z.enum(transactionTypeValues).optional().nullable(),
   categoryId: z.string().optional().nullable(),
   accountId: z.string().optional().nullable(),

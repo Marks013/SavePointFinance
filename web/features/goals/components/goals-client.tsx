@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { PresetChip } from "@/components/ui/preset-chip";
 import { Select } from "@/components/ui/select";
 import { goalFormSchema, type GoalFormValues } from "@/features/goals/schemas/goal-schema";
+import { formatDateKey } from "@/lib/date";
 import { categoryColorPresets, findPreset } from "@/lib/finance/presets";
 import { formatCurrency } from "@/lib/utils";
 
@@ -148,7 +149,7 @@ export function GoalsClient() {
       name: goal.name,
       targetAmount: goal.targetAmount,
       currentAmount: goal.currentAmount,
-      deadline: goal.deadline ? new Date(goal.deadline).toISOString().slice(0, 10) : "",
+      deadline: goal.deadline ? formatDateKey(new Date(goal.deadline)) : "",
       color: goal.color,
       icon: goal.icon ?? "",
       accountId: goal.account?.id ?? ""
