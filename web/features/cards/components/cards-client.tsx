@@ -186,6 +186,10 @@ export function CardsClient() {
     }),
     [cards]
   );
+  const usedLimitPercentage = useMemo(
+    () => (totalLimit > 0 ? Math.round((totalStatement / totalLimit) * 100) : 0),
+    [totalLimit, totalStatement]
+  );
   const statementQuery = useQuery({
     queryKey: ["card-statement", selectedStatementCardId, statementMonth, statementItemsLimit],
     queryFn: async () => {
@@ -502,7 +506,7 @@ export function CardsClient() {
               Acompanhe o limite total, a soma das faturas abertas e a utilização consolidada.
             </p>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-3">
             <article className="metric-card">
               <p className="metric-label">Limite total</p>
               <p className="metric-value">{formatCurrency(totalLimit)}</p>
@@ -510,6 +514,10 @@ export function CardsClient() {
             <article className="metric-card">
               <p className="metric-label">Fatura aberta</p>
               <p className="metric-value">{formatCurrency(totalStatement)}</p>
+            </article>
+            <article className="metric-card">
+              <p className="metric-label">Limites usados</p>
+              <p className="metric-value">{usedLimitPercentage}%</p>
             </article>
           </div>
         </div>

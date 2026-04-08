@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { addMonthsToMonthKey, formatMonthKeyLabel, getCurrentMonthKey, isValidMonthKey, normalizeMonthKey } from "@/lib/month";
 import { cn } from "@/lib/utils";
 
@@ -113,11 +113,12 @@ export function DashboardSidebarNav({ canManageSharing, isPlatformAdmin }: Dashb
         </p>
 
         <div className="mt-3 grid gap-2">
-          <Input
+          <DatePickerInput
             aria-label="Selecionar competência global"
             className="h-11 w-full min-w-0 px-3 text-center text-[0.9rem]"
             disabled={isPending}
             id="global-month"
+            monthDisplayMode="compact"
             type="month"
             value={draftMonth}
             onBlur={() => {

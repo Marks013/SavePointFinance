@@ -4,32 +4,36 @@ import { CalendarDays } from "lucide-react";
 import { forwardRef, useMemo, useRef } from "react";
 import type { InputHTMLAttributes } from "react";
 
-import { formatMonthKeyLabel } from "@/lib/month";
+import { formatMonthKeyCompactLabel, formatMonthKeyLabel } from "@/lib/month";
 import { cn } from "@/lib/utils";
 import { formatDateDisplay } from "@/lib/date";
 
 type DatePickerInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type"> & {
   type?: "date" | "month";
+  monthDisplayMode?: "long" | "compact";
 };
 
-function formatDisplayValue(type: "date" | "month", value?: string) {
+function formatDisplayValue(type: "date" | "month", value?: string, monthDisplayMode: "long" | "compact" = "long") {
   if (!value) {
     return type === "month" ? "Selecione a competência" : "Selecione a data";
   }
 
   if (type === "month") {
-    return formatMonthKeyLabel(value);
+    return monthDisplayMode === "compact" ? formatMonthKeyCompactLabel(value) : formatMonthKeyLabel(value);
   }
 
   return formatDateDisplay(new Date(`${value}T12:00:00`));
 }
 
 export const DatePickerInput = forwardRef<HTMLInputElement, DatePickerInputProps>(function DatePickerInput(
-  { className, disabled, readOnly, type = "date", value, ...props },
+  { className, disabled, readOnly, type = "date", value, monthDisplayMode = "long", ...props },
   ref
 ) {
   const innerRef = useRef<HTMLInputElement | null>(null);
-  const displayValue = useMemo(() => formatDisplayValue(type, typeof value === "string" ? value : ""), [type, value]);
+  const displayValue = useMemo(
+    () => formatDisplayValue(type, typeof value === "string" ? value : "", monthDisplayMode),
+    [monthDisplayMode, type, value]
+  );
 
   const setRefs = (node: HTMLInputElement | null) => {
     innerRef.current = node;
