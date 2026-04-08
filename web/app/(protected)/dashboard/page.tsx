@@ -123,6 +123,11 @@ async function getDashboardData(tenantId: string, month: string) {
       };
     });
 
+    const monthlyCardPayments = monthlyReport.upcoming
+      .filter((item) => item.source === "card_statement")
+      .reduce((sum, item) => sum + item.amount, 0);
+    const projectedMonthNet = monthlyReport.projection.income - monthlyReport.projection.expense;
+
     return {
       balance: accounts.filter((account) => account.isActive).reduce((sum, account) => sum + account.currentBalance, 0),
       income: monthlyReport.summary.income,
@@ -131,6 +136,8 @@ async function getDashboardData(tenantId: string, month: string) {
       classification: monthlyReport.classification,
       spendingInsights: monthlyReport.spendingInsights,
       projection: monthlyReport.projection,
+      monthlyCardPayments,
+      projectedMonthNet,
       upcomingProjection: monthlyReport.upcoming.slice(0, 5),
       goals: Number(goals._sum.currentAmount ?? 0),
       recentTransactions: recentTransactions
@@ -175,6 +182,8 @@ async function getDashboardData(tenantId: string, month: string) {
         cardPayments: 0,
         net: 0
       },
+      monthlyCardPayments: 0,
+      projectedMonthNet: 0,
       upcomingProjection: [],
       goals: 0,
       recentTransactions: [],
@@ -258,7 +267,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         <article className="surface-strong rounded-[34px] p-6 md:p-8">
           <div className="section-stack">
             <div>
-              <p className="metric-label text-white/78">Foco imediato</p>
+              <p className="metric-label text-white/78">Caixa disponível</p>
               <h2
                 className={`mt-4 whitespace-nowrap text-[clamp(2rem,4vw,3.2rem)] font-semibold tracking-[-0.07em] ${
                   data.balance < 0 ? "amount-negative" : "text-white"
@@ -276,17 +285,17 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               <div className="rounded-[24px] border border-white/12 bg-white/8 px-4 py-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-white/66">Faturas a vencer</p>
                 <p className="mt-2 whitespace-nowrap text-2xl font-semibold tracking-[-0.05em] text-white">
-                  {formatCurrency(data.projection.cardPayments)}
+                  {formatCurrency(data.monthlyCardPayments)}
                 </p>
               </div>
               <div className="rounded-[24px] border border-white/12 bg-white/8 px-4 py-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-white/66">Projeção do mês</p>
                 <p
                   className={`mt-2 whitespace-nowrap text-2xl font-semibold tracking-[-0.05em] ${
-                    data.projection.net < 0 ? "amount-negative" : "text-white"
+                    data.projectedMonthNet < 0 ? "amount-negative" : "text-white"
                   }`}
                 >
-                  {formatCurrency(data.projection.net)}
+                  {formatCurrency(data.projectedMonthNet)}
                 </p>
               </div>
             </div>

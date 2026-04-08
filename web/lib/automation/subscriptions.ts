@@ -241,12 +241,15 @@ export async function syncDueSubscriptionTransactions({
   userId: string;
   now?: Date;
 }) {
+  const dueThreshold = new Date(now);
+  dueThreshold.setHours(23, 59, 59, 999);
+
   const dueSubscriptions = await prisma.subscription.findMany({
     where: {
       tenantId,
       isActive: true,
       nextBillingDate: {
-        lte: now
+        lte: dueThreshold
       }
     },
     orderBy: {
@@ -268,7 +271,7 @@ export async function syncDueSubscriptionTransactions({
         }
       });
 
-      if (!freshSubscription || freshSubscription.nextBillingDate > now) {
+      if (!freshSubscription || freshSubscription.nextBillingDate > dueThreshold) {
         break;
       }
 

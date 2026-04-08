@@ -633,7 +633,8 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
       income: projection.income,
       expense: projection.expense,
       cardPayments: projection.cardPayments,
-      net: currentBalance + projection.income - projection.expense
+      net: projection.income - projection.expense,
+      endingBalance: currentBalance + projection.income - projection.expense
     },
     filters,
     monthly: Array.from(monthlyMap.entries()).map(([label, values]) => ({

@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
@@ -167,6 +167,7 @@ export function CardsClient() {
   const searchParams = useSearchParams();
   const month = normalizeMonthKey(searchParams.get("month"));
   const [editingId, setEditingId] = useState<string | null>(null);
+  const formSectionRef = useRef<HTMLElement | null>(null);
   const [selectedStatementCardId, setSelectedStatementCardId] = useState<string>("");
   const [statementMonth, setStatementMonth] = useState(month);
   const [statementPaymentAccountId, setStatementPaymentAccountId] = useState<string>("");
@@ -314,9 +315,22 @@ export function CardsClient() {
     setStatementMonth(month);
   }, [month]);
 
+  useEffect(() => {
+    if (!editingId) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      formSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      document.getElementById("card-name")?.focus();
+    }, 80);
+
+    return () => window.clearTimeout(timeout);
+  }, [editingId]);
+
   return (
     <div className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
-      <section className="surface content-section">
+      <section className="surface content-section" ref={formSectionRef}>
         <div className="eyebrow">Cartões</div>
         <h1 className="mt-3 text-3xl font-semibold tracking-[-0.03em]">
           {isEditing ? "Editar cartão" : "Novo cartão"}
@@ -560,7 +574,7 @@ export function CardsClient() {
                   <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted-foreground)]">
                     Fatura aberta
                   </p>
-                  <p className="mt-2 whitespace-nowrap text-lg font-semibold text-[var(--color-foreground)]">
+                  <p className="mt-2 break-words text-lg font-semibold text-[var(--color-foreground)]">
                     {formatCurrency(card.statementAmount)}
                   </p>
                   <p className="mt-2 text-xs text-[var(--color-muted-foreground)]">
@@ -572,7 +586,7 @@ export function CardsClient() {
                     Disponível
                   </p>
                   <p
-                    className={`mt-2 whitespace-nowrap text-lg font-semibold ${card.availableLimit < 0 ? "amount-negative" : "text-[var(--color-foreground)]"}`}
+                    className={`mt-2 break-words text-lg font-semibold ${card.availableLimit < 0 ? "amount-negative" : "text-[var(--color-foreground)]"}`}
                   >
                     {formatCurrency(card.availableLimit)}
                   </p>
@@ -584,7 +598,7 @@ export function CardsClient() {
                   <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted-foreground)]">
                     Em aberto
                   </p>
-                  <p className="mt-2 whitespace-nowrap text-lg font-semibold text-[var(--color-foreground)]">
+                  <p className="mt-2 break-words text-lg font-semibold text-[var(--color-foreground)]">
                     {formatCurrency(card.outstandingAmount)}
                   </p>
                   <p className="mt-2 text-xs text-[var(--color-muted-foreground)]">
@@ -612,7 +626,7 @@ export function CardsClient() {
                       <p className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted-foreground)]">
                         Proximo pagamento
                       </p>
-                      <p className="mt-1 text-sm font-semibold text-[var(--color-foreground)]">
+                      <p className="mt-1 break-words text-sm font-semibold leading-5 text-[var(--color-foreground)]">
                         {new Date(card.dueDate).toLocaleDateString("pt-BR")}
                       </p>
                     </div>

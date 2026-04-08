@@ -65,6 +65,7 @@ type ReportResponse = {
     expense: number;
     cardPayments: number;
     net: number;
+    endingBalance: number;
   };
   filters: {
     from?: string | null;
@@ -421,8 +422,8 @@ export function ReportsClient() {
         </article>
         <article className="metric-card">
           <p className="metric-label">Saldo projetado ao fim do mês</p>
-          <p className={`metric-value ${(data?.projection.net ?? 0) < 0 ? "amount-negative" : "amount-positive"}`}>
-            {formatCurrency(data?.projection.net ?? 0)}
+          <p className={`metric-value ${(data?.projection.endingBalance ?? 0) < 0 ? "amount-negative" : "amount-positive"}`}>
+            {formatCurrency(data?.projection.endingBalance ?? 0)}
           </p>
         </article>
       </div>
