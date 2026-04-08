@@ -91,6 +91,20 @@ Testar manualmente:
 docker compose run --rm backup-once
 ```
 
+Restaurar em banco de teste:
+
+```bash
+docker compose run --rm restore-backup-test
+```
+
+Restaurar em producao:
+
+```bash
+docker compose stop web
+docker compose run --rm restore-backup-prod
+docker compose up -d web
+```
+
 As variaveis de backup ficam no [`.env.example`](/C:/Users/User/Desktop/SavePointFinance/.env.example) e a operacao completa esta em [DEPLOY_AND_BOOTSTRAP.md](/C:/Users/User/Desktop/SavePointFinance/DEPLOY_AND_BOOTSTRAP.md).
 
 ## Conta administrativa

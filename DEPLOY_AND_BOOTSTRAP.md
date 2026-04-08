@@ -215,6 +215,67 @@ docker compose run --rm backup-once
 docker compose logs --tail=200 backup
 ```
 
+### Restaurar backup em banco de teste
+
+O restore automatizado valida checksum, descriptografa, extrai o payload e recria um banco de teste separado.
+
+Padrao:
+- usa o backup local mais recente em `/backups/archives`
+- restaura em `${POSTGRES_DB}_restore_test`
+- extrai os arquivos criticos para `/backups/restored-files/...`
+
+```bash
+docker compose run --rm restore-backup-test
+```
+
+### Restaurar backup em producao
+
+Fluxo minimo recomendado:
+
+1. parar a aplicacao para evitar escrita concorrente:
+
+```bash
+docker compose stop web
+```
+
+2. confirmar no `.env`:
+
+```env
+RESTORE_PRODUCTION_CONFIRMATION=RESTORE_SAVEPOINT_PROD
+```
+
+3. executar o restore:
+
+```bash
+docker compose run --rm restore-backup-prod
+```
+
+4. subir a aplicacao novamente:
+
+```bash
+docker compose up -d web
+```
+
+### Restaurar a partir do GitHub Release
+
+```env
+RESTORE_SOURCE=github
+RESTORE_GITHUB_RELEASE_TAG=savepoint-backups
+RESTORE_ASSET_BASENAME=
+```
+
+Se `RESTORE_ASSET_BASENAME` ficar vazio, o sistema baixa o artefato mais recente da release.
+
+### Restaurar a partir do Object Storage
+
+```env
+RESTORE_SOURCE=object_storage
+RESTORE_ASSET_BASENAME=
+RESTORE_OBJECT_STORAGE_DATE_PATH=
+```
+
+Se `RESTORE_ASSET_BASENAME` ficar vazio, o sistema usa o artefato mais recente encontrado no bucket/prefixo configurado.
+
 ## Recuperar o admin
 
 Se perder a conta admin ou quiser redefinir a senha/configuracao via `.env`:

@@ -201,6 +201,87 @@ services:
     networks:
       - savepoint
 
+  restore-backup-test:
+    build:
+      context: ./ops/backup
+      dockerfile: Dockerfile
+    profiles: ["ops"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      TZ: ${TZ:-America/Sao_Paulo}
+      POSTGRES_DB: ${POSTGRES_DB:-savepoint}
+      POSTGRES_USER: ${POSTGRES_USER:-savepoint}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      BACKUP_DB_HOST: ${BACKUP_DB_HOST:-postgres}
+      BACKUP_DB_PORT: ${BACKUP_DB_PORT:-5432}
+      BACKUP_ENCRYPTION_PASSPHRASE: ${BACKUP_ENCRYPTION_PASSPHRASE:-}
+      BACKUP_GITHUB_TOKEN: ${BACKUP_GITHUB_TOKEN:-}
+      BACKUP_GITHUB_REPOSITORY: ${BACKUP_GITHUB_REPOSITORY:-}
+      BACKUP_GITHUB_RELEASE_TAG: ${BACKUP_GITHUB_RELEASE_TAG:-savepoint-backups}
+      BACKUP_OBJECT_STORAGE_ENDPOINT: ${BACKUP_OBJECT_STORAGE_ENDPOINT:-}
+      BACKUP_OBJECT_STORAGE_BUCKET: ${BACKUP_OBJECT_STORAGE_BUCKET:-}
+      BACKUP_OBJECT_STORAGE_REGION: ${BACKUP_OBJECT_STORAGE_REGION:-sa-saopaulo-1}
+      BACKUP_OBJECT_STORAGE_PREFIX: ${BACKUP_OBJECT_STORAGE_PREFIX:-savepoint}
+      BACKUP_OBJECT_STORAGE_ACCESS_KEY: ${BACKUP_OBJECT_STORAGE_ACCESS_KEY:-}
+      BACKUP_OBJECT_STORAGE_SECRET_KEY: ${BACKUP_OBJECT_STORAGE_SECRET_KEY:-}
+      RESTORE_SOURCE: ${RESTORE_SOURCE:-local}
+      RESTORE_ARCHIVE_PATH: ${RESTORE_ARCHIVE_PATH:-}
+      RESTORE_CHECKSUM_PATH: ${RESTORE_CHECKSUM_PATH:-}
+      RESTORE_ASSET_BASENAME: ${RESTORE_ASSET_BASENAME:-}
+      RESTORE_GITHUB_RELEASE_TAG: ${RESTORE_GITHUB_RELEASE_TAG:-}
+      RESTORE_OBJECT_STORAGE_DATE_PATH: ${RESTORE_OBJECT_STORAGE_DATE_PATH:-}
+      RESTORE_MODE: test
+      RESTORE_TARGET_DB: ${RESTORE_TARGET_DB:-}
+      RESTORE_FILES_DESTINATION: ${RESTORE_FILES_DESTINATION:-}
+    command: ["/usr/local/bin/restore-backup.sh"]
+    volumes:
+      - savepoint_backups:/backups
+    networks:
+      - savepoint
+
+  restore-backup-prod:
+    build:
+      context: ./ops/backup
+      dockerfile: Dockerfile
+    profiles: ["ops"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      TZ: ${TZ:-America/Sao_Paulo}
+      POSTGRES_DB: ${POSTGRES_DB:-savepoint}
+      POSTGRES_USER: ${POSTGRES_USER:-savepoint}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      BACKUP_DB_HOST: ${BACKUP_DB_HOST:-postgres}
+      BACKUP_DB_PORT: ${BACKUP_DB_PORT:-5432}
+      BACKUP_ENCRYPTION_PASSPHRASE: ${BACKUP_ENCRYPTION_PASSPHRASE:-}
+      BACKUP_GITHUB_TOKEN: ${BACKUP_GITHUB_TOKEN:-}
+      BACKUP_GITHUB_REPOSITORY: ${BACKUP_GITHUB_REPOSITORY:-}
+      BACKUP_GITHUB_RELEASE_TAG: ${BACKUP_GITHUB_RELEASE_TAG:-savepoint-backups}
+      BACKUP_OBJECT_STORAGE_ENDPOINT: ${BACKUP_OBJECT_STORAGE_ENDPOINT:-}
+      BACKUP_OBJECT_STORAGE_BUCKET: ${BACKUP_OBJECT_STORAGE_BUCKET:-}
+      BACKUP_OBJECT_STORAGE_REGION: ${BACKUP_OBJECT_STORAGE_REGION:-sa-saopaulo-1}
+      BACKUP_OBJECT_STORAGE_PREFIX: ${BACKUP_OBJECT_STORAGE_PREFIX:-savepoint}
+      BACKUP_OBJECT_STORAGE_ACCESS_KEY: ${BACKUP_OBJECT_STORAGE_ACCESS_KEY:-}
+      BACKUP_OBJECT_STORAGE_SECRET_KEY: ${BACKUP_OBJECT_STORAGE_SECRET_KEY:-}
+      RESTORE_SOURCE: ${RESTORE_SOURCE:-local}
+      RESTORE_ARCHIVE_PATH: ${RESTORE_ARCHIVE_PATH:-}
+      RESTORE_CHECKSUM_PATH: ${RESTORE_CHECKSUM_PATH:-}
+      RESTORE_ASSET_BASENAME: ${RESTORE_ASSET_BASENAME:-}
+      RESTORE_GITHUB_RELEASE_TAG: ${RESTORE_GITHUB_RELEASE_TAG:-}
+      RESTORE_OBJECT_STORAGE_DATE_PATH: ${RESTORE_OBJECT_STORAGE_DATE_PATH:-}
+      RESTORE_MODE: prod
+      RESTORE_TARGET_DB: ${RESTORE_TARGET_DB:-}
+      RESTORE_FILES_DESTINATION: ${RESTORE_FILES_DESTINATION:-}
+      RESTORE_PRODUCTION_CONFIRMATION: ${RESTORE_PRODUCTION_CONFIRMATION:-}
+    command: ["/usr/local/bin/restore-backup.sh"]
+    volumes:
+      - savepoint_backups:/backups
+    networks:
+      - savepoint
+
   postgres:
     image: postgres:17-alpine
     container_name: savepoint_db
