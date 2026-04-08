@@ -243,6 +243,21 @@ async function main() {
       })
     });
     assertCondition(card.status === 201, `Criação do cartão respondeu ${card.status}`);
+    const rolloverCard = await getJson<{ id: string }>(jar, "/api/cards", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "Master Audit Fechamento 24",
+        brand: "Mastercard",
+        last4: "9876",
+        limitAmount: 3000,
+        dueDay: 8,
+        closeDay: 24,
+        color: "#222222",
+        institution: "Nubank"
+      })
+    });
+    assertCondition(rolloverCard.status === 201, `Criação do cartão com fechamento 24 respondeu ${rolloverCard.status}`);
 
     const salaryOne = await getJson<{ id: string }>(jar, "/api/transactions", {
       method: "POST",
@@ -325,6 +340,21 @@ async function main() {
       })
     });
     assertCondition(marketExpense.status === 201, `Despesa à vista respondeu ${marketExpense.status}`);
+    const rolloverExpense = await getJson<{ id: string }>(jar, "/api/transactions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        date: "2026-03-31",
+        amount: 80,
+        description: "Compra depois do fechamento",
+        type: "expense",
+        paymentMethod: "credit_card",
+        categoryId: marketCategory.id,
+        cardId: rolloverCard.payload.id,
+        installments: 1
+      })
+    });
+    assertCondition(rolloverExpense.status === 201, `Despesa após fechamento respondeu ${rolloverExpense.status}`);
 
     const installments = await prisma.transaction.findMany({
       where: {
@@ -468,6 +498,45 @@ async function main() {
     assertCondition(reportApi.status === 200, `API de relatório respondeu ${reportApi.status}`);
     assertCondition(Math.abs(reportApi.payload.summary.balance - report.summary.balance) < 0.0001, "API de relatório diverge do cálculo central");
     results.push("API de relatórios e cálculo central retornam o mesmo consolidado");
+
+    const marchTransactions = await getJson<{
+      items: Array<{ id: string }>;
+    }>(jar, `/api/transactions?from=2026-03-01&to=2026-03-31&cardId=${rolloverCard.payload.id}`);
+    assertCondition(marchTransactions.status === 200, `Transações de março responderam ${marchTransactions.status}`);
+    assertCondition(
+      !marchTransactions.payload.items.some((item) => item.id === rolloverExpense.payload.id),
+      "Compra após o fechamento apareceu na competência de março"
+    );
+
+    const aprilTransactions = await getJson<{
+      items: Array<{ id: string }>;
+    }>(jar, `/api/transactions?from=2026-04-01&to=2026-04-30&cardId=${rolloverCard.payload.id}`);
+    assertCondition(aprilTransactions.status === 200, `Transações de abril responderam ${aprilTransactions.status}`);
+    assertCondition(
+      aprilTransactions.payload.items.some((item) => item.id === rolloverExpense.payload.id),
+      "Compra após o fechamento não apareceu na competência de abril"
+    );
+
+    const marchReport = await getJson<{
+      byCard: Array<{ id: string; netStatement: number }>;
+    }>(jar, `/api/reports/summary?from=2026-03-01&to=2026-03-31&cardId=${rolloverCard.payload.id}`);
+    assertCondition(marchReport.status === 200, `Relatório de março respondeu ${marchReport.status}`);
+    assertCondition(
+      !marchReport.payload.byCard.some((item) => item.id === rolloverCard.payload.id && item.netStatement > 0),
+      "Compra após o fechamento entrou indevidamente no relatório de março"
+    );
+
+    const aprilReport = await getJson<{
+      byCard: Array<{ id: string; netStatement: number }>;
+    }>(jar, `/api/reports/summary?from=2026-04-01&to=2026-04-30&cardId=${rolloverCard.payload.id}`);
+    assertCondition(aprilReport.status === 200, `Relatório de abril respondeu ${aprilReport.status}`);
+    assertCondition(
+      aprilReport.payload.byCard.some(
+        (item) => item.id === rolloverCard.payload.id && Math.abs(item.netStatement - 80) < 0.0001
+      ),
+      "Compra após o fechamento não entrou na competência de abril do relatório"
+    );
+    results.push("Compras após o fechamento entram na competência seguinte em transações e relatórios");
 
     const dashboardResponse = await jar.fetch(`${baseUrl}/dashboard`);
     assertCondition(dashboardResponse.status === 200, `Dashboard respondeu ${dashboardResponse.status}`);

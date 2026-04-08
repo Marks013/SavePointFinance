@@ -4,6 +4,7 @@ import { getAccountsWithComputedBalance } from "@/lib/finance/accounts";
 import { getCurrentMonthKey, getMonthRange } from "@/lib/month";
 import {
   calculateStatementTotal,
+  getCardExpenseCompetenceDate,
   getCardExpenseDueDate,
   getStatementPaymentDate,
   getStatementRange
@@ -74,7 +75,8 @@ function listStatementMonthsBetween(start: Date, end: Date) {
 function buildTransactionWhere(
   tenantId: string,
   filters: FinanceReportFilters,
-  userId?: string
+  userId?: string,
+  projectionStart?: Date
 ): Prisma.TransactionWhereInput {
   const where: Prisma.TransactionWhereInput = {
     tenantId,
@@ -88,12 +90,20 @@ function buildTransactionWhere(
     where.date = {};
 
     if (filters.from) {
-      where.date.gte = new Date(`${filters.from}T00:00:00`);
+      const fromDate = new Date(`${filters.from}T00:00:00`);
+      fromDate.setMonth(fromDate.getMonth() - 1);
+      where.date.gte = fromDate;
     }
 
     if (filters.to) {
       where.date.lte = new Date(`${filters.to}T23:59:59`);
     }
+  } else if (projectionStart) {
+    const expandedStart = new Date(projectionStart);
+    expandedStart.setMonth(expandedStart.getMonth() - 1);
+    where.date = {
+      gte: expandedStart
+    };
   }
 
   if (filters.accountId) {
@@ -116,7 +126,7 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
 
   const [transactions, subscriptions, cards, goals, accounts] = await Promise.all([
     prisma.transaction.findMany({
-      where: buildTransactionWhere(tenantId, filters, userId),
+      where: buildTransactionWhere(tenantId, filters, userId, projectionStart),
       select: {
         id: true,
         amount: true,
@@ -148,7 +158,9 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
         card: {
           select: {
             name: true,
-            brand: true
+            brand: true,
+            closeDay: true,
+            dueDay: true
           }
         }
       },
@@ -258,11 +270,23 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
   };
   let classifiedAutomatically = 0;
   let uncategorizedTransactions = 0;
+  let transactionsInRange = 0;
+  const filteredTransactions = transactions.filter((transaction) => {
+    const competenceDate = transaction.card
+      ? getCardExpenseCompetenceDate(transaction.card, transaction.date)
+      : transaction.date;
 
-  for (const transaction of transactions) {
-    const label = monthLabel(transaction.date);
+    return competenceDate >= projectionStart && competenceDate <= projectionEnd;
+  });
+
+  for (const transaction of filteredTransactions) {
+    const competenceDate = transaction.card
+      ? getCardExpenseCompetenceDate(transaction.card, transaction.date)
+      : transaction.date;
+    const label = monthLabel(competenceDate);
     const amount = Number(transaction.amount);
     const monthly = monthlyMap.get(label) ?? { income: 0, expense: 0, transfer: 0 };
+    transactionsInRange += 1;
 
     if (transaction.type === TransactionType.income) {
       summary.income += amount;
@@ -373,9 +397,21 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
     monthlyMap.set(label, monthly);
   }
 
+  summary.transactions = transactionsInRange;
   summary.balance = summary.income - summary.expense;
-  const filterStart = filters.from ? new Date(`${filters.from}T00:00:00`) : transactions[0]?.date ?? projectionStart;
-  const filterEnd = filters.to ? new Date(`${filters.to}T23:59:59`) : transactions.at(-1)?.date ?? projectionEnd;
+  const filterStart = filters.from
+    ? new Date(`${filters.from}T00:00:00`)
+    : (filteredTransactions[0]?.card
+        ? getCardExpenseCompetenceDate(filteredTransactions[0].card, filteredTransactions[0].date)
+        : filteredTransactions[0]?.date) ?? projectionStart;
+  const lastFilteredTransaction = filteredTransactions.at(-1);
+  const filterEnd = filters.to
+    ? new Date(`${filters.to}T23:59:59`)
+    : (lastFilteredTransaction
+        ? lastFilteredTransaction.card
+          ? getCardExpenseCompetenceDate(lastFilteredTransaction.card, lastFilteredTransaction.date)
+          : lastFilteredTransaction.date
+        : projectionEnd);
   const totalDays = Math.max(
     1,
     Math.ceil((filterEnd.getTime() - filterStart.getTime()) / (1000 * 60 * 60 * 24)) + 1

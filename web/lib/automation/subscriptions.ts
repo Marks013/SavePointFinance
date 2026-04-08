@@ -469,6 +469,7 @@ export async function runRecurringAutomation(tenantId: string, userId: string) {
       client: prisma
     });
     const statementAmount = statement.totalAmount;
+    const outstandingAmount = statement.outstandingAmount;
 
     if (statementAmount <= 0) {
       continue;
@@ -494,12 +495,12 @@ export async function runRecurringAutomation(tenantId: string, userId: string) {
     );
 
     const limitAmount = Number(card.limitAmount);
-    const utilization = limitAmount > 0 ? statementAmount / limitAmount : 0;
+    const utilization = limitAmount > 0 ? outstandingAmount / limitAmount : 0;
 
-    if (limitAmount > 0 && statementAmount >= limitAmount) {
+    if (limitAmount > 0 && outstandingAmount >= limitAmount) {
       const subject = `Limite excedido: ${card.name}`;
       const message =
-        `O cartão ${card.name} alcançou ${formatCurrency(statementAmount)} em fatura aberta, ` +
+        `O cartão ${card.name} alcançou ${formatCurrency(outstandingAmount)} em saldo em aberto, ` +
         `acima do limite de ${formatCurrency(limitAmount)}.`;
 
       notificationDeliveries.push(
@@ -519,7 +520,7 @@ export async function runRecurringAutomation(tenantId: string, userId: string) {
       const subject = `Uso alto do limite: ${card.name}`;
       const message =
         `O cartão ${card.name} está usando ${Math.round(utilization * 100)}% do limite. ` +
-        `Fatura atual: ${formatCurrency(statementAmount)} de ${formatCurrency(limitAmount)}.`;
+        `Saldo em aberto: ${formatCurrency(outstandingAmount)} de ${formatCurrency(limitAmount)}.`;
 
       notificationDeliveries.push(
         ...(await sendUserNotifications({

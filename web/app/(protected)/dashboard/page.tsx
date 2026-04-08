@@ -5,7 +5,7 @@ import { ArrowRight, BellRing, CreditCard, Landmark, Target } from "lucide-react
 
 import { SummaryCards } from "@/features/dashboard/components/summary-cards";
 import { requireSessionUser } from "@/lib/auth/session";
-import { getCardStatementSnapshots } from "@/lib/cards/statement";
+import { getCardExpenseCompetenceDate, getCardStatementSnapshots } from "@/lib/cards/statement";
 import { formatDateDisplay } from "@/lib/date";
 import { getAccountsWithComputedBalance } from "@/lib/finance/accounts";
 import { getFinanceReport } from "@/lib/finance/reports";
@@ -23,6 +23,8 @@ function formatDate(value: Date | string | null | undefined) {
 
 async function getDashboardData(tenantId: string, month: string) {
   const { start, end, from, to } = getMonthRange(month);
+  const expandedStart = new Date(start);
+  expandedStart.setMonth(expandedStart.getMonth() - 1);
 
   try {
     const [accounts, monthlyReport, goals, recentTransactions, upcomingSubscriptions, upcomingGoals, activeCards] =
@@ -42,7 +44,7 @@ async function getDashboardData(tenantId: string, month: string) {
           where: {
             tenantId,
             date: {
-              gte: start,
+              gte: expandedStart,
               lte: end
             }
           },
@@ -53,7 +55,7 @@ async function getDashboardData(tenantId: string, month: string) {
             card: true
           },
           orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-          take: 6
+          take: 40
         }),
         prisma.subscription.findMany({
           where: {
@@ -106,6 +108,15 @@ async function getDashboardData(tenantId: string, month: string) {
       client: prisma,
       month
     });
+    const filteredRecentTransactions = recentTransactions
+      .filter((transaction) => {
+        const competenceDate = transaction.card
+          ? getCardExpenseCompetenceDate(transaction.card, transaction.date)
+          : transaction.date;
+
+        return competenceDate >= start && competenceDate <= end;
+      })
+      .slice(0, 6);
     const cardsWithStatement = activeCards.map((card) => {
       const statement = cardStatements.find((item) => item.card.id === card.id);
 
@@ -129,7 +140,7 @@ async function getDashboardData(tenantId: string, month: string) {
       projection: monthlyReport.projection,
       upcomingProjection: monthlyReport.upcoming.slice(0, 5),
       goals: Number(goals._sum.currentAmount ?? 0),
-      recentTransactions,
+      recentTransactions: filteredRecentTransactions,
       upcomingSubscriptions,
       upcomingGoals,
       activeAccounts: accounts

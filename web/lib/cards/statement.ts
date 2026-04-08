@@ -121,6 +121,13 @@ export function getCardExpenseDueDate(
   return getStatementPaymentDate(installmentStatementMonth, card.dueDay);
 }
 
+export function getCardExpenseCompetenceDate(
+  card: Pick<CardStatementCard, "closeDay" | "dueDay">,
+  referenceDate: Date
+) {
+  return getCardExpenseDueDate(card, referenceDate);
+}
+
 export function calculateStatementTotal(transactions: StatementTransactionLike[]) {
   return transactions.reduce((sum, item) => {
     const amount = Number(item.amount);
