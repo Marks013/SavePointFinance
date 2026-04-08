@@ -4,6 +4,7 @@ import { CalendarDays } from "lucide-react";
 import { forwardRef, useMemo, useRef } from "react";
 import type { InputHTMLAttributes } from "react";
 
+import { formatMonthKeyLabel } from "@/lib/month";
 import { cn } from "@/lib/utils";
 import { formatDateDisplay } from "@/lib/date";
 
@@ -17,10 +18,7 @@ function formatDisplayValue(type: "date" | "month", value?: string) {
   }
 
   if (type === "month") {
-    return new Intl.DateTimeFormat("pt-BR", {
-      month: "long",
-      year: "numeric"
-    }).format(new Date(`${value}-01T12:00:00`));
+    return formatMonthKeyLabel(value);
   }
 
   return formatDateDisplay(new Date(`${value}T12:00:00`));

@@ -40,11 +40,9 @@ export function getMonthRange(monthKey: string) {
 export function formatMonthKeyLabel(monthKey: string) {
   const normalizedMonth = normalizeMonthKey(monthKey);
   const [year, month] = normalizedMonth.split("-").map(Number);
+  const monthLabel = String(month ?? 1).padStart(2, "0");
 
-  return new Intl.DateTimeFormat("pt-BR", {
-    month: "long",
-    year: "numeric"
-  }).format(new Date(year, (month ?? 1) - 1, 1));
+  return `${monthLabel}/${year}`;
 }
 
 export function addMonthsToMonthKey(monthKey: string, offset: number) {

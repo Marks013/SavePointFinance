@@ -1195,7 +1195,7 @@ export function AdminClient() {
                   <Button
                     onClick={() => {
                       const nextExpiresAt = window.prompt(
-                        `Nova data de expiração DD-MM-AAAA para ${tenant.name}`,
+                        `Nova data de expiração DD/MM/AAAA para ${tenant.name}`,
                         tenant.expiresAt ? formatDateDisplay(tenant.expiresAt) : ""
                       );
                       if (nextExpiresAt === null) return;
@@ -1205,7 +1205,7 @@ export function AdminClient() {
                       }
                       const parsedExpiresAt = parseBrazilianDateToDateKey(nextExpiresAt);
                       if (!parsedExpiresAt) {
-                        toast.error("Informe a data no formato DD-MM-AAAA");
+                        toast.error("Informe a data no formato DD/MM/AAAA");
                         return;
                       }
                       updateTenantMutation.mutate({ id: tenant.id, expiresAt: parsedExpiresAt });

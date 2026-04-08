@@ -554,7 +554,7 @@ export function CardsClient() {
                   <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted-foreground)]">
                     Fatura
                   </p>
-                  <p className="mt-2 whitespace-nowrap text-base font-semibold text-[var(--color-foreground)]">
+                  <p className="mt-2 break-words text-base font-semibold text-[var(--color-foreground)]">
                     {formatCurrency(card.statementAmount)}
                   </p>
                 </div>
@@ -563,18 +563,20 @@ export function CardsClient() {
                     Disponível
                   </p>
                   <p
-                    className={`mt-2 whitespace-nowrap text-base font-semibold ${card.availableLimit < 0 ? "amount-negative" : "text-[var(--color-foreground)]"}`}
+                    className={`mt-2 break-words text-base font-semibold ${card.availableLimit < 0 ? "amount-negative" : "text-[var(--color-foreground)]"}`}
                   >
                     {formatCurrency(card.availableLimit)}
                   </p>
                 </div>
-                <div className="rounded-[1rem] border border-[var(--color-border)]/60 bg-[var(--color-muted)]/20 px-3 py-3">
+                <div className="rounded-[1rem] border border-[var(--color-border)]/60 bg-[var(--color-muted)]/20 px-3 py-3 sm:col-span-2">
                   <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted-foreground)]">
                     Ciclo
                   </p>
-                  <p className="mt-2 whitespace-nowrap text-sm font-semibold text-[var(--color-foreground)]">
-                    Fecha dia {card.closeDay} • vence dia {card.dueDay} • {formatDateDisplay(card.dueDate)}
-                  </p>
+                  <div className="mt-2 grid gap-1 text-sm font-semibold text-[var(--color-foreground)]">
+                    <p className="break-words">Fecha dia {card.closeDay}</p>
+                    <p className="break-words">Vence dia {card.dueDay}</p>
+                    <p className="break-words">Próximo vencimento: {formatDateDisplay(card.dueDate)}</p>
+                  </div>
                 </div>
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-[var(--color-muted-foreground)]">
@@ -656,10 +658,7 @@ export function CardsClient() {
               ? `Cartão selecionado: ${cards.find((item) => item.id === selectedStatementCardId)?.name ?? "Cartão"}.`
               : "Nenhum cartão selecionado."}
           </p>
-          <p>{`Competência em análise: ${new Date(`${statementMonth}-01T12:00:00`).toLocaleDateString("pt-BR", {
-            month: "long",
-            year: "numeric"
-          })}.`}</p>
+          <p>{`Competência em análise: ${formatMonthKeyLabel(statementMonth)}.`}</p>
         </div>
         <div className="mt-4">
           <Button
