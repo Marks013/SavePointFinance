@@ -522,7 +522,7 @@ export function TransactionsClient() {
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="date">Data</Label>
-              <DatePickerInput
+              <Input
                 className={form.formState.errors.date ? invalidFieldClassName : undefined}
                 id="date"
                 type="date"
