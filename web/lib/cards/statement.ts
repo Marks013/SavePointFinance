@@ -57,6 +57,20 @@ function getClosingMonthDate(statementMonth: string, closeDay: number, dueDay: n
 export function getCurrentStatementMonth(card: Pick<CardStatementCard, "closeDay" | "dueDay">, referenceDate = new Date()) {
   const year = referenceDate.getFullYear();
   const month = referenceDate.getMonth() + 1;
+  const currentMonthStatement = formatStatementMonth(year, month);
+  const currentMonthDueDate = getStatementPaymentDate(currentMonthStatement, card.dueDay);
+
+  if (referenceDate <= currentMonthDueDate) {
+    return currentMonthStatement;
+  }
+
+  const nextMonthReference = new Date(year, month, 1, 12, 0, 0, 0);
+  return formatStatementMonth(nextMonthReference.getFullYear(), nextMonthReference.getMonth() + 1);
+}
+
+export function getExpenseStatementMonth(card: Pick<CardStatementCard, "closeDay" | "dueDay">, referenceDate: Date) {
+  const year = referenceDate.getFullYear();
+  const month = referenceDate.getMonth() + 1;
   const closingDay = clampDay(year, month, card.closeDay);
   const closingDate = new Date(year, month - 1, closingDay, 23, 59, 59, 999);
   const dueMonthOffset = (card.closeDay >= card.dueDay ? 1 : 0) + (referenceDate <= closingDate ? 0 : 1);
@@ -101,7 +115,7 @@ export function getCardExpenseDueDate(
   referenceDate: Date,
   installmentOffset = 0
 ) {
-  const baseStatementMonth = getCurrentStatementMonth(card, referenceDate);
+  const baseStatementMonth = getExpenseStatementMonth(card, referenceDate);
   const installmentStatementMonth = addMonthsToStatementMonth(baseStatementMonth, installmentOffset);
 
   return getStatementPaymentDate(installmentStatementMonth, card.dueDay);

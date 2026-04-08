@@ -118,6 +118,7 @@ async function main() {
   const { ensureTenantDefaultCategories } = await import("../lib/finance/default-categories");
   const { getFinanceReport } = await import("../lib/finance/reports");
   const { getAccountsWithComputedBalance } = await import("../lib/finance/accounts");
+  const { getCurrentStatementMonth, getExpenseStatementMonth, getStatementPaymentDate } = await import("../lib/cards/statement");
 
   await prisma.$connect();
   await ensureDefaultPlans(prisma);
@@ -128,6 +129,20 @@ async function main() {
   const userEmail = `finance-audit-${unique}@savepoint.local`;
   const userPassword = "FinanceAudit123!";
   const results: string[] = [];
+  assertCondition(
+    getCurrentStatementMonth({ closeDay: 24, dueDay: 8 }, new Date(2026, 3, 2, 12, 0, 0, 0)) === "2026-04",
+    "Competencia padrao da fatura aberta ficou incorreta para cartao com fechamento apos vencimento"
+  );
+  assertCondition(
+    getExpenseStatementMonth({ closeDay: 24, dueDay: 8 }, new Date(2026, 2, 20, 12, 0, 0, 0)) === "2026-04",
+    "Compra antes do fechamento nao entrou na fatura esperada"
+  );
+  const expenseAfterCloseMonth = getExpenseStatementMonth({ closeDay: 24, dueDay: 8 }, new Date(2026, 2, 25, 12, 0, 0, 0));
+  assertCondition(expenseAfterCloseMonth === "2026-05", "Compra apos o fechamento nao foi empurrada para a fatura seguinte");
+  assertCondition(
+    getStatementPaymentDate(expenseAfterCloseMonth, 8).toISOString().startsWith("2026-05-08"),
+    "Vencimento calculado da compra pos-fechamento ficou incorreto"
+  );
 
   const premiumPlan = await getDefaultPlanBySlug(prisma, "premium-completo");
   assertCondition(premiumPlan, "Plano Premium padrão não encontrado");
@@ -422,6 +437,8 @@ async function main() {
     assertCondition(generateSubscription.payload.duplicated === false, "A primeira geração da assinatura foi tratada como duplicada");
     assertCondition(generateSubscription.payload.nextBillingDate.startsWith("2026-05-06"), "Próximo vencimento da assinatura não avançou corretamente");
     results.push("Assinaturas geram lançamento e avançam corretamente para o próximo vencimento");
+
+    results.push("Competencia aberta e competencia da compra respeitam fechamento e vencimento do cartao");
 
     const report = await getFinanceReport(
       tenant.id,
