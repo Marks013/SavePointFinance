@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useSearchParams } from "next/navigation";
@@ -76,6 +76,7 @@ export function InstallmentsClient() {
   const month = normalizeMonthKey(searchParams.get("month"));
   const monthRange = getMonthRange(month);
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
+  const editSectionRef = useRef<HTMLElement | null>(null);
   const [filters, setFilters] = useState({
     from: monthRange.from,
     to: monthRange.to,
@@ -109,6 +110,19 @@ export function InstallmentsClient() {
       to: monthRange.to
     }));
   }, [monthRange.from, monthRange.to]);
+
+  useEffect(() => {
+    if (!editingGroupId) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      editSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      document.getElementById("installment-description")?.focus();
+    }, 80);
+
+    return () => window.clearTimeout(timeout);
+  }, [editingGroupId]);
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -283,7 +297,7 @@ export function InstallmentsClient() {
       </section>
 
       {editingGroupId ? (
-        <section className="surface content-section">
+        <section className="surface content-section" ref={editSectionRef}>
           <p className="eyebrow">
             Edição do grupo
           </p>

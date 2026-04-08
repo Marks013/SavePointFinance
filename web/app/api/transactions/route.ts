@@ -1,6 +1,7 @@
 import { Prisma, Transaction, TransactionSource } from "@prisma/client";
 import { NextResponse } from "next/server";
 
+import { syncDueSubscriptionTransactions } from "@/lib/automation/subscriptions";
 import { requireSessionUser } from "@/lib/auth/session";
 import { getCardExpenseCompetenceDate } from "@/lib/cards/statement";
 import { classifyTransactionCategory } from "@/lib/finance/category-classifier";
@@ -14,6 +15,10 @@ import { transactionFiltersSchema, transactionFormSchema } from "@/features/tran
 export async function GET(request: Request) {
   try {
     const user = await requireSessionUser();
+    await syncDueSubscriptionTransactions({
+      tenantId: user.tenantId,
+      userId: user.id
+    });
     const { searchParams } = new URL(request.url);
     const filters = transactionFiltersSchema.parse({
       limit: searchParams.get("limit") ?? 20,
@@ -59,7 +64,7 @@ export async function GET(request: Request) {
         card: true
       },
       orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-      take: hasDateFilter ? Math.max(filters.limit * 4, 200) : filters.limit
+      take: hasDateFilter ? Math.max(filters.limit * 8, 500) : filters.limit
     });
 
     const filteredTransactions = hasDateFilter

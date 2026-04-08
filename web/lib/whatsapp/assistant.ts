@@ -1,10 +1,10 @@
 import { PaymentMethod, Prisma, Transaction, TransactionSource, TransactionType } from "@prisma/client";
 
 import {
-  getCardStatementSnapshot,
-  getCurrentStatementMonth,
+  getCurrentPayableStatementMonth,
   getStatementCloseDate,
-  getStatementPaymentDate
+  getStatementPaymentDate,
+  getStatementRange
 } from "@/lib/cards/statement";
 import { classifyTransactionCategory } from "@/lib/finance/category-classifier";
 import { getAccountsWithComputedBalance } from "@/lib/finance/accounts";
@@ -486,25 +486,42 @@ async function replyWithCardInfo(user: WhatsAppUser, body: string) {
     } satisfies AssistantResult;
   }
 
-  const month = getCurrentStatementMonth(card, new Date());
-  const statement = await getCardStatementSnapshot({
-    tenantId: user.tenantId,
-    card,
-    month,
-    client: prisma
+  const month = getCurrentPayableStatementMonth(card, new Date());
+  const { start, end } = getStatementRange(month, card.closeDay, card.dueDay);
+  const transactions = await prisma.transaction.findMany({
+    where: {
+      tenantId: user.tenantId,
+      cardId: card.id,
+      date: {
+        gte: start,
+        lte: end
+      }
+    },
+    select: {
+      amount: true,
+      type: true
+    }
   });
-  const statementAmount = statement.totalAmount;
-  const availableLimit = statement.availableLimit;
+  const statementAmount = transactions.reduce((sum, item) => {
+    const amount = Number(item.amount);
+    if (item.type === TransactionType.expense) {
+      return sum + amount;
+    }
+    if (item.type === TransactionType.income) {
+      return sum - amount;
+    }
+    return sum;
+  }, 0);
+  const availableLimit = Number(card.limitAmount) - statementAmount;
 
   return {
     intent: "card_info",
     status: "ok",
     response:
       `Cartão ${card.name}. Fatura atual: ${formatCurrency(statementAmount)}. ` +
-      `Saldo em aberto: ${formatCurrency(statement.outstandingAmount)}. ` +
       `Limite disponível: ${formatCurrency(availableLimit)} de ${formatCurrency(Number(card.limitAmount))}. ` +
       `Fecha em ${formatDate(getStatementCloseDate(month, card.closeDay, card.dueDay))} e vence em ${formatDate(
-        getStatementPaymentDate(month, card.dueDay)
+          getStatementPaymentDate(month, card.dueDay, card.closeDay)
       )}.`
   } satisfies AssistantResult;
 }

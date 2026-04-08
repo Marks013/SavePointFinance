@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { subscriptionFormSchema } from "@/features/subscriptions/schemas/subscription-schema";
+import { syncDueSubscriptionTransactions } from "@/lib/automation/subscriptions";
 import { requireSessionUser } from "@/lib/auth/session";
 import { assertTenantTransactionReferences, TenantReferenceError } from "@/lib/finance/tenant-reference-guard";
 import { prisma } from "@/lib/prisma/client";
@@ -9,6 +10,10 @@ export async function GET(request: Request) {
   try {
     const user = await requireSessionUser();
     void request;
+    await syncDueSubscriptionTransactions({
+      tenantId: user.tenantId,
+      userId: user.id
+    });
     const subscriptions = await prisma.subscription.findMany({
       where: {
         tenantId: user.tenantId

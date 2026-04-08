@@ -19,6 +19,10 @@ type StatementTransactionLike = {
   type: TransactionType | "income" | "expense" | "transfer";
 };
 
+type StatementPaymentLike = {
+  amount: number | { toString(): string };
+};
+
 function parseStatementMonth(month: string) {
   const [yearValue, monthValue] = statementMonthSchema.parse(month).split("-");
   return {
@@ -39,44 +43,97 @@ function clampDay(year: number, month: number, day: number) {
   return Math.min(Math.max(day, 1), daysInMonth(year, month));
 }
 
-function getClosingMonthDate(statementMonth: string, closeDay: number, dueDay: number) {
-  const { year, month: parsedMonth } = parseStatementMonth(statementMonth);
-  const closingMonthOffset = closeDay >= dueDay ? -1 : 0;
-  const closingMonthDate = new Date(year, parsedMonth - 1 + closingMonthOffset, 1, 12, 0, 0, 0);
-  const closingYear = closingMonthDate.getFullYear();
-  const closingMonth = closingMonthDate.getMonth() + 1;
-  const closingDay = clampDay(closingYear, closingMonth, closeDay);
+function getCompetenceMonthDate(month: string) {
+  const { year, month: parsedMonth } = parseStatementMonth(month);
+  return new Date(year, parsedMonth - 1, 1, 12, 0, 0, 0);
+}
+
+function getStatementMonthOffsetForDue(closeDay: number, dueDay: number) {
+  return dueDay > closeDay ? 0 : 1;
+}
+
+function getNextClosingDate(referenceDate: Date, closeDay: number) {
+  const year = referenceDate.getFullYear();
+  const month = referenceDate.getMonth() + 1;
+  const closingDay = clampDay(year, month, closeDay);
+  const currentMonthClose = new Date(year, month - 1, closingDay, 23, 59, 59, 999);
+
+  if (referenceDate <= currentMonthClose) {
+    return {
+      year,
+      month,
+      day: closingDay
+    };
+  }
+
+  const nextMonthDate = new Date(year, month, 1, 12, 0, 0, 0);
+  const nextYear = nextMonthDate.getFullYear();
+  const nextMonth = nextMonthDate.getMonth() + 1;
 
   return {
-    year: closingYear,
-    month: closingMonth,
+    year: nextYear,
+    month: nextMonth,
+    day: clampDay(nextYear, nextMonth, closeDay)
+  };
+}
+
+function getCompetenceMonthFromClosingDate(closing: { year: number; month: number }, closeDay: number) {
+  const anchorDate = new Date(
+    closing.year,
+    closing.month - 1,
+    1,
+    12,
+    0,
+    0,
+    0
+  );
+  anchorDate.setMonth(anchorDate.getMonth() + (closeDay > 15 ? 0 : -1));
+
+  return formatStatementMonth(anchorDate.getFullYear(), anchorDate.getMonth() + 1);
+}
+
+function getClosingMonthDate(statementMonth: string, closeDay: number) {
+  const competenceMonthDate = getCompetenceMonthDate(statementMonth);
+  const closingMonthDate = new Date(
+    competenceMonthDate.getFullYear(),
+    competenceMonthDate.getMonth() + (closeDay > 15 ? 0 : 1),
+    1,
+    12,
+    0,
+    0,
+    0
+  );
+  const year = closingMonthDate.getFullYear();
+  const parsedMonth = closingMonthDate.getMonth() + 1;
+  const closingDay = clampDay(year, parsedMonth, closeDay);
+
+  return {
+    year,
+    month: parsedMonth,
     day: closingDay
   };
 }
 
-export function getCurrentStatementMonth(card: Pick<CardStatementCard, "closeDay" | "dueDay">, referenceDate = new Date()) {
-  const year = referenceDate.getFullYear();
-  const month = referenceDate.getMonth() + 1;
-  const currentMonthStatement = formatStatementMonth(year, month);
-  const currentMonthDueDate = getStatementPaymentDate(currentMonthStatement, card.dueDay);
-
-  if (referenceDate <= currentMonthDueDate) {
-    return currentMonthStatement;
-  }
-
-  const nextMonthReference = new Date(year, month, 1, 12, 0, 0, 0);
-  return formatStatementMonth(nextMonthReference.getFullYear(), nextMonthReference.getMonth() + 1);
+function getExpenseCompetenceMonth(card: Pick<CardStatementCard, "closeDay" | "dueDay">, referenceDate: Date) {
+  const nextClosing = getNextClosingDate(referenceDate, card.closeDay);
+  return getCompetenceMonthFromClosingDate(nextClosing, card.closeDay);
 }
 
-export function getExpenseStatementMonth(card: Pick<CardStatementCard, "closeDay" | "dueDay">, referenceDate: Date) {
-  const year = referenceDate.getFullYear();
-  const month = referenceDate.getMonth() + 1;
-  const closingDay = clampDay(year, month, card.closeDay);
-  const closingDate = new Date(year, month - 1, closingDay, 23, 59, 59, 999);
-  const dueMonthOffset = (card.closeDay >= card.dueDay ? 1 : 0) + (referenceDate <= closingDate ? 0 : 1);
-  const dueDateReference = new Date(year, month - 1 + dueMonthOffset, 1, 12, 0, 0, 0);
+export function getCurrentStatementMonth(card: Pick<CardStatementCard, "closeDay" | "dueDay">, referenceDate = new Date()) {
+  return getExpenseCompetenceMonth(card, referenceDate);
+}
 
-  return formatStatementMonth(dueDateReference.getFullYear(), dueDateReference.getMonth() + 1);
+export function getCurrentPayableStatementMonth(
+  card: Pick<CardStatementCard, "closeDay" | "dueDay">,
+  referenceDate = new Date()
+) {
+  const currentStatementMonth = getCurrentStatementMonth(card, referenceDate);
+  const previousStatementMonth = addMonthsToStatementMonth(currentStatementMonth, -1);
+  const previousDueDate = getStatementPaymentDate(previousStatementMonth, card.dueDay, card.closeDay);
+  const dayReference = new Date(referenceDate);
+  dayReference.setHours(0, 0, 0, 0);
+
+  return previousDueDate >= dayReference ? previousStatementMonth : currentStatementMonth;
 }
 
 export function addMonthsToStatementMonth(month: string, amount: number) {
@@ -86,8 +143,9 @@ export function addMonthsToStatementMonth(month: string, amount: number) {
   return formatStatementMonth(shifted.getFullYear(), shifted.getMonth() + 1);
 }
 
-export function getStatementRange(month: string, closeDay: number, dueDay: number) {
-  const currentClose = getClosingMonthDate(month, closeDay, dueDay);
+export function getStatementRange(month: string, closeDay: number, _dueDay: number) {
+  void _dueDay;
+  const currentClose = getClosingMonthDate(month, closeDay);
   const previousMonthDate = new Date(currentClose.year, currentClose.month - 2, 1, 12, 0, 0, 0);
   const previousYear = previousMonthDate.getFullYear();
   const previousMonth = previousMonthDate.getMonth() + 1;
@@ -99,14 +157,26 @@ export function getStatementRange(month: string, closeDay: number, dueDay: numbe
   };
 }
 
-export function getStatementPaymentDate(month: string, dueDay: number) {
-  const { year, month: parsedMonth } = parseStatementMonth(month);
-  const paymentDay = clampDay(year, parsedMonth, dueDay);
-  return new Date(year, parsedMonth - 1, paymentDay, 12, 0, 0, 0);
+export function getStatementPaymentDate(month: string, dueDay: number, closeDay: number) {
+  const closing = getClosingMonthDate(month, closeDay);
+  const dueMonthDate = new Date(
+    closing.year,
+    closing.month - 1 + getStatementMonthOffsetForDue(closeDay, dueDay),
+    1,
+    12,
+    0,
+    0,
+    0
+  );
+  const dueYear = dueMonthDate.getFullYear();
+  const dueMonth = dueMonthDate.getMonth() + 1;
+  const paymentDay = clampDay(dueYear, dueMonth, dueDay);
+  return new Date(dueYear, dueMonth - 1, paymentDay, 12, 0, 0, 0);
 }
 
-export function getStatementCloseDate(month: string, closeDay: number, dueDay: number) {
-  const closing = getClosingMonthDate(month, closeDay, dueDay);
+export function getStatementCloseDate(month: string, closeDay: number, _dueDay: number) {
+  void _dueDay;
+  const closing = getClosingMonthDate(month, closeDay);
   return new Date(closing.year, closing.month - 1, closing.day, 12, 0, 0, 0);
 }
 
@@ -115,17 +185,23 @@ export function getCardExpenseDueDate(
   referenceDate: Date,
   installmentOffset = 0
 ) {
-  const baseStatementMonth = getExpenseStatementMonth(card, referenceDate);
+  const baseStatementMonth = getExpenseCompetenceMonth(card, referenceDate);
   const installmentStatementMonth = addMonthsToStatementMonth(baseStatementMonth, installmentOffset);
 
-  return getStatementPaymentDate(installmentStatementMonth, card.dueDay);
+  return getStatementPaymentDate(installmentStatementMonth, card.dueDay, card.closeDay);
 }
 
 export function getCardExpenseCompetenceDate(
   card: Pick<CardStatementCard, "closeDay" | "dueDay">,
   referenceDate: Date
 ) {
-  return getCardExpenseDueDate(card, referenceDate);
+  const competenceMonthKey = getExpenseCompetenceMonth(card, referenceDate);
+  const competenceMonthDate = getCompetenceMonthDate(competenceMonthKey);
+  const competenceYear = competenceMonthDate.getFullYear();
+  const competenceMonth = competenceMonthDate.getMonth() + 1;
+  const competenceDay = clampDay(competenceYear, competenceMonth, referenceDate.getDate());
+
+  return new Date(competenceYear, competenceMonth - 1, competenceDay, 12, 0, 0, 0);
 }
 
 export function calculateStatementTotal(transactions: StatementTransactionLike[]) {
@@ -145,7 +221,7 @@ export function calculateStatementTotal(transactions: StatementTransactionLike[]
   }, 0);
 }
 
-function calculatePaymentsTotal(payments: Array<{ amount: number | { toString(): string } }>) {
+function calculatePaymentsTotal(payments: StatementPaymentLike[]) {
   return payments.reduce((sum, payment) => sum + Number(payment.amount), 0);
 }
 
@@ -198,7 +274,10 @@ export async function getCardStatementSnapshot({
     })
   ]);
   const totalAmount = calculateStatementTotal(statementTransactions);
-  const outstandingAmount = Math.max(0, calculateStatementTotal(allCardTransactions) - calculatePaymentsTotal(payments));
+  const outstandingAmount = Math.max(
+    0,
+    calculateStatementTotal(allCardTransactions) - calculatePaymentsTotal(payments)
+  );
 
   return {
     month: statementMonth,
@@ -208,7 +287,7 @@ export async function getCardStatementSnapshot({
     outstandingAmount,
     availableLimit: Number(card.limitAmount) - outstandingAmount,
     closeDate: getStatementCloseDate(statementMonth, card.closeDay, card.dueDay),
-    dueDate: getStatementPaymentDate(statementMonth, card.dueDay)
+    dueDate: getStatementPaymentDate(statementMonth, card.dueDay, card.closeDay)
   };
 }
 
@@ -237,7 +316,7 @@ export async function getCardStatementSnapshots({
       start,
       end,
       closeDate: getStatementCloseDate(statementMonth, card.closeDay, card.dueDay),
-      dueDate: getStatementPaymentDate(statementMonth, card.dueDay)
+      dueDate: getStatementPaymentDate(statementMonth, card.dueDay, card.closeDay)
     };
   });
 

@@ -4,9 +4,9 @@ import type { ReactNode } from "react";
 import { ArrowRight, BellRing, CreditCard, Landmark, Target } from "lucide-react";
 
 import { SummaryCards } from "@/features/dashboard/components/summary-cards";
+import { syncDueSubscriptionTransactions } from "@/lib/automation/subscriptions";
 import { requireSessionUser } from "@/lib/auth/session";
 import { getCardExpenseCompetenceDate, getCardStatementSnapshots } from "@/lib/cards/statement";
-import { formatDateDisplay } from "@/lib/date";
 import { getAccountsWithComputedBalance } from "@/lib/finance/accounts";
 import { getFinanceReport } from "@/lib/finance/reports";
 import { formatMonthKeyLabel, getMonthRange, normalizeMonthKey } from "@/lib/month";
@@ -18,13 +18,14 @@ function formatDate(value: Date | string | null | undefined) {
     return "Sem data";
   }
 
-  return formatDateDisplay(value);
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "short"
+  }).format(new Date(value));
 }
 
 async function getDashboardData(tenantId: string, month: string) {
   const { start, end, from, to } = getMonthRange(month);
-  const expandedStart = new Date(start);
-  expandedStart.setMonth(expandedStart.getMonth() - 1);
 
   try {
     const [accounts, monthlyReport, goals, recentTransactions, upcomingSubscriptions, upcomingGoals, activeCards] =
@@ -44,7 +45,7 @@ async function getDashboardData(tenantId: string, month: string) {
           where: {
             tenantId,
             date: {
-              gte: expandedStart,
+              gte: new Date(start.getFullYear(), start.getMonth() - 1, 1, 0, 0, 0, 0),
               lte: end
             }
           },
@@ -55,7 +56,7 @@ async function getDashboardData(tenantId: string, month: string) {
             card: true
           },
           orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-          take: 40
+          take: 200
         }),
         prisma.subscription.findMany({
           where: {
@@ -108,15 +109,6 @@ async function getDashboardData(tenantId: string, month: string) {
       client: prisma,
       month
     });
-    const filteredRecentTransactions = recentTransactions
-      .filter((transaction) => {
-        const competenceDate = transaction.card
-          ? getCardExpenseCompetenceDate(transaction.card, transaction.date)
-          : transaction.date;
-
-        return competenceDate >= start && competenceDate <= end;
-      })
-      .slice(0, 6);
     const cardsWithStatement = activeCards.map((card) => {
       const statement = cardStatements.find((item) => item.card.id === card.id);
 
@@ -126,9 +118,15 @@ async function getDashboardData(tenantId: string, month: string) {
         closeDate: statement?.closeDate ?? null,
         dueDate: statement?.dueDate ?? null,
         statementAmount: statement?.totalAmount ?? 0,
+        outstandingAmount: statement?.outstandingAmount ?? 0,
         availableLimit: statement?.availableLimit ?? Number(card.limitAmount)
       };
     });
+
+    const monthlyCardPayments = monthlyReport.upcoming
+      .filter((item) => item.source === "card_statement")
+      .reduce((sum, item) => sum + item.amount, 0);
+    const projectedMonthNet = monthlyReport.projection.income - monthlyReport.projection.expense;
 
     return {
       balance: accounts.filter((account) => account.isActive).reduce((sum, account) => sum + account.currentBalance, 0),
@@ -138,9 +136,19 @@ async function getDashboardData(tenantId: string, month: string) {
       classification: monthlyReport.classification,
       spendingInsights: monthlyReport.spendingInsights,
       projection: monthlyReport.projection,
+      monthlyCardPayments,
+      projectedMonthNet,
       upcomingProjection: monthlyReport.upcoming.slice(0, 5),
       goals: Number(goals._sum.currentAmount ?? 0),
-      recentTransactions: filteredRecentTransactions,
+      recentTransactions: recentTransactions
+        .filter((transaction) => {
+          const competenceDate = transaction.card
+            ? getCardExpenseCompetenceDate(transaction.card, transaction.date)
+            : transaction.date;
+
+          return competenceDate >= start && competenceDate <= end;
+        })
+        .slice(0, 6),
       upcomingSubscriptions,
       upcomingGoals,
       activeAccounts: accounts
@@ -174,6 +182,8 @@ async function getDashboardData(tenantId: string, month: string) {
         cardPayments: 0,
         net: 0
       },
+      monthlyCardPayments: 0,
+      projectedMonthNet: 0,
       upcomingProjection: [],
       goals: 0,
       recentTransactions: [],
@@ -195,6 +205,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const user = await requireSessionUser();
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const month = normalizeMonthKey(resolvedSearchParams?.month);
+  await syncDueSubscriptionTransactions({
+    tenantId: user.tenantId,
+    userId: user.id
+  });
   const data = await getDashboardData(user.tenantId, month);
   const monthLabel = formatMonthKeyLabel(month);
   const netMonth = data.income - data.expenses;
@@ -253,7 +267,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         <article className="surface-strong rounded-[34px] p-6 md:p-8">
           <div className="section-stack">
             <div>
-              <p className="metric-label text-white/78">Foco imediato</p>
+              <p className="metric-label text-white/78">Caixa disponível</p>
               <h2
                 className={`mt-4 whitespace-nowrap text-[clamp(2rem,4vw,3.2rem)] font-semibold tracking-[-0.07em] ${
                   data.balance < 0 ? "amount-negative" : "text-white"
@@ -271,17 +285,17 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               <div className="rounded-[24px] border border-white/12 bg-white/8 px-4 py-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-white/66">Faturas a vencer</p>
                 <p className="mt-2 whitespace-nowrap text-2xl font-semibold tracking-[-0.05em] text-white">
-                  {formatCurrency(data.projection.cardPayments)}
+                  {formatCurrency(data.monthlyCardPayments)}
                 </p>
               </div>
               <div className="rounded-[24px] border border-white/12 bg-white/8 px-4 py-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-white/66">Projeção do mês</p>
                 <p
                   className={`mt-2 whitespace-nowrap text-2xl font-semibold tracking-[-0.05em] ${
-                    data.projection.net < 0 ? "amount-negative" : "text-white"
+                    data.projectedMonthNet < 0 ? "amount-negative" : "text-white"
                   }`}
                 >
-                  {formatCurrency(data.projection.net)}
+                  {formatCurrency(data.projectedMonthNet)}
                 </p>
               </div>
             </div>
@@ -378,7 +392,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             </Link>
           </div>
 
-          <div className="mt-5 hidden space-y-3">
+          <div className="mt-5 space-y-3">
             {data.recentTransactions.length > 0 ? (
               data.recentTransactions.map((transaction) => (
                 <div key={transaction.id} className="data-card flex items-center justify-between gap-4 px-4 py-3">
@@ -559,7 +573,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                         <span>Limite utilizado</span>
                         <span>
                           {Math.round(
-                            Math.min((Number(card.statementAmount) / Math.max(Number(card.limitAmount), 1)) * 100, 100)
+                            Math.min((Number(card.outstandingAmount) / Math.max(Number(card.limitAmount), 1)) * 100, 100)
                           )}
                           %
                         </span>
@@ -569,7 +583,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                           className="progress-fill"
                           style={{
                             width: `${Math.min(
-                              (Number(card.statementAmount) / Math.max(Number(card.limitAmount), 1)) * 100,
+                              (Number(card.outstandingAmount) / Math.max(Number(card.limitAmount), 1)) * 100,
                               100
                             )}%`
                           }}
@@ -604,6 +618,14 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                           }`}
                         >
                           {formatCurrency(Number(card.availableLimit))}
+                        </p>
+                      </div>
+                      <div className="rounded-[1.1rem] border border-[var(--color-border)]/70 bg-[var(--color-muted)]/25 px-3 py-3">
+                        <p className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-[var(--color-muted-foreground)]">
+                          Em aberto
+                        </p>
+                        <p className="mt-2 whitespace-nowrap text-sm font-medium text-[var(--color-foreground)]">
+                          {formatCurrency(Number(card.outstandingAmount))}
                         </p>
                       </div>
                     </div>

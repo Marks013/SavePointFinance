@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
@@ -106,6 +106,7 @@ export function SubscriptionsClient() {
   const searchParams = useSearchParams();
   const month = normalizeMonthKey(searchParams.get("month"));
   const [editingId, setEditingId] = useState<string | null>(null);
+  const formSectionRef = useRef<HTMLElement | null>(null);
   const subscriptionsQuery = useQuery({
     queryKey: ["subscriptions"],
     queryFn: getSubscriptions
@@ -249,6 +250,19 @@ export function SubscriptionsClient() {
     }
   }, [form, selectedAccountId, selectedCardId, selectedType]);
 
+  useEffect(() => {
+    if (!editingId) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      formSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      document.getElementById("sub-name")?.focus();
+    }, 80);
+
+    return () => window.clearTimeout(timeout);
+  }, [editingId]);
+
   const applyServicePreset = (preset: SubscriptionServicePreset) => {
     const currentValues = form.getValues();
     form.reset({
@@ -262,7 +276,7 @@ export function SubscriptionsClient() {
 
   return (
     <div className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
-      <section className="surface content-section">
+      <section className="surface content-section" ref={formSectionRef}>
         <div className="eyebrow">Assinaturas</div>
         <h1 className="mt-3 text-3xl font-semibold tracking-[-0.03em]">
           {isEditing ? "Editar recorrência" : "Nova recorrência"}

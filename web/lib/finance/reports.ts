@@ -9,7 +9,6 @@ import {
   getStatementPaymentDate,
   getStatementRange
 } from "@/lib/cards/statement";
-import { formatDateKey } from "@/lib/date";
 import { prisma } from "@/lib/prisma/client";
 import { addMonthsClamped } from "@/lib/utils";
 
@@ -75,8 +74,7 @@ function listStatementMonthsBetween(start: Date, end: Date) {
 function buildTransactionWhere(
   tenantId: string,
   filters: FinanceReportFilters,
-  userId?: string,
-  projectionStart?: Date
+  userId?: string
 ): Prisma.TransactionWhereInput {
   const where: Prisma.TransactionWhereInput = {
     tenantId,
@@ -98,12 +96,6 @@ function buildTransactionWhere(
     if (filters.to) {
       where.date.lte = new Date(`${filters.to}T23:59:59`);
     }
-  } else if (projectionStart) {
-    const expandedStart = new Date(projectionStart);
-    expandedStart.setMonth(expandedStart.getMonth() - 1);
-    where.date = {
-      gte: expandedStart
-    };
   }
 
   if (filters.accountId) {
@@ -126,7 +118,7 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
 
   const [transactions, subscriptions, cards, goals, accounts] = await Promise.all([
     prisma.transaction.findMany({
-      where: buildTransactionWhere(tenantId, filters, userId, projectionStart),
+      where: buildTransactionWhere(tenantId, filters, userId),
       select: {
         id: true,
         amount: true,
@@ -399,19 +391,21 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
 
   summary.transactions = transactionsInRange;
   summary.balance = summary.income - summary.expense;
-  const filterStart = filters.from
-    ? new Date(`${filters.from}T00:00:00`)
-    : (filteredTransactions[0]?.card
-        ? getCardExpenseCompetenceDate(filteredTransactions[0].card, filteredTransactions[0].date)
-        : filteredTransactions[0]?.date) ?? projectionStart;
+  const filterStart =
+    filters.from
+      ? new Date(`${filters.from}T00:00:00`)
+      : (filteredTransactions[0]?.card
+          ? getCardExpenseCompetenceDate(filteredTransactions[0].card, filteredTransactions[0].date)
+          : filteredTransactions[0]?.date) ?? projectionStart;
   const lastFilteredTransaction = filteredTransactions.at(-1);
-  const filterEnd = filters.to
-    ? new Date(`${filters.to}T23:59:59`)
-    : (lastFilteredTransaction
-        ? lastFilteredTransaction.card
-          ? getCardExpenseCompetenceDate(lastFilteredTransaction.card, lastFilteredTransaction.date)
-          : lastFilteredTransaction.date
-        : projectionEnd);
+  const filterEnd =
+    filters.to
+      ? new Date(`${filters.to}T23:59:59`)
+      : (lastFilteredTransaction
+          ? lastFilteredTransaction.card
+            ? getCardExpenseCompetenceDate(lastFilteredTransaction.card, lastFilteredTransaction.date)
+            : lastFilteredTransaction.date
+          : projectionEnd);
   const totalDays = Math.max(
     1,
     Math.ceil((filterEnd.getTime() - filterStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
@@ -444,14 +438,18 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
         amount: Number(subscription.amount),
         type: subscription.type === "income" ? "income" : "expense",
         source: "subscription",
-        reference: `${subscription.id}-${formatDateKey(occurrenceDate)}`
+        reference: `${subscription.id}-${occurrenceDate.toISOString().slice(0, 10)}`
       });
 
       occurrenceDate = addMonthsClamped(occurrenceDate, 1);
     }
   }
 
-  const statementMonths = listStatementMonthsBetween(projectionStart, projectionEnd);
+  const statementMonthStart = new Date(projectionStart);
+  statementMonthStart.setMonth(statementMonthStart.getMonth() - 1);
+  statementMonthStart.setDate(1);
+  statementMonthStart.setHours(12, 0, 0, 0);
+  const statementMonths = listStatementMonthsBetween(statementMonthStart, projectionEnd);
   const cardsWithStatements = cards.filter((card) => card.isActive);
   const earliestStatementStart = new Date(projectionStart);
   earliestStatementStart.setMonth(earliestStatementStart.getMonth() - 1);
@@ -514,7 +512,7 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
   const cardStatementEvents = cardsWithStatements.flatMap((card) =>
     statementMonths
       .map((statementMonth) => {
-        const dueDate = getStatementPaymentDate(statementMonth, card.dueDay);
+        const dueDate = getStatementPaymentDate(statementMonth, card.dueDay, card.closeDay);
 
         if (dueDate < projectionStart || dueDate > projectionEnd) {
           return null;
@@ -607,7 +605,9 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
       autoClassified: classifiedAutomatically,
       uncategorized: uncategorizedTransactions,
       coverage:
-        transactions.length > 0 ? (transactions.length - uncategorizedTransactions) / transactions.length : 0
+        filteredTransactions.length > 0
+          ? (filteredTransactions.length - uncategorizedTransactions) / filteredTransactions.length
+          : 0
     },
     spendingInsights: {
       topCategory,
@@ -633,7 +633,8 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
       income: projection.income,
       expense: projection.expense,
       cardPayments: projection.cardPayments,
-      net: currentBalance + projection.income - projection.expense
+      net: projection.income - projection.expense,
+      endingBalance: currentBalance + projection.income - projection.expense
     },
     filters,
     monthly: Array.from(monthlyMap.entries()).map(([label, values]) => ({
@@ -646,7 +647,7 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
     byAccount: Array.from(accountMap.values()).sort((a, b) => Math.abs(b.net) - Math.abs(a.net)),
     byCard: Array.from(cardMap.values()).sort((a, b) => b.netStatement - a.netStatement),
     upcoming: upcoming.slice(0, 12),
-    recent: transactions
+    recent: filteredTransactions
       .slice(-12)
       .reverse()
       .map((transaction) => ({

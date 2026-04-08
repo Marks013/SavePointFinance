@@ -3,7 +3,7 @@ import { NotificationChannel, PaymentMethod, TransactionSource, TransactionType 
 import { deliverNotification } from "@/lib/notifications/delivery";
 import {
   getCardStatementSnapshot,
-  getCurrentStatementMonth,
+  getCurrentPayableStatementMonth,
   getStatementPaymentDate
 } from "@/lib/cards/statement";
 import { getFinanceReport } from "@/lib/finance/reports";
@@ -232,29 +232,24 @@ export async function generateSubscriptionTransaction(subscriptionId: string, te
   };
 }
 
-export async function runRecurringAutomation(tenantId: string, userId: string) {
-  const now = new Date();
-  const tenantUser = await prisma.user.findFirst({
-    where: {
-      id: userId,
-      tenantId,
-      isActive: true
-    },
-    include: {
-      preferences: true
-    }
-  });
-
-  if (!tenantUser) {
-    throw new Error("User not found");
-  }
+export async function syncDueSubscriptionTransactions({
+  tenantId,
+  userId,
+  now = new Date()
+}: {
+  tenantId: string;
+  userId: string;
+  now?: Date;
+}) {
+  const dueThreshold = new Date(now);
+  dueThreshold.setHours(23, 59, 59, 999);
 
   const dueSubscriptions = await prisma.subscription.findMany({
     where: {
       tenantId,
       isActive: true,
       nextBillingDate: {
-        lte: now
+        lte: dueThreshold
       }
     },
     orderBy: {
@@ -276,7 +271,7 @@ export async function runRecurringAutomation(tenantId: string, userId: string) {
         }
       });
 
-      if (!freshSubscription || freshSubscription.nextBillingDate > now) {
+      if (!freshSubscription || freshSubscription.nextBillingDate > dueThreshold) {
         break;
       }
 
@@ -304,6 +299,32 @@ export async function runRecurringAutomation(tenantId: string, userId: string) {
       safety += 1;
     }
   }
+
+  return results;
+}
+
+export async function runRecurringAutomation(tenantId: string, userId: string) {
+  const now = new Date();
+  const tenantUser = await prisma.user.findFirst({
+    where: {
+      id: userId,
+      tenantId,
+      isActive: true
+    },
+    include: {
+      preferences: true
+    }
+  });
+
+  if (!tenantUser) {
+    throw new Error("User not found");
+  }
+
+  const results = await syncDueSubscriptionTransactions({
+    tenantId,
+    userId,
+    now
+  });
 
   const reminderWindow = new Date();
   reminderWindow.setDate(reminderWindow.getDate() + 7);
@@ -440,8 +461,8 @@ export async function runRecurringAutomation(tenantId: string, userId: string) {
   });
 
   for (const card of cards) {
-    const statementMonth = getCurrentStatementMonth(card, now);
-    const dueDate = getStatementPaymentDate(statementMonth, card.dueDay);
+    const statementMonth = getCurrentPayableStatementMonth(card, now);
+    const dueDate = getStatementPaymentDate(statementMonth, card.dueDay, card.closeDay);
 
     if (dueDate <= now || dueDate > reminderWindow) {
       continue;

@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
@@ -15,7 +15,6 @@ import { Label } from "@/components/ui/label";
 import { PresetChip } from "@/components/ui/preset-chip";
 import { Select } from "@/components/ui/select";
 import { cardFormSchema, type CardFormValues } from "@/features/cards/schemas/card-schema";
-import { formatDateDisplay } from "@/lib/date";
 import { brazilianInstitutions, cardBrandPresets, cardColorPresets, findPreset } from "@/lib/finance/presets";
 import { formatMonthKeyLabel, normalizeMonthKey } from "@/lib/month";
 import { formatCurrency } from "@/lib/utils";
@@ -168,6 +167,7 @@ export function CardsClient() {
   const searchParams = useSearchParams();
   const month = normalizeMonthKey(searchParams.get("month"));
   const [editingId, setEditingId] = useState<string | null>(null);
+  const formSectionRef = useRef<HTMLElement | null>(null);
   const [selectedStatementCardId, setSelectedStatementCardId] = useState<string>("");
   const [statementMonth, setStatementMonth] = useState(month);
   const [statementPaymentAccountId, setStatementPaymentAccountId] = useState<string>("");
@@ -188,10 +188,6 @@ export function CardsClient() {
       totalOutstanding: cards.reduce((sum, card) => sum + card.outstandingAmount, 0)
     }),
     [cards]
-  );
-  const usedLimitPercentage = useMemo(
-    () => (totalLimit > 0 ? Math.round((totalOutstanding / totalLimit) * 100) : 0),
-    [totalLimit, totalOutstanding]
   );
   const statementQuery = useQuery({
     queryKey: ["card-statement", selectedStatementCardId, statementMonth, statementItemsLimit],
@@ -224,6 +220,7 @@ export function CardsClient() {
         queryClient.invalidateQueries({ queryKey: ["transactions"] }),
         queryClient.invalidateQueries({ queryKey: ["reports-summary"] }),
         queryClient.invalidateQueries({ queryKey: ["accounts"] }),
+        queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
         queryClient.invalidateQueries({ queryKey: ["cards"] })
       ]);
     },
@@ -260,7 +257,8 @@ export function CardsClient() {
       setEditingId(null);
       form.reset();
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["cards"] })
+        queryClient.invalidateQueries({ queryKey: ["cards"] }),
+        queryClient.invalidateQueries({ queryKey: ["dashboard"] })
       ]);
     },
     onError: () => {
@@ -277,7 +275,8 @@ export function CardsClient() {
         form.reset();
       }
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["cards"] })
+        queryClient.invalidateQueries({ queryKey: ["cards"] }),
+        queryClient.invalidateQueries({ queryKey: ["dashboard"] })
       ]);
     },
     onError: (error) => {
@@ -316,9 +315,22 @@ export function CardsClient() {
     setStatementMonth(month);
   }, [month]);
 
+  useEffect(() => {
+    if (!editingId) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      formSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      document.getElementById("card-name")?.focus();
+    }, 80);
+
+    return () => window.clearTimeout(timeout);
+  }, [editingId]);
+
   return (
     <div className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
-      <section className="surface content-section">
+      <section className="surface content-section" ref={formSectionRef}>
         <div className="eyebrow">Cartões</div>
         <h1 className="mt-3 text-3xl font-semibold tracking-[-0.03em]">
           {isEditing ? "Editar cartão" : "Novo cartão"}
@@ -506,7 +518,7 @@ export function CardsClient() {
               Acompanhe o limite total, a soma das faturas abertas e a utilização consolidada.
             </p>
           </div>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             <article className="metric-card">
               <p className="metric-label">Limite total</p>
               <p className="metric-value">{formatCurrency(totalLimit)}</p>
@@ -515,9 +527,9 @@ export function CardsClient() {
               <p className="metric-label">Fatura aberta</p>
               <p className="metric-value">{formatCurrency(totalStatement)}</p>
             </article>
-            <article className="metric-card">
-              <p className="metric-label">Limites usados</p>
-              <p className="metric-value">{usedLimitPercentage}%</p>
+            <article className="metric-card sm:col-span-2">
+              <p className="metric-label">Saldo em aberto</p>
+              <p className="metric-value">{formatCurrency(totalOutstanding)}</p>
             </article>
           </div>
         </div>
@@ -557,41 +569,67 @@ export function CardsClient() {
                   </p>
                 </div>
               </div>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-[1rem] border border-[var(--color-border)]/60 bg-[var(--color-muted)]/20 px-3 py-3 sm:col-span-2">
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                <div className="rounded-[1.15rem] border border-[var(--color-border)]/60 bg-[var(--color-muted)]/18 px-4 py-4">
                   <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted-foreground)]">
-                    Fatura
+                    Fatura aberta
                   </p>
-                  <p className="mt-2 break-words text-base font-semibold text-[var(--color-foreground)]">
+                  <p className="mt-2 break-words text-lg font-semibold text-[var(--color-foreground)]">
                     {formatCurrency(card.statementAmount)}
                   </p>
+                  <p className="mt-2 text-xs text-[var(--color-muted-foreground)]">
+                    Competência {formatMonthKeyLabel(card.statementMonth)}
+                  </p>
                 </div>
-                <div className="rounded-[1rem] border border-[var(--color-border)]/60 bg-[var(--color-muted)]/20 px-3 py-3">
+                <div className="rounded-[1.15rem] border border-[var(--color-border)]/60 bg-[var(--color-muted)]/18 px-4 py-4">
                   <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted-foreground)]">
                     Disponível
                   </p>
                   <p
-                    className={`mt-2 break-words text-base font-semibold ${card.availableLimit < 0 ? "amount-negative" : "text-[var(--color-foreground)]"}`}
+                    className={`mt-2 break-words text-lg font-semibold ${card.availableLimit < 0 ? "amount-negative" : "text-[var(--color-foreground)]"}`}
                   >
                     {formatCurrency(card.availableLimit)}
                   </p>
+                  <p className="mt-2 text-xs text-[var(--color-muted-foreground)]">
+                    Limite total de {formatCurrency(card.limitAmount)}.
+                  </p>
                 </div>
-                <div className="rounded-[1rem] border border-[var(--color-border)]/60 bg-[var(--color-muted)]/20 px-3 py-3">
+                <div className="rounded-[1.15rem] border border-[var(--color-border)]/60 bg-[var(--color-muted)]/18 px-4 py-4">
                   <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted-foreground)]">
                     Em aberto
                   </p>
-                  <p className="mt-2 break-words text-base font-semibold text-[var(--color-foreground)]">
+                  <p className="mt-2 break-words text-lg font-semibold text-[var(--color-foreground)]">
                     {formatCurrency(card.outstandingAmount)}
                   </p>
-                </div>
-                <div className="rounded-[1rem] border border-[var(--color-border)]/60 bg-[var(--color-muted)]/20 px-3 py-3 sm:col-span-2">
-                  <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted-foreground)]">
-                    Ciclo
+                  <p className="mt-2 text-xs text-[var(--color-muted-foreground)]">
+                    Valor que ainda consome limite.
                   </p>
-                  <div className="mt-2 grid gap-1 text-sm font-semibold text-[var(--color-foreground)]">
-                    <p className="break-words">Fecha dia {card.closeDay}</p>
-                    <p className="break-words">Vence dia {card.dueDay}</p>
-                    <p className="break-words">Próximo vencimento: {formatDateDisplay(card.dueDate)}</p>
+                </div>
+                <div className="rounded-[1.15rem] border border-[var(--color-border)]/60 bg-[var(--color-muted)]/18 px-4 py-4 md:col-span-2">
+                  <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted-foreground)]">
+                    Ciclo do cartão
+                  </p>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                    <div className="rounded-[1rem] border border-[var(--color-border)]/70 bg-[var(--color-card)] px-3 py-3">
+                      <p className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted-foreground)]">
+                        Fecha
+                      </p>
+                      <p className="mt-1 text-sm font-semibold text-[var(--color-foreground)]">Dia {card.closeDay}</p>
+                    </div>
+                    <div className="rounded-[1rem] border border-[var(--color-border)]/70 bg-[var(--color-card)] px-3 py-3">
+                      <p className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted-foreground)]">
+                        Vence
+                      </p>
+                      <p className="mt-1 text-sm font-semibold text-[var(--color-foreground)]">Dia {card.dueDay}</p>
+                    </div>
+                    <div className="rounded-[1rem] border border-[var(--color-border)]/70 bg-[var(--color-card)] px-3 py-3">
+                      <p className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted-foreground)]">
+                        Proximo pagamento
+                      </p>
+                      <p className="mt-1 break-words text-sm font-semibold leading-5 text-[var(--color-foreground)]">
+                        {new Date(card.dueDate).toLocaleDateString("pt-BR")}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -608,7 +646,7 @@ export function CardsClient() {
                 />
               </div>
               <p className="mt-2 text-xs text-[var(--color-muted-foreground)]">
-                Utilização: {card.limitAmount > 0 ? Math.round((card.outstandingAmount / card.limitAmount) * 100) : 0}%
+                Utilizacao: {card.limitAmount > 0 ? Math.round((card.outstandingAmount / card.limitAmount) * 100) : 0}%
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button onClick={() => startEditing(card)} type="button" variant="secondary">
@@ -674,7 +712,10 @@ export function CardsClient() {
               ? `Cartão selecionado: ${cards.find((item) => item.id === selectedStatementCardId)?.name ?? "Cartão"}.`
               : "Nenhum cartão selecionado."}
           </p>
-          <p>{`Competência em análise: ${formatMonthKeyLabel(statementMonth)}.`}</p>
+          <p>{`Competência em análise: ${new Date(`${statementMonth}-01T12:00:00`).toLocaleDateString("pt-BR", {
+            month: "long",
+            year: "numeric"
+          })}.`}</p>
         </div>
         <div className="mt-4">
           <Button
@@ -760,12 +801,12 @@ export function CardsClient() {
 
             <div className="muted-panel text-sm text-[var(--color-muted-foreground)]">
               <p>
-                Ciclo da fatura: {formatDateDisplay(statementQuery.data.summary.cycleStart)} até{" "}
-                {formatDateDisplay(statementQuery.data.summary.cycleEnd)}.
+                Ciclo da fatura: {new Date(statementQuery.data.summary.cycleStart).toLocaleDateString("pt-BR")} até{" "}
+                {new Date(statementQuery.data.summary.cycleEnd).toLocaleDateString("pt-BR")}.
               </p>
               <p className="mt-2">
-                Fechamento em {formatDateDisplay(statementQuery.data.summary.closeDate)} e
-                vencimento em {formatDateDisplay(statementQuery.data.summary.dueDate)}.
+                Fechamento em {new Date(statementQuery.data.summary.closeDate).toLocaleDateString("pt-BR")} e
+                vencimento em {new Date(statementQuery.data.summary.dueDate).toLocaleDateString("pt-BR")}.
               </p>
             </div>
 
@@ -776,7 +817,7 @@ export function CardsClient() {
                   {statementIsPaid ? (
                     <>
                       <p className="mt-2 text-lg font-semibold">
-                        Pago em {formatDateDisplay(statementQuery.data.payment!.paidAt)}
+                        Pago em {new Date(statementQuery.data.payment!.paidAt).toLocaleDateString("pt-BR")}
                       </p>
                       <p className="mt-1 text-sm text-[var(--color-muted-foreground)]">
                         Conta de origem: {statementQuery.data.payment!.account.name}
@@ -829,7 +870,7 @@ export function CardsClient() {
                     <div>
                       <p className="font-semibold">{item.description}</p>
                       <p className="text-sm text-[var(--color-muted-foreground)]">
-                        {item.category} • {formatDateDisplay(item.date)}
+                        {item.category} • {new Date(item.date).toLocaleDateString("pt-BR")}
                         {item.installmentLabel ? ` • ${item.installmentLabel}` : ""}
                       </p>
                     </div>

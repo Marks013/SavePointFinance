@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
@@ -192,6 +192,7 @@ export function TransactionsClient() {
   const month = normalizeMonthKey(searchParams.get("month"));
   const monthRange = getMonthRange(month);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const formSectionRef = useRef<HTMLElement | null>(null);
   const [editingScope, setEditingScope] = useState<"single" | "group">("single");
   const [editingInstallmentsTotal, setEditingInstallmentsTotal] = useState(1);
   const [reviewSelections, setReviewSelections] = useState<ReviewSelectionState>({});
@@ -487,9 +488,22 @@ export function TransactionsClient() {
     form.setValue("installments", 1);
   }, [form, isCreditCard]);
 
+  useEffect(() => {
+    if (!editingId) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      formSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      document.getElementById("description")?.focus();
+    }, 80);
+
+    return () => window.clearTimeout(timeout);
+  }, [editingId]);
+
   return (
     <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-      <section className="surface content-section">
+      <section className="surface content-section" ref={formSectionRef}>
         <div className="page-intro">
           <div className="eyebrow">{isEditing ? "Editar transação" : "Nova transação"}</div>
           <h1 className="text-3xl font-semibold tracking-[-0.04em]">Operação financeira</h1>

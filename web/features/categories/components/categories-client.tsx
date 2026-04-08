@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
@@ -91,6 +91,7 @@ async function restoreDefaultCategories() {
 export function CategoriesClient() {
   const queryClient = useQueryClient();
   const [editingId, setEditingId] = useState<string | null>(null);
+  const formSectionRef = useRef<HTMLElement | null>(null);
   const categoriesQuery = useQuery({ queryKey: ["categories"], queryFn: getCategories });
   const categories = categoriesQuery.data?.items ?? [];
   const expenseCategories = categories.filter((category) => category.type === "expense").length;
@@ -196,9 +197,22 @@ export function CategoriesClient() {
   const selectedColor = form.watch("color");
   const selectedType = form.watch("type");
 
+  useEffect(() => {
+    if (!editingId) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      formSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      document.getElementById("category-name")?.focus();
+    }, 80);
+
+    return () => window.clearTimeout(timeout);
+  }, [editingId]);
+
   return (
     <div className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
-      <section className="surface content-section">
+      <section className="surface content-section" ref={formSectionRef}>
         <div className="eyebrow">Categorias</div>
         <h1 className="mt-3 text-3xl font-semibold tracking-[-0.03em]">
           {isEditing ? "Editar categoria" : "Nova categoria"}

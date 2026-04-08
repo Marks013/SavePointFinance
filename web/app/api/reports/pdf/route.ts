@@ -2,6 +2,7 @@ import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
 import type { ReactElement } from "react";
 
 import { SummaryDocument } from "@/features/reports/pdf/summary-document";
+import { syncDueSubscriptionTransactions } from "@/lib/automation/subscriptions";
 import { requireSessionUser } from "@/lib/auth/session";
 import { formatDateTimeDisplay } from "@/lib/date";
 import { getFinanceReport } from "@/lib/finance/reports";
@@ -10,6 +11,10 @@ import { getMonthRange, normalizeMonthKey } from "@/lib/month";
 export async function GET(request: Request) {
   try {
     const user = await requireSessionUser({ feature: "pdfExport" });
+    await syncDueSubscriptionTransactions({
+      tenantId: user.tenantId,
+      userId: user.id
+    });
     const { searchParams } = new URL(request.url);
     const month = searchParams.get("month");
     const resolvedMonth = month ? normalizeMonthKey(month) : null;
@@ -21,7 +26,7 @@ export async function GET(request: Request) {
       accountId: searchParams.get("accountId"),
       cardId: searchParams.get("cardId"),
       categoryId: searchParams.get("categoryId")
-    });
+    }, user.id);
     const periodParts = [
       report.filters.from ? `De ${report.filters.from}` : null,
       report.filters.to ? `até ${report.filters.to}` : null,
