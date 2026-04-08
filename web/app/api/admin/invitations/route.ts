@@ -215,7 +215,8 @@ export async function POST(request: Request) {
       channel: NotificationChannel.email,
       target: invitation.email,
       subject: invitationMessage.subject,
-      message: invitationMessage.message
+      message: invitationMessage.message,
+      html: invitationMessage.html
     });
 
     await logAdminAudit({

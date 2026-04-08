@@ -45,7 +45,8 @@ export async function POST(request: Request) {
       channel: NotificationChannel.email,
       target: user.email,
       subject: resetMessage.subject,
-      message: resetMessage.message
+      message: resetMessage.message,
+      html: resetMessage.html
     });
 
     return NextResponse.json({ success: true });

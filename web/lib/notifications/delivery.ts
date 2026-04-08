@@ -1,6 +1,7 @@
 import { NotificationChannel, NotificationStatus } from "@prisma/client";
 
 import { serverEnv } from "@/lib/env/server";
+import { buildGenericNotificationEmail } from "@/lib/notifications/email-template";
 import { prisma } from "@/lib/prisma/client";
 import { sendWhatsAppTextMessage } from "@/lib/whatsapp/cloud-api";
 
@@ -12,6 +13,7 @@ type NotificationInput = {
   target: string;
   subject: string;
   message: string;
+  html?: string;
 };
 
 type DeliveryResult = {
@@ -41,6 +43,10 @@ function webhookForChannel(channel: NotificationChannel) {
   return serverEnv.NOTIFICATION_WHATSAPP_WEBHOOK_URL;
 }
 
+function buildEmailHtml(input: NotificationInput) {
+  return input.html ?? buildGenericNotificationEmail(input.subject, input.message);
+}
+
 async function sendWithResend(input: NotificationInput) {
   const from = resolveEmailSender();
 
@@ -64,6 +70,7 @@ async function sendWithResend(input: NotificationInput) {
       to: [input.target],
       subject: input.subject,
       text: input.message,
+      html: buildEmailHtml(input),
       ...(serverEnv.EMAIL_REPLY_TO ? { reply_to: serverEnv.EMAIL_REPLY_TO } : {})
     })
   });
@@ -102,6 +109,7 @@ async function sendWithBrevo(input: NotificationInput) {
       to: [{ email: input.target }],
       subject: input.subject,
       textContent: input.message,
+      htmlContent: buildEmailHtml(input),
       ...(serverEnv.EMAIL_REPLY_TO ? { replyTo: { email: serverEnv.EMAIL_REPLY_TO } } : {})
     })
   });
@@ -139,6 +147,7 @@ async function sendViaWebhook(input: NotificationInput, attemptedAt: Date) {
       target: input.target,
       subject: input.subject,
       message: input.message,
+      html: input.channel === NotificationChannel.email ? buildEmailHtml(input) : undefined,
       attemptedAt: attemptedAt.toISOString()
     })
   });
