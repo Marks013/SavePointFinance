@@ -1,6 +1,11 @@
 import { PaymentMethod, Prisma, Transaction, TransactionSource, TransactionType } from "@prisma/client";
 
-import { getCurrentStatementMonth, getStatementCloseDate, getStatementPaymentDate, getStatementRange } from "@/lib/cards/statement";
+import {
+  getCurrentPayableStatementMonth,
+  getStatementCloseDate,
+  getStatementPaymentDate,
+  getStatementRange
+} from "@/lib/cards/statement";
 import { classifyTransactionCategory } from "@/lib/finance/category-classifier";
 import { getAccountsWithComputedBalance } from "@/lib/finance/accounts";
 import { ensureFallbackCategory } from "@/lib/finance/default-categories";
@@ -481,7 +486,7 @@ async function replyWithCardInfo(user: WhatsAppUser, body: string) {
     } satisfies AssistantResult;
   }
 
-  const month = getCurrentStatementMonth(card, new Date());
+  const month = getCurrentPayableStatementMonth(card, new Date());
   const { start, end } = getStatementRange(month, card.closeDay, card.dueDay);
   const transactions = await prisma.transaction.findMany({
     where: {
@@ -516,7 +521,7 @@ async function replyWithCardInfo(user: WhatsAppUser, body: string) {
       `Cartão ${card.name}. Fatura atual: ${formatCurrency(statementAmount)}. ` +
       `Limite disponível: ${formatCurrency(availableLimit)} de ${formatCurrency(Number(card.limitAmount))}. ` +
       `Fecha em ${formatDate(getStatementCloseDate(month, card.closeDay, card.dueDay))} e vence em ${formatDate(
-        getStatementPaymentDate(month, card.dueDay)
+          getStatementPaymentDate(month, card.dueDay, card.closeDay)
       )}.`
   } satisfies AssistantResult;
 }

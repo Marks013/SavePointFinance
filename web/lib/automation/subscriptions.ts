@@ -3,7 +3,7 @@ import { NotificationChannel, PaymentMethod, TransactionSource, TransactionType 
 import { deliverNotification } from "@/lib/notifications/delivery";
 import {
   getCardStatementSnapshot,
-  getCurrentStatementMonth,
+  getCurrentPayableStatementMonth,
   getStatementPaymentDate
 } from "@/lib/cards/statement";
 import { getFinanceReport } from "@/lib/finance/reports";
@@ -440,8 +440,8 @@ export async function runRecurringAutomation(tenantId: string, userId: string) {
   });
 
   for (const card of cards) {
-    const statementMonth = getCurrentStatementMonth(card, now);
-    const dueDate = getStatementPaymentDate(statementMonth, card.dueDay);
+    const statementMonth = getCurrentPayableStatementMonth(card, now);
+    const dueDate = getStatementPaymentDate(statementMonth, card.dueDay, card.closeDay);
 
     if (dueDate <= now || dueDate > reminderWindow) {
       continue;

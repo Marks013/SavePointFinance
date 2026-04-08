@@ -5,7 +5,7 @@ import { ArrowRight, BellRing, CreditCard, Landmark, Target } from "lucide-react
 
 import { SummaryCards } from "@/features/dashboard/components/summary-cards";
 import { requireSessionUser } from "@/lib/auth/session";
-import { getCardStatementSnapshots } from "@/lib/cards/statement";
+import { getCardExpenseCompetenceDate, getCardStatementSnapshots } from "@/lib/cards/statement";
 import { getAccountsWithComputedBalance } from "@/lib/finance/accounts";
 import { getFinanceReport } from "@/lib/finance/reports";
 import { formatMonthKeyLabel, getMonthRange, normalizeMonthKey } from "@/lib/month";
@@ -44,7 +44,7 @@ async function getDashboardData(tenantId: string, month: string) {
           where: {
             tenantId,
             date: {
-              gte: start,
+              gte: new Date(start.getFullYear(), start.getMonth() - 1, 1, 0, 0, 0, 0),
               lte: end
             }
           },
@@ -55,7 +55,7 @@ async function getDashboardData(tenantId: string, month: string) {
             card: true
           },
           orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-          take: 6
+          take: 24
         }),
         prisma.subscription.findMany({
           where: {
@@ -131,7 +131,15 @@ async function getDashboardData(tenantId: string, month: string) {
       projection: monthlyReport.projection,
       upcomingProjection: monthlyReport.upcoming.slice(0, 5),
       goals: Number(goals._sum.currentAmount ?? 0),
-      recentTransactions,
+      recentTransactions: recentTransactions
+        .filter((transaction) => {
+          const competenceDate = transaction.card
+            ? getCardExpenseCompetenceDate(transaction.card, transaction.date)
+            : transaction.date;
+
+          return competenceDate >= start && competenceDate <= end;
+        })
+        .slice(0, 6),
       upcomingSubscriptions,
       upcomingGoals,
       activeAccounts: accounts
