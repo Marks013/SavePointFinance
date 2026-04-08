@@ -28,6 +28,7 @@ type CardItem = {
   limitAmount: number;
   availableLimit: number;
   statementAmount: number;
+  outstandingAmount: number;
   statementMonth: string;
   closeDate: string;
   dueDate: string;
@@ -55,6 +56,7 @@ type StatementPayload = {
   month: string;
   summary: {
     totalAmount: number;
+    outstandingAmount: number;
     availableLimit: number;
     installmentItems: number;
     transactions: number;
@@ -179,16 +181,17 @@ export function CardsClient() {
   const accountsQuery = useQuery({ queryKey: ["accounts"], queryFn: getAccounts, staleTime: 30_000 });
   const cards = useMemo(() => cardsQuery.data?.items ?? [], [cardsQuery.data?.items]);
   const accounts = useMemo(() => accountsQuery.data?.items ?? [], [accountsQuery.data?.items]);
-  const { totalLimit, totalStatement } = useMemo(
+  const { totalLimit, totalStatement, totalOutstanding } = useMemo(
     () => ({
       totalLimit: cards.reduce((sum, card) => sum + card.limitAmount, 0),
-      totalStatement: cards.reduce((sum, card) => sum + card.statementAmount, 0)
+      totalStatement: cards.reduce((sum, card) => sum + card.statementAmount, 0),
+      totalOutstanding: cards.reduce((sum, card) => sum + card.outstandingAmount, 0)
     }),
     [cards]
   );
   const usedLimitPercentage = useMemo(
-    () => (totalLimit > 0 ? Math.round((totalStatement / totalLimit) * 100) : 0),
-    [totalLimit, totalStatement]
+    () => (totalLimit > 0 ? Math.round((totalOutstanding / totalLimit) * 100) : 0),
+    [totalLimit, totalOutstanding]
   );
   const statementQuery = useQuery({
     queryKey: ["card-statement", selectedStatementCardId, statementMonth, statementItemsLimit],
@@ -573,6 +576,14 @@ export function CardsClient() {
                     {formatCurrency(card.availableLimit)}
                   </p>
                 </div>
+                <div className="rounded-[1rem] border border-[var(--color-border)]/60 bg-[var(--color-muted)]/20 px-3 py-3">
+                  <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted-foreground)]">
+                    Em aberto
+                  </p>
+                  <p className="mt-2 break-words text-base font-semibold text-[var(--color-foreground)]">
+                    {formatCurrency(card.outstandingAmount)}
+                  </p>
+                </div>
                 <div className="rounded-[1rem] border border-[var(--color-border)]/60 bg-[var(--color-muted)]/20 px-3 py-3 sm:col-span-2">
                   <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted-foreground)]">
                     Ciclo
@@ -592,12 +603,12 @@ export function CardsClient() {
                 <div
                   className="h-full rounded-full bg-[var(--color-coral-500)]"
                   style={{
-                    width: `${Math.min(100, card.limitAmount > 0 ? (card.statementAmount / card.limitAmount) * 100 : 0)}%`
+                    width: `${Math.min(100, card.limitAmount > 0 ? (card.outstandingAmount / card.limitAmount) * 100 : 0)}%`
                   }}
                 />
               </div>
               <p className="mt-2 text-xs text-[var(--color-muted-foreground)]">
-                Utilização: {card.limitAmount > 0 ? Math.round((card.statementAmount / card.limitAmount) * 100) : 0}%
+                Utilização: {card.limitAmount > 0 ? Math.round((card.outstandingAmount / card.limitAmount) * 100) : 0}%
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button onClick={() => startEditing(card)} type="button" variant="secondary">
@@ -728,6 +739,10 @@ export function CardsClient() {
               <article className="metric-card">
                 <p className="text-sm text-[var(--color-muted-foreground)]">Total da fatura</p>
                 <p className="mt-2 text-2xl font-semibold">{formatCurrency(statementQuery.data.summary.totalAmount)}</p>
+              </article>
+              <article className="metric-card">
+                <p className="text-sm text-[var(--color-muted-foreground)]">Saldo em aberto</p>
+                <p className="mt-2 text-2xl font-semibold">{formatCurrency(statementQuery.data.summary.outstandingAmount)}</p>
               </article>
               <article className="metric-card">
                 <p className="text-sm text-[var(--color-muted-foreground)]">Limite disponível</p>

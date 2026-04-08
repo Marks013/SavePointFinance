@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma/client";
 
 export const statementMonthSchema = z.string().regex(/^\d{4}-\d{2}$/, "Competencia invalida");
 
-type StatementClient = Pick<PrismaClient, "transaction">;
+type StatementClient = Pick<PrismaClient, "transaction" | "statementPayment">;
 
 type CardStatementCard = {
   id: string;
@@ -138,6 +138,10 @@ export function calculateStatementTotal(transactions: StatementTransactionLike[]
   }, 0);
 }
 
+function calculatePaymentsTotal(payments: Array<{ amount: number | { toString(): string } }>) {
+  return payments.reduce((sum, payment) => sum + Number(payment.amount), 0);
+}
+
 export async function getCardStatementSnapshot({
   tenantId,
   card,
@@ -151,28 +155,51 @@ export async function getCardStatementSnapshot({
 }) {
   const statementMonth = month ?? getCurrentStatementMonth(card);
   const { start, end } = getStatementRange(statementMonth, card.closeDay, card.dueDay);
-  const transactions = await client.transaction.findMany({
-    where: {
-      tenantId,
-      cardId: card.id,
-      date: {
-        gte: start,
-        lte: end
+  const [statementTransactions, allCardTransactions, payments] = await Promise.all([
+    client.transaction.findMany({
+      where: {
+        tenantId,
+        cardId: card.id,
+        date: {
+          gte: start,
+          lte: end
+        }
+      },
+      select: {
+        amount: true,
+        type: true
       }
-    },
-    select: {
-      amount: true,
-      type: true
-    }
-  });
-  const totalAmount = calculateStatementTotal(transactions);
+    }),
+    client.transaction.findMany({
+      where: {
+        tenantId,
+        cardId: card.id
+      },
+      select: {
+        amount: true,
+        type: true
+      }
+    }),
+    client.statementPayment.findMany({
+      where: {
+        tenantId,
+        cardId: card.id
+      },
+      select: {
+        amount: true
+      }
+    })
+  ]);
+  const totalAmount = calculateStatementTotal(statementTransactions);
+  const outstandingAmount = Math.max(0, calculateStatementTotal(allCardTransactions) - calculatePaymentsTotal(payments));
 
   return {
     month: statementMonth,
     start,
     end,
     totalAmount,
-    availableLimit: Number(card.limitAmount) - totalAmount,
+    outstandingAmount,
+    availableLimit: Number(card.limitAmount) - outstandingAmount,
     closeDate: getStatementCloseDate(statementMonth, card.closeDay, card.dueDay),
     dueDate: getStatementPaymentDate(statementMonth, card.dueDay)
   };
@@ -216,27 +243,54 @@ export async function getCardStatementSnapshots({
     snapshots[0]!.end
   );
 
-  const transactions = await client.transaction.findMany({
-    where: {
-      tenantId,
-      cardId: {
-        in: cards.map((card) => card.id)
+  const [statementTransactions, allCardTransactions, payments] = await Promise.all([
+    client.transaction.findMany({
+      where: {
+        tenantId,
+        cardId: {
+          in: cards.map((card) => card.id)
+        },
+        date: {
+          gte: earliestStart,
+          lte: latestEnd
+        }
       },
-      date: {
-        gte: earliestStart,
-        lte: latestEnd
+      select: {
+        cardId: true,
+        amount: true,
+        type: true,
+        date: true
       }
-    },
-    select: {
-      cardId: true,
-      amount: true,
-      type: true,
-      date: true
-    }
-  });
+    }),
+    client.transaction.findMany({
+      where: {
+        tenantId,
+        cardId: {
+          in: cards.map((card) => card.id)
+        }
+      },
+      select: {
+        cardId: true,
+        amount: true,
+        type: true
+      }
+    }),
+    client.statementPayment.findMany({
+      where: {
+        tenantId,
+        cardId: {
+          in: cards.map((card) => card.id)
+        }
+      },
+      select: {
+        cardId: true,
+        amount: true
+      }
+    })
+  ]);
 
-  const transactionsByCard = new Map<string, typeof transactions>();
-  for (const transaction of transactions) {
+  const transactionsByCard = new Map<string, typeof statementTransactions>();
+  for (const transaction of statementTransactions) {
     if (!transaction.cardId) {
       continue;
     }
@@ -246,17 +300,41 @@ export async function getCardStatementSnapshots({
     transactionsByCard.set(transaction.cardId, current);
   }
 
+  const allTransactionsByCard = new Map<string, typeof allCardTransactions>();
+  for (const transaction of allCardTransactions) {
+    if (!transaction.cardId) {
+      continue;
+    }
+
+    const current = allTransactionsByCard.get(transaction.cardId) ?? [];
+    current.push(transaction);
+    allTransactionsByCard.set(transaction.cardId, current);
+  }
+
+  const paymentsByCard = new Map<string, typeof payments>();
+  for (const payment of payments) {
+    const current = paymentsByCard.get(payment.cardId) ?? [];
+    current.push(payment);
+    paymentsByCard.set(payment.cardId, current);
+  }
+
   return snapshots.map((snapshot) => {
     const totalAmount = calculateStatementTotal(
       (transactionsByCard.get(snapshot.card.id) ?? []).filter(
         (transaction) => transaction.date >= snapshot.start && transaction.date <= snapshot.end
       )
     );
+    const outstandingAmount = Math.max(
+      0,
+      calculateStatementTotal(allTransactionsByCard.get(snapshot.card.id) ?? []) -
+        calculatePaymentsTotal(paymentsByCard.get(snapshot.card.id) ?? [])
+    );
 
     return {
       ...snapshot,
       totalAmount,
-      availableLimit: Number(snapshot.card.limitAmount) - totalAmount
+      outstandingAmount,
+      availableLimit: Number(snapshot.card.limitAmount) - outstandingAmount
     };
   });
 }

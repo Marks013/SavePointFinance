@@ -36,6 +36,7 @@ export async function GET(request: Request) {
           limitAmount: Number(card.limitAmount),
           availableLimit: statement.availableLimit,
           statementAmount: statement.totalAmount,
+          outstandingAmount: statement.outstandingAmount,
           statementMonth: statement.month,
           closeDate: statement.closeDate.toISOString(),
           dueDate: statement.dueDate.toISOString(),
