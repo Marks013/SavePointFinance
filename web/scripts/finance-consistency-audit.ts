@@ -118,7 +118,7 @@ async function main() {
   const { ensureTenantDefaultCategories } = await import("../lib/finance/default-categories");
   const { getFinanceReport } = await import("../lib/finance/reports");
   const { getAccountsWithComputedBalance } = await import("../lib/finance/accounts");
-  const { getCurrentStatementMonth, getExpenseStatementMonth, getStatementPaymentDate } = await import("../lib/cards/statement");
+  const { getCurrentStatementMonth, getCardExpenseCompetenceDate, getStatementPaymentDate } = await import("../lib/cards/statement");
 
   await prisma.$connect();
   await ensureDefaultPlans(prisma);
@@ -134,13 +134,19 @@ async function main() {
     "Competencia padrao da fatura aberta ficou incorreta para cartao com fechamento apos vencimento"
   );
   assertCondition(
-    getExpenseStatementMonth({ closeDay: 24, dueDay: 8 }, new Date(2026, 2, 20, 12, 0, 0, 0)) === "2026-04",
+    getCardExpenseCompetenceDate({ closeDay: 24, dueDay: 8 }, new Date(2026, 2, 20, 12, 0, 0, 0))
+      .toISOString()
+      .startsWith("2026-04-20"),
     "Compra antes do fechamento nao entrou na fatura esperada"
   );
-  const expenseAfterCloseMonth = getExpenseStatementMonth({ closeDay: 24, dueDay: 8 }, new Date(2026, 2, 25, 12, 0, 0, 0));
+  const expenseAfterCloseDate = getCardExpenseCompetenceDate(
+    { closeDay: 24, dueDay: 8 },
+    new Date(2026, 2, 25, 12, 0, 0, 0)
+  );
+  const expenseAfterCloseMonth = `${expenseAfterCloseDate.getFullYear()}-${String(expenseAfterCloseDate.getMonth() + 1).padStart(2, "0")}`;
   assertCondition(expenseAfterCloseMonth === "2026-05", "Compra apos o fechamento nao foi empurrada para a fatura seguinte");
   assertCondition(
-    getStatementPaymentDate(expenseAfterCloseMonth, 8).toISOString().startsWith("2026-05-08"),
+    getStatementPaymentDate(expenseAfterCloseMonth, 8, 24).toISOString().startsWith("2026-05-08"),
     "Vencimento calculado da compra pos-fechamento ficou incorreto"
   );
 
