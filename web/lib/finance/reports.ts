@@ -150,7 +150,9 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
         card: {
           select: {
             name: true,
-            brand: true
+            brand: true,
+            closeDay: true,
+            dueDay: true
           }
         }
       },
