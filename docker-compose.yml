@@ -103,6 +103,104 @@ services:
     networks:
       - savepoint
 
+  backup:
+    build:
+      context: ./ops/backup
+      dockerfile: Dockerfile
+    container_name: savepoint_backup
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /backups/last-success.txt && find /backups/last-success.txt -mtime -2 | grep -q ."]
+      interval: 30m
+      timeout: 10s
+      retries: 1
+      start_period: 10m
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      TZ: ${TZ:-America/Sao_Paulo}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://savepoint.example.com}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@savepoint.local}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-Save Point Finança}
+      EMAIL_REPLY_TO: ${EMAIL_REPLY_TO:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      POSTGRES_DB: ${POSTGRES_DB:-savepoint}
+      POSTGRES_USER: ${POSTGRES_USER:-savepoint}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      BACKUP_DB_HOST: ${BACKUP_DB_HOST:-postgres}
+      BACKUP_DB_PORT: ${BACKUP_DB_PORT:-5432}
+      BACKUP_CRON_SCHEDULE: ${BACKUP_CRON_SCHEDULE:-0 3 * * *}
+      BACKUP_RUN_ON_STARTUP: ${BACKUP_RUN_ON_STARTUP:-false}
+      BACKUP_LOCAL_RETENTION_DAYS: ${BACKUP_LOCAL_RETENTION_DAYS:-14}
+      BACKUP_CRITICAL_PATHS: ${BACKUP_CRITICAL_PATHS:-.env,docker-compose.yml,DEPLOY_AND_BOOTSTRAP.md}
+      BACKUP_ENCRYPTION_PASSPHRASE: ${BACKUP_ENCRYPTION_PASSPHRASE:-}
+      BACKUP_ALERT_EMAIL_ENABLED: ${BACKUP_ALERT_EMAIL_ENABLED:-true}
+      BACKUP_ALERT_EMAIL_TO: ${BACKUP_ALERT_EMAIL_TO:-}
+      BACKUP_GITHUB_ENABLED: ${BACKUP_GITHUB_ENABLED:-false}
+      BACKUP_GITHUB_TOKEN: ${BACKUP_GITHUB_TOKEN:-}
+      BACKUP_GITHUB_REPOSITORY: ${BACKUP_GITHUB_REPOSITORY:-}
+      BACKUP_GITHUB_RELEASE_TAG: ${BACKUP_GITHUB_RELEASE_TAG:-savepoint-backups}
+      BACKUP_GITHUB_RETENTION_COUNT: ${BACKUP_GITHUB_RETENTION_COUNT:-30}
+      BACKUP_OBJECT_STORAGE_ENABLED: ${BACKUP_OBJECT_STORAGE_ENABLED:-false}
+      BACKUP_OBJECT_STORAGE_ENDPOINT: ${BACKUP_OBJECT_STORAGE_ENDPOINT:-}
+      BACKUP_OBJECT_STORAGE_BUCKET: ${BACKUP_OBJECT_STORAGE_BUCKET:-}
+      BACKUP_OBJECT_STORAGE_REGION: ${BACKUP_OBJECT_STORAGE_REGION:-sa-saopaulo-1}
+      BACKUP_OBJECT_STORAGE_PREFIX: ${BACKUP_OBJECT_STORAGE_PREFIX:-savepoint}
+      BACKUP_OBJECT_STORAGE_ACCESS_KEY: ${BACKUP_OBJECT_STORAGE_ACCESS_KEY:-}
+      BACKUP_OBJECT_STORAGE_SECRET_KEY: ${BACKUP_OBJECT_STORAGE_SECRET_KEY:-}
+    volumes:
+      - ./:/workspace:ro
+      - savepoint_backups:/backups
+    networks:
+      - savepoint
+
+  backup-once:
+    build:
+      context: ./ops/backup
+      dockerfile: Dockerfile
+    profiles: ["ops"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      TZ: ${TZ:-America/Sao_Paulo}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://savepoint.example.com}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@savepoint.local}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-Save Point Finança}
+      EMAIL_REPLY_TO: ${EMAIL_REPLY_TO:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      POSTGRES_DB: ${POSTGRES_DB:-savepoint}
+      POSTGRES_USER: ${POSTGRES_USER:-savepoint}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      BACKUP_DB_HOST: ${BACKUP_DB_HOST:-postgres}
+      BACKUP_DB_PORT: ${BACKUP_DB_PORT:-5432}
+      BACKUP_LOCAL_RETENTION_DAYS: ${BACKUP_LOCAL_RETENTION_DAYS:-14}
+      BACKUP_CRITICAL_PATHS: ${BACKUP_CRITICAL_PATHS:-.env,docker-compose.yml,DEPLOY_AND_BOOTSTRAP.md}
+      BACKUP_ENCRYPTION_PASSPHRASE: ${BACKUP_ENCRYPTION_PASSPHRASE:-}
+      BACKUP_ALERT_EMAIL_ENABLED: ${BACKUP_ALERT_EMAIL_ENABLED:-true}
+      BACKUP_ALERT_EMAIL_TO: ${BACKUP_ALERT_EMAIL_TO:-}
+      BACKUP_GITHUB_ENABLED: ${BACKUP_GITHUB_ENABLED:-false}
+      BACKUP_GITHUB_TOKEN: ${BACKUP_GITHUB_TOKEN:-}
+      BACKUP_GITHUB_REPOSITORY: ${BACKUP_GITHUB_REPOSITORY:-}
+      BACKUP_GITHUB_RELEASE_TAG: ${BACKUP_GITHUB_RELEASE_TAG:-savepoint-backups}
+      BACKUP_GITHUB_RETENTION_COUNT: ${BACKUP_GITHUB_RETENTION_COUNT:-30}
+      BACKUP_OBJECT_STORAGE_ENABLED: ${BACKUP_OBJECT_STORAGE_ENABLED:-false}
+      BACKUP_OBJECT_STORAGE_ENDPOINT: ${BACKUP_OBJECT_STORAGE_ENDPOINT:-}
+      BACKUP_OBJECT_STORAGE_BUCKET: ${BACKUP_OBJECT_STORAGE_BUCKET:-}
+      BACKUP_OBJECT_STORAGE_REGION: ${BACKUP_OBJECT_STORAGE_REGION:-sa-saopaulo-1}
+      BACKUP_OBJECT_STORAGE_PREFIX: ${BACKUP_OBJECT_STORAGE_PREFIX:-savepoint}
+      BACKUP_OBJECT_STORAGE_ACCESS_KEY: ${BACKUP_OBJECT_STORAGE_ACCESS_KEY:-}
+      BACKUP_OBJECT_STORAGE_SECRET_KEY: ${BACKUP_OBJECT_STORAGE_SECRET_KEY:-}
+    command: ["/usr/local/bin/run-backup.sh"]
+    volumes:
+      - ./:/workspace:ro
+      - savepoint_backups:/backups
+    networks:
+      - savepoint
+
   postgres:
     image: postgres:17-alpine
     container_name: savepoint_db
@@ -127,3 +225,4 @@ networks:
 
 volumes:
   savepoint_postgres:
+  savepoint_backups:

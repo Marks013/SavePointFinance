@@ -65,6 +65,34 @@ docker compose run --rm migrate
 docker compose up -d --build web
 ```
 
+## Backup automatico
+
+O projeto agora inclui um servico dedicado de backup criptografado.
+
+O fluxo gera:
+- dump do Postgres em formato custom
+- dump de roles/globals
+- pacote com arquivos criticos do servidor
+- artefato final criptografado
+- copia local em volume Docker
+- copia opcional no GitHub Releases de um repositorio privado
+- copia opcional no Oracle Object Storage
+- alerta de falha por e-mail via Resend
+
+Ativar:
+
+```bash
+docker compose up -d --build backup
+```
+
+Testar manualmente:
+
+```bash
+docker compose run --rm backup-once
+```
+
+As variaveis de backup ficam no [`.env.example`](/C:/Users/User/Desktop/SavePointFinance/.env.example) e a operacao completa esta em [DEPLOY_AND_BOOTSTRAP.md](/C:/Users/User/Desktop/SavePointFinance/DEPLOY_AND_BOOTSTRAP.md).
+
 ## Conta administrativa
 
 O admin inicial vem das variaveis do `.env`:
