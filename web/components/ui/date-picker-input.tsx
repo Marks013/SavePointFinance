@@ -11,6 +11,7 @@ import { formatDateDisplay } from "@/lib/date";
 type DatePickerInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type"> & {
   type?: "date" | "month";
   monthDisplayMode?: "long" | "compact";
+  displayAlign?: "left" | "center";
 };
 
 function formatDisplayValue(type: "date" | "month", value?: string, monthDisplayMode: "long" | "compact" = "long") {
@@ -26,7 +27,7 @@ function formatDisplayValue(type: "date" | "month", value?: string, monthDisplay
 }
 
 export const DatePickerInput = forwardRef<HTMLInputElement, DatePickerInputProps>(function DatePickerInput(
-  { className, disabled, readOnly, type = "date", value, monthDisplayMode = "long", ...props },
+  { className, disabled, readOnly, type = "date", value, monthDisplayMode = "long", displayAlign = "left", ...props },
   ref
 ) {
   const innerRef = useRef<HTMLInputElement | null>(null);
@@ -68,10 +69,21 @@ export const DatePickerInput = forwardRef<HTMLInputElement, DatePickerInputProps
       )}
       onClick={openPicker}
     >
-      <span className={cn("truncate pr-3 capitalize", !value && "text-[var(--color-muted-foreground)]")}>
+      <span
+        className={cn(
+          "capitalize",
+          displayAlign === "center" ? "w-full truncate px-8 text-center" : "truncate pr-3",
+          !value && "text-[var(--color-muted-foreground)]"
+        )}
+      >
         {displayValue}
       </span>
-      <CalendarDays className="shrink-0 text-[var(--color-muted-foreground)]" />
+      <CalendarDays
+        className={cn(
+          "shrink-0 text-[var(--color-muted-foreground)]",
+          displayAlign === "center" && "pointer-events-none absolute right-4"
+        )}
+      />
       <input
         {...props}
         className={cn(

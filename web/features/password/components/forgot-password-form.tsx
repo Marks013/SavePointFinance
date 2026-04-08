@@ -29,7 +29,8 @@ export function ForgotPasswordForm() {
           });
 
           if (!response.ok) {
-            toast.error("Nao foi possivel iniciar a recuperacao");
+            const payload = (await response.json().catch(() => null)) as { message?: string } | null;
+            toast.error(payload?.message ?? "Nao foi possivel iniciar a recuperacao");
             return;
           }
 

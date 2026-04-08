@@ -302,7 +302,6 @@ export function TransactionsClient() {
         queryClient.invalidateQueries({ queryKey: ["transactions"] }),
         queryClient.invalidateQueries({ queryKey: ["accounts"] }),
         queryClient.invalidateQueries({ queryKey: ["reports-summary"] }),
-        queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
         queryClient.invalidateQueries({ queryKey: ["cards"] }),
         queryClient.invalidateQueries({ queryKey: ["installments"] }),
         queryClient.invalidateQueries({ queryKey: ["subscriptions"] })
@@ -344,7 +343,6 @@ export function TransactionsClient() {
         queryClient.invalidateQueries({ queryKey: ["transactions"] }),
         queryClient.invalidateQueries({ queryKey: ["accounts"] }),
         queryClient.invalidateQueries({ queryKey: ["reports-summary"] }),
-        queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
         queryClient.invalidateQueries({ queryKey: ["cards"] }),
         queryClient.invalidateQueries({ queryKey: ["installments"] }),
         queryClient.invalidateQueries({ queryKey: ["subscriptions"] })
@@ -374,8 +372,7 @@ export function TransactionsClient() {
       });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["transactions"] }),
-        queryClient.invalidateQueries({ queryKey: ["reports-summary"] }),
-        queryClient.invalidateQueries({ queryKey: ["dashboard"] })
+        queryClient.invalidateQueries({ queryKey: ["reports-summary"] })
       ]);
     },
     onError: () => {

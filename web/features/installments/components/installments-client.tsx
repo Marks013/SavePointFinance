@@ -126,7 +126,6 @@ export function InstallmentsClient() {
         queryClient.invalidateQueries({ queryKey: ["installments"] }),
         queryClient.invalidateQueries({ queryKey: ["transactions"] }),
         queryClient.invalidateQueries({ queryKey: ["reports-summary"] }),
-        queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
         queryClient.invalidateQueries({ queryKey: ["cards"] })
       ]);
     },
@@ -166,7 +165,6 @@ export function InstallmentsClient() {
         queryClient.invalidateQueries({ queryKey: ["installments"] }),
         queryClient.invalidateQueries({ queryKey: ["transactions"] }),
         queryClient.invalidateQueries({ queryKey: ["reports-summary"] }),
-        queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
         queryClient.invalidateQueries({ queryKey: ["cards"] })
       ]);
     },
@@ -197,7 +195,6 @@ export function InstallmentsClient() {
         queryClient.invalidateQueries({ queryKey: ["installments"] }),
         queryClient.invalidateQueries({ queryKey: ["transactions"] }),
         queryClient.invalidateQueries({ queryKey: ["reports-summary"] }),
-        queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
         queryClient.invalidateQueries({ queryKey: ["cards"] })
       ]);
     },

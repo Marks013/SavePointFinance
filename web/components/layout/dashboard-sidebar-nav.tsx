@@ -80,7 +80,6 @@ export function DashboardSidebarNav({ canManageSharing, isPlatformAdmin }: Dashb
 
       startTransition(() => {
         router.replace(buildMonthRoute(normalizedMonth), { scroll: false });
-        router.refresh();
       });
     },
     [buildMonthRoute, month, router]
@@ -117,6 +116,7 @@ export function DashboardSidebarNav({ canManageSharing, isPlatformAdmin }: Dashb
             aria-label="Selecionar competência global"
             className="h-11 w-full min-w-0 px-3 text-center text-[0.9rem]"
             disabled={isPending}
+            displayAlign="center"
             id="global-month"
             monthDisplayMode="compact"
             type="month"

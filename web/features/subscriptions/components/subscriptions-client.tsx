@@ -153,8 +153,7 @@ export function SubscriptionsClient() {
       setEditingId(null);
       form.reset();
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["subscriptions"] }),
-        queryClient.invalidateQueries({ queryKey: ["dashboard"] })
+        queryClient.invalidateQueries({ queryKey: ["subscriptions"] })
       ]);
     }
   });
@@ -173,7 +172,6 @@ export function SubscriptionsClient() {
         queryClient.invalidateQueries({ queryKey: ["subscriptions"] }),
         queryClient.invalidateQueries({ queryKey: ["transactions"] }),
         queryClient.invalidateQueries({ queryKey: ["reports-summary"] }),
-        queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
         queryClient.invalidateQueries({ queryKey: ["accounts"] }),
         queryClient.invalidateQueries({ queryKey: ["cards"] })
       ]);
@@ -192,8 +190,7 @@ export function SubscriptionsClient() {
         form.reset();
       }
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["subscriptions"] }),
-        queryClient.invalidateQueries({ queryKey: ["dashboard"] })
+        queryClient.invalidateQueries({ queryKey: ["subscriptions"] })
       ]);
     }
   });

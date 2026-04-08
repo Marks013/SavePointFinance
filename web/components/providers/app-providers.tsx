@@ -1,12 +1,22 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { SessionProvider } from "next-auth/react";
 import { useState, type ReactNode } from "react";
 import { Toaster } from "sonner";
 
 import { ThemeProvider } from "@/components/providers/theme-provider";
+
+const QueryDevtools =
+  process.env.NODE_ENV === "development"
+    ? dynamic(
+        () => import("@tanstack/react-query-devtools").then((module) => module.ReactQueryDevtools),
+        { ssr: false }
+      )
+    : function QueryDevtoolsFallback() {
+        return null;
+      };
 
 type AppProvidersProps = {
   children: ReactNode;
@@ -32,7 +42,7 @@ export function AppProviders({ children, initialTheme }: AppProvidersProps) {
         <QueryClientProvider client={queryClient}>
           {children}
           <Toaster richColors position="top-right" />
-          <ReactQueryDevtools initialIsOpen={false} />
+          <QueryDevtools initialIsOpen={false} />
         </QueryClientProvider>
       </SessionProvider>
     </ThemeProvider>

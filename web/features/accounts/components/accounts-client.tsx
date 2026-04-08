@@ -103,8 +103,7 @@ export function AccountsClient() {
       form.reset();
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["accounts"] }),
-        queryClient.invalidateQueries({ queryKey: ["reports-summary"] }),
-        queryClient.invalidateQueries({ queryKey: ["dashboard"] })
+        queryClient.invalidateQueries({ queryKey: ["reports-summary"] })
       ]);
     },
     onError: () => {
@@ -122,8 +121,7 @@ export function AccountsClient() {
       }
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["accounts"] }),
-        queryClient.invalidateQueries({ queryKey: ["reports-summary"] }),
-        queryClient.invalidateQueries({ queryKey: ["dashboard"] })
+        queryClient.invalidateQueries({ queryKey: ["reports-summary"] })
       ]);
     },
     onError: (error) => {

@@ -116,8 +116,7 @@ export function GoalsClient() {
       setEditingId(null);
       form.reset();
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["goals"] }),
-        queryClient.invalidateQueries({ queryKey: ["dashboard"] })
+        queryClient.invalidateQueries({ queryKey: ["goals"] })
       ]);
     },
     onError: () => {
@@ -134,8 +133,7 @@ export function GoalsClient() {
         form.reset();
       }
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["goals"] }),
-        queryClient.invalidateQueries({ queryKey: ["dashboard"] })
+        queryClient.invalidateQueries({ queryKey: ["goals"] })
       ]);
     },
     onError: () => {

@@ -221,7 +221,6 @@ export function CardsClient() {
         queryClient.invalidateQueries({ queryKey: ["transactions"] }),
         queryClient.invalidateQueries({ queryKey: ["reports-summary"] }),
         queryClient.invalidateQueries({ queryKey: ["accounts"] }),
-        queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
         queryClient.invalidateQueries({ queryKey: ["cards"] })
       ]);
     },
@@ -258,8 +257,7 @@ export function CardsClient() {
       setEditingId(null);
       form.reset();
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["cards"] }),
-        queryClient.invalidateQueries({ queryKey: ["dashboard"] })
+        queryClient.invalidateQueries({ queryKey: ["cards"] })
       ]);
     },
     onError: () => {
@@ -276,8 +274,7 @@ export function CardsClient() {
         form.reset();
       }
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["cards"] }),
-        queryClient.invalidateQueries({ queryKey: ["dashboard"] })
+        queryClient.invalidateQueries({ queryKey: ["cards"] })
       ]);
     },
     onError: (error) => {
