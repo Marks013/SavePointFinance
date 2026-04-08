@@ -27,6 +27,7 @@ type CardItem = {
   limitAmount: number;
   availableLimit: number;
   statementAmount: number;
+  outstandingAmount: number;
   statementMonth: string;
   closeDate: string;
   dueDate: string;
@@ -54,6 +55,7 @@ type StatementPayload = {
   month: string;
   summary: {
     totalAmount: number;
+    outstandingAmount: number;
     availableLimit: number;
     installmentItems: number;
     transactions: number;
@@ -178,10 +180,11 @@ export function CardsClient() {
   const accountsQuery = useQuery({ queryKey: ["accounts"], queryFn: getAccounts, staleTime: 30_000 });
   const cards = useMemo(() => cardsQuery.data?.items ?? [], [cardsQuery.data?.items]);
   const accounts = useMemo(() => accountsQuery.data?.items ?? [], [accountsQuery.data?.items]);
-  const { totalLimit, totalStatement } = useMemo(
+  const { totalLimit, totalStatement, totalOutstanding } = useMemo(
     () => ({
       totalLimit: cards.reduce((sum, card) => sum + card.limitAmount, 0),
-      totalStatement: cards.reduce((sum, card) => sum + card.statementAmount, 0)
+      totalStatement: cards.reduce((sum, card) => sum + card.statementAmount, 0),
+      totalOutstanding: cards.reduce((sum, card) => sum + card.outstandingAmount, 0)
     }),
     [cards]
   );
@@ -510,6 +513,10 @@ export function CardsClient() {
               <p className="metric-label">Fatura aberta</p>
               <p className="metric-value">{formatCurrency(totalStatement)}</p>
             </article>
+            <article className="metric-card sm:col-span-2">
+              <p className="metric-label">Saldo em aberto</p>
+              <p className="metric-value">{formatCurrency(totalOutstanding)}</p>
+            </article>
           </div>
         </div>
         <div className="mt-6 grid gap-3 md:grid-cols-2">
@@ -567,19 +574,27 @@ export function CardsClient() {
                     {formatCurrency(card.availableLimit)}
                   </p>
                 </div>
+                <div className="rounded-[1rem] border border-[var(--color-border)]/60 bg-[var(--color-muted)]/20 px-3 py-3 sm:col-span-2">
+                  <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted-foreground)]">
+                    Em aberto
+                  </p>
+                  <p className="mt-2 whitespace-nowrap text-base font-semibold text-[var(--color-foreground)]">
+                    {formatCurrency(card.outstandingAmount)}
+                  </p>
+                </div>
                 <div className="rounded-[1rem] border border-[var(--color-border)]/60 bg-[var(--color-muted)]/20 px-3 py-3">
                   <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted-foreground)]">
                     Ciclo
                   </p>
                   <div className="mt-2 flex flex-wrap gap-2 text-xs font-semibold">
                     <span className="rounded-full border border-[var(--color-border)]/70 bg-[var(--color-card)] px-2.5 py-1 text-[var(--color-foreground)]">
-                      Fecha {card.closeDay}
+                      Fecha dia {card.closeDay}
                     </span>
                     <span className="rounded-full border border-[var(--color-border)]/70 bg-[var(--color-card)] px-2.5 py-1 text-[var(--color-foreground)]">
-                      Vence {card.dueDay}
+                      Vence dia {card.dueDay}
                     </span>
                     <span className="rounded-full border border-[var(--color-border)]/70 bg-[var(--color-card)] px-2.5 py-1 text-[var(--color-muted-foreground)]">
-                      {new Date(card.dueDate).toLocaleDateString("pt-BR")}
+                      Pagamento {new Date(card.dueDate).toLocaleDateString("pt-BR")}
                     </span>
                   </div>
                 </div>
@@ -592,7 +607,7 @@ export function CardsClient() {
                 <div
                   className="h-full rounded-full bg-[var(--color-coral-500)]"
                   style={{
-                    width: `${Math.min(100, card.limitAmount > 0 ? (card.statementAmount / card.limitAmount) * 100 : 0)}%`
+                    width: `${Math.min(100, card.limitAmount > 0 ? (card.outstandingAmount / card.limitAmount) * 100 : 0)}%`
                   }}
                 />
               </div>
@@ -731,6 +746,10 @@ export function CardsClient() {
               <article className="metric-card">
                 <p className="text-sm text-[var(--color-muted-foreground)]">Total da fatura</p>
                 <p className="mt-2 text-2xl font-semibold">{formatCurrency(statementQuery.data.summary.totalAmount)}</p>
+              </article>
+              <article className="metric-card">
+                <p className="text-sm text-[var(--color-muted-foreground)]">Saldo em aberto</p>
+                <p className="mt-2 text-2xl font-semibold">{formatCurrency(statementQuery.data.summary.outstandingAmount)}</p>
               </article>
               <article className="metric-card">
                 <p className="text-sm text-[var(--color-muted-foreground)]">Limite disponível</p>

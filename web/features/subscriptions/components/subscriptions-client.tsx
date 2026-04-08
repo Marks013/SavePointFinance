@@ -37,8 +37,8 @@ type SubscriptionItem = {
   card: RefItem | null;
 };
 
-async function getSubscriptions(month: string) {
-  const response = await fetch(`/api/subscriptions?month=${month}`, { cache: "no-store" });
+async function getSubscriptions() {
+  const response = await fetch("/api/subscriptions", { cache: "no-store" });
   if (!response.ok) throw new Error("Falha ao carregar assinaturas");
   return (await response.json()) as { items: SubscriptionItem[] };
 }
@@ -107,8 +107,8 @@ export function SubscriptionsClient() {
   const month = normalizeMonthKey(searchParams.get("month"));
   const [editingId, setEditingId] = useState<string | null>(null);
   const subscriptionsQuery = useQuery({
-    queryKey: ["subscriptions", month],
-    queryFn: () => getSubscriptions(month)
+    queryKey: ["subscriptions"],
+    queryFn: getSubscriptions
   });
   const categoriesQuery = useQuery({ queryKey: ["categories"], queryFn: getCategories });
   const accountsQuery = useQuery({ queryKey: ["accounts"], queryFn: getAccounts });

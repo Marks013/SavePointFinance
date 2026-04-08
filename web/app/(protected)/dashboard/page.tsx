@@ -55,7 +55,7 @@ async function getDashboardData(tenantId: string, month: string) {
             card: true
           },
           orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-          take: 24
+          take: 200
         }),
         prisma.subscription.findMany({
           where: {
@@ -117,6 +117,7 @@ async function getDashboardData(tenantId: string, month: string) {
         closeDate: statement?.closeDate ?? null,
         dueDate: statement?.dueDate ?? null,
         statementAmount: statement?.totalAmount ?? 0,
+        outstandingAmount: statement?.outstandingAmount ?? 0,
         availableLimit: statement?.availableLimit ?? Number(card.limitAmount)
       };
     });
@@ -558,7 +559,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                         <span>Limite utilizado</span>
                         <span>
                           {Math.round(
-                            Math.min((Number(card.statementAmount) / Math.max(Number(card.limitAmount), 1)) * 100, 100)
+                            Math.min((Number(card.outstandingAmount) / Math.max(Number(card.limitAmount), 1)) * 100, 100)
                           )}
                           %
                         </span>
@@ -568,7 +569,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                           className="progress-fill"
                           style={{
                             width: `${Math.min(
-                              (Number(card.statementAmount) / Math.max(Number(card.limitAmount), 1)) * 100,
+                              (Number(card.outstandingAmount) / Math.max(Number(card.limitAmount), 1)) * 100,
                               100
                             )}%`
                           }}
@@ -603,6 +604,14 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                           }`}
                         >
                           {formatCurrency(Number(card.availableLimit))}
+                        </p>
+                      </div>
+                      <div className="rounded-[1.1rem] border border-[var(--color-border)]/70 bg-[var(--color-muted)]/25 px-3 py-3">
+                        <p className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-[var(--color-muted-foreground)]">
+                          Em aberto
+                        </p>
+                        <p className="mt-2 whitespace-nowrap text-sm font-medium text-[var(--color-foreground)]">
+                          {formatCurrency(Number(card.outstandingAmount))}
                         </p>
                       </div>
                     </div>

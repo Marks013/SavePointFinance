@@ -59,7 +59,7 @@ export async function GET(request: Request) {
         card: true
       },
       orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-      take: hasDateFilter ? Math.max(filters.limit * 4, 200) : filters.limit
+      take: hasDateFilter ? Math.max(filters.limit * 8, 500) : filters.limit
     });
 
     const filteredTransactions = hasDateFilter

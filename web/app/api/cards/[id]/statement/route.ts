@@ -111,6 +111,7 @@ export async function GET(request: Request, context: Params) {
       month: statement.month,
       summary: {
         totalAmount: statement.totalAmount,
+        outstandingAmount: statement.outstandingAmount,
         availableLimit: statement.availableLimit,
         installmentItems,
         transactions: transactionsCount,
