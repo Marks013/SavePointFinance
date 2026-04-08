@@ -4,7 +4,6 @@ import { getAccountsWithComputedBalance } from "@/lib/finance/accounts";
 import { getCurrentMonthKey, getMonthRange } from "@/lib/month";
 import {
   calculateStatementTotal,
-  getCardExpenseCompetenceDate,
   getCardExpenseDueDate,
   getStatementPaymentDate,
   getStatementRange
@@ -88,9 +87,7 @@ function buildTransactionWhere(
     where.date = {};
 
     if (filters.from) {
-      const fromDate = new Date(`${filters.from}T00:00:00`);
-      fromDate.setMonth(fromDate.getMonth() - 1);
-      where.date.gte = fromDate;
+      where.date.gte = new Date(`${filters.from}T00:00:00`);
     }
 
     if (filters.to) {
@@ -150,9 +147,7 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
         card: {
           select: {
             name: true,
-            brand: true,
-            closeDay: true,
-            dueDay: true
+            brand: true
           }
         }
       },
@@ -262,23 +257,11 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
   };
   let classifiedAutomatically = 0;
   let uncategorizedTransactions = 0;
-  let transactionsInRange = 0;
-  const filteredTransactions = transactions.filter((transaction) => {
-    const competenceDate = transaction.card
-      ? getCardExpenseCompetenceDate(transaction.card, transaction.date)
-      : transaction.date;
 
-    return competenceDate >= projectionStart && competenceDate <= projectionEnd;
-  });
-
-  for (const transaction of filteredTransactions) {
-    const competenceDate = transaction.card
-      ? getCardExpenseCompetenceDate(transaction.card, transaction.date)
-      : transaction.date;
-    const label = monthLabel(competenceDate);
+  for (const transaction of transactions) {
+    const label = monthLabel(transaction.date);
     const amount = Number(transaction.amount);
     const monthly = monthlyMap.get(label) ?? { income: 0, expense: 0, transfer: 0 };
-    transactionsInRange += 1;
 
     if (transaction.type === TransactionType.income) {
       summary.income += amount;
@@ -389,7 +372,6 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
     monthlyMap.set(label, monthly);
   }
 
-  summary.transactions = transactionsInRange;
   summary.balance = summary.income - summary.expense;
   const filterStart = filters.from ? new Date(`${filters.from}T00:00:00`) : transactions[0]?.date ?? projectionStart;
   const filterEnd = filters.to ? new Date(`${filters.to}T23:59:59`) : transactions.at(-1)?.date ?? projectionEnd;
@@ -588,9 +570,7 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
       autoClassified: classifiedAutomatically,
       uncategorized: uncategorizedTransactions,
       coverage:
-        filteredTransactions.length > 0
-          ? (filteredTransactions.length - uncategorizedTransactions) / filteredTransactions.length
-          : 0
+        transactions.length > 0 ? (transactions.length - uncategorizedTransactions) / transactions.length : 0
     },
     spendingInsights: {
       topCategory,
@@ -629,7 +609,7 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
     byAccount: Array.from(accountMap.values()).sort((a, b) => Math.abs(b.net) - Math.abs(a.net)),
     byCard: Array.from(cardMap.values()).sort((a, b) => b.netStatement - a.netStatement),
     upcoming: upcoming.slice(0, 12),
-    recent: filteredTransactions
+    recent: transactions
       .slice(-12)
       .reverse()
       .map((transaction) => ({
