@@ -555,47 +555,67 @@ export function CardsClient() {
                   </p>
                 </div>
               </div>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-[1rem] border border-[var(--color-border)]/60 bg-[var(--color-muted)]/20 px-3 py-3 sm:col-span-2">
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                <div className="rounded-[1.15rem] border border-[var(--color-border)]/60 bg-[var(--color-muted)]/18 px-4 py-4">
                   <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted-foreground)]">
-                    Fatura
+                    Fatura aberta
                   </p>
-                  <p className="mt-2 whitespace-nowrap text-base font-semibold text-[var(--color-foreground)]">
+                  <p className="mt-2 whitespace-nowrap text-lg font-semibold text-[var(--color-foreground)]">
                     {formatCurrency(card.statementAmount)}
                   </p>
+                  <p className="mt-2 text-xs text-[var(--color-muted-foreground)]">
+                    Competência {formatMonthKeyLabel(card.statementMonth)}
+                  </p>
                 </div>
-                <div className="rounded-[1rem] border border-[var(--color-border)]/60 bg-[var(--color-muted)]/20 px-3 py-3">
+                <div className="rounded-[1.15rem] border border-[var(--color-border)]/60 bg-[var(--color-muted)]/18 px-4 py-4">
                   <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted-foreground)]">
                     Disponível
                   </p>
                   <p
-                    className={`mt-2 whitespace-nowrap text-base font-semibold ${card.availableLimit < 0 ? "amount-negative" : "text-[var(--color-foreground)]"}`}
+                    className={`mt-2 whitespace-nowrap text-lg font-semibold ${card.availableLimit < 0 ? "amount-negative" : "text-[var(--color-foreground)]"}`}
                   >
                     {formatCurrency(card.availableLimit)}
                   </p>
+                  <p className="mt-2 text-xs text-[var(--color-muted-foreground)]">
+                    Limite total de {formatCurrency(card.limitAmount)}.
+                  </p>
                 </div>
-                <div className="rounded-[1rem] border border-[var(--color-border)]/60 bg-[var(--color-muted)]/20 px-3 py-3 sm:col-span-2">
+                <div className="rounded-[1.15rem] border border-[var(--color-border)]/60 bg-[var(--color-muted)]/18 px-4 py-4">
                   <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted-foreground)]">
                     Em aberto
                   </p>
-                  <p className="mt-2 whitespace-nowrap text-base font-semibold text-[var(--color-foreground)]">
+                  <p className="mt-2 whitespace-nowrap text-lg font-semibold text-[var(--color-foreground)]">
                     {formatCurrency(card.outstandingAmount)}
                   </p>
-                </div>
-                <div className="rounded-[1rem] border border-[var(--color-border)]/60 bg-[var(--color-muted)]/20 px-3 py-3">
-                  <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted-foreground)]">
-                    Ciclo
+                  <p className="mt-2 text-xs text-[var(--color-muted-foreground)]">
+                    Valor que ainda consome limite.
                   </p>
-                  <div className="mt-2 flex flex-wrap gap-2 text-xs font-semibold">
-                    <span className="rounded-full border border-[var(--color-border)]/70 bg-[var(--color-card)] px-2.5 py-1 text-[var(--color-foreground)]">
-                      Fecha dia {card.closeDay}
-                    </span>
-                    <span className="rounded-full border border-[var(--color-border)]/70 bg-[var(--color-card)] px-2.5 py-1 text-[var(--color-foreground)]">
-                      Vence dia {card.dueDay}
-                    </span>
-                    <span className="rounded-full border border-[var(--color-border)]/70 bg-[var(--color-card)] px-2.5 py-1 text-[var(--color-muted-foreground)]">
-                      Pagamento {new Date(card.dueDate).toLocaleDateString("pt-BR")}
-                    </span>
+                </div>
+                <div className="rounded-[1.15rem] border border-[var(--color-border)]/60 bg-[var(--color-muted)]/18 px-4 py-4 md:col-span-2">
+                  <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted-foreground)]">
+                    Ciclo do cartão
+                  </p>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                    <div className="rounded-[1rem] border border-[var(--color-border)]/70 bg-[var(--color-card)] px-3 py-3">
+                      <p className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted-foreground)]">
+                        Fecha
+                      </p>
+                      <p className="mt-1 text-sm font-semibold text-[var(--color-foreground)]">Dia {card.closeDay}</p>
+                    </div>
+                    <div className="rounded-[1rem] border border-[var(--color-border)]/70 bg-[var(--color-card)] px-3 py-3">
+                      <p className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted-foreground)]">
+                        Vence
+                      </p>
+                      <p className="mt-1 text-sm font-semibold text-[var(--color-foreground)]">Dia {card.dueDay}</p>
+                    </div>
+                    <div className="rounded-[1rem] border border-[var(--color-border)]/70 bg-[var(--color-card)] px-3 py-3">
+                      <p className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted-foreground)]">
+                        Proximo pagamento
+                      </p>
+                      <p className="mt-1 text-sm font-semibold text-[var(--color-foreground)]">
+                        {new Date(card.dueDate).toLocaleDateString("pt-BR")}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -612,7 +632,7 @@ export function CardsClient() {
                 />
               </div>
               <p className="mt-2 text-xs text-[var(--color-muted-foreground)]">
-                Utilização: {card.limitAmount > 0 ? Math.round((card.statementAmount / card.limitAmount) * 100) : 0}%
+                Utilizacao: {card.limitAmount > 0 ? Math.round((card.outstandingAmount / card.limitAmount) * 100) : 0}%
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button onClick={() => startEditing(card)} type="button" variant="secondary">

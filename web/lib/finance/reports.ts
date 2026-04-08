@@ -445,7 +445,11 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
     }
   }
 
-  const statementMonths = listStatementMonthsBetween(projectionStart, projectionEnd);
+  const statementMonthStart = new Date(projectionStart);
+  statementMonthStart.setMonth(statementMonthStart.getMonth() - 1);
+  statementMonthStart.setDate(1);
+  statementMonthStart.setHours(12, 0, 0, 0);
+  const statementMonths = listStatementMonthsBetween(statementMonthStart, projectionEnd);
   const cardsWithStatements = cards.filter((card) => card.isActive);
   const earliestStatementStart = new Date(projectionStart);
   earliestStatementStart.setMonth(earliestStatementStart.getMonth() - 1);

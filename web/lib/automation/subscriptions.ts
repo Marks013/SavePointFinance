@@ -232,23 +232,15 @@ export async function generateSubscriptionTransaction(subscriptionId: string, te
   };
 }
 
-export async function runRecurringAutomation(tenantId: string, userId: string) {
-  const now = new Date();
-  const tenantUser = await prisma.user.findFirst({
-    where: {
-      id: userId,
-      tenantId,
-      isActive: true
-    },
-    include: {
-      preferences: true
-    }
-  });
-
-  if (!tenantUser) {
-    throw new Error("User not found");
-  }
-
+export async function syncDueSubscriptionTransactions({
+  tenantId,
+  userId,
+  now = new Date()
+}: {
+  tenantId: string;
+  userId: string;
+  now?: Date;
+}) {
   const dueSubscriptions = await prisma.subscription.findMany({
     where: {
       tenantId,
@@ -304,6 +296,32 @@ export async function runRecurringAutomation(tenantId: string, userId: string) {
       safety += 1;
     }
   }
+
+  return results;
+}
+
+export async function runRecurringAutomation(tenantId: string, userId: string) {
+  const now = new Date();
+  const tenantUser = await prisma.user.findFirst({
+    where: {
+      id: userId,
+      tenantId,
+      isActive: true
+    },
+    include: {
+      preferences: true
+    }
+  });
+
+  if (!tenantUser) {
+    throw new Error("User not found");
+  }
+
+  const results = await syncDueSubscriptionTransactions({
+    tenantId,
+    userId,
+    now
+  });
 
   const reminderWindow = new Date();
   reminderWindow.setDate(reminderWindow.getDate() + 7);

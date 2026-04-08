@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { ArrowRight, BellRing, CreditCard, Landmark, Target } from "lucide-react";
 
 import { SummaryCards } from "@/features/dashboard/components/summary-cards";
+import { syncDueSubscriptionTransactions } from "@/lib/automation/subscriptions";
 import { requireSessionUser } from "@/lib/auth/session";
 import { getCardExpenseCompetenceDate, getCardStatementSnapshots } from "@/lib/cards/statement";
 import { getAccountsWithComputedBalance } from "@/lib/finance/accounts";
@@ -195,6 +196,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const user = await requireSessionUser();
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const month = normalizeMonthKey(resolvedSearchParams?.month);
+  await syncDueSubscriptionTransactions({
+    tenantId: user.tenantId,
+    userId: user.id
+  });
   const data = await getDashboardData(user.tenantId, month);
   const monthLabel = formatMonthKeyLabel(month);
   const netMonth = data.income - data.expenses;

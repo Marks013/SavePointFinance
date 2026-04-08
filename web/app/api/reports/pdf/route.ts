@@ -20,7 +20,7 @@ export async function GET(request: Request) {
       accountId: searchParams.get("accountId"),
       cardId: searchParams.get("cardId"),
       categoryId: searchParams.get("categoryId")
-    });
+    }, user.id);
     const periodParts = [
       report.filters.from ? `De ${report.filters.from}` : null,
       report.filters.to ? `até ${report.filters.to}` : null,
