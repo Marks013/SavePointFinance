@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 import { requireSessionUser } from "@/lib/auth/session";
+import { getCardExpenseCompetenceDate } from "@/lib/cards/statement";
 import { prisma } from "@/lib/prisma/client";
 
 export async function GET(request: Request) {
@@ -23,7 +24,9 @@ export async function GET(request: Request) {
       groupWhere.date = {};
 
       if (from) {
-        groupWhere.date.gte = new Date(`${from}T00:00:00`);
+        const fromDate = new Date(`${from}T00:00:00`);
+        fromDate.setMonth(fromDate.getMonth() - 1);
+        groupWhere.date.gte = fromDate;
       }
 
       if (to) {
@@ -63,6 +66,9 @@ export async function GET(request: Request) {
           })
         : [];
 
+    const filterStart = from ? new Date(`${from}T00:00:00`) : null;
+    const filterEnd = to ? new Date(`${to}T23:59:59`) : null;
+
     const groups = await Promise.all(
       roots.map(async (root) => {
         const installments = await prisma.transaction.findMany({
@@ -98,7 +104,31 @@ export async function GET(request: Request) {
       })
     );
 
-    return NextResponse.json({ items: groups });
+    const filteredGroups =
+      filterStart || filterEnd
+        ? groups.filter((group) => {
+            const matchingRoot = roots.find((root) => root.id === group.id);
+            if (!matchingRoot) {
+              return false;
+            }
+
+            const competenceDate = matchingRoot.card
+              ? getCardExpenseCompetenceDate(matchingRoot.card, matchingRoot.date)
+              : matchingRoot.date;
+
+            if (filterStart && competenceDate < filterStart) {
+              return false;
+            }
+
+            if (filterEnd && competenceDate > filterEnd) {
+              return false;
+            }
+
+            return true;
+          })
+        : groups;
+
+    return NextResponse.json({ items: filteredGroups });
   } catch (error) {
     if (error instanceof Error && error.message === "Unauthorized") {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });

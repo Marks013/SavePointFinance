@@ -571,12 +571,16 @@ export function CardsClient() {
                   <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted-foreground)]">
                     Ciclo
                   </p>
-                  <div className="mt-2 space-y-1 text-sm font-semibold text-[var(--color-foreground)]">
-                    <p className="break-words">Fecha dia {card.closeDay}</p>
-                    <p className="break-words">Vence dia {card.dueDay}</p>
-                    <p className="break-words text-[var(--color-muted-foreground)]">
-                      Proximo vencimento {new Date(card.dueDate).toLocaleDateString("pt-BR")}
-                    </p>
+                  <div className="mt-2 flex flex-wrap gap-2 text-xs font-semibold">
+                    <span className="rounded-full border border-[var(--color-border)]/70 bg-[var(--color-card)] px-2.5 py-1 text-[var(--color-foreground)]">
+                      Fecha {card.closeDay}
+                    </span>
+                    <span className="rounded-full border border-[var(--color-border)]/70 bg-[var(--color-card)] px-2.5 py-1 text-[var(--color-foreground)]">
+                      Vence {card.dueDay}
+                    </span>
+                    <span className="rounded-full border border-[var(--color-border)]/70 bg-[var(--color-card)] px-2.5 py-1 text-[var(--color-muted-foreground)]">
+                      {new Date(card.dueDate).toLocaleDateString("pt-BR")}
+                    </span>
                   </div>
                 </div>
               </div>

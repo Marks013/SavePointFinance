@@ -2,6 +2,7 @@ import { Prisma, Transaction, TransactionSource } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 import { requireSessionUser } from "@/lib/auth/session";
+import { getCardExpenseCompetenceDate } from "@/lib/cards/statement";
 import { classifyTransactionCategory } from "@/lib/finance/category-classifier";
 import { ensureFallbackCategory } from "@/lib/finance/default-categories";
 import { assertTenantTransactionReferences, TenantReferenceError } from "@/lib/finance/tenant-reference-guard";
@@ -29,16 +30,19 @@ export async function GET(request: Request) {
       ...(filters.categoryId ? { categoryId: filters.categoryId } : {}),
       ...(filters.cardId ? { cardId: filters.cardId } : {})
     };
+    const hasDateFilter = Boolean(filters.from || filters.to);
 
     if (filters.accountId) {
       where.OR = [{ accountId: filters.accountId }, { destinationAccountId: filters.accountId }];
     }
 
-    if (filters.from || filters.to) {
+    if (hasDateFilter) {
       where.date = {};
 
       if (filters.from) {
-        where.date.gte = new Date(`${filters.from}T00:00:00`);
+        const fromDate = new Date(`${filters.from}T00:00:00`);
+        fromDate.setMonth(fromDate.getMonth() - 1);
+        where.date.gte = fromDate;
       }
 
       if (filters.to) {
@@ -55,11 +59,31 @@ export async function GET(request: Request) {
         card: true
       },
       orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-      take: filters.limit
+      take: hasDateFilter ? Math.max(filters.limit * 4, 200) : filters.limit
     });
 
+    const filteredTransactions = hasDateFilter
+      ? transactions
+          .filter((transaction) => {
+            const competenceDate = transaction.card
+              ? getCardExpenseCompetenceDate(transaction.card, transaction.date)
+              : transaction.date;
+
+            if (filters.from && competenceDate < new Date(`${filters.from}T00:00:00`)) {
+              return false;
+            }
+
+            if (filters.to && competenceDate > new Date(`${filters.to}T23:59:59`)) {
+              return false;
+            }
+
+            return true;
+          })
+          .slice(0, filters.limit)
+      : transactions;
+
     return NextResponse.json({
-      items: transactions.map((transaction) => ({
+      items: filteredTransactions.map((transaction) => ({
         id: transaction.id,
         date: transaction.date.toISOString(),
         amount: Number(transaction.amount),
