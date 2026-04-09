@@ -5,8 +5,8 @@ set -Eeuo pipefail
 BACKUP_CRON_SCHEDULE="${BACKUP_CRON_SCHEDULE:-0 3 * * *}"
 BACKUP_RUN_ON_STARTUP="${BACKUP_RUN_ON_STARTUP:-false}"
 
-if [[ "${1:-}" == "/usr/local/bin/run-backup.sh" ]]; then
-  exec /usr/local/bin/run-backup.sh
+if [[ "$#" -gt 0 ]]; then
+  exec "$@"
 fi
 
 if [[ "$BACKUP_RUN_ON_STARTUP" == "true" ]]; then
@@ -17,8 +17,14 @@ cat <<EOF >/etc/crontabs/root
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 TZ=${TZ:-America/Sao_Paulo}
-${BACKUP_CRON_SCHEDULE} /usr/local/bin/run-backup.sh >> /var/log/backup-cron.log 2>&1
+${BACKUP_CRON_SCHEDULE} /usr/local/bin/run-backup.sh >> /proc/1/fd/1 2>&1
 EOF
 
 echo "Backup scheduler enabled with cron '${BACKUP_CRON_SCHEDULE}'"
+
+if busybox --list 2>/dev/null | grep -qx "crond"; then
+  echo "Using busybox crond"
+  exec busybox crond -f -l 2 -c /etc/crontabs
+fi
+
 exec crond -f -l 2
