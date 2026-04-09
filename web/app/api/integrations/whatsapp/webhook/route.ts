@@ -1,26 +1,12 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
-import { prisma } from "@/lib/prisma/client";
 import { serverEnv } from "@/lib/env/server";
-import { sendWhatsAppTextMessage, verifyWhatsAppSignature } from "@/lib/whatsapp/cloud-api";
-import { processIncomingWhatsAppTextMessage } from "@/lib/whatsapp/assistant";
-
-type WebhookPayload = {
-  entry?: Array<{
-    changes?: Array<{
-      value?: {
-        messages?: Array<{
-          id?: string;
-          from?: string;
-          type?: string;
-          text?: {
-            body?: string;
-          };
-        }>;
-      };
-    }>;
-  }>;
-};
+import { processWhatsAppMessageAsync } from "@/lib/whatsapp/async-processor";
+import { verifyWhatsAppSignature } from "@/lib/whatsapp/cloud-api";
+import {
+  extractIncomingWhatsAppWebhookMessages,
+  type WhatsAppWebhookPayload
+} from "@/lib/whatsapp/webhook-payload";
 
 export async function GET(request: Request) {
   if (serverEnv.WHATSAPP_ASSISTANT_ENABLED !== "true") {
@@ -54,43 +40,43 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Invalid signature" }, { status: 401 });
   }
 
-  const payload = JSON.parse(rawBody) as WebhookPayload;
-  const messages =
-    payload.entry?.flatMap((entry) =>
-      entry.changes?.flatMap((change) => change.value?.messages ?? []) ?? []
-    ) ?? [];
+  let payload: WhatsAppWebhookPayload;
 
-  for (const message of messages) {
-    if (message.type !== "text" || !message.from || !message.text?.body) {
-      continue;
-    }
-
-    const result = await processIncomingWhatsAppTextMessage({
-      messageId: message.id ?? null,
-      phoneNumber: message.from,
-      body: message.text.body
-    });
-
-    if (result.handled) {
-      const delivery = await sendWhatsAppTextMessage(result.to, result.response);
-
-      if (result.logContext) {
-        await prisma.whatsAppMessage.create({
-          data: {
-            tenantId: result.logContext.tenantId,
-            userId: result.logContext.userId,
-            phoneNumber: result.logContext.phoneNumber,
-            direction: "outbound",
-            messageId: delivery.messageId,
-            body: result.response,
-            intent: result.logContext.intent,
-            status: delivery.ok ? "sent" : `failed:${delivery.status}`,
-            response: result.response
-          }
-        });
-      }
-    }
+  try {
+    payload = JSON.parse(rawBody) as WhatsAppWebhookPayload;
+  } catch (error) {
+    console.error("[WhatsApp] Webhook payload parse error", error);
+    return NextResponse.json({ error: "invalid payload" }, { status: 200 });
   }
 
-  return NextResponse.json({ received: true });
+  const messages = extractIncomingWhatsAppWebhookMessages(payload);
+
+  if (!messages.length) {
+    return NextResponse.json({ status: "ignored" }, { status: 200 });
+  }
+
+  after(async () => {
+    const processingResults = await Promise.allSettled(
+      messages.map((message) =>
+        processWhatsAppMessageAsync({
+          eventId: message.eventId,
+          phoneNumber: message.phoneNumber,
+          body: message.body,
+          type: message.type,
+          payload
+        })
+      )
+    );
+
+    for (const [index, result] of processingResults.entries()) {
+      if (result.status === "rejected") {
+        console.error(
+          `[WhatsApp] Fatal async error for webhook event ${messages[index]?.eventId ?? "unknown"}`,
+          result.reason
+        );
+      }
+    }
+  });
+
+  return NextResponse.json({ status: "received" }, { status: 200 });
 }
