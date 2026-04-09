@@ -270,7 +270,7 @@ async function run() {
         ownerUserId: owner.id,
         name: `Conta compartilhada ${unique}`,
         type: "checking",
-        balance: 321,
+        openingBalance: 321,
         currency: "BRL",
         color: "#136f4f"
       }

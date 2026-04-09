@@ -1,31 +1,29 @@
 import { NextResponse } from "next/server";
 
 import { subscriptionFormSchema } from "@/features/subscriptions/schemas/subscription-schema";
+import { syncDueSubscriptionTransactions } from "@/lib/automation/subscriptions";
 import { requireSessionUser } from "@/lib/auth/session";
 import { assertTenantTransactionReferences, TenantReferenceError } from "@/lib/finance/tenant-reference-guard";
-import { getMonthRange, normalizeMonthKey } from "@/lib/month";
 import { prisma } from "@/lib/prisma/client";
 
 export async function GET(request: Request) {
   try {
     const user = await requireSessionUser();
-    const { searchParams } = new URL(request.url);
-    const month = normalizeMonthKey(searchParams.get("month"));
-    const { start, end } = getMonthRange(month);
+    void request;
+    await syncDueSubscriptionTransactions({
+      tenantId: user.tenantId,
+      userId: user.id
+    });
     const subscriptions = await prisma.subscription.findMany({
       where: {
-        tenantId: user.tenantId,
-        nextBillingDate: {
-          gte: start,
-          lte: end
-        }
+        tenantId: user.tenantId
       },
       include: {
         category: true,
         account: true,
         card: true
       },
-      orderBy: { name: "asc" }
+      orderBy: [{ isActive: "desc" }, { nextBillingDate: "asc" }, { name: "asc" }]
     });
 
     return NextResponse.json({
@@ -80,6 +78,12 @@ export async function POST(request: Request) {
         autoTithe: body.autoTithe && body.type === "income"
       }
     });
+
+    // Instant sync after creation
+    await syncDueSubscriptionTransactions({
+      tenantId: user.tenantId,
+      userId: user.id
+    }).catch(err => console.error("Post-Create Sync Error:", err));
 
     return NextResponse.json({ id: subscription.id }, { status: 201 });
   } catch (error) {

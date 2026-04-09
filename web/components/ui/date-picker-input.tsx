@@ -63,7 +63,7 @@ export const DatePickerInput = forwardRef<HTMLInputElement, DatePickerInputProps
   return (
     <div
       className={cn(
-        "relative flex h-12 w-full items-center justify-between rounded-[1.15rem] border border-[var(--color-border)] bg-[var(--color-input)] px-4 py-3 text-left text-sm text-[var(--color-foreground)] shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_10px_20px_rgba(0,0,0,0.08)] outline-none transition duration-200",
+        "relative flex min-h-12 w-full items-center justify-between rounded-[1.15rem] border border-[var(--color-border)] bg-[var(--color-input)] px-4 py-3 text-left text-sm text-[var(--color-foreground)] shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_10px_20px_rgba(0,0,0,0.08)] outline-none transition duration-200",
         disabled ? "cursor-not-allowed opacity-70" : "hover:border-[var(--color-primary)]/40 hover:bg-[var(--color-card)]",
         className
       )}
@@ -71,8 +71,8 @@ export const DatePickerInput = forwardRef<HTMLInputElement, DatePickerInputProps
     >
       <span
         className={cn(
-          "capitalize",
-          displayAlign === "center" ? "w-full truncate px-8 text-center" : "truncate pr-3",
+          "min-w-0 flex-1 break-words capitalize leading-5 whitespace-normal",
+          displayAlign === "center" ? "w-full px-8 text-center" : "pr-3",
           !value && "text-[var(--color-muted-foreground)]"
         )}
       >

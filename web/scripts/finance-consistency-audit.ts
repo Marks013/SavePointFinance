@@ -56,6 +56,10 @@ function assertCondition(condition: unknown, message: string): asserts condition
   }
 }
 
+function formatLocalDateKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
 async function signIn(email: string, password: string) {
   const jar = new CookieJar();
   const csrfResponse = await jar.fetch(`${baseUrl}/api/auth/csrf`);
@@ -118,6 +122,14 @@ async function main() {
   const { ensureTenantDefaultCategories } = await import("../lib/finance/default-categories");
   const { getFinanceReport } = await import("../lib/finance/reports");
   const { getAccountsWithComputedBalance } = await import("../lib/finance/accounts");
+  const {
+    getCurrentStatementMonth,
+    getCardExpenseCompetenceDate,
+    getCardExpenseDueDate,
+    getStatementPaymentDate,
+    getStatementRange
+  } = await import("../lib/cards/statement");
+  const { advanceSubscriptionBillingDate, getSubscriptionBillingDate } = await import("../lib/subscriptions/recurrence");
 
   await prisma.$connect();
   await ensureDefaultPlans(prisma);
@@ -128,6 +140,46 @@ async function main() {
   const userEmail = `finance-audit-${unique}@savepoint.local`;
   const userPassword = "FinanceAudit123!";
   const results: string[] = [];
+  assertCondition(
+    getCurrentStatementMonth({ closeDay: 24, dueDay: 8 }, new Date(2026, 3, 2, 12, 0, 0, 0)) === "2026-04",
+    "Competencia padrao da fatura aberta ficou incorreta para cartao com fechamento apos vencimento"
+  );
+  assertCondition(
+    formatLocalDateKey(getCardExpenseCompetenceDate({ closeDay: 24, dueDay: 8 }, new Date(2026, 2, 20, 12, 0, 0, 0))) ===
+      "2026-03-20",
+    "Compra antes do fechamento nao entrou na fatura esperada"
+  );
+  const expenseAfterCloseDate = getCardExpenseCompetenceDate(
+    { closeDay: 24, dueDay: 8 },
+    new Date(2026, 2, 25, 12, 0, 0, 0)
+  );
+  const expenseAfterCloseMonth = `${expenseAfterCloseDate.getFullYear()}-${String(expenseAfterCloseDate.getMonth() + 1).padStart(2, "0")}`;
+  assertCondition(expenseAfterCloseMonth === "2026-04", "Compra apos o fechamento nao foi empurrada para a fatura seguinte");
+  assertCondition(
+    formatLocalDateKey(getCardExpenseDueDate({ closeDay: 24, dueDay: 8 }, new Date(2026, 2, 24, 12, 0, 0, 0))) ===
+      "2026-05-08",
+    "Compra no proprio dia do fechamento nao foi empurrada para o vencimento seguinte"
+  );
+  assertCondition(
+    formatLocalDateKey(getStatementPaymentDate(expenseAfterCloseMonth, 8, 24)) === "2026-05-08",
+    "Vencimento calculado da compra pos-fechamento ficou incorreto"
+  );
+  const rolloverStatementRange = getStatementRange("2026-03", 24, 8);
+  assertCondition(
+    formatLocalDateKey(rolloverStatementRange.start) === "2026-02-24" &&
+      formatLocalDateKey(rolloverStatementRange.end) === "2026-03-23",
+    "Intervalo da fatura com fechamento no dia 24 ficou inconsistente"
+  );
+  assertCondition(
+    formatLocalDateKey(getCardExpenseCompetenceDate({ closeDay: 1, dueDay: 10 }, new Date(2026, 2, 31, 12, 0, 0, 0))) ===
+      "2026-04-30",
+    "Compra antes do fechamento no dia 1 nao caiu na fatura de abril"
+  );
+  assertCondition(
+    formatLocalDateKey(getCardExpenseDueDate({ closeDay: 1, dueDay: 10 }, new Date(2026, 3, 1, 12, 0, 0, 0))) ===
+      "2026-05-10",
+    "Compra no proprio dia do fechamento nao foi empurrada para a fatura de maio"
+  );
 
   const premiumPlan = await getDefaultPlanBySlug(prisma, "premium-completo");
   assertCondition(premiumPlan, "Plano Premium padrão não encontrado");
@@ -228,6 +280,21 @@ async function main() {
       })
     });
     assertCondition(card.status === 201, `Criação do cartão respondeu ${card.status}`);
+    const rolloverCard = await getJson<{ id: string }>(jar, "/api/cards", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "Master Audit Fechamento 24",
+        brand: "Mastercard",
+        last4: "9876",
+        limitAmount: 3000,
+        dueDay: 8,
+        closeDay: 24,
+        color: "#222222",
+        institution: "Nubank"
+      })
+    });
+    assertCondition(rolloverCard.status === 201, `Criação do cartão com fechamento 24 respondeu ${rolloverCard.status}`);
 
     const salaryOne = await getJson<{ id: string }>(jar, "/api/transactions", {
       method: "POST",
@@ -310,6 +377,21 @@ async function main() {
       })
     });
     assertCondition(marketExpense.status === 201, `Despesa à vista respondeu ${marketExpense.status}`);
+    const rolloverExpense = await getJson<{ id: string }>(jar, "/api/transactions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        date: "2026-03-31",
+        amount: 80,
+        description: "Compra depois do fechamento",
+        type: "expense",
+        paymentMethod: "credit_card",
+        categoryId: marketCategory.id,
+        cardId: rolloverCard.payload.id,
+        installments: 1
+      })
+    });
+    assertCondition(rolloverExpense.status === 201, `Despesa após fechamento respondeu ${rolloverExpense.status}`);
 
     const installments = await prisma.transaction.findMany({
       where: {
@@ -393,14 +475,43 @@ async function main() {
     assertCondition(reconcile.payload.reconciled === 3, "Reconciliação não marcou todas as parcelas vencidas");
     results.push("Resumo e reconciliação de parcelamentos funcionam no grupo completo");
 
-    const subscription = await getJson<{ id: string }>(jar, "/api/subscriptions", {
+    const subscriptionAutoReference = new Date();
+    subscriptionAutoReference.setHours(12, 0, 0, 0);
+    const manualBillingDate =
+      subscriptionAutoReference.getDate() < 6
+        ? getSubscriptionBillingDate(
+            subscriptionAutoReference.getFullYear(),
+            subscriptionAutoReference.getMonth(),
+            6
+          )
+        : getSubscriptionBillingDate(
+            subscriptionAutoReference.getFullYear(),
+            subscriptionAutoReference.getMonth() + 1,
+            6
+          );
+    const manualNextBillingDate = advanceSubscriptionBillingDate(manualBillingDate, 6);
+    const autoBillingDate =
+      subscriptionAutoReference.getDate() > 6
+        ? getSubscriptionBillingDate(
+            subscriptionAutoReference.getFullYear(),
+            subscriptionAutoReference.getMonth(),
+            6
+          )
+        : getSubscriptionBillingDate(
+            subscriptionAutoReference.getFullYear(),
+            subscriptionAutoReference.getMonth() - 1,
+            6
+          );
+    const autoNextBillingDate = advanceSubscriptionBillingDate(autoBillingDate, 6);
+
+    const manualSubscription = await getJson<{ id: string }>(jar, "/api/subscriptions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        name: "Streaming Audit",
+        name: "Streaming Audit Manual",
         amount: 29.9,
         billingDay: 6,
-        nextBillingDate: "2026-04-06",
+        nextBillingDate: formatLocalDateKey(manualBillingDate),
         type: "expense",
         isActive: true,
         autoTithe: false,
@@ -409,19 +520,80 @@ async function main() {
         cardId: null
       })
     });
-    assertCondition(subscription.status === 201, `Criação da assinatura respondeu ${subscription.status}`);
+    assertCondition(manualSubscription.status === 201, `Criação da assinatura manual respondeu ${manualSubscription.status}`);
 
     const generateSubscription = await getJson<{ transactionId: string; duplicated: boolean; nextBillingDate: string }>(
       jar,
-      `/api/subscriptions/${subscription.payload.id}/generate-transaction`,
+      `/api/subscriptions/${manualSubscription.payload.id}/generate-transaction`,
       {
         method: "POST"
       }
     );
     assertCondition(generateSubscription.status === 200, `Geração manual da assinatura respondeu ${generateSubscription.status}`);
     assertCondition(generateSubscription.payload.duplicated === false, "A primeira geração da assinatura foi tratada como duplicada");
-    assertCondition(generateSubscription.payload.nextBillingDate.startsWith("2026-05-06"), "Próximo vencimento da assinatura não avançou corretamente");
-    results.push("Assinaturas geram lançamento e avançam corretamente para o próximo vencimento");
+    assertCondition(
+      formatLocalDateKey(new Date(generateSubscription.payload.nextBillingDate)) === formatLocalDateKey(manualNextBillingDate),
+      "Próximo vencimento da assinatura manual não avançou corretamente"
+    );
+    const manualSubscriptionTransactions = await prisma.transaction.findMany({
+      where: {
+        tenantId: tenant.id,
+        subscriptionId: manualSubscription.payload.id
+      },
+      orderBy: {
+        date: "asc"
+      }
+    });
+    assertCondition(manualSubscriptionTransactions.length === 1, "Assinatura manual não gerou exatamente um lançamento");
+    assertCondition(
+      formatLocalDateKey(manualSubscriptionTransactions[0]!.date) === formatLocalDateKey(manualBillingDate),
+      "Lançamento manual da assinatura foi salvo com a data incorreta"
+    );
+    results.push("Assinatura manual gera lançamento avulso e avança o próximo vencimento");
+
+    const automaticSubscription = await getJson<{ id: string }>(jar, "/api/subscriptions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "Streaming Audit Auto",
+        amount: 17.9,
+        billingDay: 6,
+        nextBillingDate: formatLocalDateKey(autoBillingDate),
+        type: "expense",
+        isActive: true,
+        autoTithe: false,
+        categoryId: marketCategory.id,
+        accountId: accountA.payload.id,
+        cardId: null
+      })
+    });
+    assertCondition(automaticSubscription.status === 201, `Criação da assinatura automática respondeu ${automaticSubscription.status}`);
+    const automaticSubscriptionModel = await prisma.subscription.findUniqueOrThrow({
+      where: {
+        id: automaticSubscription.payload.id
+      }
+    });
+    assertCondition(
+      formatLocalDateKey(automaticSubscriptionModel.nextBillingDate) === formatLocalDateKey(autoNextBillingDate),
+      "Assinatura vencida nao foi sincronizada automaticamente ao criar"
+    );
+    const automaticSubscriptionTransactions = await prisma.transaction.findMany({
+      where: {
+        tenantId: tenant.id,
+        subscriptionId: automaticSubscription.payload.id
+      },
+      orderBy: {
+        date: "asc"
+      }
+    });
+    assertCondition(
+      automaticSubscriptionTransactions.length === 1 &&
+        formatLocalDateKey(automaticSubscriptionTransactions[0]!.date) === formatLocalDateKey(autoBillingDate),
+      "Assinatura vencida nao gerou o lançamento automático esperado"
+    );
+    results.push("Assinatura vencida sincroniza automaticamente e preserva a competência correta");
+
+    results.push("Competencia aberta e competencia da compra respeitam fechamento e vencimento do cartao");
 
     const report = await getFinanceReport(
       tenant.id,
@@ -431,11 +603,11 @@ async function main() {
       }
     );
     assertCondition(Math.abs(report.summary.income - 1500) < 0.0001, `Receitas do relatório incoerentes: ${report.summary.income}`);
-    assertCondition(Math.abs(report.summary.expense - 400.01) < 0.0001, `Despesas do relatório incoerentes: ${report.summary.expense}`);
+    assertCondition(Math.abs(report.summary.expense - 300.01) < 0.0001, `Despesas do relatório incoerentes: ${report.summary.expense}`);
     assertCondition(Math.abs(report.summary.transfer - 200) < 0.0001, `Transferências do relatório incoerentes: ${report.summary.transfer}`);
-    assertCondition(Math.abs(report.summary.balance - 1099.99) < 0.0001, `Saldo do relatório incoerente: ${report.summary.balance}`);
+    assertCondition(Math.abs(report.summary.balance - 1199.99) < 0.0001, `Saldo do relatório incoerente: ${report.summary.balance}`);
     assertCondition(
-      report.byCard.some((item) => item.id === card.payload.id && Math.abs(item.netStatement - 200.01) < 0.0001),
+      report.byCard.some((item) => item.id === card.payload.id && Math.abs(item.netStatement - 100.01) < 0.0001),
       "Resumo por cartão do relatório não bate com as parcelas nas competências"
     );
     assertCondition(
@@ -451,6 +623,45 @@ async function main() {
     assertCondition(reportApi.status === 200, `API de relatório respondeu ${reportApi.status}`);
     assertCondition(Math.abs(reportApi.payload.summary.balance - report.summary.balance) < 0.0001, "API de relatório diverge do cálculo central");
     results.push("API de relatórios e cálculo central retornam o mesmo consolidado");
+
+    const marchTransactions = await getJson<{
+      items: Array<{ id: string }>;
+    }>(jar, `/api/transactions?from=2026-03-01&to=2026-03-31&cardId=${rolloverCard.payload.id}`);
+    assertCondition(marchTransactions.status === 200, `Transações de março responderam ${marchTransactions.status}`);
+    assertCondition(
+      !marchTransactions.payload.items.some((item) => item.id === rolloverExpense.payload.id),
+      "Compra após o fechamento apareceu na competência de março"
+    );
+
+    const aprilTransactions = await getJson<{
+      items: Array<{ id: string }>;
+    }>(jar, `/api/transactions?from=2026-04-01&to=2026-04-30&cardId=${rolloverCard.payload.id}`);
+    assertCondition(aprilTransactions.status === 200, `Transações de abril responderam ${aprilTransactions.status}`);
+    assertCondition(
+      aprilTransactions.payload.items.some((item) => item.id === rolloverExpense.payload.id),
+      "Compra após o fechamento não apareceu na competência de abril"
+    );
+
+    const marchReport = await getJson<{
+      byCard: Array<{ id: string; netStatement: number }>;
+    }>(jar, `/api/reports/summary?from=2026-03-01&to=2026-03-31&cardId=${rolloverCard.payload.id}`);
+    assertCondition(marchReport.status === 200, `Relatório de março respondeu ${marchReport.status}`);
+    assertCondition(
+      !marchReport.payload.byCard.some((item) => item.id === rolloverCard.payload.id && item.netStatement > 0),
+      "Compra após o fechamento entrou indevidamente no relatório de março"
+    );
+
+    const aprilReport = await getJson<{
+      byCard: Array<{ id: string; netStatement: number }>;
+    }>(jar, `/api/reports/summary?from=2026-04-01&to=2026-04-30&cardId=${rolloverCard.payload.id}`);
+    assertCondition(aprilReport.status === 200, `Relatório de abril respondeu ${aprilReport.status}`);
+    assertCondition(
+      aprilReport.payload.byCard.some(
+        (item) => item.id === rolloverCard.payload.id && Math.abs(item.netStatement - 80) < 0.0001
+      ),
+      "Compra após o fechamento não entrou na competência de abril do relatório"
+    );
+    results.push("Compras após o fechamento entram na competência seguinte em transações e relatórios");
 
     const dashboardResponse = await jar.fetch(`${baseUrl}/dashboard`);
     assertCondition(dashboardResponse.status === 200, `Dashboard respondeu ${dashboardResponse.status}`);

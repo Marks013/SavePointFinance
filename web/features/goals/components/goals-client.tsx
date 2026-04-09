@@ -283,9 +283,9 @@ export function GoalsClient() {
         <div className="mt-6 space-y-4">
           {goals.map((goal) => (
             <article key={goal.id} className="data-card p-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex min-w-0 items-center gap-3">
                     <PresetChip
                       compact
                       active
@@ -297,11 +297,11 @@ export function GoalsClient() {
                     />
                     <p className="break-words text-sm font-medium text-[var(--color-foreground)]">{goal.name}</p>
                   </div>
-                  <p className="mt-2 text-sm text-[var(--color-muted-foreground)]">
+                  <p className="mt-2 break-words text-sm text-[var(--color-muted-foreground)]">
                     {formatCurrency(goal.currentAmount)} de {formatCurrency(goal.targetAmount)}
                   </p>
                 </div>
-                <span className="text-sm font-semibold text-[var(--color-foreground)]">
+                <span className="shrink-0 text-sm font-semibold text-[var(--color-foreground)]">
                   {Math.round(goal.progress * 100)}%
                 </span>
               </div>
@@ -314,9 +314,9 @@ export function GoalsClient() {
                   }}
                 />
               </div>
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-[var(--color-muted-foreground)]">
-                <span>{goal.account?.name ?? "Sem conta vinculada"}</span>
-                <span>
+              <div className="mt-4 flex flex-wrap items-start justify-between gap-3 text-sm text-[var(--color-muted-foreground)]">
+                <span className="min-w-0 break-words">{goal.account?.name ?? "Sem conta vinculada"}</span>
+                <span className="shrink-0">
                   {goal.deadline ? formatDateDisplay(goal.deadline) : "Sem prazo"}
                 </span>
               </div>

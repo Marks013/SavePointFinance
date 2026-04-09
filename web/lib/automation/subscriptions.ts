@@ -3,14 +3,15 @@ import { NotificationChannel, PaymentMethod, TransactionSource, TransactionType 
 import { deliverNotification } from "@/lib/notifications/delivery";
 import {
   getCardStatementSnapshot,
-  getCurrentStatementMonth,
+  getCurrentPayableStatementMonth,
   getStatementPaymentDate
 } from "@/lib/cards/statement";
 import { getFinanceReport } from "@/lib/finance/reports";
 import { ensureTitheCategory, getMonthKey, syncMonthlyTitheTransaction } from "@/lib/finance/tithe";
 import { prisma } from "@/lib/prisma/client";
+import { advanceSubscriptionBillingDate } from "@/lib/subscriptions/recurrence";
 import { formatDateDisplay, formatDateKey } from "@/lib/date";
-import { addMonthsClamped, formatCurrency } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils";
 
 function startOfDay(date: Date) {
   const next = new Date(date);
@@ -164,11 +165,13 @@ export async function generateSubscriptionTransaction(subscriptionId: string, te
     throw new Error("Subscription not found");
   }
 
+  const nextBillingDate = new Date(subscription.nextBillingDate);
+  const followingBillingDate = advanceSubscriptionBillingDate(nextBillingDate, subscription.billingDay);
   const existing = await prisma.transaction.findFirst({
     where: {
       tenantId,
       subscriptionId: subscription.id,
-      date: subscription.nextBillingDate
+      date: nextBillingDate
     },
     select: {
       id: true
@@ -176,19 +179,31 @@ export async function generateSubscriptionTransaction(subscriptionId: string, te
   });
 
   if (existing) {
+    const updated = await prisma.subscription.update({
+      where: {
+        id: subscription.id,
+        tenantId
+      },
+      data: {
+        nextBillingDate: followingBillingDate
+      }
+    });
+
     return {
       transactionId: existing.id,
       duplicated: true,
-      nextBillingDate: subscription.nextBillingDate.toISOString()
+      nextBillingDate: updated.nextBillingDate.toISOString()
     };
   }
 
+  const titheCategoryId =
+    subscription.type === "income" && subscription.autoTithe ? await ensureTitheCategory(tenantId) : null;
   const transaction = await prisma.transaction.create({
     data: {
       tenantId,
       userId: subscription.userId ?? userId,
       subscriptionId: subscription.id,
-      date: subscription.nextBillingDate,
+      date: nextBillingDate,
       amount: subscription.amount,
       description: `Assinatura: ${subscription.name}`,
       type: subscription.type === "income" ? TransactionType.income : TransactionType.expense,
@@ -197,13 +212,12 @@ export async function generateSubscriptionTransaction(subscriptionId: string, te
       accountId: subscription.accountId,
       cardId: subscription.cardId,
       source: TransactionSource.manual,
-      notes: "Gerado automaticamente via assinaturas",
+      notes: "Gerado via assinatura recorrente",
       titheAmount:
         subscription.type === "income" && subscription.autoTithe
           ? Number(subscription.amount) * 0.1
           : null,
-      titheCategoryId:
-        subscription.type === "income" && subscription.autoTithe ? await ensureTitheCategory(tenantId) : null
+      titheCategoryId
     }
   });
 
@@ -213,7 +227,7 @@ export async function generateSubscriptionTransaction(subscriptionId: string, te
       tenantId
     },
     data: {
-      nextBillingDate: addMonthsClamped(subscription.nextBillingDate, 1)
+      nextBillingDate: followingBillingDate
     }
   });
 
@@ -221,7 +235,7 @@ export async function generateSubscriptionTransaction(subscriptionId: string, te
     await syncMonthlyTitheTransaction({
       tenantId,
       userId: subscription.userId ?? userId,
-      monthKey: getMonthKey(subscription.nextBillingDate)
+      monthKey: getMonthKey(nextBillingDate)
     });
   }
 
@@ -232,29 +246,24 @@ export async function generateSubscriptionTransaction(subscriptionId: string, te
   };
 }
 
-export async function runRecurringAutomation(tenantId: string, userId: string) {
-  const now = new Date();
-  const tenantUser = await prisma.user.findFirst({
-    where: {
-      id: userId,
-      tenantId,
-      isActive: true
-    },
-    include: {
-      preferences: true
-    }
-  });
-
-  if (!tenantUser) {
-    throw new Error("User not found");
-  }
+export async function syncDueSubscriptionTransactions({
+  tenantId,
+  userId,
+  now = new Date()
+}: {
+  tenantId: string;
+  userId: string;
+  now?: Date;
+}) {
+  const dueThreshold = new Date(now);
+  dueThreshold.setHours(23, 59, 59, 999);
 
   const dueSubscriptions = await prisma.subscription.findMany({
     where: {
       tenantId,
       isActive: true,
       nextBillingDate: {
-        lte: now
+        lte: dueThreshold
       }
     },
     orderBy: {
@@ -276,7 +285,7 @@ export async function runRecurringAutomation(tenantId: string, userId: string) {
         }
       });
 
-      if (!freshSubscription || freshSubscription.nextBillingDate > now) {
+      if (!freshSubscription || freshSubscription.nextBillingDate > dueThreshold) {
         break;
       }
 
@@ -287,23 +296,35 @@ export async function runRecurringAutomation(tenantId: string, userId: string) {
         ...result
       });
 
-      if (result.duplicated) {
-        const advancedDate = addMonthsClamped(freshSubscription.nextBillingDate, 1);
-
-        await prisma.subscription.update({
-          where: {
-            id: freshSubscription.id,
-            tenantId
-          },
-          data: {
-            nextBillingDate: advancedDate
-          }
-        });
-      }
-
       safety += 1;
     }
   }
+
+  return results;
+}
+
+export async function runRecurringAutomation(tenantId: string, userId: string) {
+  const now = new Date();
+  const tenantUser = await prisma.user.findFirst({
+    where: {
+      id: userId,
+      tenantId,
+      isActive: true
+    },
+    include: {
+      preferences: true
+    }
+  });
+
+  if (!tenantUser) {
+    throw new Error("User not found");
+  }
+
+  const results = await syncDueSubscriptionTransactions({
+    tenantId,
+    userId,
+    now
+  });
 
   const reminderWindow = new Date();
   reminderWindow.setDate(reminderWindow.getDate() + 7);
@@ -440,8 +461,8 @@ export async function runRecurringAutomation(tenantId: string, userId: string) {
   });
 
   for (const card of cards) {
-    const statementMonth = getCurrentStatementMonth(card, now);
-    const dueDate = getStatementPaymentDate(statementMonth, card.dueDay);
+    const statementMonth = getCurrentPayableStatementMonth(card, now);
+    const dueDate = getStatementPaymentDate(statementMonth, card.dueDay, card.closeDay);
 
     if (dueDate <= now || dueDate > reminderWindow) {
       continue;
@@ -469,6 +490,7 @@ export async function runRecurringAutomation(tenantId: string, userId: string) {
       client: prisma
     });
     const statementAmount = statement.totalAmount;
+    const outstandingAmount = statement.outstandingAmount;
 
     if (statementAmount <= 0) {
       continue;
@@ -494,12 +516,12 @@ export async function runRecurringAutomation(tenantId: string, userId: string) {
     );
 
     const limitAmount = Number(card.limitAmount);
-    const utilization = limitAmount > 0 ? statementAmount / limitAmount : 0;
+    const utilization = limitAmount > 0 ? outstandingAmount / limitAmount : 0;
 
-    if (limitAmount > 0 && statementAmount >= limitAmount) {
+    if (limitAmount > 0 && outstandingAmount >= limitAmount) {
       const subject = `Limite excedido: ${card.name}`;
       const message =
-        `O cartão ${card.name} alcançou ${formatCurrency(statementAmount)} em fatura aberta, ` +
+        `O cartão ${card.name} alcançou ${formatCurrency(outstandingAmount)} em saldo em aberto, ` +
         `acima do limite de ${formatCurrency(limitAmount)}.`;
 
       notificationDeliveries.push(
@@ -519,7 +541,7 @@ export async function runRecurringAutomation(tenantId: string, userId: string) {
       const subject = `Uso alto do limite: ${card.name}`;
       const message =
         `O cartão ${card.name} está usando ${Math.round(utilization * 100)}% do limite. ` +
-        `Fatura atual: ${formatCurrency(statementAmount)} de ${formatCurrency(limitAmount)}.`;
+        `Saldo em aberto: ${formatCurrency(outstandingAmount)} de ${formatCurrency(limitAmount)}.`;
 
       notificationDeliveries.push(
         ...(await sendUserNotifications({

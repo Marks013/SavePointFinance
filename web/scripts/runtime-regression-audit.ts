@@ -578,7 +578,7 @@ async function run() {
         ownerUserId: blockedUser.id,
         name: `Conta bloqueada ${unique}`,
         type: "checking",
-        balance: 50,
+        openingBalance: 50,
         currency: "BRL",
         color: "#111111"
       }
@@ -617,7 +617,7 @@ async function run() {
         ownerUserId: deleteUser.id,
         name: `Conta delete ${unique}`,
         type: "checking",
-        balance: 120,
+        openingBalance: 120,
         currency: "BRL",
         color: "#111111"
       }
@@ -732,7 +732,7 @@ async function run() {
         ownerUserId: selfDeleteUser.id,
         name: `Conta self ${unique}`,
         type: "checking",
-        balance: 80,
+        openingBalance: 80,
         currency: "BRL",
         color: "#111111"
       }

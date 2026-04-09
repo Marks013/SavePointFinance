@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
@@ -37,8 +37,8 @@ type SubscriptionItem = {
   card: RefItem | null;
 };
 
-async function getSubscriptions(month: string) {
-  const response = await fetch(`/api/subscriptions?month=${month}`, { cache: "no-store" });
+async function getSubscriptions() {
+  const response = await fetch("/api/subscriptions", { cache: "no-store" });
   if (!response.ok) throw new Error("Falha ao carregar assinaturas");
   return (await response.json()) as { items: SubscriptionItem[] };
 }
@@ -106,9 +106,10 @@ export function SubscriptionsClient() {
   const searchParams = useSearchParams();
   const month = normalizeMonthKey(searchParams.get("month"));
   const [editingId, setEditingId] = useState<string | null>(null);
+  const formSectionRef = useRef<HTMLElement | null>(null);
   const subscriptionsQuery = useQuery({
-    queryKey: ["subscriptions", month],
-    queryFn: () => getSubscriptions(month)
+    queryKey: ["subscriptions"],
+    queryFn: getSubscriptions
   });
   const categoriesQuery = useQuery({ queryKey: ["categories"], queryFn: getCategories });
   const accountsQuery = useQuery({ queryKey: ["accounts"], queryFn: getAccounts });
@@ -249,6 +250,19 @@ export function SubscriptionsClient() {
     }
   }, [form, selectedAccountId, selectedCardId, selectedType]);
 
+  useEffect(() => {
+    if (!editingId) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      formSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      document.getElementById("sub-name")?.focus();
+    }, 80);
+
+    return () => window.clearTimeout(timeout);
+  }, [editingId]);
+
   const applyServicePreset = (preset: SubscriptionServicePreset) => {
     const currentValues = form.getValues();
     form.reset({
@@ -262,7 +276,7 @@ export function SubscriptionsClient() {
 
   return (
     <div className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
-      <section className="surface content-section">
+      <section className="surface content-section" ref={formSectionRef}>
         <div className="eyebrow">Assinaturas</div>
         <h1 className="mt-3 text-3xl font-semibold tracking-[-0.03em]">
           {isEditing ? "Editar recorrência" : "Nova recorrência"}
@@ -402,10 +416,10 @@ export function SubscriptionsClient() {
 
             return (
               <article key={item.id} className="data-card p-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="min-w-0">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
                     {servicePreset ? (
-                      <div className="mb-3 flex items-center gap-3">
+                      <div className="mb-3 flex min-w-0 items-center gap-3">
                         <span
                           className="service-badge h-11 min-w-11 rounded-[1rem] px-3 text-xs"
                           style={{
@@ -415,28 +429,30 @@ export function SubscriptionsClient() {
                           {servicePreset.monogram}
                         </span>
                         <div className="min-w-0">
-                          <p className="font-semibold text-[var(--color-foreground)]">{item.name}</p>
-                          <p className="text-xs text-[var(--color-muted-foreground)]">{servicePreset.description}</p>
+                          <p className="break-words font-semibold text-[var(--color-foreground)]">{item.name}</p>
+                          <p className="break-words text-xs text-[var(--color-muted-foreground)]">{servicePreset.description}</p>
                         </div>
                       </div>
                     ) : (
-                      <p className="font-semibold">{item.name}</p>
+                      <p className="break-words font-semibold">{item.name}</p>
                     )}
-                    <p className="text-sm text-[var(--color-muted-foreground)]">
+                    <p className="break-words text-sm text-[var(--color-muted-foreground)]">
                       {item.category?.name ?? "Sem categoria"} • {item.type === "income" ? "próximo recebimento em " : "próxima cobrança em "}
                       {formatDateDisplay(item.nextBillingDate)}
                     </p>
-                    <p className="text-sm text-[var(--color-muted-foreground)]">
-                    {item.card?.name ?? item.account?.name ?? "Sem origem financeira"} •{" "}
-                    {item.type === "expense" ? "Despesa recorrente" : "Receita recorrente"}
-                  </p>
-                  {item.autoTithe ? (
-                    <p className="text-xs text-[var(--color-muted-foreground)]">
-                      Dízimo automático incluído nesta recorrência
+                    <p className="break-words text-sm text-[var(--color-muted-foreground)]">
+                      {item.card?.name ?? item.account?.name ?? "Sem origem financeira"} •{" "}
+                      {item.type === "expense" ? "Despesa recorrente" : "Receita recorrente"}
                     </p>
-                  ) : null}
-                </div>
-                  <p className={item.type === "expense" ? "font-semibold amount-negative" : "font-semibold"}>{formatCurrency(item.amount)}</p>
+                    {item.autoTithe ? (
+                      <p className="break-words text-xs text-[var(--color-muted-foreground)]">
+                        Dízimo automático incluído nesta recorrência
+                      </p>
+                    ) : null}
+                  </div>
+                  <p className={item.type === "expense" ? "w-full break-words text-left font-semibold amount-negative sm:w-auto sm:text-right" : "w-full break-words text-left font-semibold sm:w-auto sm:text-right"}>
+                    {formatCurrency(item.amount)}
+                  </p>
                 </div>
                 <div className="mt-4 flex flex-wrap gap-3">
                   <Button onClick={() => startEditing(item)} type="button" variant="secondary">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useSearchParams } from "next/navigation";
@@ -76,6 +76,7 @@ export function InstallmentsClient() {
   const month = normalizeMonthKey(searchParams.get("month"));
   const monthRange = getMonthRange(month);
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
+  const editSectionRef = useRef<HTMLElement | null>(null);
   const [filters, setFilters] = useState({
     from: monthRange.from,
     to: monthRange.to,
@@ -109,6 +110,19 @@ export function InstallmentsClient() {
       to: monthRange.to
     }));
   }, [monthRange.from, monthRange.to]);
+
+  useEffect(() => {
+    if (!editingGroupId) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      editSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      document.getElementById("installment-description")?.focus();
+    }, 80);
+
+    return () => window.clearTimeout(timeout);
+  }, [editingGroupId]);
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -283,7 +297,7 @@ export function InstallmentsClient() {
       </section>
 
       {editingGroupId ? (
-        <section className="surface content-section">
+        <section className="surface content-section" ref={editSectionRef}>
           <p className="eyebrow">
             Edição do grupo
           </p>
@@ -344,15 +358,15 @@ export function InstallmentsClient() {
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {groups.map((item) => (
           <article key={item.id} className="surface content-section">
-            <p className="text-lg font-semibold">{item.description}</p>
-            <p className="mt-2 text-sm text-[var(--color-muted-foreground)]">
+            <p className="break-words text-lg font-semibold">{item.description}</p>
+            <p className="mt-2 break-words text-sm text-[var(--color-muted-foreground)]">
               {item.category?.name ?? "Sem categoria"} • {item.card?.name ?? "Sem cartão"}
             </p>
-            <p className="mt-4 text-2xl font-semibold">{formatCurrency(item.totalAmount)}</p>
-            <p className="mt-2 text-sm text-[var(--color-muted-foreground)]">
+            <p className="mt-4 break-words text-2xl font-semibold">{formatCurrency(item.totalAmount)}</p>
+            <p className="mt-2 break-words text-sm text-[var(--color-muted-foreground)]">
               Parcela base: {formatCurrency(item.installmentAmount ?? 0)}
             </p>
-            <p className="mt-2 text-sm text-[var(--color-muted-foreground)]">
+            <p className="mt-2 break-words text-sm text-[var(--color-muted-foreground)]">
               {item.installmentsPaid}/{item.installmentsTotal} conciliadas
             </p>
             <div className="mt-4 h-3 overflow-hidden rounded-full bg-[var(--color-secondary)]">
@@ -361,10 +375,10 @@ export function InstallmentsClient() {
                 style={{ width: `${(item.installmentsPaid / item.installmentsTotal) * 100}%` }}
               />
             </div>
-            <p className="mt-4 text-sm text-[var(--color-muted-foreground)]">
+            <p className="mt-4 break-words text-sm text-[var(--color-muted-foreground)]">
               Próxima: {item.nextInstallmentDate ? formatDateDisplay(item.nextInstallmentDate) : "Finalizado"}
             </p>
-            <p className="mt-2 text-sm text-[var(--color-muted-foreground)]">
+            <p className="mt-2 break-words text-sm text-[var(--color-muted-foreground)]">
               Em atraso e abertas: {item.overdueOpenInstallments}
             </p>
             <div className="mt-4 flex flex-wrap gap-2">

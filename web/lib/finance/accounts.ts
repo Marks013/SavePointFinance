@@ -46,7 +46,7 @@ export async function getAccountsWithComputedBalance(tenantId: string, ownerUser
   const accountIds = new Set(accounts.map((account) => account.id));
 
   for (const account of accounts) {
-    balanceMap.set(account.id, Number(account.balance));
+    balanceMap.set(account.id, Number(account.openingBalance));
   }
 
   for (const transaction of transactions) {
@@ -74,7 +74,7 @@ export async function getAccountsWithComputedBalance(tenantId: string, ownerUser
 
   return accounts.map<ComputedAccount>((account) => ({
     ...account,
-    openingBalance: Number(account.balance),
-    currentBalance: balanceMap.get(account.id) ?? Number(account.balance)
+    openingBalance: Number(account.openingBalance),
+    currentBalance: balanceMap.get(account.id) ?? Number(account.openingBalance)
   }));
 }

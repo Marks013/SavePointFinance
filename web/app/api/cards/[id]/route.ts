@@ -77,21 +77,6 @@ export async function DELETE(_request: Request, context: Params) {
     const user = await requireSessionUser();
     const { id } = await context.params;
 
-    const hasTransactions = await prisma.transaction.findFirst({
-      where: {
-        tenantId: user.tenantId,
-        cardId: id
-      },
-      select: { id: true }
-    });
-
-    if (hasTransactions) {
-      return NextResponse.json(
-        { message: "Cartao possui transacoes vinculadas" },
-        { status: 400 }
-      );
-    }
-
     await prisma.card.delete({
       where: {
         id,

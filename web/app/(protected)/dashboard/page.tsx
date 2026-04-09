@@ -4,12 +4,17 @@ import type { ReactNode } from "react";
 import { ArrowRight, BellRing, CreditCard, Landmark, Target } from "lucide-react";
 
 import { SummaryCards } from "@/features/dashboard/components/summary-cards";
+import { syncDueSubscriptionTransactions } from "@/lib/automation/subscriptions";
 import { requireSessionUser } from "@/lib/auth/session";
-import { getCardStatementSnapshots } from "@/lib/cards/statement";
-import { formatDateDisplay } from "@/lib/date";
+import {
+  getCardExpenseCompetenceDate,
+  getCardStatementSnapshot,
+  getCardStatementSnapshots,
+  getCurrentPayableStatementMonth
+} from "@/lib/cards/statement";
 import { getAccountsWithComputedBalance } from "@/lib/finance/accounts";
 import { getFinanceReport } from "@/lib/finance/reports";
-import { formatMonthKeyLabel, getMonthRange, normalizeMonthKey } from "@/lib/month";
+import { formatMonthKeyLabel, getCurrentMonthKey, getMonthRange, normalizeMonthKey } from "@/lib/month";
 import { prisma } from "@/lib/prisma/client";
 import { formatCurrency } from "@/lib/utils";
 
@@ -18,7 +23,10 @@ function formatDate(value: Date | string | null | undefined) {
     return "Sem data";
   }
 
-  return formatDateDisplay(value);
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "short"
+  }).format(new Date(value));
 }
 
 async function getDashboardData(tenantId: string, month: string) {
@@ -42,7 +50,7 @@ async function getDashboardData(tenantId: string, month: string) {
           where: {
             tenantId,
             date: {
-              gte: start,
+              gte: new Date(start.getFullYear(), start.getMonth() - 1, 1, 0, 0, 0, 0),
               lte: end
             }
           },
@@ -53,7 +61,7 @@ async function getDashboardData(tenantId: string, month: string) {
             card: true
           },
           orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-          take: 6
+          take: 200
         }),
         prisma.subscription.findMany({
           where: {
@@ -106,8 +114,26 @@ async function getDashboardData(tenantId: string, month: string) {
       client: prisma,
       month
     });
+    const currentMonth = getCurrentMonthKey();
+    const payableStatements =
+      month === currentMonth
+        ? await Promise.all(
+            activeCards.map(async (card) => ({
+              cardId: card.id,
+              statement: await getCardStatementSnapshot({
+                tenantId,
+                card,
+                month: getCurrentPayableStatementMonth(card),
+                client: prisma
+              })
+            }))
+          )
+        : [];
+    const statementByCardId = new Map(cardStatements.map((item) => [item.card.id, item]));
+    const payableStatementByCardId = new Map(payableStatements.map((item) => [item.cardId, item.statement]));
     const cardsWithStatement = activeCards.map((card) => {
-      const statement = cardStatements.find((item) => item.card.id === card.id);
+      const statement = statementByCardId.get(card.id);
+      const payableStatement = payableStatementByCardId.get(card.id) ?? statement;
 
       return {
         ...card,
@@ -115,9 +141,16 @@ async function getDashboardData(tenantId: string, month: string) {
         closeDate: statement?.closeDate ?? null,
         dueDate: statement?.dueDate ?? null,
         statementAmount: statement?.totalAmount ?? 0,
-        availableLimit: statement?.availableLimit ?? Number(card.limitAmount)
+        outstandingAmount: statement?.outstandingAmount ?? 0,
+        availableLimit: statement?.availableLimit ?? Number(card.limitAmount),
+        payableStatementMonth: payableStatement?.month ?? month,
+        payableDueDate: payableStatement?.dueDate ?? null,
+        payableStatementAmount: payableStatement?.totalAmount ?? 0
       };
     });
+
+    const monthlyCardPayments = monthlyReport.projection.cardPayments;
+    const projectedMonthBalance = monthlyReport.projection.endingBalance;
 
     return {
       balance: accounts.filter((account) => account.isActive).reduce((sum, account) => sum + account.currentBalance, 0),
@@ -127,9 +160,19 @@ async function getDashboardData(tenantId: string, month: string) {
       classification: monthlyReport.classification,
       spendingInsights: monthlyReport.spendingInsights,
       projection: monthlyReport.projection,
+      monthlyCardPayments,
+      projectedMonthBalance,
       upcomingProjection: monthlyReport.upcoming.slice(0, 5),
       goals: Number(goals._sum.currentAmount ?? 0),
-      recentTransactions,
+      recentTransactions: recentTransactions
+        .filter((transaction) => {
+          const competenceDate = transaction.card
+            ? getCardExpenseCompetenceDate(transaction.card, transaction.date)
+            : transaction.date;
+
+          return competenceDate >= start && competenceDate <= end;
+        })
+        .slice(0, 6),
       upcomingSubscriptions,
       upcomingGoals,
       activeAccounts: accounts
@@ -161,8 +204,11 @@ async function getDashboardData(tenantId: string, month: string) {
         income: 0,
         expense: 0,
         cardPayments: 0,
-        net: 0
+        net: 0,
+        endingBalance: 0
       },
+      monthlyCardPayments: 0,
+      projectedMonthBalance: 0,
       upcomingProjection: [],
       goals: 0,
       recentTransactions: [],
@@ -184,6 +230,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const user = await requireSessionUser();
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const month = normalizeMonthKey(resolvedSearchParams?.month);
+  await syncDueSubscriptionTransactions({
+    tenantId: user.tenantId,
+    userId: user.id
+  });
   const data = await getDashboardData(user.tenantId, month);
   const monthLabel = formatMonthKeyLabel(month);
   const netMonth = data.income - data.expenses;
@@ -206,7 +256,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               <div className="editorial-panel">
                 <p className="metric-label">Resultado do mês</p>
                 <p
-                  className={`mt-3 whitespace-nowrap text-lg font-semibold tracking-[-0.04em] ${
+                  className={`mt-3 max-w-full break-words text-lg font-semibold tracking-[-0.04em] ${
                     netMonth >= 0 ? "text-[var(--color-emerald-600)]" : "amount-negative"
                   }`}
                 >
@@ -242,9 +292,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         <article className="surface-strong rounded-[34px] p-6 md:p-8">
           <div className="section-stack">
             <div>
-              <p className="metric-label text-white/78">Foco imediato</p>
+              <p className="metric-label text-white/78">Caixa disponível</p>
               <h2
-                className={`mt-4 whitespace-nowrap text-[clamp(2rem,4vw,3.2rem)] font-semibold tracking-[-0.07em] ${
+                className={`mt-4 max-w-full break-words text-[clamp(1.7rem,5vw,3.2rem)] font-semibold tracking-[-0.07em] ${
                   data.balance < 0 ? "amount-negative" : "text-white"
                 }`}
               >
@@ -259,18 +309,18 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             <div className="grid gap-3">
               <div className="rounded-[24px] border border-white/12 bg-white/8 px-4 py-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-white/66">Faturas a vencer</p>
-                <p className="mt-2 whitespace-nowrap text-2xl font-semibold tracking-[-0.05em] text-white">
-                  {formatCurrency(data.projection.cardPayments)}
+                <p className="mt-2 max-w-full break-words text-[clamp(1.25rem,4vw,2rem)] font-semibold tracking-[-0.05em] text-white">
+                  {formatCurrency(data.monthlyCardPayments)}
                 </p>
               </div>
               <div className="rounded-[24px] border border-white/12 bg-white/8 px-4 py-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-white/66">Projeção do mês</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-white/66">Saldo projetado</p>
                 <p
-                  className={`mt-2 whitespace-nowrap text-2xl font-semibold tracking-[-0.05em] ${
-                    data.projection.net < 0 ? "amount-negative" : "text-white"
+                  className={`mt-2 max-w-full break-words text-[clamp(1.25rem,4vw,2rem)] font-semibold tracking-[-0.05em] ${
+                    data.projectedMonthBalance < 0 ? "amount-negative" : "text-white"
                   }`}
                 >
-                  {formatCurrency(data.projection.net)}
+                  {formatCurrency(data.projectedMonthBalance)}
                 </p>
               </div>
             </div>
@@ -316,7 +366,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             </div>
             <div className="data-card p-4">
               <p className="metric-label">Estruturais</p>
-              <p className="mt-3 whitespace-nowrap text-base font-semibold">
+              <p className="mt-3 break-words text-base font-semibold">
                 {formatCurrency(data.spendingInsights.essentialExpenses)}
               </p>
               <p className="mt-2 text-sm text-[var(--color-muted-foreground)]">
@@ -336,13 +386,15 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             {data.spendingInsights.categoryBreakdown.slice(0, 4).map((item) => (
               <div key={item.name} className="data-card px-4 py-3">
                 <div className="flex items-center justify-between gap-4">
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium">{item.name}</p>
                     <p className="text-xs text-[var(--color-muted-foreground)]">
                       {item.items} lançamentos • {Math.round(item.share * 100)}% do total
                     </p>
                   </div>
-                  <p className="whitespace-nowrap text-sm font-semibold">{formatCurrency(item.total)}</p>
+                  <p className="max-w-full break-words text-right text-sm font-semibold sm:w-auto">
+                    {formatCurrency(item.total)}
+                  </p>
                 </div>
               </div>
             ))}
@@ -367,13 +419,13 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             </Link>
           </div>
 
-          <div className="mt-5 hidden space-y-3">
+          <div className="mt-5 space-y-3">
             {data.recentTransactions.length > 0 ? (
               data.recentTransactions.map((transaction) => (
-                <div key={transaction.id} className="data-card flex items-center justify-between gap-4 px-4 py-3">
-                  <div className="min-w-0">
+                <div key={transaction.id} className="data-card flex flex-wrap items-start justify-between gap-4 px-4 py-3">
+                  <div className="min-w-0 flex-1">
                     <p className="break-words text-sm font-medium">{transaction.description}</p>
-                    <p className="text-xs text-[var(--color-muted-foreground)]">
+                    <p className="break-words text-xs text-[var(--color-muted-foreground)]">
                       {formatDate(transaction.date)} • {transaction.category?.name ?? "Sem categoria"} •{" "}
                       {transaction.card?.name ??
                         (transaction.destinationAccount
@@ -382,7 +434,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                     </p>
                   </div>
                   <p
-                    className={`shrink-0 whitespace-nowrap text-sm font-semibold ${
+                    className={`w-full break-words text-left text-sm font-semibold sm:w-auto sm:text-right ${
                       transaction.type === "income"
                         ? "text-[var(--color-emerald-600)]"
                         : transaction.type === "expense"
@@ -414,10 +466,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               {data.upcomingProjection.length > 0 ? (
                 data.upcomingProjection.map((item) => (
                   <div key={`${item.source}-${item.reference}`} className="data-card px-4 py-3">
-                    <div className="flex items-center justify-between gap-4">
-                      <p className="text-sm font-medium">{item.label}</p>
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <p className="min-w-0 flex-1 break-words text-sm font-medium">{item.label}</p>
                       <p
-                        className={`whitespace-nowrap text-sm font-semibold ${
+                        className={`w-full break-words text-left text-sm font-semibold sm:w-auto sm:text-right ${
                           item.type === "income" ? "text-[var(--color-primary)]" : "amount-negative"
                         }`}
                       >
@@ -456,13 +508,13 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
                   return (
                     <div key={goal.id} className="data-card px-4 py-3">
-                      <div className="flex items-center justify-between gap-4">
-                        <p className="text-sm font-medium">{goal.name}</p>
-                        <p className="text-xs font-semibold text-[var(--color-muted-foreground)]">
+                      <div className="flex items-start justify-between gap-4">
+                        <p className="min-w-0 flex-1 break-words text-sm font-medium">{goal.name}</p>
+                        <p className="shrink-0 text-xs font-semibold text-[var(--color-muted-foreground)]">
                           {Math.round(progress * 100)}%
                         </p>
                       </div>
-                      <p className="mt-1 text-xs text-[var(--color-muted-foreground)]">
+                      <p className="mt-1 break-words text-xs text-[var(--color-muted-foreground)]">
                         Vence em {formatDate(goal.deadline)} • Atual {formatCurrency(Number(goal.currentAmount))} de{" "}
                         {formatCurrency(Number(goal.targetAmount))}
                       </p>
@@ -501,7 +553,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             <div className="data-card px-4 py-4">
               <p className="metric-label">Maior saldo</p>
               <p
-                className={`mt-3 whitespace-nowrap text-2xl font-semibold tracking-[-0.05em] ${
+                className={`mt-3 max-w-full break-words text-[clamp(1.25rem,4vw,2rem)] font-semibold tracking-[-0.05em] ${
                   (data.activeAccounts[0]?.currentBalance ?? 0) < 0 ? "amount-negative" : "text-[var(--color-foreground)]"
                 }`}
               >
@@ -526,19 +578,24 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               {data.activeCards.length > 0 ? (
                 data.activeCards.map((card) => (
                   <div key={card.id} className="data-card space-y-3 px-4 py-4">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium">{card.name}</p>
-                        <p className="text-xs text-[var(--color-muted-foreground)]">
+                        <p className="break-words text-xs text-[var(--color-muted-foreground)]">
                           {card.brand} {card.last4 ? `• Final ${card.last4}` : ""} • Fecha em {formatDate(card.closeDate)}
                         </p>
                       </div>
-                      <div className="text-right">
+                      <div className="w-full sm:w-auto sm:text-right">
                         <p className="text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-[var(--color-muted-foreground)]">
-                          Fatura atual
+                          Próximo vencimento
                         </p>
-                        <p className="subtle-metric-value mt-2 whitespace-nowrap text-[var(--color-foreground)]">
-                          {formatCurrency(Number(card.statementAmount))}
+                        <p className="subtle-metric-value mt-2 text-[var(--color-foreground)]">
+                          {formatCurrency(Number(card.payableStatementAmount))}
+                        </p>
+                        <p className="mt-1 break-words text-xs text-[var(--color-muted-foreground)]">
+                          {card.payableStatementAmount > 0
+                            ? `Vence em ${formatDate(card.payableDueDate)}`
+                            : "Sem cobrança prevista neste mês"}
                         </p>
                       </div>
                     </div>
@@ -548,7 +605,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                         <span>Limite utilizado</span>
                         <span>
                           {Math.round(
-                            Math.min((Number(card.statementAmount) / Math.max(Number(card.limitAmount), 1)) * 100, 100)
+                            Math.min((Number(card.outstandingAmount) / Math.max(Number(card.limitAmount), 1)) * 100, 100)
                           )}
                           %
                         </span>
@@ -558,7 +615,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                           className="progress-fill"
                           style={{
                             width: `${Math.min(
-                              (Number(card.statementAmount) / Math.max(Number(card.limitAmount), 1)) * 100,
+                              (Number(card.outstandingAmount) / Math.max(Number(card.limitAmount), 1)) * 100,
                               100
                             )}%`
                           }}
@@ -569,18 +626,24 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                     <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
                       <div className="rounded-[1.1rem] border border-[var(--color-border)]/70 bg-[var(--color-muted)]/25 px-3 py-3">
                         <p className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-[var(--color-muted-foreground)]">
-                          Limite total
+                          Fatura aberta
                         </p>
-                        <p className="mt-2 whitespace-nowrap text-sm font-medium text-[var(--color-foreground)]">
-                          {formatCurrency(Number(card.limitAmount))}
+                        <p className="mt-2 break-words text-sm font-medium text-[var(--color-foreground)]">
+                          {formatCurrency(Number(card.statementAmount))}
+                        </p>
+                        <p className="mt-1 text-xs text-[var(--color-muted-foreground)]">
+                          Competência {formatMonthKeyLabel(card.statementMonth)}
                         </p>
                       </div>
                       <div className="rounded-[1.1rem] border border-[var(--color-border)]/70 bg-[var(--color-muted)]/25 px-3 py-3">
                         <p className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-[var(--color-muted-foreground)]">
                           Vencimento
                         </p>
-                        <p className="mt-2 whitespace-nowrap text-sm font-medium text-[var(--color-foreground)]">
-                          {formatDate(card.dueDate)}
+                        <p className="mt-2 break-words text-sm font-medium text-[var(--color-foreground)]">
+                          {formatDate(card.payableDueDate)}
+                        </p>
+                        <p className="mt-1 text-xs text-[var(--color-muted-foreground)]">
+                          Referente a {formatMonthKeyLabel(card.payableStatementMonth)}
                         </p>
                       </div>
                       <div className="rounded-[1.1rem] border border-[var(--color-border)]/70 bg-[var(--color-muted)]/25 px-3 py-3">
@@ -588,11 +651,19 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                           Limite disponível
                         </p>
                         <p
-                          className={`mt-2 whitespace-nowrap text-sm font-medium ${
+                          className={`mt-2 break-words text-sm font-medium ${
                             Number(card.availableLimit) < 0 ? "amount-negative" : "text-[var(--color-foreground)]"
                           }`}
                         >
                           {formatCurrency(Number(card.availableLimit))}
+                        </p>
+                      </div>
+                      <div className="rounded-[1.1rem] border border-[var(--color-border)]/70 bg-[var(--color-muted)]/25 px-3 py-3">
+                        <p className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-[var(--color-muted-foreground)]">
+                          Em aberto
+                        </p>
+                        <p className="mt-2 break-words text-sm font-medium text-[var(--color-foreground)]">
+                          {formatCurrency(Number(card.outstandingAmount))}
                         </p>
                       </div>
                     </div>
@@ -645,9 +716,9 @@ function QuickAccessLink({
       className="data-card group flex items-start justify-between gap-4 px-4 py-3 transition hover:border-[rgba(19,111,79,0.22)]"
       href={`${href}?month=${month}`}
     >
-      <div>
+      <div className="min-w-0 flex-1">
         <p className="text-sm font-medium text-[var(--color-foreground)]">{label}</p>
-        <p className="mt-1 text-xs leading-5 text-[var(--color-muted-foreground)]">{copy}</p>
+        <p className="mt-1 break-words text-xs leading-5 text-[var(--color-muted-foreground)]">{copy}</p>
       </div>
       <ArrowRight className="mt-0.5 size-4 shrink-0 text-[var(--color-muted-foreground)] transition group-hover:translate-x-0.5 group-hover:text-[var(--color-primary)]" />
     </Link>

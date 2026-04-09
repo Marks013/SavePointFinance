@@ -93,7 +93,7 @@ async function main() {
       ownerUserId: user.id,
       name: "Conta Principal",
       type: AccountType.checking,
-      balance: 12000
+      openingBalance: 12000
     }
   });
 

@@ -213,7 +213,7 @@ model FinancialAccount {
   ownerUserId  String
   name         String
   type         AccountType   @default(checking)
-  balance      Decimal       @default(0) @db.Decimal(15, 2)
+  openingBalance Decimal       @default(0) @map("balance") @db.Decimal(15, 2)
   currency     String        @default("BRL")
   color        String        @default("#10B981")
   institution  String?
@@ -286,13 +286,13 @@ model Transaction {
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
   tenant            Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user              User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
-  subscription      Subscription?     @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
-  category          Category?         @relation("TransactionCategory", fields: [categoryId], references: [id], onDelete: SetNull)
+  user              User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subscription      Subscription?     @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  category          Category?         @relation("TransactionCategory", fields: [categoryId], references: [id], onDelete: Cascade)
   titheCategory     Category?         @relation("TransactionTitheCategory", fields: [titheCategoryId], references: [id], onDelete: SetNull)
-  financialAccount  FinancialAccount? @relation("TransactionSourceAccount", fields: [accountId], references: [id], onDelete: SetNull)
-  destinationAccount FinancialAccount? @relation("TransactionDestinationAccount", fields: [destinationAccountId], references: [id], onDelete: SetNull)
-  card              Card?             @relation(fields: [cardId], references: [id], onDelete: SetNull)
+  financialAccount  FinancialAccount? @relation("TransactionSourceAccount", fields: [accountId], references: [id], onDelete: Cascade)
+  destinationAccount FinancialAccount? @relation("TransactionDestinationAccount", fields: [destinationAccountId], references: [id], onDelete: Cascade)
+  card              Card?             @relation(fields: [cardId], references: [id], onDelete: Cascade)
   parent            Transaction?      @relation("TransactionInstallments", fields: [parentId], references: [id], onDelete: Cascade)
   installments      Transaction[]     @relation("TransactionInstallments")
   statementPayments StatementPayment[]
@@ -327,8 +327,8 @@ model Goal {
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
   tenant           Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  account          FinancialAccount?  @relation(fields: [accountId], references: [id], onDelete: SetNull)
-  user             User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
+  account          FinancialAccount?  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  user             User?              @relation(fields: [userId], references: [id], onDelete: Cascade)
   notifications    NotificationDelivery[]
 
   @@index([tenantId])
@@ -352,10 +352,10 @@ model Subscription {
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
   tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user            User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
-  category        Category?        @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  account         FinancialAccount? @relation(fields: [accountId], references: [id], onDelete: SetNull)
-  card            Card?            @relation(fields: [cardId], references: [id], onDelete: SetNull)
+  user            User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category        Category?        @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  account         FinancialAccount? @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  card            Card?            @relation(fields: [cardId], references: [id], onDelete: Cascade)
   transactions    Transaction[]
 
   @@index([tenantId])

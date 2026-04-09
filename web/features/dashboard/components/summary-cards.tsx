@@ -65,16 +65,16 @@ export function SummaryCards({ data }: SummaryCardsProps) {
         return (
           <article aria-label={card.title} key={card.key} className="metric-card">
             <div className="flex items-start justify-between gap-4">
-              <div>
+              <div className="min-w-0 flex-1">
                 <p className="metric-label">{card.title}</p>
                 <p
-                  className={`mt-4 whitespace-nowrap text-[clamp(1.45rem,2vw,1.92rem)] font-medium tracking-[-0.04em] ${card.valueClass(value)}`}
+                  className={`mt-4 break-words text-[clamp(1.2rem,3.4vw,1.92rem)] font-medium tracking-[-0.04em] ${card.valueClass(value)}`}
                 >
                   {formatCurrency(value)}
                 </p>
                 <p className="mt-3 text-sm leading-6 text-[var(--color-ink-700)]">{card.note}</p>
               </div>
-              <div className={`flex size-11 items-center justify-center rounded-[1.1rem] ${card.accent}`}>
+              <div className={`flex size-11 shrink-0 items-center justify-center rounded-[1.1rem] ${card.accent}`}>
                 <Icon className="size-5" />
               </div>
             </div>

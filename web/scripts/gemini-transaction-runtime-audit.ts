@@ -136,7 +136,7 @@ async function main() {
         ownerUserId: user.id,
         name: "Conta Gemini Audit",
         type: "checking",
-        balance: 500,
+        openingBalance: 500,
         currency: "BRL",
         color: "#111111",
         institution: "Nubank",

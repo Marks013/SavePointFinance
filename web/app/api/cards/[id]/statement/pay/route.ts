@@ -89,7 +89,7 @@ export async function POST(request: Request, context: Params) {
       return NextResponse.json({ message: "Statement has no balance to pay" }, { status: 400 });
     }
 
-    const paidAt = getStatementPaymentDate(body.month, card.dueDay);
+    const paidAt = getStatementPaymentDate(body.month, card.dueDay, card.closeDay);
     const amount = new Prisma.Decimal(totalAmount.toFixed(2));
 
     const payment = await prisma.$transaction(async (tx) => {

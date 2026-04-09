@@ -44,7 +44,7 @@ export async function PATCH(request: Request, context: Params) {
       data: {
         name: normalizedName,
         type: body.type,
-        balance: body.balance,
+        openingBalance: body.balance,
         currency: body.currency.toUpperCase(),
         color: body.color,
         institution: body.institution?.trim() || null
@@ -74,21 +74,6 @@ export async function DELETE(_request: Request, context: Params) {
   try {
     const user = await requireSessionUser();
     const { id } = await context.params;
-
-    const hasTransactions = await prisma.transaction.findFirst({
-      where: {
-        tenantId: user.tenantId,
-        OR: [{ accountId: id }, { destinationAccountId: id }]
-      },
-      select: { id: true }
-    });
-
-    if (hasTransactions) {
-      return NextResponse.json(
-        { message: "Conta possui transacoes vinculadas" },
-        { status: 400 }
-      );
-    }
 
     await prisma.financialAccount.delete({
       where: {

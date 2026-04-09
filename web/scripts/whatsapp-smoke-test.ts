@@ -55,7 +55,7 @@ async function main() {
           ownerUserId: admin.id,
           name: "Conta Smoke",
           type: "checking",
-          balance: 5000,
+          openingBalance: 5000,
           currency: "BRL",
           color: "#2f8d68",
           isActive: true

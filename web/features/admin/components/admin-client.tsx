@@ -776,24 +776,24 @@ export function AdminClient() {
           </div>
         ) : null}
         <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-[1.4rem] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-card)_88%,var(--color-muted))] px-4 py-4">
-          <p className="text-sm leading-7 text-[var(--color-muted-foreground)]">
+          <p className="min-w-0 flex-1 break-words text-sm leading-7 text-[var(--color-muted-foreground)]">
             Para compartilhar a mesma carteira com cônjuge ou familiar, use a área dedicada de compartilhamento.
           </p>
-          <Button asChild variant="secondary">
+          <Button asChild className="w-full sm:w-auto" variant="secondary">
             <Link href="/dashboard/sharing">Abrir convites</Link>
           </Button>
         </div>
       </section>
 
       <section className="surface content-section">
-        <div className="flex items-start justify-between gap-4">
-          <div>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0 flex-1">
             <h2 className="text-2xl font-semibold tracking-[-0.03em]">Catálogo de planos</h2>
             <p className="mt-2 max-w-3xl text-sm leading-7 text-[var(--color-muted-foreground)]">
               Os planos agora são registros reais. Você pode criar, editar, ativar, desativar e excluir planos customizados sem depender de presets fixos.
             </p>
           </div>
-          <article className="metric-card">
+          <article className="metric-card w-full sm:w-auto">
             <p className="metric-label">Planos ativos</p>
             <p className="metric-value">{plans.filter((item) => item.isActive).length}</p>
           </article>
@@ -801,7 +801,7 @@ export function AdminClient() {
         {isPlatformAdmin ? (
           <div className="mt-6 rounded-[1.6rem] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-card)_88%,var(--color-muted))] p-4">
             <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
+              <div className="min-w-0 flex-1">
                 <h3 className="text-lg font-semibold">Novo plano</h3>
                 <p className="mt-1 text-sm leading-7 text-[var(--color-muted-foreground)]">
                   Crie planos personalizados com limites, período de avaliação e recursos premium próprios.
@@ -844,10 +844,11 @@ export function AdminClient() {
               </label>
             </div>
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-              <p className="text-xs text-[var(--color-muted-foreground)]">
+              <p className="min-w-0 flex-1 break-words text-xs text-[var(--color-muted-foreground)]">
                 Limites vazios deixam contas e cartões sem teto específico; pessoas não têm limite por plano.
               </p>
               <Button
+                className="w-full sm:w-auto"
                 disabled={createPlanMutation.isPending || !newPlanName.trim()}
                 onClick={() => createPlanMutation.mutate()}
                 type="button"
@@ -860,13 +861,13 @@ export function AdminClient() {
         <div className="mt-6 grid gap-4 lg:grid-cols-3">
           {plans.map((plan) => (
             <article key={plan.id} className="data-card p-5">
-              <div className="flex items-center justify-between gap-3">
-                <h3 className="text-lg font-semibold">{plan.name}</h3>
-                <span className="rounded-full bg-[color-mix(in_srgb,var(--color-primary)_12%,transparent)] px-3 py-1 text-xs font-semibold text-[var(--color-primary)]">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <h3 className="min-w-0 flex-1 break-words text-lg font-semibold">{plan.name}</h3>
+                <span className="shrink-0 rounded-full bg-[color-mix(in_srgb,var(--color-primary)_12%,transparent)] px-3 py-1 text-xs font-semibold text-[var(--color-primary)]">
                   {plan.isDefault ? "Padrão" : "Customizado"}
                 </span>
               </div>
-              <p className="mt-3 text-sm leading-7 text-[var(--color-muted-foreground)]">
+              <p className="mt-3 break-words text-sm leading-7 text-[var(--color-muted-foreground)]">
                 {plan.description || "Sem descrição cadastrada para este plano."}
               </p>
               <div className="mt-4 flex flex-wrap gap-2 text-xs text-[var(--color-muted-foreground)]">
@@ -1054,14 +1055,14 @@ export function AdminClient() {
 
       <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
         <section className="surface content-section">
-          <div className="flex items-start justify-between gap-4">
-            <div>
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0 flex-1">
               <h2 className="text-2xl font-semibold tracking-[-0.03em]">Contas</h2>
               <p className="mt-2 text-sm leading-7 text-[var(--color-muted-foreground)]">
                 Ajuste plano, avaliação, capacidade e status operacional de cada conta.
               </p>
             </div>
-            <article className="metric-card">
+            <article className="metric-card w-full sm:w-auto">
               <p className="metric-label">Listadas</p>
               <p className="metric-value">{tenants.length}</p>
             </article>
@@ -1069,7 +1070,7 @@ export function AdminClient() {
           {isPlatformAdmin ? (
             <div className="mt-6 rounded-[1.6rem] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-card)_88%,var(--color-muted))] p-4">
               <div className="flex flex-wrap items-start justify-between gap-4">
-                <div>
+                <div className="min-w-0 flex-1">
                   <h3 className="text-lg font-semibold">Nova conta</h3>
                   <p className="mt-1 text-sm leading-7 text-[var(--color-muted-foreground)]">
                     Crie uma nova conta já com plano inicial, identificador limpo e categorias padrão prontas para uso.
@@ -1097,10 +1098,11 @@ export function AdminClient() {
                 </Select>
               </div>
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                <p className="text-xs text-[var(--color-muted-foreground)]">
+                <p className="min-w-0 flex-1 break-words text-xs text-[var(--color-muted-foreground)]">
                   O plano é da conta. Depois, basta convidar colaboradores para compartilhar o mesmo espaço financeiro.
                 </p>
                 <Button
+                  className="w-full sm:w-auto"
                   disabled={createTenantMutation.isPending || !newTenantName.trim() || !newTenantPlanId}
                   onClick={() => createTenantMutation.mutate()}
                   type="button"
@@ -1132,17 +1134,17 @@ export function AdminClient() {
             </div>
             {tenants.map((tenant) => (
               <article key={tenant.id} className="data-card p-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="min-w-0">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
                     <p className="font-semibold">{tenant.name}</p>
                     <p className="break-words text-sm text-[var(--color-muted-foreground)]">
                       Conta {tenant.slug} • Plano {tenant.planName}
                     </p>
-                    <p className="text-xs text-[var(--color-muted-foreground)]">
+                    <p className="break-words text-xs text-[var(--color-muted-foreground)]">
                       {formatLifecycleLabel(tenant)}
                     </p>
                   </div>
-                  <div className="text-right">
+                  <div className="w-full shrink-0 sm:w-auto sm:text-right">
                     <p className="text-sm font-semibold">{tenant.activeUsers}</p>
                     <p className="text-xs text-[var(--color-muted-foreground)]">pessoas ativas</p>
                   </div>
@@ -1229,14 +1231,14 @@ export function AdminClient() {
         </section>
 
         <section className="surface content-section">
-          <div className="flex items-start justify-between gap-4">
-            <div>
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0 flex-1">
               <h2 className="text-2xl font-semibold tracking-[-0.03em]">Colaboradores</h2>
               <p className="mt-2 text-sm leading-7 text-[var(--color-muted-foreground)]">
                 Controle perfis, acesso e redefinição de senha das pessoas com acesso à conta.
               </p>
             </div>
-            <article className="metric-card">
+            <article className="metric-card w-full sm:w-auto">
               <p className="metric-label">Listados</p>
               <p className="metric-value">{users.length}</p>
             </article>
@@ -1322,21 +1324,21 @@ export function AdminClient() {
             </div>
             {users.map((user) => (
               <article key={user.id} className="data-card p-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="min-w-0">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
                     <p className="font-semibold">{user.name}</p>
                     <p className="break-words text-sm text-[var(--color-muted-foreground)]">
                       {user.email} • {user.tenant.name}
                       {user.isPlatformAdmin ? " • Superadmin" : ""}
                     </p>
-                    <p className="text-xs text-[var(--color-muted-foreground)]">
+                    <p className="break-words text-xs text-[var(--color-muted-foreground)]">
                       Conta {user.tenant.slug} • {formatUserTenantPlanLabel(user)}
                     </p>
-                    <p className="text-xs text-[var(--color-muted-foreground)]">
+                    <p className="break-words text-xs text-[var(--color-muted-foreground)]">
                       Último login: {user.lastLogin ? formatDateTimeDisplay(user.lastLogin) : "Nunca acessou"}
                     </p>
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
                     <Button
                       onClick={() => toggleRoleMutation.mutate({ id: user.id, role: user.role === "admin" ? "member" : "admin" })}
                       type="button"
@@ -1544,14 +1546,14 @@ export function AdminClient() {
         </section>
 
         <section className="surface content-section">
-          <div className="flex items-start justify-between gap-4">
-            <div>
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0 flex-1">
               <h2 className="text-2xl font-semibold tracking-[-0.03em]">Convites ativos e histórico</h2>
               <p className="mt-2 text-sm leading-7 text-[var(--color-muted-foreground)]">
                 Acompanhe convites pendentes, aceitos e revogados sem perder o link de acesso.
               </p>
             </div>
-            <article className="metric-card">
+            <article className="metric-card w-full sm:w-auto">
               <p className="metric-label">Convites</p>
               <p className="metric-value">{invitations.length}</p>
             </article>
@@ -1608,6 +1610,7 @@ export function AdminClient() {
                   </div>
                   {!invitation.acceptedAt && !invitation.revokedAt ? (
                     <Button
+                      className="w-full sm:w-auto"
                       disabled={revokeInvitationMutation.isPending}
                       onClick={() => revokeInvitationMutation.mutate(invitation.id)}
                       type="button"
@@ -1624,14 +1627,14 @@ export function AdminClient() {
       </div>
 
       <section className="surface content-section">
-        <div className="flex items-start justify-between gap-4">
-          <div>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0 flex-1">
             <h2 className="text-2xl font-semibold tracking-[-0.03em]">Auditoria administrativa</h2>
             <p className="mt-2 text-sm leading-7 text-[var(--color-muted-foreground)]">
               Acompanhe alterações sensíveis em pessoas, convites, contas e planos.
             </p>
           </div>
-          <article className="metric-card">
+          <article className="metric-card w-full sm:w-auto">
             <p className="metric-label">Eventos</p>
             <p className="metric-value">{auditItems.length}</p>
           </article>
@@ -1669,7 +1672,7 @@ export function AdminClient() {
           {auditItems.map((item) => (
             <article key={item.id} className="data-card p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <p className="font-semibold">{item.summary}</p>
                   <p className="break-words text-sm text-[var(--color-muted-foreground)]">
                     {item.actorUser.name} • {item.actorUser.email}
@@ -1677,7 +1680,7 @@ export function AdminClient() {
                     {item.targetUser ? ` • ${item.targetUser.email}` : ""}
                   </p>
                 </div>
-                <p className="text-xs text-[var(--color-muted-foreground)]">
+                <p className="w-full break-words text-xs text-[var(--color-muted-foreground)] sm:w-auto sm:text-right">
                   {formatDateTimeDisplay(item.createdAt)}
                 </p>
               </div>

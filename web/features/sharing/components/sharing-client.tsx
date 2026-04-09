@@ -301,8 +301,8 @@ export function SharingClient() {
             {members.map((member) => (
               <article key={member.id} className="data-card p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="font-semibold">{member.name}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="break-words font-semibold">{member.name}</p>
                     <p className="mt-1 break-words text-sm text-[var(--color-muted-foreground)]">{member.email}</p>
                     <p className="mt-2 text-xs text-[var(--color-muted-foreground)]">
                       {member.lastLogin
@@ -310,7 +310,7 @@ export function SharingClient() {
                         : "Ainda sem acesso registrado"}
                     </p>
                   </div>
-                  <div className="text-right">
+                  <div className="w-full sm:w-auto sm:text-right">
                     <p className="text-sm font-semibold text-[var(--color-foreground)]">
                       {member.isActive ? "Ativo" : "Revogado"}
                     </p>
@@ -347,14 +347,14 @@ export function SharingClient() {
             return (
               <article key={invitation.id} className="data-card p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="font-semibold">{invitation.name}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="break-words font-semibold">{invitation.name}</p>
                     <p className="mt-1 break-words text-sm text-[var(--color-muted-foreground)]">{invitation.email}</p>
                     <p className="mt-2 text-xs text-[var(--color-muted-foreground)]">
                       Expira em {formatDateDisplay(invitation.expiresAt)}
                     </p>
                   </div>
-                  <div className="text-right">
+                  <div className="w-full sm:w-auto sm:text-right">
                     <p className="text-sm font-semibold text-[var(--color-foreground)]">
                       {invitationStatusLabel(invitation)}
                     </p>

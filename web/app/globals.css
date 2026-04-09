@@ -305,7 +305,7 @@ button {
   border-radius: 1.75rem;
   border: 1px solid rgba(214, 199, 172, 0.85);
   background: rgba(255, 252, 246, 0.82);
-  padding: 1.35rem;
+  padding: clamp(1rem, 2vw, 1.35rem);
   box-shadow:
     0 16px 32px rgba(33, 24, 11, 0.06),
     inset 0 1px 0 rgba(255, 255, 255, 0.55);
@@ -351,20 +351,29 @@ button {
 
 .metric-value {
   margin-top: 0.9rem;
-  font-size: clamp(1.45rem, 2.3vw, 2.05rem);
+  max-width: 100%;
+  font-size: clamp(1.2rem, 3.6vw, 2.05rem);
   font-weight: 500;
   letter-spacing: -0.035em;
   line-height: 1.15;
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  text-wrap: pretty;
 }
 
 .subtle-metric-value {
-  font-size: clamp(1.18rem, 1.8vw, 1.5rem);
+  max-width: 100%;
+  font-size: clamp(1rem, 3vw, 1.5rem);
   font-weight: 500;
   letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
+  line-height: 1.2;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  text-wrap: pretty;
 }
 
 .amount-positive {
@@ -383,7 +392,7 @@ button {
 
 .content-section {
   border-radius: 2rem;
-  padding: 1.35rem;
+  padding: clamp(1rem, 2vw, 1.85rem);
 }
 
 .data-card {
@@ -750,6 +759,7 @@ button {
 .data-card,
 .editorial-panel {
   animation: fade-rise 360ms ease;
+  min-width: 0;
 }
 
 .surface:hover,
@@ -769,18 +779,20 @@ button {
   .page-shell {
     width: min(1520px, calc(100% - 32px));
   }
-
-  .content-section {
-    padding: 1.65rem;
-  }
 }
 
 @media (min-width: 1440px) {
   .page-shell {
     width: min(1580px, calc(100% - 40px));
   }
+}
 
-  .content-section {
-    padding: 1.85rem;
+@media (max-width: 767px) {
+  .metric-card {
+    min-height: 0;
+  }
+
+  .page-title {
+    line-height: 1.04;
   }
 }

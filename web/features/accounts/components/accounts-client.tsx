@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
@@ -73,6 +73,7 @@ async function deleteAccount(id: string) {
 export function AccountsClient() {
   const queryClient = useQueryClient();
   const [editingId, setEditingId] = useState<string | null>(null);
+  const formSectionRef = useRef<HTMLElement | null>(null);
   const accountsQuery = useQuery({ queryKey: ["accounts"], queryFn: getAccounts });
   const accounts = accountsQuery.data?.items ?? [];
   const activeBalance = accounts.reduce((sum, account) => sum + account.balance, 0);
@@ -152,9 +153,22 @@ export function AccountsClient() {
   const selectedColor = form.watch("color");
   const selectedInstitution = form.watch("institution");
 
+  useEffect(() => {
+    if (!editingId) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      formSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      document.getElementById("account-name")?.focus();
+    }, 80);
+
+    return () => window.clearTimeout(timeout);
+  }, [editingId]);
+
   return (
     <div className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
-      <section className="surface content-section">
+      <section className="surface content-section" ref={formSectionRef}>
         <div className="eyebrow">Contas</div>
         <h1 className="mt-3 text-3xl font-semibold tracking-[-0.03em]">
           {isEditing ? "Editar conta" : "Nova conta financeira"}
@@ -275,7 +289,7 @@ export function AccountsClient() {
         <div className="mt-6 grid gap-3 md:grid-cols-2">
           {accounts.map((account) => (
             <article key={account.id} className="data-card p-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-3">
                   <PresetChip
                     compact
@@ -291,16 +305,16 @@ export function AccountsClient() {
                     <p className="text-xs tracking-[0.02em] text-[var(--color-muted-foreground)]">{account.type}</p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className={`font-semibold ${account.balance < 0 ? "amount-negative" : ""}`}>{formatCurrency(account.balance)}</p>
+                <div className="w-full sm:w-auto sm:text-right">
+                  <p className={`break-words font-semibold ${account.balance < 0 ? "amount-negative" : ""}`}>{formatCurrency(account.balance)}</p>
                   <p className="text-xs text-[var(--color-muted-foreground)]">Saldo atual</p>
                 </div>
               </div>
-              {account.institution ? <p className="mt-3 text-sm text-[var(--color-muted-foreground)]">{account.institution}</p> : null}
-              <p className="mt-2 text-sm text-[var(--color-muted-foreground)]">
+              {account.institution ? <p className="mt-3 break-words text-sm text-[var(--color-muted-foreground)]">{account.institution}</p> : null}
+              <p className="mt-2 break-words text-sm text-[var(--color-muted-foreground)]">
                 Saldo de referência: {formatCurrency(account.openingBalance)}
               </p>
-              <p className="mt-2 text-sm text-[var(--color-muted-foreground)]">
+              <p className="mt-2 break-words text-sm text-[var(--color-muted-foreground)]">
                 Variação operacional: <span className={(account.balance - account.openingBalance) < 0 ? "amount-negative" : undefined}>{formatCurrency(account.balance - account.openingBalance)}</span>
               </p>
               <div className="mt-4 flex flex-wrap gap-2">

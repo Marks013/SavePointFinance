@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { subscriptionFormSchema } from "@/features/subscriptions/schemas/subscription-schema";
+import { syncDueSubscriptionTransactions } from "@/lib/automation/subscriptions";
 import { requireSessionUser } from "@/lib/auth/session";
 import { assertTenantTransactionReferences, TenantReferenceError } from "@/lib/finance/tenant-reference-guard";
 import { prisma } from "@/lib/prisma/client";
@@ -37,6 +38,12 @@ export async function PATCH(request: Request, context: Params) {
         autoTithe: body.autoTithe && body.type === "income"
       }
     });
+
+    // Instant sync after update
+    await syncDueSubscriptionTransactions({
+      tenantId: user.tenantId,
+      userId: user.id
+    }).catch(err => console.error("Post-Update Sync Error:", err));
 
     return NextResponse.json({ success: true });
   } catch (error) {

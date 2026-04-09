@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
@@ -91,6 +91,7 @@ async function restoreDefaultCategories() {
 export function CategoriesClient() {
   const queryClient = useQueryClient();
   const [editingId, setEditingId] = useState<string | null>(null);
+  const formSectionRef = useRef<HTMLElement | null>(null);
   const categoriesQuery = useQuery({ queryKey: ["categories"], queryFn: getCategories });
   const categories = categoriesQuery.data?.items ?? [];
   const expenseCategories = categories.filter((category) => category.type === "expense").length;
@@ -196,9 +197,22 @@ export function CategoriesClient() {
   const selectedColor = form.watch("color");
   const selectedType = form.watch("type");
 
+  useEffect(() => {
+    if (!editingId) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      formSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      document.getElementById("category-name")?.focus();
+    }, 80);
+
+    return () => window.clearTimeout(timeout);
+  }, [editingId]);
+
   return (
     <div className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
-      <section className="surface content-section">
+      <section className="surface content-section" ref={formSectionRef}>
         <div className="eyebrow">Categorias</div>
         <h1 className="mt-3 text-3xl font-semibold tracking-[-0.03em]">
           {isEditing ? "Editar categoria" : "Nova categoria"}
@@ -293,14 +307,15 @@ export function CategoriesClient() {
 
       <section className="surface content-section">
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
+          <div className="min-w-0 flex-1">
             <h2 className="text-2xl font-semibold tracking-[-0.03em]">Categorias ativas</h2>
             <p className="mt-2 text-sm leading-7 text-[var(--color-muted-foreground)]">
               Revise, edite ou restaure a base padrão sem duplicar itens existentes.
             </p>
           </div>
-          <div className="flex flex-col gap-3 sm:items-end">
+          <div className="flex w-full flex-col gap-3 sm:w-auto sm:items-end">
             <Button
+              className="w-full sm:w-auto"
               disabled={restoreDefaultsMutation.isPending}
               onClick={() => restoreDefaultsMutation.mutate()}
               type="button"
@@ -308,15 +323,15 @@ export function CategoriesClient() {
             >
               {restoreDefaultsMutation.isPending ? "Restaurando..." : "Restaurar categorias padrão"}
             </Button>
-            <div className="grid gap-3 sm:grid-cols-2">
-            <article className="metric-card">
-              <p className="metric-label">Despesas</p>
-              <p className="metric-value">{expenseCategories}</p>
-            </article>
-            <article className="metric-card">
-              <p className="metric-label">Receitas</p>
-              <p className="metric-value">{incomeCategories}</p>
-            </article>
+            <div className="grid w-full gap-3 sm:grid-cols-2">
+              <article className="metric-card w-full">
+                <p className="metric-label">Despesas</p>
+                <p className="metric-value">{expenseCategories}</p>
+              </article>
+              <article className="metric-card w-full">
+                <p className="metric-label">Receitas</p>
+                <p className="metric-value">{incomeCategories}</p>
+              </article>
             </div>
           </div>
         </div>
@@ -348,13 +363,13 @@ export function CategoriesClient() {
                 </div>
               </div>
               {category.keywords.length > 0 ? (
-                <p className="mt-3 text-sm text-[var(--color-muted-foreground)]">
+                <p className="mt-3 break-words text-sm text-[var(--color-muted-foreground)]">
                   {category.keywords.slice(0, 5).join(", ")}
                   {category.keywords.length > 5 ? "..." : ""}
                 </p>
               ) : null}
               {category.monthlyLimit ? (
-                <p className="mt-2 text-sm text-[var(--color-muted-foreground)]">
+                <p className="mt-2 break-words text-sm text-[var(--color-muted-foreground)]">
                   Limite mensal: {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(category.monthlyLimit)}
                 </p>
               ) : null}

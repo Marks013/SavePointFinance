@@ -1,7 +1,9 @@
 import { Prisma, Transaction, TransactionSource } from "@prisma/client";
 import { NextResponse } from "next/server";
 
+import { syncDueSubscriptionTransactions } from "@/lib/automation/subscriptions";
 import { requireSessionUser } from "@/lib/auth/session";
+import { getCardExpenseCompetenceDate } from "@/lib/cards/statement";
 import { classifyTransactionCategory } from "@/lib/finance/category-classifier";
 import { ensureFallbackCategory } from "@/lib/finance/default-categories";
 import { assertTenantTransactionReferences, TenantReferenceError } from "@/lib/finance/tenant-reference-guard";
@@ -13,6 +15,10 @@ import { transactionFiltersSchema, transactionFormSchema } from "@/features/tran
 export async function GET(request: Request) {
   try {
     const user = await requireSessionUser();
+    await syncDueSubscriptionTransactions({
+      tenantId: user.tenantId,
+      userId: user.id
+    });
     const { searchParams } = new URL(request.url);
     const filters = transactionFiltersSchema.parse({
       limit: searchParams.get("limit") ?? 20,
@@ -29,16 +35,23 @@ export async function GET(request: Request) {
       ...(filters.categoryId ? { categoryId: filters.categoryId } : {}),
       ...(filters.cardId ? { cardId: filters.cardId } : {})
     };
+    const isCardSearch = Boolean(filters.cardId || (!filters.accountId && !filters.categoryId));
+    const hasDateFilter = Boolean(filters.from || filters.to);
 
     if (filters.accountId) {
       where.OR = [{ accountId: filters.accountId }, { destinationAccountId: filters.accountId }];
     }
 
-    if (filters.from || filters.to) {
+    if (hasDateFilter) {
       where.date = {};
 
       if (filters.from) {
-        where.date.gte = new Date(`${filters.from}T00:00:00`);
+        const fromDate = new Date(`${filters.from}T00:00:00`);
+        // We only need the previous month buffer if searching for cards
+        if (isCardSearch) {
+          fromDate.setMonth(fromDate.getMonth() - 1);
+        }
+        where.date.gte = fromDate;
       }
 
       if (filters.to) {
@@ -55,11 +68,32 @@ export async function GET(request: Request) {
         card: true
       },
       orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-      take: filters.limit
+      // If we don't have cards involved, we can trust the DB limit 100%
+      take: isCardSearch && hasDateFilter ? Math.max(filters.limit * 8, 500) : filters.limit
     });
 
+    const filteredTransactions = isCardSearch && hasDateFilter
+      ? transactions
+          .filter((transaction) => {
+            const competenceDate = transaction.card
+              ? getCardExpenseCompetenceDate(transaction.card, transaction.date)
+              : transaction.date;
+
+            if (filters.from && competenceDate < new Date(`${filters.from}T00:00:00`)) {
+              return false;
+            }
+
+            if (filters.to && competenceDate > new Date(`${filters.to}T23:59:59`)) {
+              return false;
+            }
+
+            return true;
+          })
+          .slice(0, filters.limit)
+      : transactions;
+
     return NextResponse.json({
-      items: transactions.map((transaction) => ({
+      items: filteredTransactions.map((transaction) => ({
         id: transaction.id,
         date: transaction.date.toISOString(),
         amount: Number(transaction.amount),

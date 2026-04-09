@@ -294,7 +294,7 @@ export function SettingsClient() {
       {canManageSharing ? (
         <section className="surface content-section">
           <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
+            <div className="min-w-0 flex-1">
               <div className="eyebrow">Convidar parentes</div>
               <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em]">Compartilhamento familiar</h2>
               <p className="mt-2 max-w-3xl text-sm leading-7 text-[var(--color-muted-foreground)]">
@@ -302,7 +302,7 @@ export function SettingsClient() {
                 {profileQuery.data?.tenant.name ?? "principal"}.
               </p>
             </div>
-            <Button asChild>
+            <Button asChild className="w-full sm:w-auto">
               <Link href="/dashboard/sharing">Abrir convites</Link>
             </Button>
           </div>
@@ -407,20 +407,20 @@ export function SettingsClient() {
 
               {automationResult ? (
                 <div className="muted-panel mt-6 text-sm">
-                  <p><strong>Transações geradas:</strong> {automationResult.processedSubscriptions}</p>
-                  <p><strong>Lembretes emitidos:</strong> {automationResult.reminders}</p>
+                  <p className="break-words"><strong>Transações geradas:</strong> {automationResult.processedSubscriptions}</p>
+                  <p className="break-words"><strong>Lembretes emitidos:</strong> {automationResult.reminders}</p>
                   {automationResult.subscriptionResults.length > 0 ? (
-                    <p className="mt-3 text-[var(--color-muted-foreground)]">
+                    <p className="mt-3 break-words text-[var(--color-muted-foreground)]">
                       Assinaturas processadas: {automationResult.subscriptionResults.map((item) => item.name).join(", ")}
                     </p>
                   ) : null}
                   {automationResult.goalReminders.length > 0 ? (
-                    <p className="mt-2 text-[var(--color-muted-foreground)]">
+                    <p className="mt-2 break-words text-[var(--color-muted-foreground)]">
                       Metas lembradas: {automationResult.goalReminders.map((item) => item.name).join(", ")}
                     </p>
                   ) : null}
                   {automationResult.notificationDeliveries.length > 0 ? (
-                    <p className="mt-2 text-[var(--color-muted-foreground)]">
+                    <p className="mt-2 break-words text-[var(--color-muted-foreground)]">
                       Entregas:{" "}
                       {automationResult.notificationDeliveries
                         .map((item) => `${item.channel}:${item.status}`)
@@ -449,7 +449,7 @@ export function SettingsClient() {
         <div className="mt-6 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
           <article className="data-card p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
+              <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold">Status da integração</p>
                 <p className="mt-1 text-sm text-[var(--color-muted-foreground)]">
                   {!whatsappEnabledForPlan
@@ -459,7 +459,7 @@ export function SettingsClient() {
                       : "Assistente ainda desabilitado no ambiente."}
                 </p>
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
                 <span className="rounded-full border border-[var(--color-border)] px-3 py-1 text-xs text-[var(--color-muted-foreground)]">
                   {whatsappEnabledForPlan
                     ? profileQuery.data?.integrations.whatsappAssistantEnabled
@@ -481,7 +481,7 @@ export function SettingsClient() {
                 <p className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">
                   Número vinculado
                 </p>
-                <p className="mt-2 text-sm">
+                <p className="mt-2 break-words text-sm">
                   {profileQuery.data?.whatsappNumber || "Cadastre um número no formato (DD) 9 0000-0000"}
                 </p>
               </div>
@@ -497,7 +497,7 @@ export function SettingsClient() {
                 <p className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">
                   Classificação inteligente
                 </p>
-                <p className="mt-2 text-sm">
+                <p className="mt-2 break-words text-sm">
                   {profileQuery.data?.integrations.smartClassificationEnabled
                     ? "Ativa para interpretar descrições e ajudar na categoria dos lançamentos."
                     : "Desativada no ambiente. O sistema usa apenas regras locais e memória do histórico."}
@@ -508,12 +508,12 @@ export function SettingsClient() {
           <article className="data-card p-5">
             <p className="text-sm font-semibold">Exemplos de comando</p>
             <div className="mt-4 space-y-2 text-sm text-[var(--color-muted-foreground)]">
-              <p>`gastei 42,50 mercado na Nubank`</p>
-              <p>`gastei 120 farmácia no cartão Visa 3x`</p>
-              <p>`recebi 3200 salário no Itaú`</p>
-              <p>`saldo`</p>
-              <p>`fatura Visa`</p>
-              <p>`limite Mastercard`</p>
+              <p className="break-words">`gastei 42,50 mercado na Nubank`</p>
+              <p className="break-words">`gastei 120 farmácia no cartão Visa 3x`</p>
+              <p className="break-words">`recebi 3200 salário no Itaú`</p>
+              <p className="break-words">`saldo`</p>
+              <p className="break-words">`fatura Visa`</p>
+              <p className="break-words">`limite Mastercard`</p>
             </div>
           </article>
         </div>
@@ -543,16 +543,16 @@ export function SettingsClient() {
           {notifications.map((item) => (
             <article key={item.id} className="data-card p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="font-semibold">{item.subject}</p>
-                  <p className="mt-1 text-sm text-[var(--color-muted-foreground)]">
+                <div className="min-w-0 flex-1">
+                  <p className="break-words font-semibold">{item.subject}</p>
+                  <p className="mt-1 break-words text-sm text-[var(--color-muted-foreground)]">
                     {formatChannel(item.channel)} • {formatNotificationStatus(item.status)} • {item.target}
                   </p>
                   {item.goal ? (
-                    <p className="mt-1 text-sm text-[var(--color-muted-foreground)]">Meta relacionada: {item.goal.name}</p>
+                    <p className="mt-1 break-words text-sm text-[var(--color-muted-foreground)]">Meta relacionada: {item.goal.name}</p>
                   ) : null}
                 </div>
-                <p className="text-sm text-[var(--color-muted-foreground)]">
+                <p className="w-full break-words text-sm text-[var(--color-muted-foreground)] sm:w-auto sm:text-right">
                   {item.deliveredAt
                     ? formatDateTimeDisplay(item.deliveredAt)
                     : item.attemptedAt
@@ -560,9 +560,9 @@ export function SettingsClient() {
                       : "Pendente"}
                 </p>
               </div>
-              <p className="mt-3 text-sm text-[var(--color-muted-foreground)]">{item.message}</p>
+              <p className="mt-3 break-words text-sm text-[var(--color-muted-foreground)]">{item.message}</p>
               {item.errorMessage ? (
-                <p className="mt-2 text-sm text-[var(--color-muted-foreground)]">Erro: {item.errorMessage}</p>
+                <p className="mt-2 break-words text-sm text-[var(--color-muted-foreground)]">Erro: {item.errorMessage}</p>
               ) : null}
             </article>
           ))}

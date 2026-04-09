@@ -66,6 +66,7 @@ type ReportResponse = {
     expense: number;
     cardPayments: number;
     net: number;
+    endingBalance: number;
   };
   filters: {
     from?: string | null;
@@ -386,9 +387,11 @@ export function ReportsClient() {
             </Button>
           </div>
         </div>
-        <div className="muted-panel mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-[var(--color-muted-foreground)]">
-          <p>{`Mês ativo: ${monthLabel}.`}</p>
-          <p>{activeRefinements.length > 0 ? activeRefinements.join(" • ") : "Sem refinamentos adicionais."}</p>
+        <div className="muted-panel mt-4 flex flex-wrap items-start justify-between gap-3 text-sm text-[var(--color-muted-foreground)]">
+          <p className="shrink-0">{`Mês ativo: ${monthLabel}.`}</p>
+          <p className="min-w-0 flex-1 break-words text-left sm:text-right">
+            {activeRefinements.length > 0 ? activeRefinements.join(" • ") : "Sem refinamentos adicionais."}
+          </p>
         </div>
       </section>
 
@@ -422,8 +425,8 @@ export function ReportsClient() {
         </article>
         <article className="metric-card">
           <p className="metric-label">Saldo projetado ao fim do mês</p>
-          <p className={`metric-value ${(data?.projection.net ?? 0) < 0 ? "amount-negative" : "amount-positive"}`}>
-            {formatCurrency(data?.projection.net ?? 0)}
+          <p className={`metric-value ${(data?.projection.endingBalance ?? 0) < 0 ? "amount-negative" : "amount-positive"}`}>
+            {formatCurrency(data?.projection.endingBalance ?? 0)}
           </p>
         </article>
       </div>
@@ -518,15 +521,15 @@ export function ReportsClient() {
             {(data?.byAccount ?? []).length ? (
               data?.byAccount.slice(0, 8).map((item) => (
                 <article key={item.id} className="data-card p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p className="font-semibold">{item.name}</p>
-                      <p className="text-sm text-[var(--color-muted-foreground)]">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="break-words font-semibold">{item.name}</p>
+                      <p className="break-words text-sm text-[var(--color-muted-foreground)]">
                         Entradas {formatCurrency(item.income)} • Saídas {formatCurrency(item.expense)}
                       </p>
                     </div>
                     <p
-                      className={`font-semibold ${
+                      className={`w-full break-words text-left font-semibold sm:w-auto sm:text-right ${
                         item.net >= 0 ? "text-[var(--color-emerald-600)]" : "amount-negative"
                       }`}
                     >
@@ -549,14 +552,14 @@ export function ReportsClient() {
             {(data?.byCard ?? []).length ? (
               data?.byCard.slice(0, 8).map((item) => (
                 <article key={item.id} className="data-card p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p className="font-semibold">{item.name}</p>
-                      <p className="text-sm text-[var(--color-muted-foreground)]">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="break-words font-semibold">{item.name}</p>
+                      <p className="break-words text-sm text-[var(--color-muted-foreground)]">
                         {item.brand} • {item.transactions} lançamentos • Estorno {formatCurrency(item.refunds)}
                       </p>
                     </div>
-                    <p className={`font-semibold ${item.netStatement < 0 ? "amount-negative" : "amount-positive"}`}>
+                    <p className={`w-full break-words text-left font-semibold sm:w-auto sm:text-right ${item.netStatement < 0 ? "amount-negative" : "amount-positive"}`}>
                       {formatCurrency(item.netStatement)}
                     </p>
                   </div>
@@ -576,19 +579,19 @@ export function ReportsClient() {
         <div className="mt-6 space-y-3">
           {(data?.recent ?? []).map((item) => (
             <article key={item.id} className="data-card p-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="font-semibold">{item.description}</p>
-                  <p className="text-sm text-[var(--color-muted-foreground)]">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="break-words font-semibold">{item.description}</p>
+                  <p className="break-words text-sm text-[var(--color-muted-foreground)]">
                     {item.category} • {formatDateDisplay(item.date)}
                   </p>
-                  <p className="text-sm text-[var(--color-muted-foreground)]">
+                  <p className="break-words text-sm text-[var(--color-muted-foreground)]">
                     {item.card ?? item.account ?? "Sem origem"}
                     {item.destinationAccount ? ` → ${item.destinationAccount}` : ""}
                   </p>
                 </div>
                 <p
-                  className={`font-semibold ${
+                  className={`w-full break-words text-left font-semibold sm:w-auto sm:text-right ${
                     item.type === "expense"
                       ? "amount-negative"
                       : item.type === "income"
@@ -610,10 +613,10 @@ export function ReportsClient() {
           {(data?.upcoming ?? []).length ? (
             data?.upcoming.map((item) => (
               <article key={`${item.source}-${item.reference}`} className="data-card p-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <p className="font-semibold">{item.label}</p>
-                    <p className="text-sm text-[var(--color-muted-foreground)]">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="break-words font-semibold">{item.label}</p>
+                    <p className="break-words text-sm text-[var(--color-muted-foreground)]">
                       {formatDateDisplay(item.date)} •{" "}
                       {item.source === "subscription"
                         ? "Recorrência"
@@ -622,7 +625,7 @@ export function ReportsClient() {
                           : "Prazo de meta"}
                     </p>
                   </div>
-                  <p className={item.type === "income" ? "font-semibold text-[var(--color-primary)]" : "font-semibold amount-negative"}>
+                  <p className={item.type === "income" ? "w-full break-words text-left font-semibold text-[var(--color-primary)] sm:w-auto sm:text-right" : "w-full break-words text-left font-semibold amount-negative sm:w-auto sm:text-right"}>
                     {formatCurrency(item.amount)}
                   </p>
                 </div>
@@ -642,14 +645,16 @@ export function ReportsClient() {
           {(data?.spendingInsights.categoryBreakdown ?? []).length ? (
             data?.spendingInsights.categoryBreakdown.map((item) => (
               <article key={item.name} className="data-card p-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <p className="font-semibold">{item.name}</p>
-                    <p className="text-sm text-[var(--color-muted-foreground)]">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="break-words font-semibold">{item.name}</p>
+                    <p className="break-words text-sm text-[var(--color-muted-foreground)]">
                       {item.items} lançamentos • {Math.round(item.share * 100)}% do total de despesas
                     </p>
                   </div>
-                  <p className="font-semibold amount-negative">{formatCurrency(item.total)}</p>
+                  <p className="w-full break-words text-left font-semibold amount-negative sm:w-auto sm:text-right">
+                    {formatCurrency(item.total)}
+                  </p>
                 </div>
               </article>
             ))

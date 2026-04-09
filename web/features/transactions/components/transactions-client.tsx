@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
@@ -192,6 +192,7 @@ export function TransactionsClient() {
   const month = normalizeMonthKey(searchParams.get("month"));
   const monthRange = getMonthRange(month);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const formSectionRef = useRef<HTMLElement | null>(null);
   const [editingScope, setEditingScope] = useState<"single" | "group">("single");
   const [editingInstallmentsTotal, setEditingInstallmentsTotal] = useState(1);
   const [reviewSelections, setReviewSelections] = useState<ReviewSelectionState>({});
@@ -487,9 +488,22 @@ export function TransactionsClient() {
     form.setValue("installments", 1);
   }, [form, isCreditCard]);
 
+  useEffect(() => {
+    if (!editingId) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      formSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      document.getElementById("description")?.focus();
+    }, 80);
+
+    return () => window.clearTimeout(timeout);
+  }, [editingId]);
+
   return (
     <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-      <section className="surface content-section">
+      <section className="surface content-section" ref={formSectionRef}>
         <div className="page-intro">
           <div className="eyebrow">{isEditing ? "Editar transação" : "Nova transação"}</div>
           <h1 className="text-3xl font-semibold tracking-[-0.04em]">Operação financeira</h1>
@@ -519,7 +533,7 @@ export function TransactionsClient() {
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="date">Data</Label>
-              <DatePickerInput
+              <Input
                 className={form.formState.errors.date ? invalidFieldClassName : undefined}
                 id="date"
                 type="date"
@@ -768,14 +782,14 @@ export function TransactionsClient() {
         </div>
 
         <div className="mt-6">
-          <div className="flex items-center justify-between gap-3">
-            <div>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
               <p className="metric-label">Sugestões para revisar</p>
               <p className="mt-1 text-sm text-[var(--color-muted-foreground)]">
                 Classificações automáticas recentes, priorizando as de menor confiança.
               </p>
             </div>
-            <p className="text-sm font-medium text-[var(--color-muted-foreground)]">
+            <p className="shrink-0 text-sm font-medium text-[var(--color-muted-foreground)]">
               {automaticSuggestions.length} em análise
             </p>
           </div>
@@ -789,19 +803,19 @@ export function TransactionsClient() {
                 return (
                   <article key={`review-${transaction.id}`} className="data-card p-4">
                     <div className="flex flex-wrap items-start justify-between gap-4">
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold">{transaction.description}</p>
-                        <p className="mt-1 text-xs text-[var(--color-muted-foreground)]">
+                      <div className="min-w-0 flex-1">
+                        <p className="break-words text-sm font-semibold">{transaction.description}</p>
+                        <p className="mt-1 break-words text-xs text-[var(--color-muted-foreground)]">
                           {formatDateDisplay(transaction.date)} • {formatCurrency(transaction.amount)} •{" "}
                           {transaction.account?.name ?? transaction.card?.name ?? "Sem origem"}
                         </p>
-                        <p className="mt-2 text-xs text-[var(--color-muted-foreground)]">
+                        <p className="mt-2 break-words text-xs text-[var(--color-muted-foreground)]">
                           Sugerido: {transaction.category?.name ?? "Sem categoria"}{" "}
                           {transaction.classification?.ai ? "por IA" : "por regras"} • confiança{" "}
                           {Math.round((transaction.classification?.confidence ?? 0) * 100)}%
                         </p>
                       </div>
-                      <div className="grid gap-2 lg:min-w-[280px]">
+                      <div className="grid w-full gap-2 lg:min-w-[280px] lg:max-w-[360px]">
                         <Select
                           value={selectedCategoryId}
                           onChange={(event) =>
@@ -962,9 +976,11 @@ export function TransactionsClient() {
           </div>
         </div>
 
-        <div className="muted-panel mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-[var(--color-muted-foreground)]">
-          <p>{`Mês ativo: ${formatMonthKeyLabel(month)}.`}</p>
-          <p>{activeRefinements.length > 0 ? activeRefinements.join(" • ") : "Sem refinamentos adicionais."}</p>
+        <div className="muted-panel mt-4 flex flex-wrap items-start justify-between gap-3 text-sm text-[var(--color-muted-foreground)]">
+          <p className="shrink-0">{`Mês ativo: ${formatMonthKeyLabel(month)}.`}</p>
+          <p className="min-w-0 flex-1 break-words text-left sm:text-right">
+            {activeRefinements.length > 0 ? activeRefinements.join(" • ") : "Sem refinamentos adicionais."}
+          </p>
         </div>
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
@@ -1031,7 +1047,7 @@ export function TransactionsClient() {
               className="data-card p-4"
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
+                <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span
                       className={cn(
@@ -1045,18 +1061,18 @@ export function TransactionsClient() {
                     >
                       {formatTransactionTypeLabel(transaction.type)}
                     </span>
-                    <span className="text-xs text-[var(--color-muted-foreground)]">
+                    <span className="break-words text-xs text-[var(--color-muted-foreground)]">
                       {formatDateDisplay(transaction.date)}
                     </span>
                   </div>
-                  <p className="mt-3 text-base font-semibold">{transaction.description}</p>
-                  <p className="mt-1 text-sm text-[var(--color-muted-foreground)]">
+                  <p className="mt-3 break-words text-base font-semibold">{transaction.description}</p>
+                  <p className="mt-1 break-words text-sm text-[var(--color-muted-foreground)]">
                     {transaction.type === "transfer"
                       ? `${transaction.account?.name ?? "Sem origem"} → ${transaction.destinationAccount?.name ?? "Sem destino"}`
                       : `${transaction.category?.name ?? "Sem categoria"} • ${transaction.account?.name ?? transaction.card?.name ?? "Sem origem"}`}
                   </p>
                   {transaction.classification?.auto || transaction.titheAmount ? (
-                    <p className="mt-2 text-xs text-[var(--color-muted-foreground)]">
+                    <p className="mt-2 break-words text-xs text-[var(--color-muted-foreground)]">
                       {transaction.classification?.auto
                         ? transaction.classification.ai
                           ? "Categoria sugerida por IA"
@@ -1068,15 +1084,15 @@ export function TransactionsClient() {
                     </p>
                   ) : null}
                   {transaction.titheAmount ? (
-                    <p className="mt-2 text-xs text-[var(--color-muted-foreground)]">
+                    <p className="mt-2 break-words text-xs text-[var(--color-muted-foreground)]">
                       Dízimo {formatCurrency(transaction.titheAmount)}
                     </p>
                   ) : null}
                 </div>
-                <div className="text-right">
+                <div className="w-full sm:w-auto sm:text-right">
                   <p
                     className={cn(
-                      "text-lg font-semibold",
+                      "break-words text-lg font-semibold",
                       transaction.type === "income"
                         ? "text-[var(--color-primary)]"
                         : transaction.type === "expense"
@@ -1091,7 +1107,7 @@ export function TransactionsClient() {
                       {transaction.installmentNumber}/{transaction.installmentsTotal}
                     </p>
                   ) : null}
-                  <div className="mt-3 flex flex-wrap justify-end gap-2">
+                  <div className="mt-3 flex flex-wrap gap-2 sm:justify-end">
                     <Button onClick={() => startEditing(transaction)} type="button" variant="secondary">
                       Editar
                     </Button>

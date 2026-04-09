@@ -78,7 +78,7 @@ export async function POST(request: Request) {
         ownerUserId: user.id,
         name: normalizedName,
         type: body.type,
-        balance: body.balance,
+        openingBalance: body.balance,
         currency: body.currency.toUpperCase(),
         color: body.color,
         institution: body.institution?.trim() || null
@@ -90,8 +90,8 @@ export async function POST(request: Request) {
         id: account.id,
         name: account.name,
         type: account.type,
-        balance: Number(account.balance),
-        openingBalance: Number(account.balance),
+        balance: Number(account.openingBalance),
+        openingBalance: Number(account.openingBalance),
         currency: account.currency,
         color: account.color,
         institution: account.institution
