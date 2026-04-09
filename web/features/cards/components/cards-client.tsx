@@ -31,6 +31,9 @@ type CardItem = {
   statementMonth: string;
   closeDate: string;
   dueDate: string;
+  payableStatementAmount: number;
+  payableStatementMonth: string;
+  payableDueDate: string;
   dueDay: number;
   closeDay: number;
   color: string;
@@ -626,9 +629,20 @@ export function CardsClient() {
                       <p className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted-foreground)]">
                         Proximo pagamento
                       </p>
-                      <p className="mt-1 break-words text-sm font-semibold leading-5 text-[var(--color-foreground)]">
-                        {new Date(card.dueDate).toLocaleDateString("pt-BR")}
-                      </p>
+                      {card.payableStatementAmount > 0 ? (
+                        <>
+                          <p className="mt-1 break-words text-sm font-semibold leading-5 text-[var(--color-foreground)]">
+                            {new Date(card.payableDueDate).toLocaleDateString("pt-BR")}
+                          </p>
+                          <p className="mt-1 break-words text-xs text-[var(--color-muted-foreground)]">
+                            {formatCurrency(card.payableStatementAmount)} • {formatMonthKeyLabel(card.payableStatementMonth)}
+                          </p>
+                        </>
+                      ) : (
+                        <p className="mt-1 break-words text-sm font-semibold leading-5 text-[var(--color-muted-foreground)]">
+                          Sem cobrança pendente
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>

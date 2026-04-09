@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { cardFormSchema } from "@/features/cards/schemas/card-schema";
 import { requireSessionUser } from "@/lib/auth/session";
-import { getCardStatementSnapshot } from "@/lib/cards/statement";
+import { getCardStatementSnapshot, getCurrentPayableStatementMonth } from "@/lib/cards/statement";
 import { canCreateCard } from "@/lib/licensing/server";
 import { prisma } from "@/lib/prisma/client";
 
@@ -27,6 +27,13 @@ export async function GET(request: Request) {
           month,
           client: prisma
         });
+        const payableStatementMonth = getCurrentPayableStatementMonth(card);
+        const payableStatement = await getCardStatementSnapshot({
+          tenantId: user.tenantId,
+          card,
+          month: payableStatementMonth,
+          client: prisma
+        });
 
         return {
           id: card.id,
@@ -40,6 +47,9 @@ export async function GET(request: Request) {
           statementMonth: statement.month,
           closeDate: statement.closeDate.toISOString(),
           dueDate: statement.dueDate.toISOString(),
+          payableStatementAmount: payableStatement.totalAmount,
+          payableStatementMonth: payableStatement.month,
+          payableDueDate: payableStatement.dueDate.toISOString(),
           dueDay: card.dueDay,
           closeDay: card.closeDay,
           color: card.color,
