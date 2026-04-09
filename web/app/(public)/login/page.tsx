@@ -1,7 +1,24 @@
+import { redirect } from "next/navigation";
+
 import { LoginForm } from "@/features/auth/components/login-form";
+import { getCurrentTenantAccess } from "@/lib/auth/session";
 import { BrandMark } from "@/components/layout/brand-mark";
 
-export default function LoginPage() {
+export default async function LoginPage() {
+  try {
+    const access = await getCurrentTenantAccess({
+      allowBlocked: true
+    });
+
+    if (!access.license.canAccessApp) {
+      redirect(`/license?reason=${access.blockedReason ?? "expired"}`);
+    }
+
+    redirect("/dashboard");
+  } catch {
+    // Session is absent or invalid; keep the login page public.
+  }
+
   return (
     <main id="main-content" className="page-shell grid min-h-screen items-center py-8">
       <section className="mx-auto grid w-full max-w-[980px] gap-4 xl:grid-cols-[0.82fr_1fr] xl:items-center">

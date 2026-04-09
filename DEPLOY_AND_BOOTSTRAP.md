@@ -85,6 +85,19 @@ Modelos disponiveis:
 - docker local: [`.env.local-docker.example`](/C:/Users/samue/Desktop/SavePoint/SavePoint/.env.local-docker.example)
 - o arquivo ativo usado pelo `docker compose` continua sendo `.env`
 
+Geracao rapida:
+
+```bash
+npm run bootstrap:docker
+npm run bootstrap:server
+```
+
+Para desenvolvimento do `web` sem Docker:
+
+```bash
+npm run bootstrap:web
+```
+
 ## Como funciona
 
 ### `web`
@@ -170,6 +183,12 @@ docker compose run --rm bootstrap-admin
 
 ```bash
 docker compose up -d web
+```
+
+Atalho padronizado para Docker local:
+
+```bash
+npm run bootstrap:docker:up
 ```
 
 Se for usar armazenamento S3 compativel/MinIO:

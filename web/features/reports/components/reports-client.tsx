@@ -348,7 +348,7 @@ export function ReportsClient() {
             </Button>
           )}
         </div>
-        <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-7">
+        <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           <div className="space-y-2">
             <Label htmlFor="reports-period-mode">Escopo</Label>
             <Select
@@ -438,7 +438,7 @@ export function ReportsClient() {
               ))}
             </Select>
           </div>
-          <div className="flex items-end md:col-span-2 xl:col-span-3 2xl:col-span-1">
+          <div className="flex items-end md:col-span-2 xl:col-span-3 2xl:col-span-4">
             <Button
               onClick={() => setFilters({ type: "", accountId: "", cardId: "", categoryId: "" })}
               type="button"
@@ -459,36 +459,36 @@ export function ReportsClient() {
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <article className="metric-card">
           <p className="metric-label">Resultado do período</p>
-          <p className={`metric-value ${(data?.summary.balance ?? 0) < 0 ? "amount-negative" : "amount-positive"}`}>
+          <p className={`metric-value amount-nowrap ${(data?.summary.balance ?? 0) < 0 ? "amount-negative" : "amount-positive"}`}>
             {formatCurrency(data?.summary.balance ?? 0)}
           </p>
         </article>
         <article className="metric-card">
           <p className="metric-label">Receitas do período</p>
-          <p className="metric-value amount-positive">{formatCurrency(data?.summary.income ?? 0)}</p>
+          <p className="metric-value amount-nowrap amount-positive">{formatCurrency(data?.summary.income ?? 0)}</p>
         </article>
         <article className="metric-card">
           <p className="metric-label">Despesas do período</p>
-          <p className="metric-value amount-negative">{formatCurrency(data?.summary.expense ?? 0)}</p>
+          <p className="metric-value amount-nowrap amount-negative">{formatCurrency(data?.summary.expense ?? 0)}</p>
         </article>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <article className="metric-card">
           <p className="metric-label">Saldo inicial do período</p>
-          <p className={`metric-value ${(data?.periodBalances.opening ?? 0) < 0 ? "amount-negative" : "amount-positive"}`}>
+          <p className={`metric-value amount-nowrap ${(data?.periodBalances.opening ?? 0) < 0 ? "amount-negative" : "amount-positive"}`}>
             {formatCurrency(data?.periodBalances.opening ?? 0)}
           </p>
         </article>
         <article className="metric-card">
           <p className="metric-label">Variação real nas contas</p>
-          <p className={`metric-value ${(data?.periodBalances.net ?? 0) < 0 ? "amount-negative" : "amount-positive"}`}>
+          <p className={`metric-value amount-nowrap ${(data?.periodBalances.net ?? 0) < 0 ? "amount-negative" : "amount-positive"}`}>
             {formatCurrency(data?.periodBalances.net ?? 0)}
           </p>
         </article>
         <article className="metric-card">
           <p className="metric-label">Saldo final do período</p>
-          <p className={`metric-value ${(data?.periodBalances.closing ?? 0) < 0 ? "amount-negative" : "amount-positive"}`}>
+          <p className={`metric-value amount-nowrap ${(data?.periodBalances.closing ?? 0) < 0 ? "amount-negative" : "amount-positive"}`}>
             {formatCurrency(data?.periodBalances.closing ?? 0)}
           </p>
         </article>
@@ -497,11 +497,11 @@ export function ReportsClient() {
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <article className="metric-card">
           <p className="metric-label">Média mensal de receitas</p>
-          <p className="metric-value amount-positive">{formatCurrency(data?.comparison.averageIncome ?? 0)}</p>
+          <p className="metric-value amount-nowrap amount-positive">{formatCurrency(data?.comparison.averageIncome ?? 0)}</p>
         </article>
         <article className="metric-card">
           <p className="metric-label">Média mensal de despesas</p>
-          <p className="metric-value amount-negative">{formatCurrency(data?.comparison.averageExpense ?? 0)}</p>
+          <p className="metric-value amount-nowrap amount-negative">{formatCurrency(data?.comparison.averageExpense ?? 0)}</p>
         </article>
         <article className="metric-card">
           <p className="metric-label">Transferências no fluxo</p>
@@ -510,14 +510,14 @@ export function ReportsClient() {
         <article className="metric-card">
           <p className="metric-label">Conta com maior impacto</p>
           <p className="metric-value text-base">{data?.comparison.topAccount?.name ?? "Sem dados"}</p>
-          <p className={`mt-2 text-sm ${(data?.comparison.topAccount?.net ?? 0) < 0 ? "amount-negative" : "amount-positive"}`}>
+          <p className={`amount-nowrap mt-2 text-sm ${(data?.comparison.topAccount?.net ?? 0) < 0 ? "amount-negative" : "amount-positive"}`}>
             {formatCurrency(data?.comparison.topAccount?.net ?? 0)}
           </p>
         </article>
         <article className="metric-card">
           <p className="metric-label">Cartão com maior impacto</p>
           <p className="metric-value text-base">{data?.comparison.topCard?.name ?? "Sem dados"}</p>
-          <p className={`mt-2 text-sm ${(data?.comparison.topCard?.netStatement ?? 0) < 0 ? "amount-negative" : "amount-positive"}`}>
+          <p className={`amount-nowrap mt-2 text-sm ${(data?.comparison.topCard?.netStatement ?? 0) < 0 ? "amount-negative" : "amount-positive"}`}>
             {formatCurrency(data?.comparison.topCard?.netStatement ?? 0)}
           </p>
         </article>
@@ -598,14 +598,14 @@ export function ReportsClient() {
             </article>
             <article className="data-card p-4">
               <p className="metric-label">Essenciais</p>
-              <p className="mt-3 text-base font-semibold">{formatCurrency(data?.spendingInsights.essentialExpenses ?? 0)}</p>
+              <p className="amount-nowrap mt-3 text-base font-semibold">{formatCurrency(data?.spendingInsights.essentialExpenses ?? 0)}</p>
               <p className="mt-2 text-sm text-[var(--color-muted-foreground)]">
                 Moradia, saúde, utilidades e despesas estruturais.
               </p>
             </article>
             <article className="data-card p-4">
               <p className="metric-label">Estilo de vida</p>
-              <p className="mt-3 text-base font-semibold">{formatCurrency(data?.spendingInsights.lifestyleExpenses ?? 0)}</p>
+              <p className="amount-nowrap mt-3 text-base font-semibold">{formatCurrency(data?.spendingInsights.lifestyleExpenses ?? 0)}</p>
               <p className="mt-2 text-sm text-[var(--color-muted-foreground)]">
                 Consumo flexível como lazer, delivery, viagens e streaming.
               </p>
@@ -637,7 +637,7 @@ export function ReportsClient() {
                       </p>
                     </div>
                     <p
-                      className={`w-full break-words text-left font-semibold sm:w-auto sm:text-right ${
+                      className={`amount-nowrap w-full text-left font-semibold sm:w-auto sm:text-right ${
                         item.net >= 0 ? "text-[var(--color-emerald-600)]" : "amount-negative"
                       }`}
                     >
@@ -667,7 +667,7 @@ export function ReportsClient() {
                         {item.brand} • {item.transactions} lançamentos • Estorno {formatCurrency(item.refunds)}
                       </p>
                     </div>
-                    <p className={`w-full break-words text-left font-semibold sm:w-auto sm:text-right ${item.netStatement < 0 ? "amount-negative" : "amount-positive"}`}>
+                    <p className={`amount-nowrap w-full text-left font-semibold sm:w-auto sm:text-right ${item.netStatement < 0 ? "amount-negative" : "amount-positive"}`}>
                       {formatCurrency(item.netStatement)}
                     </p>
                   </div>
@@ -699,7 +699,7 @@ export function ReportsClient() {
                   </p>
                 </div>
                 <p
-                  className={`w-full break-words text-left font-semibold sm:w-auto sm:text-right ${
+                  className={`amount-nowrap w-full text-left font-semibold sm:w-auto sm:text-right ${
                     item.type === "expense"
                       ? "amount-negative"
                       : item.type === "income"
@@ -733,7 +733,7 @@ export function ReportsClient() {
                           : "Prazo de meta"}
                     </p>
                   </div>
-                  <p className={item.type === "income" ? "w-full break-words text-left font-semibold text-[var(--color-primary)] sm:w-auto sm:text-right" : "w-full break-words text-left font-semibold amount-negative sm:w-auto sm:text-right"}>
+                  <p className={item.type === "income" ? "amount-nowrap w-full text-left font-semibold text-[var(--color-primary)] sm:w-auto sm:text-right" : "amount-nowrap w-full text-left font-semibold amount-negative sm:w-auto sm:text-right"}>
                     {formatCurrency(item.amount)}
                   </p>
                 </div>
@@ -760,7 +760,7 @@ export function ReportsClient() {
                       {item.items} lançamentos • {Math.round(item.share * 100)}% do total de despesas
                     </p>
                   </div>
-                  <p className="w-full break-words text-left font-semibold amount-negative sm:w-auto sm:text-right">
+                  <p className="amount-nowrap w-full text-left font-semibold amount-negative sm:w-auto sm:text-right">
                     {formatCurrency(item.total)}
                   </p>
                 </div>

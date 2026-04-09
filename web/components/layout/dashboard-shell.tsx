@@ -33,8 +33,8 @@ export async function DashboardShell({ children }: DashboardShellProps) {
         : "Membro da carteira compartilhada";
 
   return (
-    <div className="page-shell flex min-h-screen flex-col gap-5 overflow-x-clip py-4 md:py-5 lg:grid lg:h-screen lg:grid-cols-[256px_minmax(0,1fr)] lg:gap-5 lg:overflow-hidden xl:grid-cols-[264px_minmax(0,1fr)] xl:gap-6">
-      <aside className="surface flex max-h-[38vh] min-h-0 flex-col overflow-y-auto rounded-[30px] p-4 lg:max-h-none xl:p-5">
+    <div className="page-shell flex min-h-screen flex-col gap-5 py-4 md:py-5 lg:grid lg:h-screen lg:grid-cols-[256px_minmax(0,1fr)] lg:gap-5 lg:overflow-y-hidden xl:grid-cols-[264px_minmax(0,1fr)] xl:gap-6">
+      <aside className="surface flex min-h-0 flex-col overflow-visible rounded-[30px] p-4 lg:max-h-none lg:overflow-y-auto xl:p-5">
         <div className="mb-6 rounded-[24px] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-card)_86%,transparent)] p-4">
           <div className="flex flex-col gap-3">
             <BrandMark compact />
@@ -69,7 +69,12 @@ export async function DashboardShell({ children }: DashboardShellProps) {
         </div>
       </aside>
 
-      <main id="main-content" className="min-h-0 min-w-0 overflow-x-clip overflow-y-auto pb-8 pr-1 lg:pb-10">{children}</main>
+      <main
+        id="main-content"
+        className="min-h-0 min-w-0 w-full max-w-full overflow-x-hidden overflow-y-auto pb-8 pr-1 lg:pb-10"
+      >
+        {children}
+      </main>
     </div>
   );
 }

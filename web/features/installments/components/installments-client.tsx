@@ -343,7 +343,7 @@ export function InstallmentsClient() {
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <article className="metric-card">
           <p className="metric-label">Valor parcelado</p>
-          <p className="metric-value">{formatCurrency(totalAmount)}</p>
+          <p className="metric-value amount-nowrap">{formatCurrency(totalAmount)}</p>
         </article>
         <article className="metric-card">
           <p className="metric-label">Parcelas restantes</p>
@@ -362,7 +362,7 @@ export function InstallmentsClient() {
             <p className="mt-2 break-words text-sm text-[var(--color-muted-foreground)]">
               {item.category?.name ?? "Sem categoria"} • {item.card?.name ?? "Sem cartão"}
             </p>
-            <p className="mt-4 break-words text-2xl font-semibold">{formatCurrency(item.totalAmount)}</p>
+            <p className="amount-nowrap mt-4 text-2xl font-semibold">{formatCurrency(item.totalAmount)}</p>
             <p className="mt-2 break-words text-sm text-[var(--color-muted-foreground)]">
               Parcela base: {formatCurrency(item.installmentAmount ?? 0)}
             </p>

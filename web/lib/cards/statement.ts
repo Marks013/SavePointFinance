@@ -21,6 +21,7 @@ type StatementTransactionLike = {
 
 type StatementPaymentLike = {
   amount: number | { toString(): string };
+  month?: string;
 };
 
 function parseStatementMonth(month: string) {
@@ -219,6 +220,10 @@ function calculatePaymentsTotal(payments: StatementPaymentLike[]) {
   return payments.reduce((sum, payment) => sum + Number(payment.amount), 0);
 }
 
+function calculateStatementPaymentsTotal(payments: StatementPaymentLike[], statementMonth: string) {
+  return calculatePaymentsTotal(payments.filter((payment) => payment.month === statementMonth));
+}
+
 export async function getCardStatementSnapshot({
   tenantId,
   card,
@@ -263,11 +268,13 @@ export async function getCardStatementSnapshot({
         cardId: card.id
       },
       select: {
-        amount: true
+        amount: true,
+        month: true
       }
     })
   ]);
   const totalAmount = calculateStatementTotal(statementTransactions);
+  const statementOutstandingAmount = Math.max(0, totalAmount - calculateStatementPaymentsTotal(payments, statementMonth));
   const outstandingAmount = Math.max(
     0,
     calculateStatementTotal(allCardTransactions) - calculatePaymentsTotal(payments)
@@ -278,6 +285,7 @@ export async function getCardStatementSnapshot({
     start,
     end,
     totalAmount,
+    statementOutstandingAmount,
     outstandingAmount,
     availableLimit: Number(card.limitAmount) - outstandingAmount,
     closeDate: getStatementCloseDate(statementMonth, card.closeDay, card.dueDay),
@@ -364,7 +372,8 @@ export async function getCardStatementSnapshots({
       },
       select: {
         cardId: true,
-        amount: true
+        amount: true,
+        month: true
       }
     })
   ]);
@@ -399,22 +408,65 @@ export async function getCardStatementSnapshots({
   }
 
   return snapshots.map((snapshot) => {
+    const cardPayments = paymentsByCard.get(snapshot.card.id) ?? [];
     const totalAmount = calculateStatementTotal(
       (transactionsByCard.get(snapshot.card.id) ?? []).filter(
         (transaction) => transaction.date >= snapshot.start && transaction.date <= snapshot.end
       )
     );
+    const statementOutstandingAmount = Math.max(0, totalAmount - calculateStatementPaymentsTotal(cardPayments, snapshot.month));
     const outstandingAmount = Math.max(
       0,
       calculateStatementTotal(allTransactionsByCard.get(snapshot.card.id) ?? []) -
-        calculatePaymentsTotal(paymentsByCard.get(snapshot.card.id) ?? [])
+        calculatePaymentsTotal(cardPayments)
     );
 
     return {
       ...snapshot,
       totalAmount,
+      statementOutstandingAmount,
       outstandingAmount,
       availableLimit: Number(snapshot.card.limitAmount) - outstandingAmount
     };
   });
+}
+
+export async function getNextPayableStatementSnapshot({
+  tenantId,
+  card,
+  referenceDate = new Date(),
+  client = prisma
+}: {
+  tenantId: string;
+  card: CardStatementCard;
+  referenceDate?: Date;
+  client?: StatementClient;
+}) {
+  const currentStatementMonth = getCurrentStatementMonth(card, referenceDate);
+  const candidateMonths = Array.from(
+    new Set([
+      addMonthsToStatementMonth(currentStatementMonth, -1),
+      currentStatementMonth,
+      addMonthsToStatementMonth(currentStatementMonth, 1)
+    ])
+  );
+  const snapshots = await Promise.all(
+    candidateMonths.map((month) =>
+      getCardStatementSnapshot({
+        tenantId,
+        card,
+        month,
+        client
+      })
+    )
+  );
+  const referenceBoundary = new Date(referenceDate);
+  referenceBoundary.setHours(0, 0, 0, 0);
+  const payableSnapshots = snapshots
+    .filter((snapshot) => snapshot.statementOutstandingAmount > 0)
+    .sort((left, right) => left.dueDate.getTime() - right.dueDate.getTime());
+
+  const nextUpcoming = payableSnapshots.find((snapshot) => snapshot.dueDate >= referenceBoundary);
+
+  return nextUpcoming ?? payableSnapshots[0] ?? snapshots.find((snapshot) => snapshot.month === currentStatementMonth) ?? snapshots[0];
 }

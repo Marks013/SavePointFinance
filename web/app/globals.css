@@ -44,6 +44,10 @@
   color-scheme: dark;
 }
 
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
 :root[data-theme="dark"] {
   color-scheme: dark;
   --color-ink-950: #f5f8f6;
@@ -376,6 +380,23 @@ button {
   text-wrap: pretty;
 }
 
+.hero-amount {
+  max-width: 100%;
+  font-size: clamp(1.5rem, 5vw, 3.2rem);
+  font-weight: 600;
+  letter-spacing: -0.07em;
+  line-height: 1.02;
+  font-variant-numeric: tabular-nums;
+}
+
+.amount-nowrap {
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: keep-all;
+  text-wrap: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
 .amount-positive {
   color: var(--color-emerald-600);
 }
@@ -406,6 +427,49 @@ button {
     border-color 180ms ease,
     background-color 180ms ease,
     box-shadow 180ms ease;
+}
+
+@supports (container-type: inline-size) {
+  .metric-card,
+  .editorial-panel,
+  .surface-strong {
+    container-type: inline-size;
+  }
+
+  .metric-card {
+    padding: clamp(0.9rem, 6cqw, 1.35rem);
+  }
+
+  .metric-value {
+    font-size: clamp(1.05rem, 11cqw, 2.05rem);
+  }
+
+  .subtle-metric-value {
+    font-size: clamp(0.95rem, 8.5cqw, 1.5rem);
+  }
+
+  .hero-amount {
+    font-size: clamp(1.35rem, 11cqw, 3.2rem);
+  }
+
+  @container (max-width: 15rem) {
+    .metric-card {
+      min-height: 7.5rem;
+    }
+
+    .metric-value,
+    .subtle-metric-value {
+      letter-spacing: -0.02em;
+      line-height: 1.08;
+    }
+  }
+
+  @container (max-width: 20rem) {
+    .hero-amount {
+      letter-spacing: -0.05em;
+      line-height: 1.04;
+    }
+  }
 }
 
 :root[data-theme="light"] .data-card {
@@ -566,6 +630,30 @@ button {
   gap: 1.5rem;
 }
 
+.metric-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+}
+
+.metric-grid-compact {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+}
+
+.content-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+}
+
+.detail-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+}
+
 .section-title {
   font-size: clamp(1.7rem, 2vw, 2.4rem);
   font-weight: 600;
@@ -583,6 +671,7 @@ button {
 }
 
 .editorial-panel {
+  min-width: 0;
   border-radius: 2rem;
   border: 1px solid rgba(36, 48, 57, 0.82);
   background:

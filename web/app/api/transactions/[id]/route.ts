@@ -130,6 +130,10 @@ export async function PATCH(request: Request, context: Params) {
               notes,
               titheAmount: applyTithe ? new Prisma.Decimal((body.amount * 0.1).toFixed(2)) : null,
               titheCategoryId,
+              classificationSource: classification.classificationSource,
+              classificationKeyword: classification.classificationKeyword,
+              classificationReason: classification.reason,
+              classificationVersion: 2,
               aiClassified: classification.aiClassified,
               aiConfidence:
                 classification.confidence !== null ? new Prisma.Decimal(classification.confidence.toFixed(2)) : null
@@ -174,6 +178,10 @@ export async function PATCH(request: Request, context: Params) {
         notes,
         titheAmount: applyTithe ? new Prisma.Decimal((body.amount * 0.1).toFixed(2)) : null,
         titheCategoryId,
+        classificationSource: classification.classificationSource,
+        classificationKeyword: classification.classificationKeyword,
+        classificationReason: classification.reason,
+        classificationVersion: 2,
         aiClassified: classification.aiClassified,
         aiConfidence:
           classification.confidence !== null ? new Prisma.Decimal(classification.confidence.toFixed(2)) : null

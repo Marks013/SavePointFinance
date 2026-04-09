@@ -2,9 +2,11 @@ import { NextResponse } from "next/server";
 
 import { categoryFormSchema } from "@/features/categories/schemas/category-schema";
 import { requireSessionUser } from "@/lib/auth/session";
+import { invalidateTenantClassificationCache } from "@/lib/finance/classification-cache";
 import {
   buildCategoryKeywords,
   dedupeTenantCategories,
+  getDefaultCategorySystemKey,
   normalizeCategoryName
 } from "@/lib/finance/default-categories";
 import { prisma } from "@/lib/prisma/client";
@@ -13,6 +15,7 @@ export async function GET() {
   try {
     const user = await requireSessionUser();
     await dedupeTenantCategories(user.tenantId);
+    invalidateTenantClassificationCache(user.tenantId);
     const categories = await prisma.category.findMany({
       where: {
         tenantId: user.tenantId
@@ -45,6 +48,7 @@ export async function POST(request: Request) {
   try {
     const user = await requireSessionUser();
     await dedupeTenantCategories(user.tenantId);
+    invalidateTenantClassificationCache(user.tenantId);
     const body = categoryFormSchema.parse(await request.json());
     const normalizedName = normalizeCategoryName(body.name);
     const keywords = buildCategoryKeywords(
@@ -76,6 +80,7 @@ export async function POST(request: Request) {
       data: {
         tenantId: user.tenantId,
         name: normalizedName,
+        systemKey: getDefaultCategorySystemKey(body.type, normalizedName),
         icon: body.icon,
         color: body.color,
         type: body.type,
@@ -83,6 +88,8 @@ export async function POST(request: Request) {
         keywords
       }
     });
+
+    invalidateTenantClassificationCache(user.tenantId);
 
     return NextResponse.json(
       {

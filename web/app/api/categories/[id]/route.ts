@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 
 import { categoryFormSchema } from "@/features/categories/schemas/category-schema";
 import { requireSessionUser } from "@/lib/auth/session";
-import { buildCategoryKeywords, normalizeCategoryName } from "@/lib/finance/default-categories";
+import { invalidateTenantClassificationCache } from "@/lib/finance/classification-cache";
+import { buildCategoryKeywords, getDefaultCategorySystemKey, normalizeCategoryName } from "@/lib/finance/default-categories";
 import { prisma } from "@/lib/prisma/client";
 
 type Params = {
@@ -52,6 +53,7 @@ export async function PATCH(request: Request, context: Params) {
       },
       data: {
         name: normalizedName,
+        systemKey: getDefaultCategorySystemKey(body.type, normalizedName),
         icon: body.icon,
         color: body.color,
         type: body.type,
@@ -59,6 +61,8 @@ export async function PATCH(request: Request, context: Params) {
         keywords
       }
     });
+
+    invalidateTenantClassificationCache(user.tenantId);
 
     return NextResponse.json(updated);
   } catch (error) {
@@ -105,6 +109,8 @@ export async function DELETE(_request: Request, context: Params) {
         tenantId: user.tenantId
       }
     });
+
+    invalidateTenantClassificationCache(user.tenantId);
 
     return NextResponse.json({ success: true });
   } catch (error) {

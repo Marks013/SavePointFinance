@@ -183,6 +183,7 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
         accountId: true,
         destinationAccountId: true,
         cardId: true,
+        classificationSource: true,
         aiClassified: true,
         aiConfidence: true,
         category: {
@@ -367,7 +368,11 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
         summary.uncategorizedExpense += amount;
         uncategorizedTransactions += 1;
       }
-      if (transaction.aiClassified || transaction.aiConfidence !== null) {
+      if (
+        transaction.classificationSource !== "manual_input" &&
+        transaction.classificationSource !== "manual_rule" &&
+        transaction.classificationSource !== "unknown"
+      ) {
         classifiedAutomatically += 1;
       }
       const category = categoryMap.get(categoryName) ?? {

@@ -195,7 +195,7 @@ export function AccountsClient() {
   }, [editingId]);
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
+    <div className="grid gap-6 2xl:grid-cols-[0.85fr_1.15fr]">
       <section className="surface content-section" ref={formSectionRef}>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -315,33 +315,41 @@ export function AccountsClient() {
       </section>
 
       <section className="surface content-section">
-        <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="space-y-4">
           <div>
             <h2 className="text-2xl font-semibold tracking-[-0.03em]">Contas disponíveis</h2>
             <p className="mt-2 text-sm leading-7 text-[var(--color-muted-foreground)]">
               Use esta visão para separar o movimento do período selecionado do acumulado total da conta.
             </p>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="metric-grid-compact">
             <article className="metric-card">
               <p className="metric-label">Saldo atual total</p>
-              <p className={`metric-value ${activeBalance < 0 ? "amount-negative" : ""}`}>{formatCurrency(activeBalance)}</p>
+              <p className={`metric-value amount-nowrap ${activeBalance < 0 ? "amount-negative" : ""}`}>
+                {formatCurrency(activeBalance)}
+              </p>
             </article>
             <article className="metric-card">
               <p className="metric-label">{`Movimento de ${monthLabel}`}</p>
-              <p className={`metric-value ${periodNet < 0 ? "amount-negative" : ""}`}>{formatCurrency(periodNet)}</p>
+              <p className={`metric-value amount-nowrap ${periodNet < 0 ? "amount-negative" : ""}`}>
+                {formatCurrency(periodNet)}
+              </p>
             </article>
             <article className="metric-card">
               <p className="metric-label">Variação acumulada</p>
-              <p className={`metric-value ${accumulatedNet < 0 ? "amount-negative" : ""}`}>{formatCurrency(accumulatedNet)}</p>
+              <p className={`metric-value amount-nowrap ${accumulatedNet < 0 ? "amount-negative" : ""}`}>
+                {formatCurrency(accumulatedNet)}
+              </p>
             </article>
             <article className="metric-card">
               <p className="metric-label">Base cadastrada</p>
-              <p className={`metric-value ${openingBalance < 0 ? "amount-negative" : ""}`}>{formatCurrency(openingBalance)}</p>
+              <p className={`metric-value amount-nowrap ${openingBalance < 0 ? "amount-negative" : ""}`}>
+                {formatCurrency(openingBalance)}
+              </p>
             </article>
           </div>
         </div>
-        <div className="mt-6 grid gap-3 md:grid-cols-2">
+        <div className="content-grid mt-6">
           {accounts.map((account) => (
             <article key={account.id} className="data-card p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
@@ -361,25 +369,32 @@ export function AccountsClient() {
                   </div>
                 </div>
                 <div className="w-full sm:w-auto sm:text-right">
-                  <p className={`break-words font-semibold ${account.balance < 0 ? "amount-negative" : ""}`}>{formatCurrency(account.balance)}</p>
+                  <p className={`amount-nowrap font-semibold ${account.balance < 0 ? "amount-negative" : ""}`}>
+                    {formatCurrency(account.balance)}
+                  </p>
                   <p className="text-xs text-[var(--color-muted-foreground)]">Saldo atual</p>
                 </div>
               </div>
               {account.institution ? <p className="mt-3 break-words text-sm text-[var(--color-muted-foreground)]">{account.institution}</p> : null}
               <p className="mt-2 break-words text-sm text-[var(--color-muted-foreground)]">
-                Saldo de referência: {formatCurrency(account.openingBalance)}
+                Saldo de referência: <span className="amount-nowrap">{formatCurrency(account.openingBalance)}</span>
               </p>
               <p className="mt-2 break-words text-sm text-[var(--color-muted-foreground)]">
                 {`Movimento de ${monthLabel}`}:{" "}
-                <span className={account.periodNet < 0 ? "amount-negative" : undefined}>{formatCurrency(account.periodNet)}</span>
+                <span className={`amount-nowrap ${account.periodNet < 0 ? "amount-negative" : ""}`}>
+                  {formatCurrency(account.periodNet)}
+                </span>
               </p>
               <p className="mt-2 break-words text-sm text-[var(--color-muted-foreground)]">
-                Entradas {formatCurrency(account.periodIncome)} • Saídas {formatCurrency(account.periodExpense)} •
-                Transferências líquidas {formatCurrency(account.periodTransferIn - account.periodTransferOut)}
+                Entradas <span className="amount-nowrap">{formatCurrency(account.periodIncome)}</span> • Saídas{" "}
+                <span className="amount-nowrap">{formatCurrency(account.periodExpense)}</span> • Transferências
+                líquidas <span className="amount-nowrap">{formatCurrency(account.periodTransferIn - account.periodTransferOut)}</span>
               </p>
               <p className="mt-2 break-words text-sm text-[var(--color-muted-foreground)]">
                 Variação acumulada:{" "}
-                <span className={account.accumulatedNet < 0 ? "amount-negative" : undefined}>{formatCurrency(account.accumulatedNet)}</span>
+                <span className={`amount-nowrap ${account.accumulatedNet < 0 ? "amount-negative" : ""}`}>
+                  {formatCurrency(account.accumulatedNet)}
+                </span>
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button onClick={() => startEditing(account)} type="button" variant="secondary">

@@ -9,6 +9,8 @@ O banco foi consolidado em uma migration baseline unica para ambientes novos.
 ```text
 SavePoint/
 ├── web/
+├── scripts/
+├── package.json
 ├── docker-compose.yml
 ├── .env.example
 ├── .env.server.example
@@ -22,11 +24,55 @@ SavePoint/
 - raiz: arquivos de producao e deploy com Docker
 - `web/`: codigo da aplicacao e ambiente de desenvolvimento local
 
+## Configuracao rapida
+
+### 1. Desenvolvimento local do `web`
+
+Cria `web/.env.local` com segredos locais automaticamente:
+
+```bash
+npm run bootstrap:web
+```
+
+### 2. Docker local
+
+Cria `.env` na raiz com URLs locais e segredos gerados:
+
+```bash
+npm run bootstrap:docker
+```
+
+Para configurar e subir a stack inteira:
+
+```bash
+npm run bootstrap:docker:up
+```
+
+### 3. Servidor ou producao
+
+Cria `.env` na raiz com base no modelo de servidor:
+
+```bash
+npm run bootstrap:server
+```
+
+Se quiser recriar o arquivo de destino:
+
+```bash
+npm run bootstrap:docker -- --force
+npm run bootstrap:server -- --force
+```
+
 ## Deploy em producao
 
 Fluxo recomendado para Oracle Cloud com Nginx Proxy Manager:
 
-1. copie [`.env.server.example`](/C:/Users/samue/Desktop/SavePoint/SavePoint/.env.server.example) para `.env`
+1. gere `.env` com:
+
+```bash
+npm run bootstrap:server
+```
+
 2. ajuste `NEXT_PUBLIC_APP_URL`, `AUTH_URL`, segredos, senha do admin e `RESEND_API_KEY`
 3. execute:
 
@@ -105,7 +151,7 @@ docker compose run --rm restore-backup-prod
 docker compose up -d web
 ```
 
-As variaveis de backup ficam no [`.env.example`](/C:/Users/User/Desktop/SavePointFinance/.env.example) e a operacao completa esta em [DEPLOY_AND_BOOTSTRAP.md](/C:/Users/User/Desktop/SavePointFinance/DEPLOY_AND_BOOTSTRAP.md).
+As variaveis de backup ficam no [`.env.example`](/C:/Users/samue/Desktop/SavePoint/SavePoint/.env.example) e a operacao completa esta em [DEPLOY_AND_BOOTSTRAP.md](/C:/Users/samue/Desktop/SavePoint/SavePoint/DEPLOY_AND_BOOTSTRAP.md).
 
 ## Conta administrativa
 

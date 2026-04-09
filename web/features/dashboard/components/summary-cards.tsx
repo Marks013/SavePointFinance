@@ -57,7 +57,7 @@ const cards = [
 
 export function SummaryCards({ data }: SummaryCardsProps) {
   return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
+    <div className="metric-grid">
       {cards.map((card) => {
         const Icon = card.icon;
         const value = data[card.key];
@@ -68,7 +68,7 @@ export function SummaryCards({ data }: SummaryCardsProps) {
               <div className="min-w-0 flex-1">
                 <p className="metric-label">{card.title}</p>
                 <p
-                  className={`mt-4 break-words text-[clamp(1.2rem,3.4vw,1.92rem)] font-medium tracking-[-0.04em] ${card.valueClass(value)}`}
+                  className={`metric-value amount-nowrap ${card.valueClass(value)}`}
                 >
                   {formatCurrency(value)}
                 </p>

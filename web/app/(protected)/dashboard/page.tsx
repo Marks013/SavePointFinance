@@ -9,9 +9,8 @@ import { requireSessionUser } from "@/lib/auth/session";
 import {
   getCardExpenseCompetenceDate,
   getCardExpenseDueDate,
-  getCardStatementSnapshot,
+  getNextPayableStatementSnapshot,
   getCardStatementSnapshots,
-  getCurrentPayableStatementMonth
 } from "@/lib/cards/statement";
 import { getAccountsWithComputedBalance } from "@/lib/finance/accounts";
 import { getFinanceReport } from "@/lib/finance/reports";
@@ -45,8 +44,17 @@ function getMonthPerspective(month: string) {
   return month > currentMonth ? "future" : "past";
 }
 
+function getStatementReferenceDate(month: string) {
+  if (month === getCurrentMonthKey()) {
+    return new Date();
+  }
+
+  return getMonthRange(month).end;
+}
+
 async function getDashboardData(tenantId: string, month: string) {
   const { start, end, from, to } = getMonthRange(month);
+  const statementReferenceDate = getStatementReferenceDate(month);
 
   try {
     const [accounts, monthlyReport, goals, recentTransactions, upcomingSubscriptions, upcomingGoals, activeCards] =
@@ -119,8 +127,7 @@ async function getDashboardData(tenantId: string, month: string) {
           },
           orderBy: {
             createdAt: "desc"
-          },
-          take: 4
+          }
         })
       ]);
 
@@ -130,21 +137,17 @@ async function getDashboardData(tenantId: string, month: string) {
       client: prisma,
       month
     });
-    const currentMonth = getCurrentMonthKey();
-    const payableStatements =
-      month === currentMonth
-        ? await Promise.all(
-            activeCards.map(async (card) => ({
-              cardId: card.id,
-              statement: await getCardStatementSnapshot({
-                tenantId,
-                card,
-                month: getCurrentPayableStatementMonth(card),
-                client: prisma
-              })
-            }))
-          )
-        : [];
+    const payableStatements = await Promise.all(
+      activeCards.map(async (card) => ({
+        cardId: card.id,
+        statement: await getNextPayableStatementSnapshot({
+          tenantId,
+          card,
+          referenceDate: statementReferenceDate,
+          client: prisma
+        })
+      }))
+    );
     const statementByCardId = new Map(cardStatements.map((item) => [item.card.id, item]));
     const payableStatementByCardId = new Map(payableStatements.map((item) => [item.cardId, item.statement]));
     const cardsWithStatement = activeCards.map((card) => {
@@ -157,11 +160,12 @@ async function getDashboardData(tenantId: string, month: string) {
         closeDate: statement?.closeDate ?? null,
         dueDate: statement?.dueDate ?? null,
         statementAmount: statement?.totalAmount ?? 0,
+        statementOutstandingAmount: statement?.statementOutstandingAmount ?? 0,
         outstandingAmount: statement?.outstandingAmount ?? 0,
         availableLimit: statement?.availableLimit ?? Number(card.limitAmount),
         payableStatementMonth: payableStatement?.month ?? month,
         payableDueDate: payableStatement?.dueDate ?? null,
-        payableStatementAmount: payableStatement?.totalAmount ?? 0
+        payableStatementAmount: payableStatement?.statementOutstandingAmount ?? 0
       };
     });
 
@@ -199,9 +203,10 @@ async function getDashboardData(tenantId: string, month: string) {
         .filter((account) => account.isActive)
         .sort((a, b) => b.currentBalance - a.currentBalance)
         .slice(0, 4),
-      activeCards: cardsWithStatement
+      activeCards: cardsWithStatement.slice(0, 4)
     };
-  } catch {
+  } catch (error) {
+    console.error("Failed to load dashboard data", error);
     return {
       periodBalances: {
         opening: 0,
@@ -254,10 +259,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const monthPerspective = getMonthPerspective(month);
   const commitmentCardNote =
     monthPerspective === "current"
-      ? "Cobranças, metas e faturas previstas para este mês."
+      ? "Recorrências e faturas ainda previstas para este mês."
       : monthPerspective === "future"
-        ? "Cobranças, metas e faturas previstas para o mês selecionado."
-        : "Cobranças, metas e faturas mapeadas para a competência selecionada.";
+        ? "Recorrências e faturas previstas para o mês selecionado."
+        : "Recorrências e faturas mapeadas para a competência selecionada.";
   const dueSectionTitle =
     monthPerspective === "current" ? "Próximos vencimentos" : monthPerspective === "future" ? "Vencimentos previstos" : "Vencimentos do período";
   const dueSectionEmpty =
@@ -272,7 +277,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
   return (
     <div className="space-y-6 py-4">
-      <section className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+      <section className="grid gap-4 2xl:grid-cols-[1.2fr_0.8fr]">
         <article className="surface overflow-hidden rounded-[34px] p-6 md:p-8">
           <div className="section-stack">
             <div className="page-intro">
@@ -284,11 +289,11 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               </p>
             </div>
 
-            <div className="grid gap-3 md:grid-cols-3">
+            <div className="metric-grid-compact">
               <div className="editorial-panel">
                 <p className="metric-label">Resultado do período</p>
                 <p
-                  className={`mt-3 max-w-full break-words text-lg font-semibold tracking-[-0.04em] ${
+                  className={`subtle-metric-value amount-nowrap mt-3 ${
                     data.periodBalances.net >= 0 ? "text-[var(--color-emerald-600)]" : "amount-negative"
                   }`}
                 >
@@ -301,7 +306,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               <div className="editorial-panel">
                 <p className="metric-label">Saldo inicial do período</p>
                 <p
-                  className={`mt-3 text-lg font-semibold tracking-[-0.04em] ${
+                  className={`subtle-metric-value amount-nowrap mt-3 ${
                     data.periodBalances.opening < 0 ? "amount-negative" : "text-[var(--color-foreground)]"
                   }`}
                 >
@@ -314,7 +319,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               <div className="editorial-panel">
                 <p className="metric-label">Saldo final do período</p>
                 <p
-                  className={`mt-3 text-lg font-semibold tracking-[-0.04em] ${
+                  className={`subtle-metric-value amount-nowrap mt-3 ${
                     data.periodBalances.closing < 0 ? "amount-negative" : "text-[var(--color-foreground)]"
                   }`}
                 >
@@ -343,7 +348,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             <div>
               <p className="metric-label text-white/78">Caixa contabilizado na competência</p>
               <h2
-                className={`mt-4 max-w-full break-words text-[clamp(1.7rem,5vw,3.2rem)] font-semibold tracking-[-0.07em] ${
+                className={`hero-amount amount-nowrap mt-4 ${
                   data.periodBalances.closing < 0 ? "amount-negative" : "text-white"
                 }`}
               >
@@ -357,7 +362,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             <div className="grid gap-3">
               <div className="rounded-[24px] border border-white/12 bg-white/8 px-4 py-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-white/66">Faturas com vencimento no período</p>
-                <p className="mt-2 max-w-full break-words text-[clamp(1.25rem,4vw,2rem)] font-semibold tracking-[-0.05em] text-white">
+                <p className="subtle-metric-value amount-nowrap mt-2 text-white">
                   {formatCurrency(data.monthlyCardPayments)}
                 </p>
                 <p className="mt-2 text-sm leading-6 text-white/70">
@@ -367,7 +372,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               <div className="rounded-[24px] border border-white/12 bg-white/8 px-4 py-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-white/66">Saídas previstas no período</p>
                 <p
-                  className={`mt-2 max-w-full break-words text-[clamp(1.25rem,4vw,2rem)] font-semibold tracking-[-0.05em] ${
+                  className={`subtle-metric-value amount-nowrap mt-2 ${
                     data.periodExpenseForecast > 0 ? "amount-negative" : "text-white"
                   }`}
                 >
@@ -418,7 +423,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             </div>
             <div className="data-card p-4">
               <p className="metric-label">Estruturais</p>
-              <p className="mt-3 break-words text-base font-semibold">
+              <p className="amount-nowrap mt-3 text-base font-semibold">
                 {formatCurrency(data.spendingInsights.essentialExpenses)}
               </p>
               <p className="mt-2 text-sm text-[var(--color-muted-foreground)]">
@@ -434,7 +439,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             </div>
           </div>
 
-          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          <div className="metric-grid-compact mt-5">
             {data.spendingInsights.categoryBreakdown.slice(0, 4).map((item) => (
               <div key={item.name} className="data-card px-4 py-3">
                 <div className="flex items-center justify-between gap-4">
@@ -444,7 +449,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                       {item.items} lançamentos • {Math.round(item.share * 100)}% do total
                     </p>
                   </div>
-                  <p className="max-w-full break-words text-right text-sm font-semibold sm:w-auto">
+                  <p className="amount-nowrap max-w-full text-right text-sm font-semibold sm:w-auto">
                     {formatCurrency(item.total)}
                   </p>
                 </div>
@@ -493,7 +498,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                     ) : null}
                   </div>
                   <p
-                    className={`w-full break-words text-left text-sm font-semibold sm:w-auto sm:text-right ${
+                    className={`amount-nowrap w-full text-left text-sm font-semibold sm:w-auto sm:text-right ${
                       transaction.type === "income"
                         ? "text-[var(--color-emerald-600)]"
                         : transaction.type === "expense"
@@ -528,7 +533,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                     <div className="flex flex-wrap items-start justify-between gap-4">
                       <p className="min-w-0 flex-1 break-words text-sm font-medium">{item.label}</p>
                       <p
-                        className={`w-full break-words text-left text-sm font-semibold sm:w-auto sm:text-right ${
+                        className={`amount-nowrap w-full text-left text-sm font-semibold sm:w-auto sm:text-right ${
                           item.type === "income" ? "text-[var(--color-primary)]" : "amount-negative"
                         }`}
                       >
@@ -590,14 +595,14 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         </div>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[0.82fr_1.18fr]">
+      <section className="grid gap-4 2xl:grid-cols-[0.82fr_1.18fr]">
         <article className="surface content-section">
           <div className="flex items-center gap-3">
             <Landmark className="size-5 text-[var(--color-primary)]" />
             <h2 className="text-xl font-semibold">Resumo das contas</h2>
           </div>
 
-          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          <div className="metric-grid-compact mt-5">
             <div className="data-card px-4 py-4">
               <p className="metric-label">Contas ativas</p>
               <p className="mt-3 text-2xl font-semibold tracking-[-0.05em] text-[var(--color-foreground)]">
@@ -612,7 +617,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             <div className="data-card px-4 py-4">
               <p className="metric-label">Maior saldo</p>
               <p
-                className={`mt-3 max-w-full break-words text-[clamp(1.25rem,4vw,2rem)] font-semibold tracking-[-0.05em] ${
+                className={`amount-nowrap mt-3 max-w-full text-[clamp(1.25rem,4vw,2rem)] font-semibold tracking-[-0.05em] ${
                   (data.activeAccounts[0]?.currentBalance ?? 0) < 0 ? "amount-negative" : "text-[var(--color-foreground)]"
                 }`}
               >
@@ -648,7 +653,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                         <p className="text-[0.72rem] font-semibold uppercase tracking-[0.1em] text-[var(--color-muted-foreground)]">
                           Próximo vencimento
                         </p>
-                        <p className="subtle-metric-value mt-2 text-[var(--color-foreground)]">
+                        <p className="subtle-metric-value amount-nowrap mt-2 text-[var(--color-foreground)]">
                           {formatCurrency(Number(card.payableStatementAmount))}
                         </p>
                         <p className="mt-1 break-words text-xs text-[var(--color-muted-foreground)]">
@@ -682,12 +687,12 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                       </div>
                     </div>
 
-                    <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
+                    <div className="detail-grid">
                       <div className="rounded-[1.1rem] border border-[var(--color-border)]/70 bg-[var(--color-muted)]/25 px-3 py-3">
                         <p className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-[var(--color-muted-foreground)]">
-                          Fatura aberta
+                          Competencia aberta
                         </p>
-                        <p className="mt-2 break-words text-sm font-medium text-[var(--color-foreground)]">
+                        <p className="amount-nowrap mt-2 text-sm font-medium text-[var(--color-foreground)]">
                           {formatCurrency(Number(card.statementAmount))}
                         </p>
                         <p className="mt-1 text-xs text-[var(--color-muted-foreground)]">
@@ -710,7 +715,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                           Limite disponível
                         </p>
                         <p
-                          className={`mt-2 break-words text-sm font-medium ${
+                          className={`amount-nowrap mt-2 text-sm font-medium ${
                             Number(card.availableLimit) < 0 ? "amount-negative" : "text-[var(--color-foreground)]"
                           }`}
                         >
@@ -719,9 +724,9 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                       </div>
                       <div className="rounded-[1.1rem] border border-[var(--color-border)]/70 bg-[var(--color-muted)]/25 px-3 py-3">
                         <p className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-[var(--color-muted-foreground)]">
-                          Em aberto
+                          Saldo total do cartao
                         </p>
-                        <p className="mt-2 break-words text-sm font-medium text-[var(--color-foreground)]">
+                        <p className="amount-nowrap mt-2 text-sm font-medium text-[var(--color-foreground)]">
                           {formatCurrency(Number(card.outstandingAmount))}
                         </p>
                       </div>
@@ -746,7 +751,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               </div>
             </div>
 
-            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <div className="metric-grid-compact mt-5">
               <QuickAccessLink copy="Saldo, bancos e movimentação por conta." href="/dashboard/accounts" label="Contas" month={month} />
               <QuickAccessLink copy="Faturas, limite e uso mensal." href="/dashboard/cards" label="Cartões" month={month} />
               <QuickAccessLink copy="Objetivos e reservas planejadas." href="/dashboard/goals" label="Metas" month={month} />

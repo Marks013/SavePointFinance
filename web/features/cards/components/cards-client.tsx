@@ -27,6 +27,7 @@ type CardItem = {
   limitAmount: number;
   availableLimit: number;
   statementAmount: number;
+  statementOutstandingAmount: number;
   outstandingAmount: number;
   statementMonth: string;
   closeDate: string;
@@ -58,6 +59,7 @@ type StatementPayload = {
   month: string;
   summary: {
     totalAmount: number;
+    statementOutstandingAmount: number;
     outstandingAmount: number;
     availableLimit: number;
     installmentItems: number;
@@ -172,6 +174,7 @@ export function CardsClient() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(true);
   const formSectionRef = useRef<HTMLElement | null>(null);
+  const statementSectionRef = useRef<HTMLElement | null>(null);
   const [selectedStatementCardId, setSelectedStatementCardId] = useState<string>("");
   const [statementMonth, setStatementMonth] = useState(month);
   const [statementPaymentAccountId, setStatementPaymentAccountId] = useState<string>("");
@@ -219,6 +222,7 @@ export function CardsClient() {
     },
     onSuccess: async () => {
       toast.success("Fatura paga com sucesso");
+      setStatementPaymentAccountId("");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["card-statement", selectedStatementCardId, statementMonth] }),
         queryClient.invalidateQueries({ queryKey: ["transactions"] }),
@@ -324,14 +328,55 @@ export function CardsClient() {
 
   const isEditing = editingId !== null;
   const showEditor = isEditorOpen || isEditing || cards.length === 0;
+  const selectedStatementCard = cards.find((card) => card.id === selectedStatementCardId) ?? null;
   const statementIsPaid = Boolean(statementQuery.data?.payment);
+  const statementOutstandingAmount = statementQuery.data?.summary.statementOutstandingAmount ?? 0;
+  const canPayStatement = Boolean(statementQuery.data && !statementIsPaid && statementOutstandingAmount > 0);
   const selectedBrand = form.watch("brand");
   const selectedInstitution = form.watch("institution");
   const selectedColor = form.watch("color");
 
+  const getDefaultStatementMonth = (card: CardItem) =>
+    card.payableStatementAmount > 0 ? card.payableStatementMonth : card.statementMonth;
+
+  const scrollToStatementWorkspace = () => {
+    window.setTimeout(() => {
+      statementSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
+  };
+
+  const resetStatementWorkspace = () => {
+    setSelectedStatementCardId("");
+    setStatementPaymentAccountId("");
+    setStatementMonth(month);
+    setStatementItemsLimit("50");
+  };
+
+  const applyStatementSelection = (card: CardItem, monthOverride?: string, options?: { scroll?: boolean }) => {
+    setSelectedStatementCardId(card.id);
+    setStatementPaymentAccountId("");
+    setStatementMonth(monthOverride ?? getDefaultStatementMonth(card));
+    setStatementItemsLimit("50");
+    if (options?.scroll) {
+      scrollToStatementWorkspace();
+    }
+  };
+
+  const openStatementWorkspace = (card: CardItem, monthOverride?: string) => {
+    applyStatementSelection(card, monthOverride, { scroll: true });
+  };
+
   useEffect(() => {
     setStatementMonth(month);
   }, [month]);
+
+  useEffect(() => {
+    if (!statementQuery.data || statementIsPaid || statementPaymentAccountId || accounts.length !== 1) {
+      return;
+    }
+
+    setStatementPaymentAccountId(accounts[0]!.id);
+  }, [accounts, statementIsPaid, statementPaymentAccountId, statementQuery.data]);
 
   useEffect(() => {
     if (!editingId) {
@@ -347,7 +392,7 @@ export function CardsClient() {
   }, [editingId]);
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
+    <div className="grid gap-6 2xl:grid-cols-[0.85fr_1.15fr]">
       <section className="surface content-section" ref={formSectionRef}>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -547,29 +592,29 @@ export function CardsClient() {
       </section>
 
       <section className="surface content-section">
-        <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="space-y-4">
           <div>
             <h2 className="text-2xl font-semibold tracking-[-0.03em]">Cartões ativos</h2>
             <p className="mt-2 text-sm leading-7 text-[var(--color-muted-foreground)]">
               Acompanhe o limite total, a soma das faturas abertas e a utilização consolidada.
             </p>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="metric-grid-compact">
             <article className="metric-card">
               <p className="metric-label">Limite total</p>
-              <p className="metric-value">{formatCurrency(totalLimit)}</p>
+              <p className="metric-value amount-nowrap">{formatCurrency(totalLimit)}</p>
             </article>
             <article className="metric-card">
               <p className="metric-label">Fatura aberta</p>
-              <p className="metric-value">{formatCurrency(totalStatement)}</p>
+              <p className="metric-value amount-nowrap">{formatCurrency(totalStatement)}</p>
             </article>
-            <article className="metric-card sm:col-span-2">
+            <article className="metric-card">
               <p className="metric-label">Saldo em aberto</p>
-              <p className="metric-value">{formatCurrency(totalOutstanding)}</p>
+              <p className="metric-value amount-nowrap">{formatCurrency(totalOutstanding)}</p>
             </article>
           </div>
         </div>
-        <div className="mt-6 grid gap-3 md:grid-cols-2">
+        <div className="content-grid mt-6">
           {cards.map((card) => (
             <article
               key={card.id}
@@ -600,17 +645,17 @@ export function CardsClient() {
                   <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted-foreground)]">
                     Limite
                   </p>
-                  <p className="mt-1 break-words text-lg font-semibold text-[var(--color-foreground)]">
+                  <p className="amount-nowrap mt-1 text-lg font-semibold text-[var(--color-foreground)]">
                     {formatCurrency(card.limitAmount)}
                   </p>
                 </div>
               </div>
-              <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <div className="metric-grid-compact mt-4">
                 <div className="rounded-[1.15rem] border border-[var(--color-border)]/60 bg-[var(--color-muted)]/18 px-4 py-4">
                   <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted-foreground)]">
-                    Fatura aberta
+                    Competencia aberta
                   </p>
-                  <p className="mt-2 break-words text-lg font-semibold text-[var(--color-foreground)]">
+                  <p className="amount-nowrap mt-2 text-lg font-semibold text-[var(--color-foreground)]">
                     {formatCurrency(card.statementAmount)}
                   </p>
                   <p className="mt-2 text-xs text-[var(--color-muted-foreground)]">
@@ -622,7 +667,7 @@ export function CardsClient() {
                     Disponível
                   </p>
                   <p
-                    className={`mt-2 break-words text-lg font-semibold ${card.availableLimit < 0 ? "amount-negative" : "text-[var(--color-foreground)]"}`}
+                    className={`amount-nowrap mt-2 text-lg font-semibold ${card.availableLimit < 0 ? "amount-negative" : "text-[var(--color-foreground)]"}`}
                   >
                     {formatCurrency(card.availableLimit)}
                   </p>
@@ -632,51 +677,51 @@ export function CardsClient() {
                 </div>
                 <div className="rounded-[1.15rem] border border-[var(--color-border)]/60 bg-[var(--color-muted)]/18 px-4 py-4">
                   <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted-foreground)]">
-                    Em aberto
+                    Saldo total do cartao
                   </p>
-                  <p className="mt-2 break-words text-lg font-semibold text-[var(--color-foreground)]">
+                  <p className="amount-nowrap mt-2 text-lg font-semibold text-[var(--color-foreground)]">
                     {formatCurrency(card.outstandingAmount)}
                   </p>
                   <p className="mt-2 text-xs text-[var(--color-muted-foreground)]">
-                    Valor que ainda consome limite.
+                    Valor consolidado que ainda consome limite.
                   </p>
                 </div>
-                <div className="rounded-[1.15rem] border border-[var(--color-border)]/60 bg-[var(--color-muted)]/18 px-4 py-4 md:col-span-2">
-                  <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted-foreground)]">
-                    Ciclo do cartão
-                  </p>
-                  <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                    <div className="rounded-[1rem] border border-[var(--color-border)]/70 bg-[var(--color-card)] px-3 py-3">
-                      <p className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted-foreground)]">
-                        Fecha
-                      </p>
-                      <p className="mt-1 text-sm font-semibold text-[var(--color-foreground)]">Dia {card.closeDay}</p>
-                    </div>
-                    <div className="rounded-[1rem] border border-[var(--color-border)]/70 bg-[var(--color-card)] px-3 py-3">
-                      <p className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted-foreground)]">
-                        Vence
-                      </p>
-                      <p className="mt-1 text-sm font-semibold text-[var(--color-foreground)]">Dia {card.dueDay}</p>
-                    </div>
-                    <div className="rounded-[1rem] border border-[var(--color-border)]/70 bg-[var(--color-card)] px-3 py-3">
-                      <p className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted-foreground)]">
-                        Proximo pagamento
-                      </p>
-                      {card.payableStatementAmount > 0 ? (
-                        <>
-                          <p className="mt-1 break-words text-sm font-semibold leading-5 text-[var(--color-foreground)]">
-                            {new Date(card.payableDueDate).toLocaleDateString("pt-BR")}
-                          </p>
-                          <p className="mt-1 break-words text-xs text-[var(--color-muted-foreground)]">
-                            {formatCurrency(card.payableStatementAmount)} • {formatMonthKeyLabel(card.payableStatementMonth)}
-                          </p>
-                        </>
-                      ) : (
-                        <p className="mt-1 break-words text-sm font-semibold leading-5 text-[var(--color-muted-foreground)]">
-                          Sem cobrança pendente
+              </div>
+              <div className="mt-3 rounded-[1.15rem] border border-[var(--color-border)]/60 bg-[var(--color-muted)]/18 px-4 py-4">
+                <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted-foreground)]">
+                  Ciclo do cartão
+                </p>
+                <div className="detail-grid mt-3">
+                  <div className="rounded-[1rem] border border-[var(--color-border)]/70 bg-[var(--color-card)] px-3 py-3">
+                    <p className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted-foreground)]">
+                      Fecha
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-[var(--color-foreground)]">Dia {card.closeDay}</p>
+                  </div>
+                  <div className="rounded-[1rem] border border-[var(--color-border)]/70 bg-[var(--color-card)] px-3 py-3">
+                    <p className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted-foreground)]">
+                      Vence
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-[var(--color-foreground)]">Dia {card.dueDay}</p>
+                  </div>
+                  <div className="rounded-[1rem] border border-[var(--color-border)]/70 bg-[var(--color-card)] px-3 py-3">
+                    <p className="text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted-foreground)]">
+                      Proximo pagamento
+                    </p>
+                    {card.payableStatementAmount > 0 ? (
+                      <>
+                        <p className="mt-1 break-words text-sm font-semibold leading-5 text-[var(--color-foreground)]">
+                          {new Date(card.payableDueDate).toLocaleDateString("pt-BR")}
                         </p>
-                      )}
-                    </div>
+                        <p className="mt-1 break-words text-xs text-[var(--color-muted-foreground)]">
+                          {formatCurrency(card.payableStatementAmount)} • {formatMonthKeyLabel(card.payableStatementMonth)}
+                        </p>
+                      </>
+                    ) : (
+                      <p className="mt-1 break-words text-sm font-semibold leading-5 text-[var(--color-muted-foreground)]">
+                        Sem cobrança pendente
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -696,6 +741,9 @@ export function CardsClient() {
                 Utilizacao: {card.limitAmount > 0 ? Math.round((card.outstandingAmount / card.limitAmount) * 100) : 0}%
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
+                <Button onClick={() => openStatementWorkspace(card)} type="button" variant={card.payableStatementAmount > 0 ? "default" : "secondary"}>
+                  {card.payableStatementAmount > 0 ? "Abrir e pagar fatura" : "Abrir fatura"}
+                </Button>
                 <Button onClick={() => startEditing(card)} type="button" variant="secondary">
                   Editar
                 </Button>
@@ -719,8 +767,141 @@ export function CardsClient() {
         </div>
       </section>
 
-      <section className="surface content-section xl:col-span-2">
-        <div className="flex flex-wrap items-end gap-4">
+      <section className="surface content-section 2xl:col-span-2" ref={statementSectionRef}>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="max-w-3xl">
+            <div className="eyebrow">Central de fatura</div>
+            <h2 className="mt-3 text-3xl font-semibold tracking-[-0.03em]">Acompanhe e pague a competencia certa</h2>
+            <p className="mt-4 text-sm leading-7 text-[var(--color-muted-foreground)]">
+              O pagamento da fatura fica concentrado aqui. Selecione o cartao, confira a competencia e registre a
+              baixa sem depender dos filtros da listagem.
+            </p>
+          </div>
+          {selectedStatementCardId ? (
+            <Button onClick={resetStatementWorkspace} type="button" variant="ghost">
+              Limpar selecao
+            </Button>
+          ) : null}
+        </div>
+
+        <article className="surface-strong mt-6 rounded-[30px] p-5 md:p-6">
+          <div className="flex h-full flex-col justify-between gap-5">
+            <div>
+              <p className="metric-label text-white/72">Acao principal</p>
+              {!selectedStatementCardId ? (
+                <>
+                  <h3 className="mt-3 text-2xl font-semibold text-white">Selecione um cartao para abrir a fatura</h3>
+                  <p className="mt-3 max-w-xl text-sm leading-7 text-white/80">
+                    Assim que um cartao for escolhido, a competencia, o saldo pendente e a acao de pagamento aparecem
+                    aqui no topo.
+                  </p>
+                </>
+              ) : statementQuery.isLoading && !statementQuery.data ? (
+                <>
+                  <h3 className="mt-3 text-2xl font-semibold text-white">Carregando a competencia selecionada</h3>
+                  <p className="mt-3 max-w-xl text-sm leading-7 text-white/80">
+                    Buscando os lancamentos, o saldo pendente e os dados de pagamento da fatura.
+                  </p>
+                </>
+              ) : statementQuery.data ? (
+                <>
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div className="min-w-0 flex-1">
+                      <h3 className="break-words text-2xl font-semibold text-white">
+                        {selectedStatementCard?.name ?? statementQuery.data.card.name}
+                      </h3>
+                      <p className="mt-2 break-words text-sm text-white/72">
+                        {formatMonthKeyLabel(statementQuery.data.month)} • vence em{" "}
+                        {new Date(statementQuery.data.summary.dueDate).toLocaleDateString("pt-BR")}
+                      </p>
+                    </div>
+                    <div className="rounded-full border border-white/16 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-white/80">
+                      {statementIsPaid
+                        ? "Fatura baixada"
+                        : canPayStatement
+                          ? "Saldo pendente"
+                          : statementQuery.data.summary.totalAmount > 0
+                            ? "Competencia conciliada"
+                            : "Sem lancamentos"}
+                    </div>
+                  </div>
+
+                  <p className="mt-6 text-xs font-semibold uppercase tracking-[0.14em] text-white/62">
+                    {statementIsPaid ? "Valor baixado" : canPayStatement ? "Valor a pagar agora" : "Resumo da competencia"}
+                  </p>
+                  <p className="hero-amount amount-nowrap mt-3 text-white">
+                    {formatCurrency(
+                      statementIsPaid
+                        ? statementQuery.data.payment!.amount
+                        : canPayStatement
+                          ? statementOutstandingAmount
+                          : statementQuery.data.summary.totalAmount
+                    )}
+                  </p>
+                  <p className="mt-3 max-w-xl text-sm leading-7 text-white/80">
+                    {statementIsPaid
+                      ? `Baixada em ${new Date(statementQuery.data.payment!.paidAt).toLocaleDateString("pt-BR")} pela conta ${statementQuery.data.payment!.account.name}.`
+                      : canPayStatement
+                        ? "Escolha a conta pagadora abaixo para registrar a baixa da competencia pendente."
+                        : statementQuery.data.summary.totalAmount > 0
+                          ? "Essa competencia nao tem saldo pendente neste momento, mas continua disponivel para conferencia."
+                          : "Ainda nao existem compras vinculadas a esta competencia."}
+                  </p>
+                </>
+              ) : null}
+            </div>
+
+            <div className="rounded-[24px] border border-white/12 bg-white/8 p-4">
+              {!selectedStatementCardId ? (
+                <p className="text-sm leading-7 text-white/76">Escolha um cartao abaixo para destravar a central de fatura.</p>
+              ) : statementQuery.isLoading && !statementQuery.data ? (
+                <p className="text-sm leading-7 text-white/76">Preparando o painel de pagamento da fatura...</p>
+              ) : statementQuery.data && canPayStatement ? (
+                <div className="grid gap-3 lg:grid-cols-[1fr_auto]">
+                  <div className="space-y-2">
+                    <Label className="text-white/78" htmlFor="statement-payment-account">
+                      Conta pagadora
+                    </Label>
+                    <Select
+                      id="statement-payment-account"
+                      value={statementPaymentAccountId}
+                      onChange={(event) => setStatementPaymentAccountId(event.target.value)}
+                    >
+                      <option value="">Selecione a conta pagadora</option>
+                      {accounts.map((account) => (
+                        <option key={account.id} value={account.id}>
+                          {account.name}
+                        </option>
+                      ))}
+                    </Select>
+                    {accounts.length === 0 ? (
+                      <p className="text-sm text-white/72">Cadastre uma conta para registrar o pagamento da fatura.</p>
+                    ) : null}
+                  </div>
+                  <div className="flex items-end">
+                    <Button
+                      disabled={payStatementMutation.isPending || !statementPaymentAccountId}
+                      onClick={() => payStatementMutation.mutate()}
+                      type="button"
+                    >
+                      {payStatementMutation.isPending ? "Pagando..." : "Pagar fatura"}
+                    </Button>
+                  </div>
+                </div>
+              ) : statementQuery.data && statementIsPaid ? (
+                <p className="text-sm leading-7 text-white/76">
+                  O pagamento desta competencia ja foi registrado e nao precisa de nova acao.
+                </p>
+              ) : statementQuery.data ? (
+                <p className="text-sm leading-7 text-white/76">
+                  Nenhum saldo pendente foi encontrado para esta competencia.
+                </p>
+              ) : null}
+            </div>
+          </div>
+        </article>
+
+        <div className="mt-6 flex flex-wrap items-start gap-4">
           <div className="min-w-0 flex-1 space-y-2">
             <Label htmlFor="statement-card">Cartão</Label>
             <Select
@@ -728,10 +909,14 @@ export function CardsClient() {
               value={selectedStatementCardId}
               onChange={(event) => {
                 const nextCardId = event.target.value;
-                setSelectedStatementCardId(nextCardId);
+                if (!nextCardId) {
+                  resetStatementWorkspace();
+                  return;
+                }
+
                 const nextCard = cards.find((item) => item.id === nextCardId);
                 if (nextCard) {
-                  setStatementMonth(nextCard.statementMonth);
+                  applyStatementSelection(nextCard);
                 }
               }}
             >
@@ -764,7 +949,7 @@ export function CardsClient() {
             year: "numeric"
           })}.`}</p>
         </div>
-        <div className="mt-4">
+        <div className="mt-4 hidden">
           <Button
             onClick={() => {
               setSelectedStatementCardId("");
@@ -779,13 +964,13 @@ export function CardsClient() {
           </Button>
         </div>
 
-        {!selectedStatementCardId ? (
+        {false ? (
           <div className="muted-panel mt-6 border border-dashed px-4 py-6 text-sm text-[var(--color-muted-foreground)]">
             Selecione um cartão para acompanhar a competência, conferir a fatura e registrar o pagamento.
           </div>
         ) : null}
 
-        {selectedStatementCardId && statementQuery.isLoading ? (
+        {selectedStatementCardId && statementQuery.isLoading && !statementQuery.data ? (
           <div className="mt-6 grid gap-3">
             {Array.from({ length: 3 }).map((_, index) => (
               <div
@@ -823,26 +1008,30 @@ export function CardsClient() {
                 </Select>
               </div>
             </div>
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               <article className="metric-card">
-                <p className="text-sm text-[var(--color-muted-foreground)]">Total da fatura</p>
-                <p className="mt-2 text-2xl font-semibold">{formatCurrency(statementQuery.data.summary.totalAmount)}</p>
+                <p className="metric-label">Total da competencia</p>
+                <p className="metric-value amount-nowrap">{formatCurrency(statementQuery.data.summary.totalAmount)}</p>
               </article>
               <article className="metric-card">
-                <p className="text-sm text-[var(--color-muted-foreground)]">Saldo em aberto</p>
-                <p className="mt-2 text-2xl font-semibold">{formatCurrency(statementQuery.data.summary.outstandingAmount)}</p>
+                <p className="metric-label">Saldo pendente</p>
+                <p className="metric-value amount-nowrap">{formatCurrency(statementOutstandingAmount)}</p>
+              </article>
+              <article className="metric-card">
+                <p className="metric-label">Saldo total do cartao</p>
+                <p className="metric-value amount-nowrap">{formatCurrency(statementQuery.data.summary.outstandingAmount)}</p>
               </article>
               <article className="metric-card">
                 <p className="text-sm text-[var(--color-muted-foreground)]">Limite disponível</p>
-                <p className={`mt-2 text-2xl font-semibold ${statementQuery.data.summary.availableLimit < 0 ? "amount-negative" : ""}`}>{formatCurrency(statementQuery.data.summary.availableLimit)}</p>
+                <p className={`metric-value amount-nowrap ${statementQuery.data.summary.availableLimit < 0 ? "amount-negative" : ""}`}>{formatCurrency(statementQuery.data.summary.availableLimit)}</p>
               </article>
               <article className="metric-card">
                 <p className="text-sm text-[var(--color-muted-foreground)]">Lançamentos</p>
-                <p className="mt-2 text-2xl font-semibold">{statementQuery.data.summary.transactions}</p>
+                <p className="metric-value">{statementQuery.data.summary.transactions}</p>
               </article>
               <article className="metric-card">
                 <p className="text-sm text-[var(--color-muted-foreground)]">Parceladas</p>
-                <p className="mt-2 text-2xl font-semibold">{statementQuery.data.summary.installmentItems}</p>
+                <p className="metric-value">{statementQuery.data.summary.installmentItems}</p>
               </article>
             </div>
 
@@ -857,7 +1046,7 @@ export function CardsClient() {
               </p>
             </div>
 
-            <div className="data-card p-4">
+            {/* Legacy payment panel migrated to the primary action panel above
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div className="min-w-0 flex-1">
                   <p className="text-sm text-[var(--color-muted-foreground)]">Pagamento da fatura</p>
@@ -903,7 +1092,7 @@ export function CardsClient() {
                   </div>
                 ) : null}
               </div>
-            </div>
+            */}
 
             <div className="space-y-3">
               {statementQuery.data.itemsMeta.hasMore ? (
@@ -921,7 +1110,7 @@ export function CardsClient() {
                         {item.installmentLabel ? ` • ${item.installmentLabel}` : ""}
                       </p>
                     </div>
-                    <p className="w-full break-words text-left font-semibold sm:w-auto sm:text-right">
+                    <p className="amount-nowrap w-full text-left font-semibold sm:w-auto sm:text-right">
                       {formatCurrency(item.amount)}
                     </p>
                   </div>

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { requireSessionUser } from "@/lib/auth/session";
+import { invalidateTenantClassificationCache } from "@/lib/finance/classification-cache";
 import { ensureTenantDefaultCategories } from "@/lib/finance/default-categories";
 import { prisma } from "@/lib/prisma/client";
 
@@ -14,6 +15,7 @@ export async function POST() {
     });
 
     await ensureTenantDefaultCategories(user.tenantId);
+    invalidateTenantClassificationCache(user.tenantId);
 
     const after = await prisma.category.count({
       where: {

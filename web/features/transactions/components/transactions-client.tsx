@@ -279,9 +279,17 @@ export function TransactionsClient() {
       automaticSuggestions: transactions
         .filter((item) => item.classification?.auto && item.type !== "transfer")
         .sort((a, b) => (a.classification?.confidence ?? 0) - (b.classification?.confidence ?? 0))
-        .slice(0, 6)
+      .slice(0, 6)
     };
   }, [transactions]);
+  const automaticSuggestionIds = useMemo(
+    () => new Set(automaticSuggestions.map((item) => item.id)),
+    [automaticSuggestions]
+  );
+  const visibleTransactions = useMemo(
+    () => transactions.filter((item) => !automaticSuggestionIds.has(item.id)),
+    [automaticSuggestionIds, transactions]
+  );
 
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionFormSchema),
@@ -512,7 +520,7 @@ export function TransactionsClient() {
   }, [editingId]);
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+    <div className="grid gap-6 2xl:grid-cols-[0.9fr_1.1fr]">
       <section className="surface content-section" ref={formSectionRef}>
         <div className="page-intro">
           <div className="flex flex-wrap items-start justify-between gap-4">
@@ -794,18 +802,18 @@ export function TransactionsClient() {
           </Button>
         </div>
 
-        <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="mt-6 grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
           <article className="metric-card">
             <p className="metric-label">Receitas filtradas</p>
-            <p className="metric-value">{formatCurrency(incomeTotal)}</p>
+            <p className="metric-value amount-nowrap">{formatCurrency(incomeTotal)}</p>
           </article>
           <article className="metric-card">
             <p className="metric-label">Despesas filtradas</p>
-            <p className="metric-value amount-negative">{formatCurrency(expenseTotal)}</p>
+            <p className="metric-value amount-nowrap amount-negative">{formatCurrency(expenseTotal)}</p>
           </article>
           <article className="metric-card">
             <p className="metric-label">Transferências filtradas</p>
-            <p className="metric-value">{formatCurrency(transferTotal)}</p>
+            <p className="metric-value amount-nowrap">{formatCurrency(transferTotal)}</p>
           </article>
         </div>
 
@@ -862,6 +870,7 @@ export function TransactionsClient() {
                         </Select>
                         <div className="flex flex-wrap gap-2">
                           <Button
+                            className="hidden"
                             disabled={!transaction.category?.id || reviewMutation.isPending}
                             onClick={() =>
                               reviewMutation.mutate({
@@ -1064,12 +1073,12 @@ export function TransactionsClient() {
           {!transactionsQuery.isLoading && transactionsQuery.isFetching ? (
             <p className="text-sm text-[var(--color-muted-foreground)]">Atualizando resultados com os filtros atuais...</p>
           ) : null}
-          {!transactionsQuery.isLoading && transactions.length > 0 ? (
+          {!transactionsQuery.isLoading && visibleTransactions.length > 0 ? (
             <p className="text-sm text-[var(--color-muted-foreground)]">
-              Mostrando {transactions.length} movimentações nesta amostra. Ajuste o limite para ampliar a leitura do mês.
+              Mostrando {visibleTransactions.length} movimentações nesta amostra. Ajuste o limite para ampliar a leitura do mês.
             </p>
           ) : null}
-          {transactions.map((transaction) => (
+          {visibleTransactions.map((transaction) => (
             <article
               key={transaction.id}
               className="data-card p-4"
@@ -1126,7 +1135,7 @@ export function TransactionsClient() {
                 <div className="w-full sm:w-auto sm:text-right">
                   <p
                     className={cn(
-                      "break-words text-lg font-semibold",
+                      "amount-nowrap text-lg font-semibold",
                       transaction.type === "income"
                         ? "text-[var(--color-primary)]"
                         : transaction.type === "expense"
@@ -1159,7 +1168,7 @@ export function TransactionsClient() {
             </article>
           ))}
 
-          {!transactionsQuery.isLoading && transactions.length === 0 ? (
+          {!transactionsQuery.isLoading && visibleTransactions.length === 0 ? (
             <div className="muted-panel border border-dashed px-4 py-6 text-sm text-[var(--color-muted-foreground)]">
               Nenhuma transação foi encontrada para os filtros selecionados.
             </div>

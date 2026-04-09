@@ -337,7 +337,7 @@ export function SubscriptionsClient() {
   };
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
+    <div className="grid gap-6 2xl:grid-cols-[0.85fr_1.15fr]">
       <section className="surface content-section" ref={formSectionRef}>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -474,21 +474,21 @@ export function SubscriptionsClient() {
       </section>
 
       <section className="surface content-section">
-        <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="space-y-4">
           <div>
             <h2 className="text-2xl font-semibold tracking-[-0.03em]">Assinaturas ativas</h2>
             <p className="mt-2 text-sm leading-7 text-[var(--color-muted-foreground)]">
               Controle o custo fixo mensal e o próximo lançamento previsto de cada recorrência no mês selecionado.
             </p>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="metric-grid-compact">
             <article className="metric-card">
               <p className="metric-label">Saídas mensais</p>
-              <p className="metric-value amount-negative">{formatCurrency(monthlyExpenses)}</p>
+              <p className="metric-value amount-nowrap amount-negative">{formatCurrency(monthlyExpenses)}</p>
             </article>
             <article className="metric-card">
               <p className="metric-label">Entradas mensais</p>
-              <p className="metric-value">{formatCurrency(monthlyIncome)}</p>
+              <p className="metric-value amount-nowrap">{formatCurrency(monthlyIncome)}</p>
             </article>
           </div>
         </div>
@@ -540,7 +540,7 @@ export function SubscriptionsClient() {
                       </p>
                     ) : null}
                   </div>
-                  <p className={item.type === "expense" ? "w-full break-words text-left font-semibold amount-negative sm:w-auto sm:text-right" : "w-full break-words text-left font-semibold sm:w-auto sm:text-right"}>
+                  <p className={item.type === "expense" ? "amount-nowrap w-full text-left font-semibold amount-negative sm:w-auto sm:text-right" : "amount-nowrap w-full text-left font-semibold sm:w-auto sm:text-right"}>
                     {formatCurrency(item.amount)}
                   </p>
                 </div>

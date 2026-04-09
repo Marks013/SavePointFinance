@@ -291,21 +291,21 @@ export function GoalsClient() {
       </section>
 
       <section className="surface content-section">
-        <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="space-y-4">
           <div>
             <h2 className="text-2xl font-semibold tracking-[-0.03em]">Metas ativas</h2>
             <p className="mt-2 text-sm leading-7 text-[var(--color-muted-foreground)]">
               Visualize o avanço acumulado, o volume já reservado e o que ainda falta atingir.
             </p>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="metric-grid-compact">
             <article className="metric-card">
               <p className="metric-label">Reservado</p>
-              <p className="metric-value">{formatCurrency(reservedAmount)}</p>
+              <p className="metric-value amount-nowrap">{formatCurrency(reservedAmount)}</p>
             </article>
             <article className="metric-card">
               <p className="metric-label">Objetivo total</p>
-              <p className="metric-value">{formatCurrency(targetAmount)}</p>
+              <p className="metric-value amount-nowrap">{formatCurrency(targetAmount)}</p>
             </article>
             <article className="metric-card">
               <p className="metric-label">Concluídas</p>

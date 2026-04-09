@@ -4,7 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
-    "build": "next build",
+    "env:init": "node scripts/init-local-env.mjs",
+    "prebuild": "prisma generate",
+    "build": "node scripts/build-with-env.mjs",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.typecheck.json --noEmit",
@@ -13,7 +15,8 @@
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
     "data:import-legacy": "tsx scripts/import-legacy.ts",
-    "audit:invitations": "tsx scripts/invitation-isolation-audit.ts"
+    "audit:invitations": "tsx scripts/invitation-isolation-audit.ts",
+    "audit:cards-smoke": "tsx scripts/card-statement-smoke-audit.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "2.11.1",

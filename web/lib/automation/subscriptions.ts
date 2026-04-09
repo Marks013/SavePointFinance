@@ -221,6 +221,10 @@ export async function generateSubscriptionTransaction(subscriptionId: string, te
       cardId: subscription.cardId,
       source: TransactionSource.manual,
       notes: "Gerado via assinatura recorrente",
+      classificationSource: classification.classificationSource,
+      classificationKeyword: classification.classificationKeyword,
+      classificationReason: classification.reason,
+      classificationVersion: 2,
       aiClassified: classification.aiClassified,
       aiConfidence:
         classification.confidence !== null

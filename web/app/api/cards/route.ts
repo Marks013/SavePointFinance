@@ -2,15 +2,25 @@ import { NextResponse } from "next/server";
 
 import { cardFormSchema } from "@/features/cards/schemas/card-schema";
 import { requireSessionUser } from "@/lib/auth/session";
-import { getCardStatementSnapshot, getCurrentPayableStatementMonth } from "@/lib/cards/statement";
+import { getCardStatementSnapshot, getNextPayableStatementSnapshot, statementMonthSchema } from "@/lib/cards/statement";
 import { canCreateCard } from "@/lib/licensing/server";
+import { getCurrentMonthKey, getMonthRange } from "@/lib/month";
 import { prisma } from "@/lib/prisma/client";
+
+function getStatementReferenceDate(month?: string) {
+  if (!month || month === getCurrentMonthKey()) {
+    return new Date();
+  }
+
+  return getMonthRange(month).end;
+}
 
 export async function GET(request: Request) {
   try {
     const user = await requireSessionUser();
     const { searchParams } = new URL(request.url);
-    const month = searchParams.get("month") ?? undefined;
+    const month = statementMonthSchema.optional().parse(searchParams.get("month") ?? undefined);
+    const referenceDate = getStatementReferenceDate(month);
     const cards = await prisma.card.findMany({
       where: {
         tenantId: user.tenantId
@@ -27,11 +37,10 @@ export async function GET(request: Request) {
           month,
           client: prisma
         });
-        const payableStatementMonth = getCurrentPayableStatementMonth(card);
-        const payableStatement = await getCardStatementSnapshot({
+        const payableStatement = await getNextPayableStatementSnapshot({
           tenantId: user.tenantId,
           card,
-          month: payableStatementMonth,
+          referenceDate,
           client: prisma
         });
 
@@ -43,11 +52,12 @@ export async function GET(request: Request) {
           limitAmount: Number(card.limitAmount),
           availableLimit: statement.availableLimit,
           statementAmount: statement.totalAmount,
+          statementOutstandingAmount: statement.statementOutstandingAmount,
           outstandingAmount: statement.outstandingAmount,
           statementMonth: statement.month,
           closeDate: statement.closeDate.toISOString(),
           dueDate: statement.dueDate.toISOString(),
-          payableStatementAmount: payableStatement.totalAmount,
+          payableStatementAmount: payableStatement.statementOutstandingAmount,
           payableStatementMonth: payableStatement.month,
           payableDueDate: payableStatement.dueDate.toISOString(),
           dueDay: card.dueDay,

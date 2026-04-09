@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireSessionUser } from "@/lib/auth/session";
-import { getStatementPaymentDate, getStatementRange, statementMonthSchema } from "@/lib/cards/statement";
+import { getCardStatementSnapshot, getStatementPaymentDate, statementMonthSchema } from "@/lib/cards/statement";
 import { prisma } from "@/lib/prisma/client";
 
 type Params = {
@@ -59,38 +59,19 @@ export async function POST(request: Request, context: Params) {
       return NextResponse.json({ message: "Statement already paid" }, { status: 409 });
     }
 
-    const { start, end } = getStatementRange(body.month, card.closeDay, card.dueDay);
-    const statementTransactions = await prisma.transaction.findMany({
-      where: {
-        tenantId: user.tenantId,
-        cardId: id,
-        date: {
-          gte: start,
-          lte: end
-        }
-      }
+    const statement = await getCardStatementSnapshot({
+      tenantId: user.tenantId,
+      card,
+      month: body.month,
+      client: prisma
     });
 
-    const totalAmount = statementTransactions.reduce((sum, item) => {
-      const amount = Number(item.amount);
-
-      if (item.type === TransactionType.expense) {
-        return sum + amount;
-      }
-
-      if (item.type === TransactionType.income) {
-        return sum - amount;
-      }
-
-      return sum;
-    }, 0);
-
-    if (totalAmount <= 0) {
+    if (statement.statementOutstandingAmount <= 0) {
       return NextResponse.json({ message: "Statement has no balance to pay" }, { status: 400 });
     }
 
     const paidAt = getStatementPaymentDate(body.month, card.dueDay, card.closeDay);
-    const amount = new Prisma.Decimal(totalAmount.toFixed(2));
+    const amount = new Prisma.Decimal(statement.statementOutstandingAmount.toFixed(2));
 
     const payment = await prisma.$transaction(async (tx) => {
       const paymentTransaction = await tx.transaction.create({

@@ -1,0 +1,11 @@
+{
+  "name": "savepoint-tooling",
+  "private": true,
+  "scripts": {
+    "bootstrap:web": "node scripts/bootstrap.mjs web-local",
+    "bootstrap:docker": "node scripts/bootstrap.mjs docker-local",
+    "bootstrap:docker:up": "node scripts/bootstrap.mjs docker-local --up",
+    "bootstrap:server": "node scripts/bootstrap.mjs server",
+    "bootstrap:server:up": "node scripts/bootstrap.mjs server --up"
+  }
+}

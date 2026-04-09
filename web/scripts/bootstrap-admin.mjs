@@ -60,6 +60,55 @@ const DEFAULT_PLANS = [
   }
 ];
 
+const DEFAULT_CATEGORY_SYSTEM_KEYS = {
+  "income:salario": "salario",
+  "income:freelance e servicos": "freelance-servicos",
+  "income:rendimentos": "rendimentos",
+  "income:reembolso": "reembolso",
+  "income:vendas": "vendas",
+  "income:transferencias recebidas": "transferencias-recebidas",
+  "income:outras receitas": "outras-receitas",
+  "expense:supermercado": "supermercado",
+  "expense:feira e hortifruti": "feira-hortifruti",
+  "expense:restaurantes": "restaurantes",
+  "expense:delivery": "delivery",
+  "expense:cafe e padaria": "cafe-padaria",
+  "expense:combustivel": "combustivel",
+  "expense:transporte": "transporte",
+  "expense:apps de mobilidade": "apps-mobilidade",
+  "expense:moradia": "moradia",
+  "expense:condominio": "condominio",
+  "expense:energia eletrica": "energia-eletrica",
+  "expense:agua e saneamento": "agua-saneamento",
+  "expense:internet e telefonia": "internet-telefonia",
+  "expense:saude": "saude",
+  "expense:farmacia": "farmacia",
+  "expense:educacao": "educacao",
+  "expense:streaming e assinaturas": "streaming-assinaturas",
+  "expense:lazer": "lazer",
+  "expense:pets": "pets",
+  "expense:impostos e taxas": "impostos-taxas",
+  "expense:tarifas bancarias": "tarifas-bancarias",
+  "expense:dizimo": "dizimo",
+  "expense:compras online": "compras-online",
+  "expense:vestuario": "vestuario",
+  "expense:viagem": "viagem",
+  "expense:outras despesas": "outras-despesas"
+};
+
+function normalizeCategoryName(value) {
+  return String(value)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getDefaultCategorySystemKey(type, name) {
+  return DEFAULT_CATEGORY_SYSTEM_KEYS[`${String(type)}:${normalizeCategoryName(name)}`] ?? null;
+}
+
 if (!DATABASE_URL) {
   throw new Error("DATABASE_URL is required.");
 }
@@ -266,15 +315,28 @@ async function ensureAdmin(client) {
   }
 
   const existingCategories = await client.query(
-    'SELECT "name", "type" FROM "Category" WHERE "tenantId" = $1',
+    'SELECT "id", "name", "type", "systemKey" FROM "Category" WHERE "tenantId" = $1',
     [tenantId]
   );
   const existingKeys = new Set(
-    existingCategories.rows.map((row) => `${row.type}:${String(row.name).toLowerCase()}`)
+    existingCategories.rows.map((row) => `${row.type}:${normalizeCategoryName(row.name)}`)
   );
 
+  for (const category of existingCategories.rows) {
+    if (category.systemKey) {
+      continue;
+    }
+
+    const systemKey = getDefaultCategorySystemKey(category.type, category.name);
+    if (!systemKey) {
+      continue;
+    }
+
+    await client.query('UPDATE "Category" SET "systemKey" = $1 WHERE "id" = $2', [systemKey, category.id]);
+  }
+
   for (const category of defaultCategories) {
-    const key = `${category.type}:${String(category.name).toLowerCase()}`;
+    const key = `${category.type}:${normalizeCategoryName(category.name)}`;
     if (existingKeys.has(key)) {
       continue;
     }
@@ -282,13 +344,14 @@ async function ensureAdmin(client) {
     await client.query(
       `
         INSERT INTO "Category" (
-          "id", "tenantId", "name", "icon", "color", "type", "keywords", "isDefault", "createdAt"
+          "id", "tenantId", "systemKey", "name", "icon", "color", "type", "keywords", "isDefault", "createdAt"
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7::text[], $8, NOW())
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8::text[], $9, NOW())
       `,
       [
         randomUUID(),
         tenantId,
+        category.systemKey ?? getDefaultCategorySystemKey(category.type, category.name),
         category.name,
         category.icon,
         category.color,
