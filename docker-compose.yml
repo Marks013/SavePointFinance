@@ -3,12 +3,18 @@ services:
     build:
       context: ./web
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
+        SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-production}
     container_name: savepoint_web
     restart: unless-stopped
     environment:
       NODE_ENV: production
       DATABASE_URL: postgresql://${POSTGRES_USER:-savepoint}:${POSTGRES_PASSWORD:-change-me}@postgres:5432/${POSTGRES_DB:-savepoint}
       NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://savepoint.example.com}
+      NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-production}
       AUTH_URL: ${AUTH_URL:-https://savepoint.example.com}
       AUTH_SECRET: ${AUTH_SECRET:-change-me}
       AUTH_TRUST_HOST: ${AUTH_TRUST_HOST:-true}

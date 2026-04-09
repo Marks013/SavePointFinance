@@ -1,3 +1,4 @@
+import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
 
 const isProduction = process.env.NODE_ENV === "production";
@@ -72,4 +73,16 @@ const nextConfig: NextConfig = {
   }
 };
 
-export default nextConfig;
+export default withSentryConfig(nextConfig, {
+  silent: true,
+  sourcemaps: {
+    disable: true
+  },
+  tunnelRoute: "/monitoring",
+  webpack: {
+    treeshake: {
+      removeDebugLogging: true,
+      removeTracing: true
+    }
+  }
+});

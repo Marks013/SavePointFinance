@@ -14,6 +14,10 @@ ENV DATABASE_URL=postgresql://savepoint:changeme@postgres:5432/savepoint
 ENV AUTH_SECRET=build-only-secret
 ENV AUTOMATION_CRON_SECRET=build-only-secret
 ENV AUTH_TRUST_HOST=true
+ARG NEXT_PUBLIC_SENTRY_DSN
+ARG SENTRY_ENVIRONMENT=production
+ENV NEXT_PUBLIC_SENTRY_DSN=$NEXT_PUBLIC_SENTRY_DSN
+ENV SENTRY_ENVIRONMENT=$SENTRY_ENVIRONMENT
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
