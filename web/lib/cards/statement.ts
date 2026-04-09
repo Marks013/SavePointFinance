@@ -48,6 +48,10 @@ function getCompetenceMonthDate(month: string) {
   return new Date(year, parsedMonth - 1, 1, 12, 0, 0, 0);
 }
 
+function getStatementMonthOffsetForDue(closeDay: number, dueDay: number) {
+  return dueDay > closeDay ? 0 : 1;
+}
+
 function getNextClosingDate(referenceDate: Date, closeDay: number) {
   const year = referenceDate.getFullYear();
   const month = referenceDate.getMonth() + 1;
@@ -74,8 +78,11 @@ function getNextClosingDate(referenceDate: Date, closeDay: number) {
   };
 }
 
-function getStatementMonthFromClosingDate(closing: { year: number; month: number }) {
-  return formatStatementMonth(closing.year, closing.month);
+function getStatementMonthFromClosingDate(closing: { year: number; month: number }, closeDay: number) {
+  const anchorDate = new Date(closing.year, closing.month - 1, 1, 12, 0, 0, 0);
+  anchorDate.setMonth(anchorDate.getMonth() + (closeDay > 15 ? 0 : -1));
+
+  return formatStatementMonth(anchorDate.getFullYear(), anchorDate.getMonth() + 1);
 }
 
 function getClosingMonthDate(statementMonth: string, closeDay: number, _dueDay: number) {
@@ -83,7 +90,7 @@ function getClosingMonthDate(statementMonth: string, closeDay: number, _dueDay: 
   const competenceMonthDate = getCompetenceMonthDate(statementMonth);
   const closingMonthDate = new Date(
     competenceMonthDate.getFullYear(),
-    competenceMonthDate.getMonth(),
+    competenceMonthDate.getMonth() + (closeDay > 15 ? 0 : 1),
     1,
     12,
     0,
@@ -104,7 +111,7 @@ function getClosingMonthDate(statementMonth: string, closeDay: number, _dueDay: 
 function getExpenseCompetenceMonth(card: Pick<CardStatementCard, "closeDay" | "dueDay">, referenceDate: Date) {
   const nextClosing = getNextClosingDate(referenceDate, card.closeDay);
   void card.dueDay;
-  return getStatementMonthFromClosingDate(nextClosing);
+  return getStatementMonthFromClosingDate(nextClosing, card.closeDay);
 }
 
 export function getCurrentStatementMonth(card: Pick<CardStatementCard, "closeDay" | "dueDay">, referenceDate = new Date()) {
@@ -146,10 +153,10 @@ export function getStatementRange(month: string, closeDay: number, _dueDay: numb
 }
 
 export function getStatementPaymentDate(month: string, dueDay: number, closeDay: number) {
-  const competenceMonthDate = getCompetenceMonthDate(month);
+  const closing = getClosingMonthDate(month, closeDay, dueDay);
   const dueMonthDate = new Date(
-    competenceMonthDate.getFullYear(),
-    competenceMonthDate.getMonth() + (dueDay > closeDay ? 0 : 1),
+    closing.year,
+    closing.month - 1 + getStatementMonthOffsetForDue(closeDay, dueDay),
     1,
     12,
     0,
