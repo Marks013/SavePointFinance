@@ -22,9 +22,5 @@ EOF
 
 echo "Backup scheduler enabled with cron '${BACKUP_CRON_SCHEDULE}'"
 
-if busybox --list 2>/dev/null | grep -qx "crond"; then
-  echo "Using busybox crond"
-  exec busybox crond -f -l 2 -c /etc/crontabs
-fi
-
-exec crond -f -l 2
+echo "Using busybox crond"
+exec busybox crond -f -l 2 -c /etc/crontabs

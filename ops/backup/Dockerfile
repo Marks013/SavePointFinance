@@ -5,7 +5,6 @@ RUN apk add --no-cache \
   ca-certificates \
   coreutils \
   curl \
-  dcron \
   git \
   jq \
   openssl \
