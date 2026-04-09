@@ -25,6 +25,9 @@ import { formatCurrency } from "@/lib/utils";
 
 type RefItem = { id: string; name: string };
 type SubscriptionItem = {
+  activeMonthDate: string | null;
+  activeMonthGenerated: boolean | null;
+  activeMonthTransactionDate: string | null;
   id: string;
   name: string;
   amount: number;
@@ -53,16 +56,20 @@ function buildEmptySubscriptionValues(): SubscriptionFormValues {
   };
 }
 
-function getOccurrenceDateForMonth(nextBillingDate: string, billingDay: number, monthKey: string) {
-  const referenceDate = new Date(nextBillingDate);
+function getOccurrenceDateForMonth(item: SubscriptionItem, monthKey: string) {
+  if (item.activeMonthDate) {
+    return new Date(item.activeMonthDate);
+  }
+
+  const referenceDate = new Date(item.nextBillingDate);
   const [year, month] = monthKey.split("-").map(Number);
   const monthOffset = (year - referenceDate.getFullYear()) * 12 + ((month - 1) - referenceDate.getMonth());
 
-  return advanceSubscriptionBillingDate(referenceDate, billingDay, monthOffset);
+  return advanceSubscriptionBillingDate(referenceDate, item.billingDay, monthOffset);
 }
 
-async function getSubscriptions() {
-  const response = await fetch("/api/subscriptions", { cache: "no-store" });
+async function getSubscriptions(month: string) {
+  const response = await fetch(`/api/subscriptions?month=${month}`, { cache: "no-store" });
   if (!response.ok) throw new Error("Falha ao carregar assinaturas");
   return (await response.json()) as { items: SubscriptionItem[] };
 }
@@ -130,10 +137,11 @@ export function SubscriptionsClient() {
   const searchParams = useSearchParams();
   const month = normalizeMonthKey(searchParams.get("month"));
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [isEditorOpen, setIsEditorOpen] = useState(true);
   const formSectionRef = useRef<HTMLElement | null>(null);
   const subscriptionsQuery = useQuery({
-    queryKey: ["subscriptions"],
-    queryFn: getSubscriptions
+    queryKey: ["subscriptions", month],
+    queryFn: () => getSubscriptions(month)
   });
   const categoriesQuery = useQuery({ queryKey: ["categories"], queryFn: getCategories });
   const accountsQuery = useQuery({ queryKey: ["accounts"], queryFn: getAccounts });
@@ -163,11 +171,20 @@ export function SubscriptionsClient() {
       return response.json();
     },
     onSuccess: async () => {
+      const wasEditing = Boolean(editingId);
       toast.success(editingId ? "Assinatura atualizada" : "Assinatura criada");
       setEditingId(null);
+      if (wasEditing) {
+        setIsEditorOpen(false);
+      }
       form.reset(buildEmptySubscriptionValues());
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["subscriptions"] })
+        queryClient.invalidateQueries({ queryKey: ["subscriptions"] }),
+        queryClient.invalidateQueries({ queryKey: ["transactions"] }),
+        queryClient.invalidateQueries({ queryKey: ["reports-summary"] }),
+        queryClient.invalidateQueries({ queryKey: ["accounts"] }),
+        queryClient.invalidateQueries({ queryKey: ["cards"] }),
+        queryClient.invalidateQueries({ queryKey: ["dashboard"] })
       ]);
     }
   });
@@ -201,15 +218,22 @@ export function SubscriptionsClient() {
       toast.success("Assinatura excluída");
       if (editingId) {
         setEditingId(null);
+        setIsEditorOpen(false);
         form.reset(buildEmptySubscriptionValues());
       }
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["subscriptions"] })
+        queryClient.invalidateQueries({ queryKey: ["subscriptions"] }),
+        queryClient.invalidateQueries({ queryKey: ["transactions"] }),
+        queryClient.invalidateQueries({ queryKey: ["reports-summary"] }),
+        queryClient.invalidateQueries({ queryKey: ["accounts"] }),
+        queryClient.invalidateQueries({ queryKey: ["cards"] }),
+        queryClient.invalidateQueries({ queryKey: ["dashboard"] })
       ]);
     }
   });
 
   const startEditing = (item: SubscriptionItem) => {
+    setIsEditorOpen(true);
     setEditingId(item.id);
     form.reset({
       name: item.name,
@@ -227,6 +251,13 @@ export function SubscriptionsClient() {
 
   const cancelEditing = () => {
     setEditingId(null);
+    setIsEditorOpen(false);
+    form.reset(buildEmptySubscriptionValues());
+  };
+
+  const openCreateForm = () => {
+    setEditingId(null);
+    setIsEditorOpen(true);
     form.reset(buildEmptySubscriptionValues());
   };
 
@@ -235,6 +266,7 @@ export function SubscriptionsClient() {
   const selectedCardId = form.watch("cardId");
   const filteredCategories = (categoriesQuery.data?.items ?? []).filter((item) => item.type === selectedType);
   const isEditing = editingId !== null;
+  const showEditor = isEditorOpen || isEditing || subscriptions.length === 0;
   const selectedName = form.watch("name");
   const streamingCategoryId =
     (categoriesQuery.data?.items ?? []).find(
@@ -243,9 +275,9 @@ export function SubscriptionsClient() {
   const subscriptionsForActiveMonth = [...subscriptions]
     .map((item) => ({
       ...item,
-      activeMonthDate: getOccurrenceDateForMonth(item.nextBillingDate, item.billingDay, month)
+      activeMonthDateResolved: getOccurrenceDateForMonth(item, month)
     }))
-    .sort((a, b) => a.activeMonthDate.getTime() - b.activeMonthDate.getTime());
+    .sort((a, b) => a.activeMonthDateResolved.getTime() - b.activeMonthDateResolved.getTime());
 
   useEffect(() => {
     if (selectedType === "income" && selectedCardId) {
@@ -285,10 +317,19 @@ export function SubscriptionsClient() {
   return (
     <div className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
       <section className="surface content-section" ref={formSectionRef}>
-        <div className="eyebrow">Assinaturas</div>
-        <h1 className="mt-3 text-3xl font-semibold tracking-[-0.03em]">
-          {isEditing ? "Editar recorrência" : "Nova recorrência"}
-        </h1>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <div className="eyebrow">Assinaturas</div>
+            <h1 className="mt-3 text-3xl font-semibold tracking-[-0.03em]">
+              {isEditing ? "Editar recorrência" : "Nova recorrência"}
+            </h1>
+          </div>
+          {!showEditor ? (
+            <Button onClick={openCreateForm} type="button" variant="secondary">
+              Nova recorrência
+            </Button>
+          ) : null}
+        </div>
         <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--color-muted-foreground)]">
           Use recorrências para registrar despesas e receitas que se repetem todo mês e manter o dashboard coerente com
           a rotina financeira.
@@ -296,23 +337,25 @@ export function SubscriptionsClient() {
         <p className="mt-3 text-sm font-medium text-[var(--color-primary)]">
           Competência ativa: {formatMonthKeyLabel(month)}
         </p>
-        <div className="mt-6 space-y-3">
-          <Label>Serviços populares</Label>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {subscriptionServicePresets.map((preset) => (
-              <SubscriptionServiceCard
-                active={selectedName === preset.label}
-                key={preset.value}
-                onSelect={() => applyServicePreset(preset)}
-                preset={preset}
-              />
-            ))}
-          </div>
-          <p className="text-sm text-[var(--color-muted-foreground)]">
-            Toque em um modelo para preencher rapidamente o nome e sugerir a categoria certa de streaming.
-          </p>
-        </div>
-        <form className="mt-8 space-y-5" onSubmit={form.handleSubmit((values) => saveMutation.mutate(values))}>
+        {showEditor ? (
+          <>
+            <div className="mt-6 space-y-3">
+              <Label>Serviços populares</Label>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {subscriptionServicePresets.map((preset) => (
+                  <SubscriptionServiceCard
+                    active={selectedName === preset.label}
+                    key={preset.value}
+                    onSelect={() => applyServicePreset(preset)}
+                    preset={preset}
+                  />
+                ))}
+              </div>
+              <p className="text-sm text-[var(--color-muted-foreground)]">
+                Toque em um modelo para preencher rapidamente o nome e sugerir a categoria certa de streaming.
+              </p>
+            </div>
+            <form className="mt-8 space-y-5" onSubmit={form.handleSubmit((values) => saveMutation.mutate(values))}>
           <div className="space-y-2">
             <Label htmlFor="sub-name">Nome</Label>
             <Input id="sub-name" {...form.register("name")} />
@@ -396,7 +439,16 @@ export function SubscriptionsClient() {
               Cancelar edição
             </Button>
           ) : null}
-        </form>
+            </form>
+          </>
+        ) : (
+          <div className="muted-panel mt-8 flex flex-col gap-4 px-4 py-5 text-sm text-[var(--color-muted-foreground)]">
+            <p>O editor foi fechado após a última edição concluída.</p>
+            <Button className="w-full sm:w-auto" onClick={openCreateForm} type="button" variant="secondary">
+              Nova recorrência
+            </Button>
+          </div>
+        )}
       </section>
 
       <section className="surface content-section">
@@ -444,9 +496,9 @@ export function SubscriptionsClient() {
                     ) : (
                       <p className="break-words font-semibold">{item.name}</p>
                     )}
-                    <p className="break-words text-sm text-[var(--color-muted-foreground)]">
+                      <p className="break-words text-sm text-[var(--color-muted-foreground)]">
                       {item.category?.name ?? "Sem categoria"} • {item.type === "income" ? "ocorrência no mês ativo em " : "cobrança no mês ativo em "}
-                      {formatDateDisplay(item.activeMonthDate)}
+                      {formatDateDisplay(item.activeMonthDateResolved)}
                     </p>
                     <p className="break-words text-sm text-[var(--color-muted-foreground)]">
                       {item.card?.name ?? item.account?.name ?? "Sem origem financeira"} •{" "}
@@ -454,6 +506,11 @@ export function SubscriptionsClient() {
                     </p>
                     <p className="break-words text-xs text-[var(--color-muted-foreground)]">
                       Competência {formatMonthKeyLabel(month)} • próxima cobrança real em {formatDateDisplay(item.nextBillingDate)}
+                    </p>
+                    <p className="break-words text-xs text-[var(--color-muted-foreground)]">
+                      {item.activeMonthGenerated
+                        ? `Lançamento já gerado em ${formatDateDisplay(item.activeMonthTransactionDate ?? item.activeMonthDateResolved)}`
+                        : `Lançamento ainda não gerado nesta competência`}
                     </p>
                     {item.autoTithe ? (
                       <p className="break-words text-xs text-[var(--color-muted-foreground)]">
@@ -470,12 +527,12 @@ export function SubscriptionsClient() {
                     Editar
                   </Button>
                   <Button
-                    disabled={generateMutation.isPending}
+                    disabled={generateMutation.isPending || Boolean(item.activeMonthGenerated)}
                     onClick={() => generateMutation.mutate(item.id)}
                     type="button"
                     variant="secondary"
                   >
-                    Gerar transação
+                    {item.activeMonthGenerated ? "Já lançada" : "Gerar transação"}
                   </Button>
                   <Button
                     disabled={deleteMutation.isPending}

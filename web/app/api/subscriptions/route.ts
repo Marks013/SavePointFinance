@@ -4,16 +4,20 @@ import { subscriptionFormSchema } from "@/features/subscriptions/schemas/subscri
 import { syncDueSubscriptionTransactions } from "@/lib/automation/subscriptions";
 import { requireSessionUser } from "@/lib/auth/session";
 import { assertTenantTransactionReferences, TenantReferenceError } from "@/lib/finance/tenant-reference-guard";
+import { getMonthRange, normalizeMonthKey } from "@/lib/month";
 import { prisma } from "@/lib/prisma/client";
+import { getSubscriptionBillingDate } from "@/lib/subscriptions/recurrence";
 
 export async function GET(request: Request) {
   try {
     const user = await requireSessionUser();
-    void request;
     await syncDueSubscriptionTransactions({
       tenantId: user.tenantId,
       userId: user.id
     });
+    const { searchParams } = new URL(request.url);
+    const month = normalizeMonthKey(searchParams.get("month"));
+    const monthRange = month ? getMonthRange(month) : null;
     const subscriptions = await prisma.subscription.findMany({
       where: {
         tenantId: user.tenantId
@@ -25,9 +29,44 @@ export async function GET(request: Request) {
       },
       orderBy: [{ isActive: "desc" }, { nextBillingDate: "asc" }, { name: "asc" }]
     });
+    const monthlyTransactions =
+      monthRange && subscriptions.length > 0
+        ? await prisma.transaction.findMany({
+            where: {
+              tenantId: user.tenantId,
+              subscriptionId: {
+                in: subscriptions.map((subscription) => subscription.id)
+              },
+              date: {
+                gte: new Date(`${monthRange.from}T00:00:00`),
+                lte: new Date(`${monthRange.to}T23:59:59`)
+              }
+            },
+            select: {
+              subscriptionId: true,
+              date: true
+            },
+            orderBy: [{ date: "asc" }, { createdAt: "asc" }]
+          })
+        : [];
+    const transactionBySubscriptionId = new Map(
+      monthlyTransactions
+        .filter((transaction): transaction is typeof transaction & { subscriptionId: string } => Boolean(transaction.subscriptionId))
+        .map((transaction) => [transaction.subscriptionId, transaction])
+    );
 
     return NextResponse.json({
       items: subscriptions.map((subscription) => ({
+        activeMonthDate:
+          monthRange
+            ? getSubscriptionBillingDate(
+                Number(month.split("-")[0]),
+                Number(month.split("-")[1]) - 1,
+                subscription.billingDay
+              ).toISOString()
+            : null,
+        activeMonthGenerated: monthRange ? transactionBySubscriptionId.has(subscription.id) : null,
+        activeMonthTransactionDate: transactionBySubscriptionId.get(subscription.id)?.date.toISOString() ?? null,
         id: subscription.id,
         name: subscription.name,
         amount: Number(subscription.amount),

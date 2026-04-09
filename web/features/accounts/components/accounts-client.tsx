@@ -73,6 +73,7 @@ async function deleteAccount(id: string) {
 export function AccountsClient() {
   const queryClient = useQueryClient();
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [isEditorOpen, setIsEditorOpen] = useState(true);
   const formSectionRef = useRef<HTMLElement | null>(null);
   const accountsQuery = useQuery({ queryKey: ["accounts"], queryFn: getAccounts });
   const accounts = accountsQuery.data?.items ?? [];
@@ -99,8 +100,12 @@ export function AccountsClient() {
       return createAccount(values);
     },
     onSuccess: async () => {
+      const wasEditing = Boolean(editingId);
       toast.success(editingId ? "Conta atualizada" : "Conta criada");
       setEditingId(null);
+      if (wasEditing) {
+        setIsEditorOpen(false);
+      }
       form.reset();
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["accounts"] }),
@@ -118,6 +123,7 @@ export function AccountsClient() {
       toast.success("Conta excluída");
       if (editingId) {
         setEditingId(null);
+        setIsEditorOpen(false);
         form.reset();
       }
       await Promise.all([
@@ -133,6 +139,7 @@ export function AccountsClient() {
   });
 
   const startEditing = (account: AccountItem) => {
+    setIsEditorOpen(true);
     setEditingId(account.id);
     form.reset({
       name: account.name,
@@ -146,10 +153,18 @@ export function AccountsClient() {
 
   const cancelEditing = () => {
     setEditingId(null);
+    setIsEditorOpen(false);
+    form.reset();
+  };
+
+  const openCreateForm = () => {
+    setEditingId(null);
+    setIsEditorOpen(true);
     form.reset();
   };
 
   const isEditing = editingId !== null;
+  const showEditor = isEditorOpen || isEditing || accounts.length === 0;
   const selectedColor = form.watch("color");
   const selectedInstitution = form.watch("institution");
 
@@ -169,102 +184,120 @@ export function AccountsClient() {
   return (
     <div className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
       <section className="surface content-section" ref={formSectionRef}>
-        <div className="eyebrow">Contas</div>
-        <h1 className="mt-3 text-3xl font-semibold tracking-[-0.03em]">
-          {isEditing ? "Editar conta" : "Nova conta financeira"}
-        </h1>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <div className="eyebrow">Contas</div>
+            <h1 className="mt-3 text-3xl font-semibold tracking-[-0.03em]">
+              {isEditing ? "Editar conta" : "Nova conta financeira"}
+            </h1>
+          </div>
+          {!showEditor ? (
+            <Button onClick={openCreateForm} type="button" variant="secondary">
+              Nova conta
+            </Button>
+          ) : null}
+        </div>
         <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--color-muted-foreground)]">
           Cadastre contas bancárias e carteiras usadas no dia a dia. O saldo atual é recalculado a partir do saldo de
           referência mais as movimentações vinculadas a cada conta.
         </p>
 
-        <form className="mt-8 space-y-5" onSubmit={form.handleSubmit((values) => saveMutation.mutate(values))}>
-          <div className="space-y-2">
-            <Label htmlFor="account-name">Nome</Label>
-            <Input id="account-name" {...form.register("name")} />
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
+        {showEditor ? (
+          <form className="mt-8 space-y-5" onSubmit={form.handleSubmit((values) => saveMutation.mutate(values))}>
             <div className="space-y-2">
-              <Label htmlFor="account-type">Tipo</Label>
-              <Select id="account-type" {...form.register("type")}>
-                <option value="checking">Corrente</option>
-                <option value="savings">Poupança</option>
-                <option value="investment">Investimento</option>
-                <option value="wallet">Carteira</option>
-              </Select>
+              <Label htmlFor="account-name">Nome</Label>
+              <Input id="account-name" {...form.register("name")} />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="account-balance">Saldo de referência</Label>
-              <CurrencyInput control={form.control} id="account-balance" name="balance" />
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="account-type">Tipo</Label>
+                <Select id="account-type" {...form.register("type")}>
+                  <option value="checking">Corrente</option>
+                  <option value="savings">Poupança</option>
+                  <option value="investment">Investimento</option>
+                  <option value="wallet">Carteira</option>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="account-balance">Saldo de referência</Label>
+                <CurrencyInput control={form.control} id="account-balance" name="balance" />
+              </div>
             </div>
-          </div>
-          <div className="grid gap-4 lg:grid-cols-3">
-            <div className="space-y-2">
-              <Label htmlFor="account-currency">Moeda</Label>
-              <Select id="account-currency" {...form.register("currency")}>
-                <option value="BRL">Real brasileiro (R$)</option>
-              </Select>
+            <div className="grid gap-4 lg:grid-cols-3">
+              <div className="space-y-2">
+                <Label htmlFor="account-currency">Moeda</Label>
+                <Select id="account-currency" {...form.register("currency")}>
+                  <option value="BRL">Real brasileiro (R$)</option>
+                </Select>
+              </div>
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="account-institution">Instituição</Label>
+                <Select id="account-institution" {...form.register("institution")}>
+                  {brazilianInstitutions.map((institution) => (
+                    <option key={institution.value} value={institution.value}>
+                      {institution.label}
+                    </option>
+                  ))}
+                </Select>
+              </div>
             </div>
-            <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="account-institution">Instituição</Label>
-              <Select id="account-institution" {...form.register("institution")}>
-                {brazilianInstitutions.map((institution) => (
-                  <option key={institution.value} value={institution.value}>
-                    {institution.label}
-                  </option>
+            <div className="space-y-3">
+              <Label>Paleta da conta</Label>
+              <div className="flex flex-wrap gap-3">
+                {accountColorPresets.map((preset) => (
+                  <button
+                    aria-label={`Selecionar cor ${preset.label}`}
+                    key={preset.value}
+                    className="rounded-full"
+                    onClick={() => form.setValue("color", preset.value, { shouldDirty: true })}
+                    type="button"
+                  >
+                    <PresetChip
+                      active={selectedColor === preset.value}
+                      background={preset.background}
+                      color={preset.color}
+                      label={preset.label}
+                      shortLabel={preset.shortLabel}
+                      swatchOnly
+                    />
+                  </button>
                 ))}
-              </Select>
+              </div>
             </div>
-          </div>
-          <div className="space-y-3">
-            <Label>Paleta da conta</Label>
-            <div className="flex flex-wrap gap-3">
-              {accountColorPresets.map((preset) => (
-                <button
-                  aria-label={`Selecionar cor ${preset.label}`}
-                  key={preset.value}
-                  className="rounded-full"
-                  onClick={() => form.setValue("color", preset.value, { shouldDirty: true })}
-                  type="button"
-                >
-                  <PresetChip
-                    active={selectedColor === preset.value}
-                    background={preset.background}
-                    color={preset.color}
-                    label={preset.label}
-                    shortLabel={preset.shortLabel}
-                    swatchOnly
-                  />
-                </button>
-              ))}
+            <div className="muted-panel flex flex-wrap items-center gap-3">
+              <PresetChip
+                active
+                background={findPreset(accountColorPresets, selectedColor)?.background ?? "rgba(15,138,95,0.14)"}
+                color={findPreset(accountColorPresets, selectedColor)?.color ?? "#0F8A5F"}
+                description="Instituição selecionada"
+                label={selectedInstitution || "Banco"}
+                shortLabel={findPreset(brazilianInstitutions, selectedInstitution)?.shortLabel ?? "BK"}
+              />
+              <p className="text-sm text-[var(--color-muted-foreground)]">
+                A conta ficará identificada visualmente por cor e instituição nas telas de lançamento e resumo.
+              </p>
             </div>
-          </div>
-          <div className="muted-panel flex flex-wrap items-center gap-3">
-            <PresetChip
-              active
-              background={findPreset(accountColorPresets, selectedColor)?.background ?? "rgba(15,138,95,0.14)"}
-              color={findPreset(accountColorPresets, selectedColor)?.color ?? "#0F8A5F"}
-              description="Instituição selecionada"
-              label={selectedInstitution || "Banco"}
-              shortLabel={findPreset(brazilianInstitutions, selectedInstitution)?.shortLabel ?? "BK"}
-            />
             <p className="text-sm text-[var(--color-muted-foreground)]">
-              A conta ficará identificada visualmente por cor e instituição nas telas de lançamento e resumo.
+              O saldo de referência é usado como base da conta. Para controle financeiro consistente,
+              vincule os lançamentos à conta correta no momento do registro.
             </p>
-          </div>
-          <p className="text-sm text-[var(--color-muted-foreground)]">
-            O saldo de referência é usado como base da conta. Para controle financeiro consistente,
-            vincule os lançamentos à conta correta no momento do registro.
-          </p>
-          <Button className="w-full" disabled={saveMutation.isPending} type="submit">
-            {saveMutation.isPending ? "Salvando..." : isEditing ? "Salvar conta" : "Criar conta"}
-          </Button>
-          {isEditing ? (
-            <Button className="w-full" onClick={cancelEditing} type="button" variant="ghost">
-              Cancelar edição
+            <Button className="w-full" disabled={saveMutation.isPending} type="submit">
+              {saveMutation.isPending ? "Salvando..." : isEditing ? "Salvar conta" : "Criar conta"}
             </Button>
-          ) : null}
-        </form>
+            {isEditing ? (
+              <Button className="w-full" onClick={cancelEditing} type="button" variant="ghost">
+                Cancelar edição
+              </Button>
+            ) : null}
+          </form>
+        ) : (
+          <div className="muted-panel mt-8 flex flex-col gap-4 px-4 py-5 text-sm text-[var(--color-muted-foreground)]">
+            <p>O editor foi fechado após a última edição concluída.</p>
+            <Button className="w-full sm:w-auto" onClick={openCreateForm} type="button" variant="secondary">
+              Nova conta
+            </Button>
+          </div>
+        )}
       </section>
 
       <section className="surface content-section">

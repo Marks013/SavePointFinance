@@ -189,6 +189,23 @@ function getMonthKeyFromDate(value: string) {
   return formatDateKey(new Date(value)).slice(0, 7);
 }
 
+function buildEmptyTransactionValues(): TransactionFormValues {
+  return {
+    date: formatDateKey(new Date()),
+    amount: 0,
+    description: "",
+    type: "expense",
+    paymentMethod: "pix",
+    categoryId: "",
+    accountId: "",
+    destinationAccountId: "",
+    cardId: "",
+    notes: "",
+    installments: 1,
+    applyTithe: false
+  };
+}
+
 const invalidFieldClassName =
   "border-[var(--color-destructive)] focus:border-[var(--color-destructive)] focus:ring-[var(--color-destructive)]/12";
 
@@ -198,6 +215,7 @@ export function TransactionsClient() {
   const month = normalizeMonthKey(searchParams.get("month"));
   const monthRange = getMonthRange(month);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [isEditorOpen, setIsEditorOpen] = useState(true);
   const formSectionRef = useRef<HTMLElement | null>(null);
   const [editingScope, setEditingScope] = useState<"single" | "group">("single");
   const [editingInstallmentsTotal, setEditingInstallmentsTotal] = useState(1);
@@ -253,20 +271,7 @@ export function TransactionsClient() {
 
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionFormSchema),
-    defaultValues: {
-      date: formatDateKey(new Date()),
-      amount: 0,
-      description: "",
-      type: "expense",
-      paymentMethod: "pix",
-      categoryId: "",
-      accountId: "",
-      destinationAccountId: "",
-      cardId: "",
-      notes: "",
-      installments: 1,
-      applyTithe: false
-    }
+    defaultValues: buildEmptyTransactionValues()
   });
 
   const saveMutation = useMutation({
@@ -281,6 +286,7 @@ export function TransactionsClient() {
       return createTransaction(values);
     },
     onSuccess: async (payload) => {
+      const wasEditing = Boolean(editingId);
       toast.success(
         editingId
           ? payload?.scope === "group"
@@ -289,22 +295,12 @@ export function TransactionsClient() {
           : "Transação criada"
       );
       setEditingId(null);
+      if (wasEditing) {
+        setIsEditorOpen(false);
+      }
       setEditingScope("single");
       setEditingInstallmentsTotal(1);
-      form.reset({
-        date: formatDateKey(new Date()),
-        amount: 0,
-        description: "",
-        type: "expense",
-        paymentMethod: "pix",
-        categoryId: "",
-        accountId: "",
-        destinationAccountId: "",
-        cardId: "",
-        notes: "",
-        installments: 1,
-        applyTithe: false
-      });
+      form.reset(buildEmptyTransactionValues());
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["transactions"] }),
         queryClient.invalidateQueries({ queryKey: ["accounts"] }),
@@ -331,20 +327,8 @@ export function TransactionsClient() {
       toast.success("Transação excluída");
       if (editingId) {
         setEditingId(null);
-        form.reset({
-          date: formatDateKey(new Date()),
-          amount: 0,
-          description: "",
-          type: "expense",
-          paymentMethod: "pix",
-          categoryId: "",
-          accountId: "",
-          destinationAccountId: "",
-          cardId: "",
-          notes: "",
-          installments: 1,
-          applyTithe: false
-        });
+        setIsEditorOpen(false);
+        form.reset(buildEmptyTransactionValues());
       }
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["transactions"] }),
@@ -388,6 +372,7 @@ export function TransactionsClient() {
   });
 
   const startEditing = (transaction: TransactionItem) => {
+    setIsEditorOpen(true);
     setEditingId(transaction.id);
     setEditingScope("single");
     setEditingInstallmentsTotal(transaction.installmentsTotal);
@@ -409,22 +394,18 @@ export function TransactionsClient() {
 
   const cancelEditing = () => {
     setEditingId(null);
+    setIsEditorOpen(false);
     setEditingScope("single");
     setEditingInstallmentsTotal(1);
-    form.reset({
-      date: formatDateKey(new Date()),
-      amount: 0,
-      description: "",
-      type: "expense",
-      paymentMethod: "pix",
-      categoryId: "",
-      accountId: "",
-      destinationAccountId: "",
-      cardId: "",
-      notes: "",
-      installments: 1,
-      applyTithe: false
-    });
+    form.reset(buildEmptyTransactionValues());
+  };
+
+  const openCreateForm = () => {
+    setEditingId(null);
+    setIsEditorOpen(true);
+    setEditingScope("single");
+    setEditingInstallmentsTotal(1);
+    form.reset(buildEmptyTransactionValues());
   };
 
   const selectedType = form.watch("type");
@@ -457,6 +438,7 @@ export function TransactionsClient() {
       : null
   ].filter(Boolean) as string[], [filters.type, selectedFilterAccount, selectedFilterCard, selectedFilterCategory]);
   const isEditing = editingId !== null;
+  const showEditor = isEditorOpen || isEditing || transactions.length === 0;
   const filteredCategories = useMemo(() => categories.filter((category) => {
     if (selectedType === "transfer") {
       return true;
@@ -511,8 +493,17 @@ export function TransactionsClient() {
     <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
       <section className="surface content-section" ref={formSectionRef}>
         <div className="page-intro">
-          <div className="eyebrow">{isEditing ? "Editar transação" : "Nova transação"}</div>
-          <h1 className="text-3xl font-semibold tracking-[-0.04em]">Operação financeira</h1>
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <div className="eyebrow">{isEditing ? "Editar transação" : "Nova transação"}</div>
+              <h1 className="text-3xl font-semibold tracking-[-0.04em]">Operação financeira</h1>
+            </div>
+            {!showEditor ? (
+              <Button onClick={openCreateForm} type="button" variant="secondary">
+                Nova transação
+              </Button>
+            ) : null}
+          </div>
           <p className="text-sm leading-7 text-[var(--color-muted-foreground)]">
             Registre lançamentos, vincule contas ou cartões e mantenha o histórico financeiro conectado ao painel,
             à fatura e aos relatórios.
@@ -526,16 +517,17 @@ export function TransactionsClient() {
           </p>
         </div>
 
-        <form
-          className="mt-8 space-y-5"
-          onSubmit={form.handleSubmit(
-            (values) => saveMutation.mutate(values),
-            (errors) => {
-              const firstError = Object.values(errors).find((error) => error?.message)?.message;
-              toast.error(firstError ?? "Revise os campos obrigatórios antes de continuar");
-            }
-          )}
-        >
+        {showEditor ? (
+          <form
+            className="mt-8 space-y-5"
+            onSubmit={form.handleSubmit(
+              (values) => saveMutation.mutate(values),
+              (errors) => {
+                const firstError = Object.values(errors).find((error) => error?.message)?.message;
+                toast.error(firstError ?? "Revise os campos obrigatórios antes de continuar");
+              }
+            )}
+          >
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="date">Data</Label>
@@ -758,7 +750,15 @@ export function TransactionsClient() {
               Cancelar edição
             </Button>
           ) : null}
-        </form>
+          </form>
+        ) : (
+          <div className="muted-panel mt-8 flex flex-col gap-4 px-4 py-5 text-sm text-[var(--color-muted-foreground)]">
+            <p>O editor foi fechado após a última edição concluída.</p>
+            <Button className="w-full sm:w-auto" onClick={openCreateForm} type="button" variant="secondary">
+              Nova transação
+            </Button>
+          </div>
+        )}
       </section>
 
       <section className="surface content-section">

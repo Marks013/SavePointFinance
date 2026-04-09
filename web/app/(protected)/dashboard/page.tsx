@@ -169,7 +169,6 @@ async function getDashboardData(tenantId: string, month: string) {
     const periodExpenseForecast = monthlyReport.projection.expense;
 
     return {
-      currentCash: accounts.filter((account) => account.isActive).reduce((sum, account) => sum + account.currentBalance, 0),
       periodBalances: monthlyReport.periodBalances,
       income: monthlyReport.summary.income,
       expenses: monthlyReport.summary.expense,
@@ -204,7 +203,6 @@ async function getDashboardData(tenantId: string, month: string) {
     };
   } catch {
     return {
-      currentCash: 0,
       periodBalances: {
         opening: 0,
         closing: 0,
@@ -343,16 +341,16 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         <article className="surface-strong rounded-[34px] p-6 md:p-8">
           <div className="section-stack">
             <div>
-              <p className="metric-label text-white/78">Caixa hoje</p>
+              <p className="metric-label text-white/78">Caixa contabilizado na competência</p>
               <h2
                 className={`mt-4 max-w-full break-words text-[clamp(1.7rem,5vw,3.2rem)] font-semibold tracking-[-0.07em] ${
-                  data.currentCash < 0 ? "amount-negative" : "text-white"
+                  data.periodBalances.closing < 0 ? "amount-negative" : "text-white"
                 }`}
               >
-                {formatCurrency(data.currentCash)}
+                {formatCurrency(data.periodBalances.closing)}
               </h2>
               <p className="mt-3 max-w-sm text-sm leading-7 text-white/80">
-                Posição atual das contas ativas hoje. Esse número não usa competência do cartão.
+                Posição das contas dentro da competência selecionada, sem misturar com o caixa real de hoje.
               </p>
             </div>
 

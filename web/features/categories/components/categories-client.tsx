@@ -91,6 +91,7 @@ async function restoreDefaultCategories() {
 export function CategoriesClient() {
   const queryClient = useQueryClient();
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [isEditorOpen, setIsEditorOpen] = useState(true);
   const formSectionRef = useRef<HTMLElement | null>(null);
   const categoriesQuery = useQuery({ queryKey: ["categories"], queryFn: getCategories });
   const categories = categoriesQuery.data?.items ?? [];
@@ -117,8 +118,12 @@ export function CategoriesClient() {
       return createCategory(values);
     },
     onSuccess: async () => {
+      const wasEditing = Boolean(editingId);
       toast.success(editingId ? "Categoria atualizada" : "Categoria criada");
       setEditingId(null);
+      if (wasEditing) {
+        setIsEditorOpen(false);
+      }
       form.reset();
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["categories"] }),
@@ -139,6 +144,7 @@ export function CategoriesClient() {
       toast.success("Categoria excluída");
       if (editingId) {
         setEditingId(null);
+        setIsEditorOpen(false);
         form.reset();
       }
       await Promise.all([
@@ -177,6 +183,7 @@ export function CategoriesClient() {
   });
 
   const startEditing = (category: CategoryItem) => {
+    setIsEditorOpen(true);
     setEditingId(category.id);
     form.reset({
       name: category.name,
@@ -190,10 +197,18 @@ export function CategoriesClient() {
 
   const cancelEditing = () => {
     setEditingId(null);
+    setIsEditorOpen(false);
+    form.reset();
+  };
+
+  const openCreateForm = () => {
+    setEditingId(null);
+    setIsEditorOpen(true);
     form.reset();
   };
 
   const isEditing = editingId !== null;
+  const showEditor = isEditorOpen || isEditing || categories.length === 0;
   const selectedColor = form.watch("color");
   const selectedType = form.watch("type");
 
@@ -213,96 +228,114 @@ export function CategoriesClient() {
   return (
     <div className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
       <section className="surface content-section" ref={formSectionRef}>
-        <div className="eyebrow">Categorias</div>
-        <h1 className="mt-3 text-3xl font-semibold tracking-[-0.03em]">
-          {isEditing ? "Editar categoria" : "Nova categoria"}
-        </h1>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <div className="eyebrow">Categorias</div>
+            <h1 className="mt-3 text-3xl font-semibold tracking-[-0.03em]">
+              {isEditing ? "Editar categoria" : "Nova categoria"}
+            </h1>
+          </div>
+          {!showEditor ? (
+            <Button onClick={openCreateForm} type="button" variant="secondary">
+              Nova categoria
+            </Button>
+          ) : null}
+        </div>
         <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--color-muted-foreground)]">
           Cadastre categorias claras para organizar lançamentos e melhorar os relatórios.
         </p>
 
-        <form className="mt-8 space-y-5" onSubmit={form.handleSubmit((values) => saveMutation.mutate(values))}>
-          <div className="space-y-2">
-            <Label htmlFor="category-name">Nome</Label>
-            <Input id="category-name" {...form.register("name")} />
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
+        {showEditor ? (
+          <form className="mt-8 space-y-5" onSubmit={form.handleSubmit((values) => saveMutation.mutate(values))}>
             <div className="space-y-2">
-              <Label htmlFor="category-type">Tipo</Label>
-              <Select id="category-type" {...form.register("type")}>
-                <option value="expense">Despesa</option>
-                <option value="income">Receita</option>
-              </Select>
+              <Label htmlFor="category-name">Nome</Label>
+              <Input id="category-name" {...form.register("name")} />
             </div>
-            <div className="space-y-3">
-              <Label>Cor da categoria</Label>
-              <div className="flex flex-wrap gap-3">
-                {categoryColorPresets.map((preset) => (
-                  <button
-                    aria-label={`Selecionar cor ${preset.label}`}
-                    key={preset.value}
-                    className="rounded-full"
-                    onClick={() => form.setValue("color", preset.value, { shouldDirty: true })}
-                    type="button"
-                  >
-                    <PresetChip
-                      active={selectedColor === preset.value}
-                      background={preset.background}
-                      color={preset.color}
-                      label={preset.label}
-                      shortLabel={preset.shortLabel}
-                      swatchOnly
-                    />
-                  </button>
-                ))}
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="category-type">Tipo</Label>
+                <Select id="category-type" {...form.register("type")}>
+                  <option value="expense">Despesa</option>
+                  <option value="income">Receita</option>
+                </Select>
+              </div>
+              <div className="space-y-3">
+                <Label>Cor da categoria</Label>
+                <div className="flex flex-wrap gap-3">
+                  {categoryColorPresets.map((preset) => (
+                    <button
+                      aria-label={`Selecionar cor ${preset.label}`}
+                      key={preset.value}
+                      className="rounded-full"
+                      onClick={() => form.setValue("color", preset.value, { shouldDirty: true })}
+                      type="button"
+                    >
+                      <PresetChip
+                        active={selectedColor === preset.value}
+                        background={preset.background}
+                        color={preset.color}
+                        label={preset.label}
+                        shortLabel={preset.shortLabel}
+                        swatchOnly
+                      />
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="category-icon">Ícone</Label>
-              <Input id="category-icon" {...form.register("icon")} />
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="category-icon">Ícone</Label>
+                <Input id="category-icon" {...form.register("icon")} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="category-monthly-limit">Limite mensal</Label>
+                <CurrencyInput
+                  control={form.control}
+                  id="category-monthly-limit"
+                  name="monthlyLimit"
+                  nullable
+                  placeholder="Opcional"
+                />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="category-monthly-limit">Limite mensal</Label>
-              <CurrencyInput
-                control={form.control}
-                id="category-monthly-limit"
-                name="monthlyLimit"
-                nullable
-                placeholder="Opcional"
+            <div className="grid gap-4 md:grid-cols-1">
+              <div className="space-y-2">
+                <Label htmlFor="category-keywords">Palavras-chave</Label>
+                <Input id="category-keywords" placeholder="mercado, casa, salário" {...form.register("keywords")} />
+              </div>
+            </div>
+            <div className="muted-panel flex flex-wrap items-center gap-3">
+              <PresetChip
+                active
+                background={findPreset(categoryColorPresets, selectedColor)?.background ?? "rgba(107,114,128,0.14)"}
+                color={findPreset(categoryColorPresets, selectedColor)?.color ?? selectedColor}
+                label={selectedType === "income" ? "Categoria de receita" : "Categoria de despesa"}
+                shortLabel=""
+                swatchOnly
               />
+              <p className="text-sm text-[var(--color-muted-foreground)]">
+                A cor será usada na interface e nos gráficos.
+              </p>
             </div>
-          </div>
-          <div className="grid gap-4 md:grid-cols-1">
-            <div className="space-y-2">
-              <Label htmlFor="category-keywords">Palavras-chave</Label>
-              <Input id="category-keywords" placeholder="mercado, casa, salário" {...form.register("keywords")} />
-            </div>
-          </div>
-          <div className="muted-panel flex flex-wrap items-center gap-3">
-            <PresetChip
-              active
-              background={findPreset(categoryColorPresets, selectedColor)?.background ?? "rgba(107,114,128,0.14)"}
-              color={findPreset(categoryColorPresets, selectedColor)?.color ?? selectedColor}
-              label={selectedType === "income" ? "Categoria de receita" : "Categoria de despesa"}
-              shortLabel=""
-              swatchOnly
-            />
-            <p className="text-sm text-[var(--color-muted-foreground)]">
-              A cor será usada na interface e nos gráficos.
-            </p>
-          </div>
-          <p className="text-sm text-[var(--color-muted-foreground)]">Use palavras-chave para ajudar a classificação automática.</p>
-          <Button className="w-full" disabled={saveMutation.isPending} type="submit">
-            {saveMutation.isPending ? "Salvando..." : isEditing ? "Salvar categoria" : "Criar categoria"}
-          </Button>
-          {isEditing ? (
-            <Button className="w-full" onClick={cancelEditing} type="button" variant="ghost">
-              Cancelar edição
+            <p className="text-sm text-[var(--color-muted-foreground)]">Use palavras-chave para ajudar a classificação automática.</p>
+            <Button className="w-full" disabled={saveMutation.isPending} type="submit">
+              {saveMutation.isPending ? "Salvando..." : isEditing ? "Salvar categoria" : "Criar categoria"}
             </Button>
-          ) : null}
-        </form>
+            {isEditing ? (
+              <Button className="w-full" onClick={cancelEditing} type="button" variant="ghost">
+                Cancelar edição
+              </Button>
+            ) : null}
+          </form>
+        ) : (
+          <div className="muted-panel mt-8 flex flex-col gap-4 px-4 py-5 text-sm text-[var(--color-muted-foreground)]">
+            <p>O editor foi fechado após a última edição concluída.</p>
+            <Button className="w-full sm:w-auto" onClick={openCreateForm} type="button" variant="secondary">
+              Nova categoria
+            </Button>
+          </div>
+        )}
       </section>
 
       <section className="surface content-section">

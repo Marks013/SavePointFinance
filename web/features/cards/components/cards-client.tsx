@@ -170,6 +170,7 @@ export function CardsClient() {
   const searchParams = useSearchParams();
   const month = normalizeMonthKey(searchParams.get("month"));
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [isEditorOpen, setIsEditorOpen] = useState(true);
   const formSectionRef = useRef<HTMLElement | null>(null);
   const [selectedStatementCardId, setSelectedStatementCardId] = useState<string>("");
   const [statementMonth, setStatementMonth] = useState(month);
@@ -256,8 +257,12 @@ export function CardsClient() {
       return createCard(values);
     },
     onSuccess: async () => {
+      const wasEditing = Boolean(editingId);
       toast.success(editingId ? "Cartão atualizado" : "Cartão criado");
       setEditingId(null);
+      if (wasEditing) {
+        setIsEditorOpen(false);
+      }
       form.reset();
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["cards"] }),
@@ -275,6 +280,7 @@ export function CardsClient() {
       toast.success("Cartão excluído");
       if (editingId) {
         setEditingId(null);
+        setIsEditorOpen(false);
         form.reset();
       }
       await Promise.all([
@@ -290,6 +296,7 @@ export function CardsClient() {
   });
 
   const startEditing = (card: CardItem) => {
+    setIsEditorOpen(true);
     setEditingId(card.id);
     form.reset({
       name: card.name,
@@ -305,10 +312,18 @@ export function CardsClient() {
 
   const cancelEditing = () => {
     setEditingId(null);
+    setIsEditorOpen(false);
+    form.reset();
+  };
+
+  const openCreateForm = () => {
+    setEditingId(null);
+    setIsEditorOpen(true);
     form.reset();
   };
 
   const isEditing = editingId !== null;
+  const showEditor = isEditorOpen || isEditing || cards.length === 0;
   const statementIsPaid = Boolean(statementQuery.data?.payment);
   const selectedBrand = form.watch("brand");
   const selectedInstitution = form.watch("institution");
@@ -334,10 +349,19 @@ export function CardsClient() {
   return (
     <div className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
       <section className="surface content-section" ref={formSectionRef}>
-        <div className="eyebrow">Cartões</div>
-        <h1 className="mt-3 text-3xl font-semibold tracking-[-0.03em]">
-          {isEditing ? "Editar cartão" : "Novo cartão"}
-        </h1>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <div className="eyebrow">Cartões</div>
+            <h1 className="mt-3 text-3xl font-semibold tracking-[-0.03em]">
+              {isEditing ? "Editar cartão" : "Novo cartão"}
+            </h1>
+          </div>
+          {!showEditor ? (
+            <Button onClick={openCreateForm} type="button" variant="secondary">
+              Novo cartão
+            </Button>
+          ) : null}
+        </div>
         <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--color-muted-foreground)]">
           Cadastre cartões usados no crédito para controlar limite, competência, pagamento de fatura e impacto nos
           relatórios.
@@ -346,16 +370,17 @@ export function CardsClient() {
           Competência global ativa: {formatMonthKeyLabel(month)}
         </p>
 
-        <form
-          className="mt-8 space-y-5"
-          onSubmit={form.handleSubmit(
-            (values) => saveMutation.mutate(values),
-            (errors) => {
-              const firstError = Object.values(errors).find((error) => error?.message)?.message;
-              toast.error(firstError ?? "Revise os campos obrigatÃ³rios antes de continuar");
-            }
-          )}
-        >
+        {showEditor ? (
+          <form
+            className="mt-8 space-y-5"
+            onSubmit={form.handleSubmit(
+              (values) => saveMutation.mutate(values),
+              (errors) => {
+                const firstError = Object.values(errors).find((error) => error?.message)?.message;
+                toast.error(firstError ?? "Revise os campos obrigatórios antes de continuar");
+              }
+            )}
+          >
           <div className="space-y-2">
             <Label htmlFor="card-name">Nome</Label>
             <Input
@@ -510,7 +535,15 @@ export function CardsClient() {
               Cancelar edição
             </Button>
           ) : null}
-        </form>
+          </form>
+        ) : (
+          <div className="muted-panel mt-8 flex flex-col gap-4 px-4 py-5 text-sm text-[var(--color-muted-foreground)]">
+            <p>O editor foi fechado após a última edição concluída.</p>
+            <Button className="w-full sm:w-auto" onClick={openCreateForm} type="button" variant="secondary">
+              Novo cartão
+            </Button>
+          </div>
+        )}
       </section>
 
       <section className="surface content-section">
