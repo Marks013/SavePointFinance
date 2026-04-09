@@ -211,7 +211,7 @@ export function SummaryDocument({ generatedAt, periodLabel, summary, recent, byA
             <Text style={[styles.metricValue, styles.negative]}>{money(summary.expense)}</Text>
           </View>
           <View style={styles.metricCard}>
-            <Text style={styles.metricLabel}>Saldo</Text>
+            <Text style={styles.metricLabel}>Resultado do período</Text>
             <Text style={[styles.metricValue, summary.balance < 0 ? styles.negative : styles.positive]}>
               {money(summary.balance)}
             </Text>

@@ -38,6 +38,11 @@ type CategoryInsight = {
   share: number;
 };
 
+type AccountBalancePoint = {
+  opening: number;
+  closing: number;
+};
+
 function monthLabel(date: Date) {
   return new Intl.DateTimeFormat("pt-BR", {
     month: "short",
@@ -116,7 +121,7 @@ function buildTransactionWhere(
 export async function getFinanceReport(tenantId: string, filters: FinanceReportFilters, userId?: string) {
   const { start: projectionStart, end: projectionEnd } = getFilterRange(filters);
 
-  const [transactions, subscriptions, cards, goals, accounts] = await Promise.all([
+  const [transactions, subscriptions, cards, goals, accounts, balanceTransactions] = await Promise.all([
     prisma.transaction.findMany({
       where: buildTransactionWhere(tenantId, filters, userId),
       select: {
@@ -221,7 +226,25 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
         deadline: "asc"
       }
     }),
-    getAccountsWithComputedBalance(tenantId, userId)
+    getAccountsWithComputedBalance(tenantId, userId),
+    prisma.transaction.findMany({
+      where: {
+        tenantId,
+        ...(userId ? { userId } : {}),
+        date: {
+          lte: projectionEnd
+        },
+        OR: [{ accountId: { not: null } }, { destinationAccountId: { not: null } }]
+      },
+      select: {
+        date: true,
+        accountId: true,
+        destinationAccountId: true,
+        amount: true,
+        type: true
+      },
+      orderBy: [{ date: "asc" }, { createdAt: "asc" }]
+    })
   ]);
 
   const monthlyMap = new Map<string, { income: number; expense: number; transfer: number }>();
@@ -596,6 +619,67 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
     share: item.total / totalExpenseBase
   }));
   const topCategory = categoryInsights[0] ?? null;
+  const activeAccountBalances = new Map<string, AccountBalancePoint>();
+
+  for (const account of accounts) {
+    if (!account.isActive) {
+      continue;
+    }
+
+    const openingBalance = Number(account.openingBalance);
+    activeAccountBalances.set(account.id, {
+      opening: openingBalance,
+      closing: openingBalance
+    });
+  }
+
+  for (const transaction of balanceTransactions) {
+    const amount = Number(transaction.amount);
+
+    if (transaction.accountId) {
+      const account = activeAccountBalances.get(transaction.accountId);
+
+      if (account) {
+        const effect =
+          transaction.type === TransactionType.income
+            ? amount
+            : transaction.type === TransactionType.expense || transaction.type === TransactionType.transfer
+              ? -amount
+              : 0;
+
+        if (effect !== 0) {
+          if (transaction.date < projectionStart) {
+            account.opening += effect;
+          }
+
+          account.closing += effect;
+        }
+      }
+    }
+
+    if (transaction.destinationAccountId && transaction.type === TransactionType.transfer) {
+      const account = activeAccountBalances.get(transaction.destinationAccountId);
+
+      if (account) {
+        if (transaction.date < projectionStart) {
+          account.opening += amount;
+        }
+
+        account.closing += amount;
+      }
+    }
+  }
+
+  const periodBalanceTotals = Array.from(activeAccountBalances.values()).reduce(
+    (totals, account) => ({
+      opening: totals.opening + account.opening,
+      closing: totals.closing + account.closing
+    }),
+    {
+      opening: 0,
+      closing: 0
+    }
+  );
   const currentBalance = accounts
     .filter((account) => account.isActive)
     .reduce((sum, account) => sum + account.currentBalance, 0);
@@ -636,6 +720,11 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
       cardPayments: projection.cardPayments,
       net: projection.income - projection.expense,
       endingBalance: currentBalance + projection.income - projection.expense
+    },
+    periodBalances: {
+      opening: periodBalanceTotals.opening,
+      closing: periodBalanceTotals.closing,
+      net: periodBalanceTotals.closing - periodBalanceTotals.opening
     },
     filters,
     monthly: Array.from(monthlyMap.entries()).map(([label, values]) => ({

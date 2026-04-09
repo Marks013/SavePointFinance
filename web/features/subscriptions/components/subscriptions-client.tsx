@@ -20,6 +20,7 @@ import {
   type SubscriptionServicePreset
 } from "@/lib/finance/presets";
 import { formatMonthKeyLabel, normalizeMonthKey } from "@/lib/month";
+import { advanceSubscriptionBillingDate } from "@/lib/subscriptions/recurrence";
 import { formatCurrency } from "@/lib/utils";
 
 type RefItem = { id: string; name: string };
@@ -36,6 +37,29 @@ type SubscriptionItem = {
   account: RefItem | null;
   card: RefItem | null;
 };
+
+function buildEmptySubscriptionValues(): SubscriptionFormValues {
+  return {
+    name: "",
+    amount: 0,
+    billingDay: 1,
+    categoryId: "",
+    accountId: "",
+    cardId: "",
+    nextBillingDate: formatDateKey(new Date()),
+    type: "expense",
+    isActive: true,
+    autoTithe: false
+  };
+}
+
+function getOccurrenceDateForMonth(nextBillingDate: string, billingDay: number, monthKey: string) {
+  const referenceDate = new Date(nextBillingDate);
+  const [year, month] = monthKey.split("-").map(Number);
+  const monthOffset = (year - referenceDate.getFullYear()) * 12 + ((month - 1) - referenceDate.getMonth());
+
+  return advanceSubscriptionBillingDate(referenceDate, billingDay, monthOffset);
+}
 
 async function getSubscriptions() {
   const response = await fetch("/api/subscriptions", { cache: "no-store" });
@@ -125,18 +149,7 @@ export function SubscriptionsClient() {
 
   const form = useForm<SubscriptionFormValues>({
     resolver: zodResolver(subscriptionFormSchema),
-    defaultValues: {
-      name: "",
-      amount: 0,
-      billingDay: 1,
-      categoryId: "",
-      accountId: "",
-      cardId: "",
-      nextBillingDate: formatDateKey(new Date()),
-      type: "expense",
-      isActive: true,
-      autoTithe: false
-    }
+    defaultValues: buildEmptySubscriptionValues()
   });
 
   const saveMutation = useMutation({
@@ -152,7 +165,7 @@ export function SubscriptionsClient() {
     onSuccess: async () => {
       toast.success(editingId ? "Assinatura atualizada" : "Assinatura criada");
       setEditingId(null);
-      form.reset();
+      form.reset(buildEmptySubscriptionValues());
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["subscriptions"] })
       ]);
@@ -188,7 +201,7 @@ export function SubscriptionsClient() {
       toast.success("Assinatura excluída");
       if (editingId) {
         setEditingId(null);
-        form.reset();
+        form.reset(buildEmptySubscriptionValues());
       }
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["subscriptions"] })
@@ -214,18 +227,7 @@ export function SubscriptionsClient() {
 
   const cancelEditing = () => {
     setEditingId(null);
-    form.reset({
-      name: "",
-      amount: 0,
-      billingDay: 1,
-      categoryId: "",
-      accountId: "",
-      cardId: "",
-      nextBillingDate: formatDateKey(new Date()),
-      type: "expense",
-      isActive: true,
-      autoTithe: false
-    });
+    form.reset(buildEmptySubscriptionValues());
   };
 
   const selectedType = form.watch("type");
@@ -238,6 +240,12 @@ export function SubscriptionsClient() {
     (categoriesQuery.data?.items ?? []).find(
       (item) => item.type === "expense" && item.name === "Streaming e assinaturas"
     )?.id ?? "";
+  const subscriptionsForActiveMonth = [...subscriptions]
+    .map((item) => ({
+      ...item,
+      activeMonthDate: getOccurrenceDateForMonth(item.nextBillingDate, item.billingDay, month)
+    }))
+    .sort((a, b) => a.activeMonthDate.getTime() - b.activeMonthDate.getTime());
 
   useEffect(() => {
     if (selectedType === "income" && selectedCardId) {
@@ -411,7 +419,7 @@ export function SubscriptionsClient() {
           </div>
         </div>
         <div className="mt-6 space-y-3">
-          {subscriptions.map((item) => {
+          {subscriptionsForActiveMonth.map((item) => {
             const servicePreset = findSubscriptionServicePreset(item.name);
 
             return (
@@ -437,12 +445,15 @@ export function SubscriptionsClient() {
                       <p className="break-words font-semibold">{item.name}</p>
                     )}
                     <p className="break-words text-sm text-[var(--color-muted-foreground)]">
-                      {item.category?.name ?? "Sem categoria"} • {item.type === "income" ? "próximo recebimento em " : "próxima cobrança em "}
-                      {formatDateDisplay(item.nextBillingDate)}
+                      {item.category?.name ?? "Sem categoria"} • {item.type === "income" ? "ocorrência no mês ativo em " : "cobrança no mês ativo em "}
+                      {formatDateDisplay(item.activeMonthDate)}
                     </p>
                     <p className="break-words text-sm text-[var(--color-muted-foreground)]">
                       {item.card?.name ?? item.account?.name ?? "Sem origem financeira"} •{" "}
                       {item.type === "expense" ? "Despesa recorrente" : "Receita recorrente"}
+                    </p>
+                    <p className="break-words text-xs text-[var(--color-muted-foreground)]">
+                      Competência {formatMonthKeyLabel(month)} • próxima cobrança real em {formatDateDisplay(item.nextBillingDate)}
                     </p>
                     {item.autoTithe ? (
                       <p className="break-words text-xs text-[var(--color-muted-foreground)]">

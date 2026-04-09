@@ -68,6 +68,11 @@ type ReportResponse = {
     net: number;
     endingBalance: number;
   };
+  periodBalances: {
+    opening: number;
+    closing: number;
+    net: number;
+  };
   filters: {
     from?: string | null;
     to?: string | null;
@@ -397,38 +402,47 @@ export function ReportsClient() {
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <article className="metric-card">
-          <p className="metric-label">Saldo operacional</p>
+          <p className="metric-label">Resultado do período</p>
           <p className={`metric-value ${(data?.summary.balance ?? 0) < 0 ? "amount-negative" : "amount-positive"}`}>
             {formatCurrency(data?.summary.balance ?? 0)}
           </p>
         </article>
         <article className="metric-card">
-          <p className="metric-label">Receitas</p>
+          <p className="metric-label">Receitas do período</p>
           <p className="metric-value amount-positive">{formatCurrency(data?.summary.income ?? 0)}</p>
         </article>
         <article className="metric-card">
-          <p className="metric-label">Despesas</p>
+          <p className="metric-label">Despesas do período</p>
           <p className="metric-value amount-negative">{formatCurrency(data?.summary.expense ?? 0)}</p>
         </article>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <article className="metric-card">
-          <p className="metric-label">Saldo atual consolidado</p>
-          <p className={`metric-value ${(data?.projection.currentBalance ?? 0) < 0 ? "amount-negative" : "amount-positive"}`}>
-            {formatCurrency(data?.projection.currentBalance ?? 0)}
+          <p className="metric-label">Saldo inicial do mês</p>
+          <p className={`metric-value ${(data?.periodBalances.opening ?? 0) < 0 ? "amount-negative" : "amount-positive"}`}>
+            {formatCurrency(data?.periodBalances.opening ?? 0)}
           </p>
         </article>
         <article className="metric-card">
-          <p className="metric-label">Faturas a vencer</p>
-          <p className="metric-value amount-negative">{formatCurrency(data?.projection.cardPayments ?? 0)}</p>
-        </article>
-        <article className="metric-card">
-          <p className="metric-label">Saldo projetado ao fim do mês</p>
-          <p className={`metric-value ${(data?.projection.endingBalance ?? 0) < 0 ? "amount-negative" : "amount-positive"}`}>
-            {formatCurrency(data?.projection.endingBalance ?? 0)}
+          <p className="metric-label">Variação real nas contas</p>
+          <p className={`metric-value ${(data?.periodBalances.net ?? 0) < 0 ? "amount-negative" : "amount-positive"}`}>
+            {formatCurrency(data?.periodBalances.net ?? 0)}
           </p>
         </article>
+        <article className="metric-card">
+          <p className="metric-label">Saldo final do mês</p>
+          <p className={`metric-value ${(data?.periodBalances.closing ?? 0) < 0 ? "amount-negative" : "amount-positive"}`}>
+            {formatCurrency(data?.periodBalances.closing ?? 0)}
+          </p>
+        </article>
+      </div>
+
+      <div className="muted-panel flex flex-wrap items-start justify-between gap-3 text-sm text-[var(--color-muted-foreground)]">
+        <p className="min-w-0 flex-1 break-words">
+          Resultado do período segue a competência financeira. Saldos inicial e final usam o caixa real das contas nas
+          datas registradas, então podem divergir quando compras no cartão ainda não viraram pagamento.
+        </p>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
@@ -608,7 +622,7 @@ export function ReportsClient() {
       </section>
 
       <section className="surface content-section">
-        <h2 className="text-xl font-semibold">Próximos vencimentos e estimativas</h2>
+        <h2 className="text-xl font-semibold">Vencimentos e estimativas do período</h2>
         <div className="mt-6 space-y-3">
           {(data?.upcoming ?? []).length ? (
             data?.upcoming.map((item) => (

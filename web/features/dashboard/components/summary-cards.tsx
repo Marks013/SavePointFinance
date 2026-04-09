@@ -1,54 +1,54 @@
-import { ArrowDownCircle, ArrowUpCircle, Landmark, PiggyBank } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, Landmark } from "lucide-react";
 
 import { formatCurrency } from "@/lib/utils";
 
 type SummaryCardsProps = {
   data: {
-    balance: number;
+    openingBalance: number;
+    closingBalance: number;
     income: number;
     expenses: number;
-    goals: number;
     averageDailyExpense: number;
   };
 };
 
 const cards = [
   {
-    key: "balance",
-    title: "Saldo consolidado",
-    note: "Posicao total das contas ativas",
+    key: "openingBalance",
+    title: "Saldo inicial do período",
+    note: "Caixa real das contas no início da competência",
     accent: "bg-[var(--color-primary)] text-[var(--color-primary-foreground)]",
     icon: Landmark,
     valueClass: (value: number) => (value < 0 ? "amount-negative" : "text-[var(--color-foreground)]")
   },
   {
+    key: "closingBalance",
+    title: "Saldo final do período",
+    note: "Caixa real das contas ao fim da competência",
+    accent: "bg-[var(--color-card)] text-[var(--color-primary)] border border-[var(--color-border)]",
+    icon: Landmark,
+    valueClass: (value: number) => (value < 0 ? "amount-negative" : "text-[var(--color-foreground)]")
+  },
+  {
     key: "income",
-    title: "Receitas do periodo",
-    note: "Entradas registradas no mes",
+    title: "Receitas do período",
+    note: "Entradas registradas na competência selecionada",
     accent: "bg-[var(--color-card)] text-[var(--color-emerald-600)] border border-[var(--color-border)]",
     icon: ArrowUpCircle,
     valueClass: () => "amount-positive"
   },
   {
     key: "expenses",
-    title: "Despesas do periodo",
-    note: "Saidas e compromissos ja lancados",
+    title: "Despesas do período",
+    note: "Saídas lançadas pela competência financeira",
     accent: "bg-[var(--color-card)] text-[var(--color-coral-500)] border border-[var(--color-border)]",
     icon: ArrowDownCircle,
     valueClass: () => "amount-negative"
   },
   {
-    key: "goals",
-    title: "Reservado em metas",
-    note: "Valor comprometido com objetivos",
-    accent: "bg-[var(--color-card)] text-[var(--color-gold-500)] border border-[var(--color-border)]",
-    icon: PiggyBank,
-    valueClass: () => "text-[var(--color-gold-500)]"
-  },
-  {
     key: "averageDailyExpense",
-    title: "Despesa media diaria",
-    note: "Ritmo medio de saida no periodo",
+    title: "Despesa média diária",
+    note: "Ritmo médio de saída dentro do período",
     accent: "bg-[var(--color-card)] text-[var(--color-ink-900)] border border-[var(--color-border)]",
     icon: ArrowDownCircle,
     valueClass: () => "amount-negative"

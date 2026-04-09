@@ -49,6 +49,8 @@ type CardItem = {
 type TransactionItem = {
   id: string;
   date: string;
+  competenceDate: string | null;
+  payableDate: string | null;
   amount: number;
   description: string;
   type: "income" | "expense" | "transfer";
@@ -181,6 +183,10 @@ function formatTransactionTypeLabel(type: TransactionItem["type"]) {
     default:
       return type;
   }
+}
+
+function getMonthKeyFromDate(value: string) {
+  return formatDateKey(new Date(value)).slice(0, 7);
 }
 
 const invalidFieldClassName =
@@ -1062,7 +1068,7 @@ export function TransactionsClient() {
                       {formatTransactionTypeLabel(transaction.type)}
                     </span>
                     <span className="break-words text-xs text-[var(--color-muted-foreground)]">
-                      {formatDateDisplay(transaction.date)}
+                      {transaction.card ? `Compra em ${formatDateDisplay(transaction.date)}` : formatDateDisplay(transaction.date)}
                     </span>
                   </div>
                   <p className="mt-3 break-words text-base font-semibold">{transaction.description}</p>
@@ -1071,6 +1077,12 @@ export function TransactionsClient() {
                       ? `${transaction.account?.name ?? "Sem origem"} → ${transaction.destinationAccount?.name ?? "Sem destino"}`
                       : `${transaction.category?.name ?? "Sem categoria"} • ${transaction.account?.name ?? transaction.card?.name ?? "Sem origem"}`}
                   </p>
+                  {transaction.card && transaction.competenceDate && transaction.payableDate ? (
+                    <p className="mt-2 break-words text-xs text-[var(--color-muted-foreground)]">
+                      Competência {formatMonthKeyLabel(getMonthKeyFromDate(transaction.competenceDate))} • vence{" "}
+                      {formatDateDisplay(transaction.payableDate)}
+                    </p>
+                  ) : null}
                   {transaction.classification?.auto || transaction.titheAmount ? (
                     <p className="mt-2 break-words text-xs text-[var(--color-muted-foreground)]">
                       {transaction.classification?.auto

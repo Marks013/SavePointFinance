@@ -8,6 +8,7 @@ import { syncDueSubscriptionTransactions } from "@/lib/automation/subscriptions"
 import { requireSessionUser } from "@/lib/auth/session";
 import {
   getCardExpenseCompetenceDate,
+  getCardExpenseDueDate,
   getCardStatementSnapshot,
   getCardStatementSnapshots,
   getCurrentPayableStatementMonth
@@ -27,6 +28,21 @@ function formatDate(value: Date | string | null | undefined) {
     day: "2-digit",
     month: "short"
   }).format(new Date(value));
+}
+
+function formatMonthFromDate(value: Date | string) {
+  const date = new Date(value);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function getMonthPerspective(month: string) {
+  const currentMonth = getCurrentMonthKey();
+
+  if (month === currentMonth) {
+    return "current";
+  }
+
+  return month > currentMonth ? "future" : "past";
 }
 
 async function getDashboardData(tenantId: string, month: string) {
@@ -150,18 +166,18 @@ async function getDashboardData(tenantId: string, month: string) {
     });
 
     const monthlyCardPayments = monthlyReport.projection.cardPayments;
-    const projectedMonthBalance = monthlyReport.projection.endingBalance;
+    const periodExpenseForecast = monthlyReport.projection.expense;
 
     return {
-      balance: accounts.filter((account) => account.isActive).reduce((sum, account) => sum + account.currentBalance, 0),
+      currentCash: accounts.filter((account) => account.isActive).reduce((sum, account) => sum + account.currentBalance, 0),
+      periodBalances: monthlyReport.periodBalances,
       income: monthlyReport.summary.income,
       expenses: monthlyReport.summary.expense,
       averageDailyExpense: monthlyReport.summary.averageDailyExpense,
       classification: monthlyReport.classification,
       spendingInsights: monthlyReport.spendingInsights,
-      projection: monthlyReport.projection,
       monthlyCardPayments,
-      projectedMonthBalance,
+      periodExpenseForecast,
       upcomingProjection: monthlyReport.upcoming.slice(0, 5),
       goals: Number(goals._sum.currentAmount ?? 0),
       recentTransactions: recentTransactions
@@ -172,7 +188,12 @@ async function getDashboardData(tenantId: string, month: string) {
 
           return competenceDate >= start && competenceDate <= end;
         })
-        .slice(0, 6),
+        .slice(0, 6)
+        .map((transaction) => ({
+          ...transaction,
+          competenceDate: transaction.card ? getCardExpenseCompetenceDate(transaction.card, transaction.date) : null,
+          payableDate: transaction.card ? getCardExpenseDueDate(transaction.card, transaction.date) : null
+        })),
       upcomingSubscriptions,
       upcomingGoals,
       activeAccounts: accounts
@@ -183,7 +204,12 @@ async function getDashboardData(tenantId: string, month: string) {
     };
   } catch {
     return {
-      balance: 0,
+      currentCash: 0,
+      periodBalances: {
+        opening: 0,
+        closing: 0,
+        net: 0
+      },
       income: 0,
       expenses: 0,
       averageDailyExpense: 0,
@@ -198,17 +224,8 @@ async function getDashboardData(tenantId: string, month: string) {
         lifestyleExpenses: 0,
         categoryBreakdown: []
       },
-      projection: {
-        horizonDays: 30,
-        currentBalance: 0,
-        income: 0,
-        expense: 0,
-        cardPayments: 0,
-        net: 0,
-        endingBalance: 0
-      },
       monthlyCardPayments: 0,
-      projectedMonthBalance: 0,
+      periodExpenseForecast: 0,
       upcomingProjection: [],
       goals: 0,
       recentTransactions: [],
@@ -236,7 +253,24 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   });
   const data = await getDashboardData(user.tenantId, month);
   const monthLabel = formatMonthKeyLabel(month);
-  const netMonth = data.income - data.expenses;
+  const monthPerspective = getMonthPerspective(month);
+  const commitmentCardNote =
+    monthPerspective === "current"
+      ? "Cobranças, metas e faturas previstas para este mês."
+      : monthPerspective === "future"
+        ? "Cobranças, metas e faturas previstas para o mês selecionado."
+        : "Cobranças, metas e faturas mapeadas para a competência selecionada.";
+  const dueSectionTitle =
+    monthPerspective === "current" ? "Próximos vencimentos" : monthPerspective === "future" ? "Vencimentos previstos" : "Vencimentos do período";
+  const dueSectionEmpty =
+    monthPerspective === "current"
+      ? "Nenhuma cobrança futura encontrada."
+      : monthPerspective === "future"
+        ? "Nenhum vencimento previsto para o período."
+        : "Nenhum vencimento encontrado no período.";
+  const goalSectionTitle = monthPerspective === "current" ? "Metas com prazo próximo" : "Metas com prazo no período";
+  const movementSectionCopy =
+    "Lançamentos contabilizados dentro da competência selecionada, mesmo quando a compra original aconteceu em outra data.";
 
   return (
     <div className="space-y-6 py-4">
@@ -247,32 +281,49 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               <div className="eyebrow">Painel financeiro</div>
               <h1 className="page-title max-w-3xl">Visão central da operação em {monthLabel}</h1>
               <p className="page-copy">
-                Acompanhe saldo, resultado do mês, compromissos futuros e a atividade mais recente em uma estrutura mais
-                objetiva e menos espalhada.
+                Acompanhe resultado por competência, caixa real das contas e compromissos do período sem misturar
+                naturezas diferentes.
               </p>
             </div>
 
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid gap-3 md:grid-cols-3">
               <div className="editorial-panel">
-                <p className="metric-label">Resultado do mês</p>
+                <p className="metric-label">Resultado do período</p>
                 <p
                   className={`mt-3 max-w-full break-words text-lg font-semibold tracking-[-0.04em] ${
-                    netMonth >= 0 ? "text-[var(--color-emerald-600)]" : "amount-negative"
+                    data.periodBalances.net >= 0 ? "text-[var(--color-emerald-600)]" : "amount-negative"
                   }`}
                 >
-                  {formatCurrency(netMonth)}
+                  {formatCurrency(data.periodBalances.net)}
                 </p>
                 <p className="mt-2 text-sm leading-6 text-[var(--color-ink-700)]">
-                  Diferença entre entradas e saídas registradas.
+                  Diferença entre receitas e despesas pela competência financeira.
                 </p>
               </div>
               <div className="editorial-panel">
-                <p className="metric-label">Compromissos próximos</p>
-                <p className="mt-3 text-lg font-semibold tracking-[-0.04em] text-[var(--color-foreground)]">
-                  {data.upcomingProjection.length} previstos
+                <p className="metric-label">Saldo inicial do período</p>
+                <p
+                  className={`mt-3 text-lg font-semibold tracking-[-0.04em] ${
+                    data.periodBalances.opening < 0 ? "amount-negative" : "text-[var(--color-foreground)]"
+                  }`}
+                >
+                  {formatCurrency(data.periodBalances.opening)}
                 </p>
                 <p className="mt-2 text-sm leading-6 text-[var(--color-ink-700)]">
-                  Cobranças, metas e faturas previstas para este mês.
+                  Caixa real das contas no primeiro dia da competência.
+                </p>
+              </div>
+              <div className="editorial-panel">
+                <p className="metric-label">Saldo final do período</p>
+                <p
+                  className={`mt-3 text-lg font-semibold tracking-[-0.04em] ${
+                    data.periodBalances.closing < 0 ? "amount-negative" : "text-[var(--color-foreground)]"
+                  }`}
+                >
+                  {formatCurrency(data.periodBalances.closing)}
+                </p>
+                <p className="mt-2 text-sm leading-6 text-[var(--color-ink-700)]">
+                  Caixa real das contas após os lançamentos datados no período.
                 </p>
               </div>
             </div>
@@ -292,36 +343,39 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         <article className="surface-strong rounded-[34px] p-6 md:p-8">
           <div className="section-stack">
             <div>
-              <p className="metric-label text-white/78">Caixa disponível</p>
+              <p className="metric-label text-white/78">Caixa hoje</p>
               <h2
                 className={`mt-4 max-w-full break-words text-[clamp(1.7rem,5vw,3.2rem)] font-semibold tracking-[-0.07em] ${
-                  data.balance < 0 ? "amount-negative" : "text-white"
+                  data.currentCash < 0 ? "amount-negative" : "text-white"
                 }`}
               >
-                {formatCurrency(data.balance)}
+                {formatCurrency(data.currentCash)}
               </h2>
               <p className="mt-3 max-w-sm text-sm leading-7 text-white/80">
-                Saldo consolidado das contas ativas, com leitura direta para acompanhar a operação sem navegar por várias
-                telas.
+                Posição atual das contas ativas hoje. Esse número não usa competência do cartão.
               </p>
             </div>
 
             <div className="grid gap-3">
               <div className="rounded-[24px] border border-white/12 bg-white/8 px-4 py-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-white/66">Faturas a vencer</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-white/66">Faturas com vencimento no período</p>
                 <p className="mt-2 max-w-full break-words text-[clamp(1.25rem,4vw,2rem)] font-semibold tracking-[-0.05em] text-white">
                   {formatCurrency(data.monthlyCardPayments)}
                 </p>
+                <p className="mt-2 text-sm leading-6 text-white/70">
+                  Soma das faturas que vencem dentro da competência aberta na navegação.
+                </p>
               </div>
               <div className="rounded-[24px] border border-white/12 bg-white/8 px-4 py-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-white/66">Saldo projetado</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-white/66">Saídas previstas no período</p>
                 <p
                   className={`mt-2 max-w-full break-words text-[clamp(1.25rem,4vw,2rem)] font-semibold tracking-[-0.05em] ${
-                    data.projectedMonthBalance < 0 ? "amount-negative" : "text-white"
+                    data.periodExpenseForecast > 0 ? "amount-negative" : "text-white"
                   }`}
                 >
-                  {formatCurrency(data.projectedMonthBalance)}
+                  {formatCurrency(data.periodExpenseForecast)}
                 </p>
+                <p className="mt-2 text-sm leading-6 text-white/70">{commitmentCardNote}</p>
               </div>
             </div>
           </div>
@@ -330,10 +384,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
       <SummaryCards
         data={{
-          balance: data.balance,
+          openingBalance: data.periodBalances.opening,
+          closingBalance: data.periodBalances.closing,
           income: data.income,
           expenses: data.expenses,
-          goals: data.goals,
           averageDailyExpense: data.averageDailyExpense
         }}
       />
@@ -411,7 +465,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             <div>
               <h2 className="text-xl font-semibold">Movimento recente</h2>
               <p className="mt-1 text-sm text-[var(--color-muted-foreground)]">
-                Últimos lançamentos registrados na sua conta financeira.
+                {movementSectionCopy}
               </p>
             </div>
             <Link className="text-sm font-medium text-[var(--color-primary)]" href={`/dashboard/transactions?month=${month}`}>
@@ -426,12 +480,19 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                   <div className="min-w-0 flex-1">
                     <p className="break-words text-sm font-medium">{transaction.description}</p>
                     <p className="break-words text-xs text-[var(--color-muted-foreground)]">
-                      {formatDate(transaction.date)} • {transaction.category?.name ?? "Sem categoria"} •{" "}
+                      {transaction.card ? `Compra em ${formatDate(transaction.date)}` : formatDate(transaction.date)} •{" "}
+                      {transaction.category?.name ?? "Sem categoria"} •{" "}
                       {transaction.card?.name ??
                         (transaction.destinationAccount
                           ? `${transaction.financialAccount?.name ?? "Sem origem"} → ${transaction.destinationAccount.name}`
                           : transaction.financialAccount?.name ?? "Sem origem")}
                     </p>
+                    {transaction.card && transaction.competenceDate && transaction.payableDate ? (
+                      <p className="mt-1 break-words text-xs text-[var(--color-muted-foreground)]">
+                        Competência {formatMonthKeyLabel(formatMonthFromDate(transaction.competenceDate))} • vence{" "}
+                        {formatDate(transaction.payableDate)}
+                      </p>
+                    ) : null}
                   </div>
                   <p
                     className={`w-full break-words text-left text-sm font-semibold sm:w-auto sm:text-right ${
@@ -459,7 +520,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           <article className="surface content-section">
             <div className="flex items-center gap-3">
               <BellRing className="size-5 text-[var(--color-primary)]" />
-              <h2 className="text-xl font-semibold">Próximos vencimentos</h2>
+              <h2 className="text-xl font-semibold">{dueSectionTitle}</h2>
             </div>
 
             <div className="mt-5 space-y-3">
@@ -488,7 +549,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                 ))
               ) : (
                 <div className="muted-panel border border-dashed px-4 py-6 text-sm text-[var(--color-muted-foreground)]">
-                  Nenhuma cobrança futura encontrada.
+                  {dueSectionEmpty}
                 </div>
               )}
             </div>
@@ -497,7 +558,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           <article className="surface content-section">
             <div className="flex items-center gap-3">
               <Target className="size-5 text-[var(--color-gold-500)]" />
-              <h2 className="text-xl font-semibold">Metas com prazo próximo</h2>
+              <h2 className="text-xl font-semibold">{goalSectionTitle}</h2>
             </div>
 
             <div className="mt-5 space-y-3">
