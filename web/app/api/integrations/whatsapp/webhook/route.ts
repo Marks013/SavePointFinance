@@ -56,25 +56,29 @@ export async function POST(request: Request) {
   }
 
   after(async () => {
-    const processingResults = await Promise.allSettled(
-      messages.map((message) =>
-        processWhatsAppMessageAsync({
-          eventId: message.eventId,
-          phoneNumber: message.phoneNumber,
-          body: message.body,
-          type: message.type,
-          payload
-        })
-      )
-    );
+    try {
+      const processingResults = await Promise.allSettled(
+        messages.map((message) =>
+          processWhatsAppMessageAsync({
+            eventId: message.eventId,
+            phoneNumber: message.phoneNumber,
+            body: message.body,
+            type: message.type,
+            payload
+          })
+        )
+      );
 
-    for (const [index, result] of processingResults.entries()) {
-      if (result.status === "rejected") {
-        console.error(
-          `[WhatsApp] Fatal async error for webhook event ${messages[index]?.eventId ?? "unknown"}`,
-          result.reason
-        );
+      for (const [index, result] of processingResults.entries()) {
+        if (result.status === "rejected") {
+          console.error(
+            `[WhatsApp] Fatal async error for webhook event ${messages[index]?.eventId ?? "unknown"}`,
+            result.reason
+          );
+        }
       }
+    } catch (error) {
+      console.error("[WhatsApp] Unhandled after() failure", error);
     }
   });
 

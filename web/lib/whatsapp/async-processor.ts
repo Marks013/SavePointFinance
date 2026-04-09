@@ -72,22 +72,22 @@ async function createWebhookLock(eventId: string, payload: WhatsAppWebhookPayloa
 }
 
 export async function processWhatsAppMessageAsync(input: ProcessWhatsAppMessageAsyncInput) {
-  const acquiredLock = await createWebhookLock(input.eventId, input.payload);
-
-  if (!acquiredLock) {
-    return;
-  }
-
-  if (input.type !== "text" || !input.phoneNumber || !input.body) {
-    await markWebhookStatus(
-      input.eventId,
-      "SUCCESS",
-      "Ignored webhook without a supported text message payload."
-    );
-    return;
-  }
-
   try {
+    const acquiredLock = await createWebhookLock(input.eventId, input.payload);
+
+    if (!acquiredLock) {
+      return;
+    }
+
+    if (input.type !== "text" || !input.phoneNumber || !input.body) {
+      await markWebhookStatus(
+        input.eventId,
+        "SUCCESS",
+        "Ignored webhook without a supported text message payload."
+      );
+      return;
+    }
+
     const result = await processIncomingWhatsAppTextMessage({
       messageId: input.eventId,
       phoneNumber: input.phoneNumber,
@@ -127,6 +127,8 @@ export async function processWhatsAppMessageAsync(input: ProcessWhatsAppMessageA
   } catch (error) {
     const errorMessage = getErrorMessage(error);
     console.error(`[WhatsApp] Failed to process webhook event ${input.eventId}`, error);
-    await markWebhookStatus(input.eventId, "FAILED", errorMessage);
+    if (input.eventId) {
+      await markWebhookStatus(input.eventId, "FAILED", errorMessage);
+    }
   }
 }

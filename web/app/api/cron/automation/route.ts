@@ -13,6 +13,13 @@ function isAuthorized(request: Request) {
   return bearerToken === serverEnv.AUTOMATION_CRON_SECRET || fallbackToken === serverEnv.AUTOMATION_CRON_SECRET;
 }
 
+async function pruneWebhookEvents() {
+  return prisma.$executeRaw`
+    DELETE FROM "WebhookEvent"
+    WHERE "createdAt" < NOW() - INTERVAL '30 days'
+  `;
+}
+
 export async function POST(request: Request) {
   try {
     if (!isAuthorized(request)) {
@@ -87,9 +94,12 @@ export async function POST(request: Request) {
       });
     }
 
+    const prunedWebhookEvents = await pruneWebhookEvents();
+
     return NextResponse.json({
       processedTenants: results.filter((item) => !item.skipped).length,
       skippedTenants: results.filter((item) => item.skipped).length,
+      prunedWebhookEvents,
       results
     });
   } catch {
