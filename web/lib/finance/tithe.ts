@@ -1,6 +1,6 @@
 import { Prisma, type PrismaClient } from "@prisma/client";
 
-import { buildCategoryKeywords, defaultCategories } from "@/lib/finance/default-categories";
+import { buildCategoryKeywords, defaultCategories, getDefaultCategorySystemKey } from "@/lib/finance/default-categories";
 import { prisma } from "@/lib/prisma/client";
 import { formatDateKey } from "@/lib/date";
 
@@ -53,6 +53,7 @@ export async function ensureTitheCategory(tenantId: string, client: TitheClient 
     data: {
       tenantId,
       name: definition.name,
+      systemKey: definition.systemKey ?? getDefaultCategorySystemKey(definition.type, definition.name),
       icon: definition.icon,
       color: definition.color,
       type: definition.type,

@@ -1,5 +1,10 @@
-import type { Category, PaymentMethod } from "@prisma/client";
+import type { Category, ClassificationSource, PaymentMethod } from "@prisma/client";
 
+import {
+  buildNormalizedClassificationText,
+  normalizeClassificationText,
+  tokenizeClassificationText
+} from "@/lib/finance/classification-normalization";
 import { serverEnv } from "@/lib/env/server";
 import { dedupeKeywords, getFallbackCategoryName } from "@/lib/finance/default-categories";
 
@@ -22,6 +27,8 @@ type ClassificationResult = {
   categoryId: string | null;
   confidence: number | null;
   aiClassified: boolean;
+  classificationSource: ClassificationSource;
+  classificationKeyword: string | null;
   reason: string;
 };
 
@@ -235,20 +242,11 @@ for (const signal of semanticSignals) {
 }
 
 function normalizeText(value: string) {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  return normalizeClassificationText(value);
 }
 
 function tokenize(value: string) {
-  return normalizeText(value)
-    .split(" ")
-    .map((item) => item.trim())
-    .filter((item) => item.length >= 2);
+  return tokenizeClassificationText(value);
 }
 
 function expandContext(tokens: string[]) {
@@ -446,6 +444,19 @@ function extractGeminiText(payload: unknown) {
   return null;
 }
 
+const INTERNAL_MATCH_REASONS = new Set([
+  "nome exato",
+  "nome da categoria",
+  "estabelecimento",
+  "contexto semantico",
+  "historico exato",
+  "historico semelhante"
+]);
+
+function resolveClassificationKeyword(matchedKeywords: string[]) {
+  return matchedKeywords.find((item) => !INTERNAL_MATCH_REASONS.has(normalizeText(item))) ?? null;
+}
+
 async function refineWithGemini(
   input: ClassifyTransactionInput,
   candidates: Array<{ id: string; name: string; score: number }>
@@ -627,6 +638,8 @@ async function refineWithGemini(
           categoryId: mapped.id,
           confidence: Math.max(0, Math.min(Number(parsed.confidence ?? 0.5), 0.99)),
           aiClassified: true,
+          classificationSource: "ai_runtime",
+          classificationKeyword: null,
           reason: parsed.rationale?.trim() || "Classificação contextual por IA"
         } satisfies ClassificationResult,
         failureReason: null
@@ -669,6 +682,8 @@ export async function classifyTransactionCategory(
       categoryId: null,
       confidence: null,
       aiClassified: false,
+      classificationSource: "unknown",
+      classificationKeyword: null,
       reason: "Transferências não usam categoria"
     };
   }
@@ -680,11 +695,13 @@ export async function classifyTransactionCategory(
       categoryId: null,
       confidence: null,
       aiClassified: false,
+      classificationSource: "unknown",
+      classificationKeyword: null,
       reason: "Sem categorias disponíveis"
     };
   }
 
-  const haystack = normalizeText(`${input.description} ${input.notes ?? ""}`);
+  const haystack = buildNormalizedClassificationText(input.description, input.notes ?? null);
   const tokens = expandContext(tokenize(`${input.description} ${input.notes ?? ""}`));
   const ranked = typedCategories
     .map((category) => ({
@@ -702,6 +719,8 @@ export async function classifyTransactionCategory(
       categoryId: best.id,
       confidence: Math.min(0.92, 0.52 + best.score / 24),
       aiClassified: false,
+      classificationSource: "category_keyword",
+      classificationKeyword: resolveClassificationKeyword(best.matchedKeywords),
       reason: "Correspondencia semantica forte"
     };
   }
@@ -711,6 +730,8 @@ export async function classifyTransactionCategory(
       categoryId: best.id,
       confidence: Math.min(0.94, 0.46 + best.score / 20),
       aiClassified: false,
+      classificationSource: "category_keyword",
+      classificationKeyword: resolveClassificationKeyword(best.matchedKeywords),
       reason: best.matchedKeywords.length
         ? `Correspondência com ${best.matchedKeywords.slice(0, 3).join(", ")}`
         : "Correspondência contextual"
@@ -734,6 +755,8 @@ export async function classifyTransactionCategory(
     categoryId: fallback?.id ?? best?.id ?? null,
     confidence: best?.score ? Math.min(0.68, 0.32 + best.score / 28) : 0.24,
     aiClassified: false,
+    classificationSource: best?.score ? "category_keyword" : "fallback",
+    classificationKeyword: best ? resolveClassificationKeyword(best.matchedKeywords) : null,
     reason: aiAttempt?.failureReason
       ? `Fallback local após indisponibilidade do Gemini: ${aiAttempt.failureReason}`
       : best?.score

@@ -1,7 +1,18 @@
-import { type PaymentMethod, type Prisma, type TransactionType } from "@prisma/client";
+import {
+  type ClassificationSource,
+  type PaymentMethod,
+  type Prisma,
+  type TransactionType
+} from "@prisma/client";
 
 import { classifyTransactionCategory } from "@/lib/finance/category-classifier";
+import { getTenantClassificationContext } from "@/lib/finance/classification-cache";
+import {
+  matchCategoryKeywords,
+  matchTenantCategoryRules
+} from "@/lib/finance/category-rules";
 import { ensureFallbackCategory } from "@/lib/finance/default-categories";
+import { matchGlobalKeywordContext } from "@/lib/finance/global-keywords";
 import { prisma } from "@/lib/prisma/client";
 
 type ClassificationInput = {
@@ -18,6 +29,8 @@ type ClassificationOutput = {
   categoryId: string | null;
   confidence: number | null;
   aiClassified: boolean;
+  classificationSource: ClassificationSource;
+  classificationKeyword: string | null;
   reason: string;
 };
 
@@ -29,6 +42,8 @@ export async function resolveTransactionClassification(
       categoryId: null,
       confidence: null,
       aiClassified: false,
+      classificationSource: "unknown",
+      classificationKeyword: null,
       reason: "Transferências não usam categoria"
     };
   }
@@ -38,21 +53,93 @@ export async function resolveTransactionClassification(
       categoryId: input.categoryId,
       confidence: null,
       aiClassified: false,
+      classificationSource: "manual_input",
+      classificationKeyword: null,
       reason: "Categoria definida manualmente"
     };
   }
 
-  const categories = await prisma.category.findMany({
-    where: {
-      tenantId: input.tenantId
-    },
-    select: {
-      id: true,
-      name: true,
-      type: true,
-      keywords: true
+  const { categories, rules: categoryRules } = await getTenantClassificationContext(input.tenantId);
+
+  const manualRuleMatch = matchTenantCategoryRules(
+    categoryRules.filter((rule) => rule.source === "manual"),
+    {
+      type: input.type,
+      description: input.description,
+      notes: input.notes ?? null
     }
+  );
+
+  if (manualRuleMatch) {
+    return {
+      categoryId: manualRuleMatch.categoryId,
+      confidence: manualRuleMatch.confidence,
+      aiClassified: false,
+      classificationSource: manualRuleMatch.classificationSource,
+      classificationKeyword: manualRuleMatch.classificationKeyword,
+      reason: manualRuleMatch.reason
+    };
+  }
+
+  const categoryKeywordMatch = matchCategoryKeywords(categories, {
+    type: input.type,
+    description: input.description,
+    notes: input.notes ?? null
   });
+
+  if (categoryKeywordMatch) {
+    return {
+      categoryId: categoryKeywordMatch.categoryId,
+      confidence: categoryKeywordMatch.confidence,
+      aiClassified: false,
+      classificationSource: categoryKeywordMatch.classificationSource,
+      classificationKeyword: categoryKeywordMatch.classificationKeyword,
+      reason: categoryKeywordMatch.reason
+    };
+  }
+
+  const aiLearnedRuleMatch = matchTenantCategoryRules(
+    categoryRules.filter((rule) => rule.source === "ai_learned"),
+    {
+      type: input.type,
+      description: input.description,
+      notes: input.notes ?? null
+    }
+  );
+
+  if (aiLearnedRuleMatch) {
+    return {
+      categoryId: aiLearnedRuleMatch.categoryId,
+      confidence: aiLearnedRuleMatch.confidence,
+      aiClassified: true,
+      classificationSource: aiLearnedRuleMatch.classificationSource,
+      classificationKeyword: aiLearnedRuleMatch.classificationKeyword,
+      reason: aiLearnedRuleMatch.reason
+    };
+  }
+
+  const globalMatch = matchGlobalKeywordContext({
+    description: input.description,
+    notes: input.notes ?? null,
+    type: input.type
+  });
+
+  if (globalMatch) {
+    const globalCategory = categories.find(
+      (category) => category.type === input.type && category.systemKey === globalMatch.categoryKey
+    );
+
+    if (globalCategory) {
+      return {
+        categoryId: globalCategory.id,
+        confidence: globalMatch.confidence,
+        aiClassified: false,
+        classificationSource: "global_context",
+        classificationKeyword: globalMatch.keyword,
+        reason: `Contexto global: ${globalMatch.keyword}`
+      };
+    }
+  }
 
   const historyWhere: Prisma.TransactionWhereInput = {
     tenantId: input.tenantId,

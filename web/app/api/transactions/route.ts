@@ -133,9 +133,13 @@ export async function GET(request: Request) {
         applyTithe: Number(transaction.titheAmount ?? 0) > 0,
         classification: transaction.categoryId
           ? {
-              auto: transaction.aiClassified || transaction.aiConfidence !== null,
+              auto:
+                transaction.classificationSource !== "manual_input" &&
+                transaction.classificationSource !== "manual_rule" &&
+                transaction.classificationSource !== "unknown",
               ai: transaction.aiClassified,
-              confidence: transaction.aiConfidence ? Number(transaction.aiConfidence) : null
+              confidence: transaction.aiConfidence ? Number(transaction.aiConfidence) : null,
+              source: transaction.classificationSource
             }
           : null
       }))
@@ -229,6 +233,10 @@ export async function POST(request: Request) {
           parentId,
           titheAmount: applyTithe ? new Prisma.Decimal((installmentAmounts[index] * 0.1).toFixed(2)) : null,
           titheCategoryId,
+          classificationSource: classification.classificationSource,
+          classificationKeyword: classification.classificationKeyword,
+          classificationReason: classification.reason,
+          classificationVersion: 2,
           aiClassified: classification.aiClassified,
           aiConfidence:
             classification.confidence !== null ? new Prisma.Decimal(classification.confidence.toFixed(2)) : null
@@ -286,6 +294,7 @@ export async function POST(request: Request) {
               auto: !body.categoryId,
               ai: classification.aiClassified,
               confidence: classification.confidence,
+              source: classification.classificationSource,
               reason: classification.reason
             }
           : null

@@ -21,6 +21,28 @@ enum CategoryType {
   expense
 }
 
+enum ClassificationSource {
+  manual_input
+  manual_rule
+  category_keyword
+  global_context
+  ai_learned
+  ai_runtime
+  fallback
+  unknown
+}
+
+enum CategoryRuleSource {
+  manual
+  ai_learned
+  imported
+}
+
+enum CategoryRuleMatchMode {
+  exact_phrase
+  contains_phrase
+}
+
 enum AccountType {
   checking
   savings
@@ -96,6 +118,7 @@ model Tenant {
   planConfig     Plan               @relation(fields: [planId], references: [id], onDelete: Restrict)
   users          User[]
   categories     Category[]
+  categoryRules  CategoryRule[]
   financials     FinancialAccount[]
   cards          Card[]
   transactions   Transaction[]
@@ -187,6 +210,7 @@ model Category {
   id           String        @id @default(cuid())
   tenantId     String
   parentId     String?
+  systemKey    String?
   name         String
   icon         String        @default("tag")
   color        String        @default("#6B7280")
@@ -198,13 +222,39 @@ model Category {
   tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   parent       Category?     @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
   children     Category[]    @relation("CategoryTree")
+  rules        CategoryRule[]
   transactions Transaction[] @relation("TransactionCategory")
   titheUsages  Transaction[] @relation("TransactionTitheCategory")
   subscriptions Subscription[]
 
   @@index([tenantId, type])
+  @@index([tenantId, type, systemKey])
   @@index([parentId])
   @@unique([tenantId, type, name])
+}
+
+model CategoryRule {
+  id                       String                 @id @default(cuid())
+  tenantId                 String
+  categoryId               String
+  type                     CategoryType
+  normalizedKeyword        String
+  matchMode                CategoryRuleMatchMode  @default(exact_phrase)
+  source                   CategoryRuleSource
+  priority                 Int                    @default(100)
+  confidence               Decimal?               @db.Decimal(3, 2)
+  createdFromTransactionId String?
+  hitCount                 Int                    @default(0)
+  lastMatchedAt            DateTime?
+  isActive                 Boolean                @default(true)
+  createdAt                DateTime               @default(now())
+  updatedAt                DateTime               @updatedAt
+  tenant                   Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  category                 Category               @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, type, normalizedKeyword, source, matchMode])
+  @@index([tenantId, type, isActive, priority])
+  @@index([categoryId, isActive])
 }
 
 model FinancialAccount {
@@ -279,6 +329,10 @@ model Transaction {
   installmentsTotal Int               @default(1)
   installmentNumber Int               @default(1)
   parentId          String?
+  classificationSource ClassificationSource @default(unknown)
+  classificationKeyword String?
+  classificationReason  String?
+  classificationVersion Int               @default(2)
   aiClassified      Boolean           @default(false)
   aiConfidence      Decimal?          @db.Decimal(3, 2)
   titheAmount       Decimal?          @db.Decimal(15, 2)

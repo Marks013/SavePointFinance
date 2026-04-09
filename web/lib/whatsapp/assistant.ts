@@ -6,9 +6,10 @@ import {
   getStatementPaymentDate,
   getStatementRange
 } from "@/lib/cards/statement";
-import { classifyTransactionCategory } from "@/lib/finance/category-classifier";
 import { getAccountsWithComputedBalance } from "@/lib/finance/accounts";
+import { normalizeClassificationText } from "@/lib/finance/classification-normalization";
 import { ensureFallbackCategory } from "@/lib/finance/default-categories";
+import { resolveTransactionClassification } from "@/lib/finance/transaction-classification";
 import { resolveTenantLicenseState } from "@/lib/licensing/policy";
 import { prisma } from "@/lib/prisma/client";
 import { addMonthsClamped, formatCurrency, splitAmountIntoInstallments } from "@/lib/utils";
@@ -55,13 +56,7 @@ type IncomingTextMessage = {
 };
 
 function normalizeText(value: string) {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  return normalizeClassificationText(value);
 }
 
 function formatDate(value: Date) {
@@ -236,7 +231,7 @@ async function createExpenseOrIncomeFromText(user: WhatsAppUser, body: string, t
     } satisfies AssistantResult;
   }
 
-  const [accounts, cards, categories, history] = await Promise.all([
+  const [accounts, cards] = await Promise.all([
     getAccountsWithComputedBalance(user.tenantId),
     prisma.card.findMany({
       where: {
@@ -246,35 +241,6 @@ async function createExpenseOrIncomeFromText(user: WhatsAppUser, body: string, t
       orderBy: {
         name: "asc"
       }
-    }),
-    prisma.category.findMany({
-      where: {
-        tenantId: user.tenantId
-      },
-      select: {
-        id: true,
-        name: true,
-        type: true,
-        keywords: true
-      }
-    }),
-    prisma.transaction.findMany({
-      where: {
-        tenantId: user.tenantId,
-        type,
-        categoryId: {
-          not: null
-        }
-      },
-      select: {
-        categoryId: true,
-        description: true,
-        notes: true,
-        aiClassified: true,
-        aiConfidence: true
-      },
-      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-      take: 250
     })
   ]);
   const activeAccounts = accounts.filter((item) => item.isActive);
@@ -343,25 +309,27 @@ async function createExpenseOrIncomeFromText(user: WhatsAppUser, body: string, t
     selectedCard ? [selectedCard.name, selectedCard.brand, selectedCard.institution ?? ""] : []
   );
 
-  const classification = await classifyTransactionCategory({
+  const classification = await resolveTransactionClassification({
+    tenantId: user.tenantId,
     type,
     description,
     notes: null,
-    paymentMethod,
-    categories,
-    history: history
-      .filter((item): item is typeof item & { categoryId: string } => Boolean(item.categoryId))
-      .map((item) => ({
-        categoryId: item.categoryId,
-        description: item.description,
-        notes: item.notes,
-        aiClassified: item.aiClassified,
-        aiConfidence: item.aiConfidence ? Number(item.aiConfidence) : null
-      }))
+    paymentMethod
   });
 
   const installmentAmounts = splitAmountIntoInstallments(amountData.value, installments);
   const resolvedCategoryId = classification.categoryId || (await ensureFallbackCategory(user.tenantId, type));
+  const resolvedCategory = resolvedCategoryId
+    ? await prisma.category.findFirst({
+        where: {
+          tenantId: user.tenantId,
+          id: resolvedCategoryId
+        },
+        select: {
+          name: true
+        }
+      })
+    : null;
   let parentId: string | null = null;
 
   for (let index = 0; index < installments; index += 1) {
@@ -382,6 +350,10 @@ async function createExpenseOrIncomeFromText(user: WhatsAppUser, body: string, t
         installmentsTotal: installments,
         installmentNumber: index + 1,
         parentId,
+        classificationSource: classification.classificationSource,
+        classificationKeyword: classification.classificationKeyword,
+        classificationReason: classification.reason,
+        classificationVersion: 2,
         aiClassified: classification.aiClassified,
         aiConfidence:
           classification.confidence !== null ? new Prisma.Decimal(classification.confidence.toFixed(2)) : null
@@ -396,9 +368,7 @@ async function createExpenseOrIncomeFromText(user: WhatsAppUser, body: string, t
   const targetLabel = selectedCard
     ? `cartão ${selectedCard.name}`
     : `conta ${account?.name ?? "informada"}`;
-  const category = classification.categoryId
-    ? categories.find((item) => item.id === classification.categoryId)?.name ?? "Categoria sugerida"
-    : categories.find((item) => item.id === resolvedCategoryId)?.name ?? "Outros";
+  const category = resolvedCategory?.name ?? "Outros";
 
   return {
     intent: type === "income" ? "launch_income" : "launch_expense",
