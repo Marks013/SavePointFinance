@@ -75,11 +75,23 @@ async function sendWithResend(input: NotificationInput) {
     })
   });
 
+  const payloadText = await response.text().catch(() => "");
+  let providerError: string | null = null;
+
+  if (!response.ok) {
+    try {
+      const payload = JSON.parse(payloadText) as { message?: string; error?: { message?: string } };
+      providerError = payload.error?.message ?? payload.message ?? null;
+    } catch {
+      providerError = payloadText.trim() || null;
+    }
+  }
+
   return {
     ok: response.ok,
     skipped: false,
     status: response.status,
-    error: response.ok ? null : `Resend respondeu ${response.status}`
+    error: response.ok ? null : providerError ? `Resend respondeu ${response.status}: ${providerError}` : `Resend respondeu ${response.status}`
   } satisfies DeliveryResult;
 }
 

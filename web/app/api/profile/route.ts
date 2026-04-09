@@ -64,7 +64,8 @@ export async function GET() {
         emailNotifications: profile.preferences?.emailNotifications ?? true,
         monthlyReports: profile.preferences?.monthlyReports ?? true,
         budgetAlerts: profile.preferences?.budgetAlerts ?? true,
-        dueReminders: profile.preferences?.dueReminders ?? true
+        dueReminders: profile.preferences?.dueReminders ?? true,
+        autoTithe: profile.preferences?.autoTithe ?? false
       }
     });
   } catch (error) {
@@ -89,6 +90,7 @@ export async function PATCH(request: Request) {
         monthlyReports: boolean;
         budgetAlerts: boolean;
         dueReminders: boolean;
+        autoTithe: boolean;
       };
     };
 
@@ -107,7 +109,8 @@ export async function PATCH(request: Request) {
               emailNotifications: body.preferences.emailNotifications,
               monthlyReports: body.preferences.monthlyReports,
               budgetAlerts: body.preferences.budgetAlerts,
-              dueReminders: body.preferences.dueReminders
+              dueReminders: body.preferences.dueReminders,
+              autoTithe: body.preferences.autoTithe
             },
             update: {
               currency: body.preferences.currency.trim().toUpperCase(),
@@ -115,7 +118,8 @@ export async function PATCH(request: Request) {
               emailNotifications: body.preferences.emailNotifications,
               monthlyReports: body.preferences.monthlyReports,
               budgetAlerts: body.preferences.budgetAlerts,
-              dueReminders: body.preferences.dueReminders
+              dueReminders: body.preferences.dueReminders,
+              autoTithe: body.preferences.autoTithe
             }
           }
         }

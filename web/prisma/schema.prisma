@@ -177,7 +177,7 @@ model UserPreference {
   monthlyReports     Boolean  @default(true)
   budgetAlerts       Boolean  @default(true)
   dueReminders       Boolean  @default(true)
-  autoTithe          Boolean  @default(true)
+  autoTithe          Boolean  @default(false)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
   user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)

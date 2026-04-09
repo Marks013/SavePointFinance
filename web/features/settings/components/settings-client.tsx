@@ -56,6 +56,7 @@ type ProfilePayload = {
     monthlyReports: boolean;
     budgetAlerts: boolean;
     dueReminders: boolean;
+    autoTithe: boolean;
   };
 };
 
@@ -96,6 +97,7 @@ type SettingsFormValues = {
   monthlyReports: boolean;
   budgetAlerts: boolean;
   dueReminders: boolean;
+  autoTithe: boolean;
 };
 
 function formatNotificationStatus(status: string) {
@@ -193,7 +195,8 @@ export function SettingsClient() {
       emailNotifications: true,
       monthlyReports: true,
       budgetAlerts: true,
-      dueReminders: true
+      dueReminders: true,
+      autoTithe: false
     },
     values: profileQuery.data
       ? {
@@ -204,7 +207,8 @@ export function SettingsClient() {
           emailNotifications: profileQuery.data.preferences.emailNotifications,
           monthlyReports: profileQuery.data.preferences.monthlyReports,
           budgetAlerts: profileQuery.data.preferences.budgetAlerts,
-          dueReminders: profileQuery.data.preferences.dueReminders
+          dueReminders: profileQuery.data.preferences.dueReminders,
+          autoTithe: profileQuery.data.preferences.autoTithe
         }
       : undefined
   });
@@ -223,7 +227,8 @@ export function SettingsClient() {
             emailNotifications: values.emailNotifications,
             monthlyReports: values.monthlyReports,
             budgetAlerts: values.budgetAlerts,
-            dueReminders: values.dueReminders
+            dueReminders: values.dueReminders,
+            autoTithe: values.autoTithe
           }
         })
       });
@@ -380,6 +385,7 @@ export function SettingsClient() {
               <label className="muted-panel flex items-center gap-3 text-sm"><input className="app-checkbox" type="checkbox" {...form.register("monthlyReports")} /> Relatórios mensais</label>
               <label className="muted-panel flex items-center gap-3 text-sm"><input className="app-checkbox" type="checkbox" {...form.register("budgetAlerts")} /> Alertas de orçamento</label>
               <label className="muted-panel flex items-center gap-3 text-sm"><input className="app-checkbox" type="checkbox" {...form.register("dueReminders")} /> Lembretes de vencimento</label>
+              <label className="muted-panel flex items-center gap-3 text-sm"><input className="app-checkbox" type="checkbox" {...form.register("autoTithe")} /> Marcar dízimo por padrão em novas receitas</label>
             </div>
             <Button className="w-full" disabled={profileMutation.isPending} type="submit">
               {profileMutation.isPending ? "Salvando..." : "Salvar configurações"}

@@ -5,6 +5,9 @@ import { PaymentMethod } from "@prisma/client";
 
 loadEnv({ path: resolve(process.cwd(), "../.env"), override: false });
 loadEnv({ path: resolve(process.cwd(), ".env"), override: false });
+process.env.DATABASE_URL ||= "postgresql://audit:auditoria@localhost:5432/audit";
+process.env.AUTH_SECRET ||= "audit-secret";
+process.env.AUTOMATION_CRON_SECRET ||= "audit-cron-secret";
 
 function assertCondition(condition: unknown, message: string): asserts condition {
   if (!condition) {

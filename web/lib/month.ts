@@ -55,6 +55,27 @@ export function formatMonthKeyCompactLabel(monthKey: string) {
   return `${monthLabel}/${year}`;
 }
 
+export function getYearFromMonthKey(monthKey: string) {
+  return normalizeMonthKey(monthKey).slice(0, 4);
+}
+
+export function getYearRange(yearOrMonthKey: string) {
+  const year = Number(yearOrMonthKey.length >= 4 ? yearOrMonthKey.slice(0, 4) : yearOrMonthKey);
+  const start = new Date(year, 0, 1, 0, 0, 0, 0);
+  const end = new Date(year, 11, 31, 23, 59, 59, 999);
+
+  return {
+    start,
+    end,
+    from: formatDateKey(start),
+    to: formatDateKey(end)
+  };
+}
+
+export function formatYearLabel(yearOrMonthKey: string) {
+  return `ano de ${getYearFromMonthKey(yearOrMonthKey)}`;
+}
+
 export function addMonthsToMonthKey(monthKey: string, offset: number) {
   const normalizedMonth = normalizeMonthKey(monthKey);
   const [year, month] = normalizedMonth.split("-").map(Number);

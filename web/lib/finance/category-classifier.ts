@@ -25,6 +25,11 @@ type ClassificationResult = {
   reason: string;
 };
 
+type GeminiRefinementResult = {
+  classification: ClassificationResult | null;
+  failureReason: string | null;
+};
+
 const contextualAliases: Record<string, string[]> = {
   mercado: ["supermercado", "mercado", "compras mercado", "compras casa"],
   mercadinho: ["supermercado", "mercado"],
@@ -444,11 +449,14 @@ function extractGeminiText(payload: unknown) {
 async function refineWithGemini(
   input: ClassifyTransactionInput,
   candidates: Array<{ id: string; name: string; score: number }>
-) {
+): Promise<GeminiRefinementResult> {
   const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey) {
-    return null;
+    return {
+      classification: null,
+      failureReason: "GEMINI_API_KEY ausente"
+    };
   }
 
   const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
@@ -472,113 +480,185 @@ async function refineWithGemini(
     })
     .join("\n");
   const candidateNames = candidates.map((item) => item.name);
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 1200);
+  const configuredTimeout = Number(process.env.GEMINI_TIMEOUT_MS ?? 5000);
+  const timeoutMs = Number.isFinite(configuredTimeout)
+    ? Math.min(Math.max(Math.round(configuredTimeout), 1000), 15000)
+    : 5000;
+  const configuredAttempts = Number(process.env.GEMINI_RETRY_ATTEMPTS ?? 3);
+  const maxAttempts = Number.isFinite(configuredAttempts)
+    ? Math.min(Math.max(Math.round(configuredAttempts), 1), 4)
+    : 3;
+  let lastFailureReason: string | null = null;
 
-  try {
-    const response = await fetch(baseUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": apiKey
-      },
-      signal: controller.signal,
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              {
-                text: [
-                  "Você é um classificador de lançamentos financeiros de um app brasileiro de finanças pessoais.",
-                  "Escolha exatamente uma categoria já existente para o lançamento informado.",
-                  "Nunca invente categoria, nunca responda texto fora do JSON e nunca explique além dos campos pedidos.",
-                  "",
-                  "Regras obrigatórias:",
-                  "1. Escolha somente entre as categorias fornecidas.",
-                  "2. Considere português do Brasil, com e sem acento, maiúsculas/minúsculas e nomes abreviados.",
-                  "3. Priorize nesta ordem: estabelecimento/marca, item ou serviço comprado, contexto semântico, histórico manual da carteira e forma de pagamento apenas como desempate.",
-                  "4. Se a descrição sugerir assinatura, streaming, mercado, farmácia, padaria, transporte, combustível ou contas da casa, use o contexto do gasto real e não palavras genéricas.",
-                  "5. Se houver duas opções parecidas, escolha a mais específica para o consumo descrito.",
-                  "6. A confiança deve ficar entre 0.51 e 0.98.",
-                  "",
-                  "Saída obrigatória em JSON válido:",
-                  '{"category":"nome exato da categoria","confidence":0.78,"rationale":"motivo curto e objetivo"}',
-                  "",
-                  `Tipo do lançamento: ${input.type}`,
-                  `Descrição: ${input.description}`,
-                  `Observações: ${input.notes ?? "sem observações"}`,
-                  `Forma de pagamento: ${input.paymentMethod}`,
-                  "",
-                  "Categorias candidatas:",
-                  candidateText,
-                  "",
-                  "Histórico manual relevante da carteira:",
-                  historyText || "- sem histórico manual relevante"
-                ].join("\n")
-              }
-            ]
-          }
-        ],
-        generationConfig: {
-          responseMimeType: "application/json",
-          responseJsonSchema: {
-            type: "object",
-            properties: {
-              category: {
-                type: "string",
-                enum: candidateNames
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const response = await fetch(baseUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": apiKey
+        },
+        signal: controller.signal,
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  text: [
+                    "Você é um classificador de lançamentos financeiros de um app brasileiro de finanças pessoais.",
+                    "Escolha exatamente uma categoria já existente para o lançamento informado.",
+                    "Nunca invente categoria, nunca responda texto fora do JSON e nunca explique além dos campos pedidos.",
+                    "",
+                    "Regras obrigatórias:",
+                    "1. Escolha somente entre as categorias fornecidas.",
+                    "2. Considere português do Brasil, com e sem acento, maiúsculas/minúsculas e nomes abreviados.",
+                    "3. Priorize nesta ordem: estabelecimento/marca, item ou serviço comprado, contexto semântico, histórico manual da carteira e forma de pagamento apenas como desempate.",
+                    "4. Se a descrição sugerir assinatura, streaming, mercado, farmácia, padaria, transporte, combustível ou contas da casa, use o contexto do gasto real e não palavras genéricas.",
+                    "5. Se houver duas opções parecidas, escolha a mais específica para o consumo descrito.",
+                    "6. A confiança deve ficar entre 0.51 e 0.98.",
+                    "",
+                    "Saída obrigatória em JSON válido:",
+                    '{"category":"nome exato da categoria","confidence":0.78,"rationale":"motivo curto e objetivo"}',
+                    "",
+                    `Tipo do lançamento: ${input.type}`,
+                    `Descrição: ${input.description}`,
+                    `Observações: ${input.notes ?? "sem observações"}`,
+                    `Forma de pagamento: ${input.paymentMethod}`,
+                    "",
+                    "Categorias candidatas:",
+                    candidateText,
+                    "",
+                    "Histórico manual relevante da carteira:",
+                    historyText || "- sem histórico manual relevante"
+                  ].join("\n")
+                }
+              ]
+            }
+          ],
+          generationConfig: {
+            responseMimeType: "application/json",
+            responseJsonSchema: {
+              type: "object",
+              properties: {
+                category: {
+                  type: "string",
+                  enum: candidateNames
+                },
+                confidence: {
+                  type: "number"
+                },
+                rationale: {
+                  type: "string"
+                }
               },
-              confidence: {
-                type: "number"
-              },
-              rationale: {
-                type: "string"
-              }
-            },
-            required: ["category", "confidence", "rationale"]
+              required: ["category", "confidence", "rationale"]
+            }
           }
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => "");
+        const failureReason = errorText.trim() ? `Gemini ${response.status}: ${errorText.trim()}` : `Gemini ${response.status}`;
+        const retryable = [429, 500, 502, 503, 504].includes(response.status);
+
+        lastFailureReason = failureReason;
+
+        if (retryable && attempt < maxAttempts) {
+          await new Promise((resolve) => setTimeout(resolve, 250 * attempt));
+          continue;
         }
-      })
-    });
 
-    clearTimeout(timeout);
+        return {
+          classification: null,
+          failureReason
+        };
+      }
 
-    if (!response.ok) {
-      return null;
+      const payload = await response.json();
+      const text = extractGeminiText(payload);
+
+      if (!text) {
+        return {
+          classification: null,
+          failureReason: "Gemini respondeu sem conteúdo utilizável"
+        };
+      }
+
+      let parsed: {
+        category?: string;
+        confidence?: number;
+        rationale?: string;
+      };
+
+      try {
+        parsed = JSON.parse(text) as {
+          category?: string;
+          confidence?: number;
+          rationale?: string;
+        };
+      } catch {
+        return {
+          classification: null,
+          failureReason: "Gemini retornou JSON inválido"
+        };
+      }
+
+      if (!parsed.category) {
+        return {
+          classification: null,
+          failureReason: "Gemini não informou categoria"
+        };
+      }
+
+      const mapped = mapAiCategoryName(input.categories, parsed.category);
+      if (!mapped) {
+        return {
+          classification: null,
+          failureReason: `Gemini sugeriu categoria fora da lista: ${parsed.category}`
+        };
+      }
+
+      return {
+        classification: {
+          categoryId: mapped.id,
+          confidence: Math.max(0, Math.min(Number(parsed.confidence ?? 0.5), 0.99)),
+          aiClassified: true,
+          reason: parsed.rationale?.trim() || "Classificação contextual por IA"
+        } satisfies ClassificationResult,
+        failureReason: null
+      };
+    } catch (error) {
+      const failureReason =
+        error instanceof Error && error.name === "AbortError"
+          ? `tempo limite excedido (${timeoutMs}ms)`
+          : error instanceof Error
+            ? error.message
+            : "falha desconhecida na integração Gemini";
+
+      lastFailureReason = failureReason;
+
+      if (attempt < maxAttempts) {
+        await new Promise((resolve) => setTimeout(resolve, 250 * attempt));
+        continue;
+      }
+
+      return {
+        classification: null,
+        failureReason
+      };
+    } finally {
+      clearTimeout(timeout);
     }
-
-    const payload = await response.json();
-    const text = extractGeminiText(payload);
-
-    if (!text) {
-      return null;
-    }
-
-    const parsed = JSON.parse(text) as {
-      category?: string;
-      confidence?: number;
-      rationale?: string;
-    };
-
-    if (!parsed.category) {
-      return null;
-    }
-
-    const mapped = mapAiCategoryName(input.categories, parsed.category);
-    if (!mapped) {
-      return null;
-    }
-
-    return {
-      categoryId: mapped.id,
-      confidence: Math.max(0, Math.min(Number(parsed.confidence ?? 0.5), 0.99)),
-      aiClassified: true,
-      reason: parsed.rationale?.trim() || "Classificação contextual por IA"
-    } satisfies ClassificationResult;
-  } catch {
-    clearTimeout(timeout);
-    return null;
   }
+
+  return {
+    classification: null,
+    failureReason: lastFailureReason ?? "falha desconhecida na integração Gemini"
+  };
 }
 
 export async function classifyTransactionCategory(
@@ -638,7 +718,7 @@ export async function classifyTransactionCategory(
   }
 
   const fallback = typedCategories.find((item) => item.name === getFallbackCategoryName(typedType));
-  const aiResult =
+  const aiAttempt =
     serverEnv.GEMINI_ENABLED === "true"
       ? await refineWithGemini(
           input,
@@ -646,14 +726,18 @@ export async function classifyTransactionCategory(
         )
       : null;
 
-  if (aiResult) {
-    return aiResult;
+  if (aiAttempt?.classification) {
+    return aiAttempt.classification;
   }
 
   return {
     categoryId: fallback?.id ?? best?.id ?? null,
     confidence: best?.score ? Math.min(0.68, 0.32 + best.score / 28) : 0.24,
     aiClassified: false,
-    reason: best?.score ? "Classificação aproximada por contexto" : "Categoria padrão aplicada"
+    reason: aiAttempt?.failureReason
+      ? `Fallback local após indisponibilidade do Gemini: ${aiAttempt.failureReason}`
+      : best?.score
+        ? "Classificação aproximada por contexto"
+        : "Categoria padrão aplicada"
   };
 }

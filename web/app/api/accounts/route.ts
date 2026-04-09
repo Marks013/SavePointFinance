@@ -4,12 +4,26 @@ import { accountFormSchema } from "@/features/accounts/schemas/account-schema";
 import { requireSessionUser } from "@/lib/auth/session";
 import { getAccountsWithComputedBalance } from "@/lib/finance/accounts";
 import { canCreateAccount } from "@/lib/licensing/server";
+import { getMonthRange, normalizeMonthKey } from "@/lib/month";
 import { prisma } from "@/lib/prisma/client";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const user = await requireSessionUser();
-    const accounts = await getAccountsWithComputedBalance(user.tenantId);
+    const { searchParams } = new URL(request.url);
+    const month = searchParams.get("month");
+    const resolvedMonth = month ? normalizeMonthKey(month) : null;
+    const monthRange = resolvedMonth ? getMonthRange(resolvedMonth) : null;
+    const accounts = await getAccountsWithComputedBalance(
+      user.tenantId,
+      undefined,
+      monthRange
+        ? {
+            start: monthRange.start,
+            end: monthRange.end
+          }
+        : undefined
+    );
 
     return NextResponse.json({
       items: accounts.map((account) => ({
@@ -20,7 +34,13 @@ export async function GET() {
         openingBalance: account.openingBalance,
         currency: account.currency,
         color: account.color,
-        institution: account.institution
+        institution: account.institution,
+        accumulatedNet: account.accumulatedNet,
+        periodIncome: account.periodIncome,
+        periodExpense: account.periodExpense,
+        periodTransferIn: account.periodTransferIn,
+        periodTransferOut: account.periodTransferOut,
+        periodNet: account.periodNet
       }))
     });
   } catch (error) {

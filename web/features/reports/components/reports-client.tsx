@@ -10,10 +10,16 @@ import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { formatDateDisplay } from "@/lib/date";
-import { formatMonthKeyLabel, getMonthRange, normalizeMonthKey } from "@/lib/month";
+import { formatMonthKeyLabel, formatYearLabel, getMonthRange, getYearRange, normalizeMonthKey } from "@/lib/month";
 import { formatCurrency } from "@/lib/utils";
 
 type ReportResponse = {
+  period: {
+    from: string;
+    to: string;
+    scope: "month" | "year" | "custom";
+    months: number;
+  };
   isPlatformAdmin: boolean;
   license: {
     plan: "free" | "pro";
@@ -72,6 +78,38 @@ type ReportResponse = {
     opening: number;
     closing: number;
     net: number;
+  };
+  comparison: {
+    averageIncome: number;
+    averageExpense: number;
+    averageTransfer: number;
+    expenseToIncomeRatio: number | null;
+    transferShare: number;
+    topAccount: {
+      id: string;
+      name: string;
+      income: number;
+      expense: number;
+      transferIn: number;
+      transferOut: number;
+      net: number;
+    } | null;
+    topCard: {
+      id: string;
+      name: string;
+      brand: string;
+      spent: number;
+      refunds: number;
+      netStatement: number;
+      transactions: number;
+    } | null;
+    topCategory: {
+      id: string | null;
+      name: string;
+      total: number;
+      items: number;
+      share: number;
+    } | null;
   };
   filters: {
     from?: string | null;
@@ -206,23 +244,30 @@ export function ReportsClient() {
   const month = normalizeMonthKey(searchParams.get("month"));
   const monthLabel = formatMonthKeyLabel(month);
   const monthRange = useMemo(() => getMonthRange(month), [month]);
+  const yearRange = useMemo(() => getYearRange(month), [month]);
+  const [periodMode, setPeriodMode] = useState<"month" | "year">("month");
   const [filters, setFilters] = useState({
     type: "",
     accountId: "",
     cardId: "",
     categoryId: ""
   });
+  const activeRange = useMemo(
+    () => (periodMode === "year" ? yearRange : monthRange),
+    [monthRange, periodMode, yearRange]
+  );
+  const periodLabel = periodMode === "year" ? formatYearLabel(month) : monthLabel;
   const effectiveFilters = useMemo(
     () => ({
       month,
-      from: monthRange.from,
-      to: monthRange.to,
+      from: activeRange.from,
+      to: activeRange.to,
       type: filters.type,
       accountId: filters.accountId,
       cardId: filters.cardId,
       categoryId: filters.categoryId
     }),
-    [filters.accountId, filters.cardId, filters.categoryId, filters.type, month, monthRange.from, monthRange.to]
+    [activeRange.from, activeRange.to, filters.accountId, filters.cardId, filters.categoryId, filters.type, month]
   );
   const accountsQuery = useQuery({
     queryKey: ["accounts-options"],
@@ -240,7 +285,7 @@ export function ReportsClient() {
     staleTime: 30_000
   });
   const reportsQuery = useQuery({
-    queryKey: ["reports-summary", month, filters],
+    queryKey: ["reports-summary", month, periodMode, filters],
     queryFn: () => getReportSummary(effectiveFilters),
     staleTime: 15_000,
     placeholderData: (previousData) => previousData
@@ -264,15 +309,15 @@ export function ReportsClient() {
   const pdfHref = useMemo(() => {
     const searchParams = new URLSearchParams();
     searchParams.set("month", month);
-    searchParams.set("from", monthRange.from);
-    searchParams.set("to", monthRange.to);
+    searchParams.set("from", activeRange.from);
+    searchParams.set("to", activeRange.to);
     if (filters.type) searchParams.set("type", filters.type);
     if (filters.accountId) searchParams.set("accountId", filters.accountId);
     if (filters.cardId) searchParams.set("cardId", filters.cardId);
     if (filters.categoryId) searchParams.set("categoryId", filters.categoryId);
     const query = searchParams.toString();
     return query ? `/api/reports/pdf?${query}` : "/api/reports/pdf";
-  }, [filters, month, monthRange.from, monthRange.to]);
+  }, [activeRange.from, activeRange.to, filters, month]);
 
   return (
     <div className="space-y-6">
@@ -280,9 +325,9 @@ export function ReportsClient() {
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="page-intro">
             <div className="eyebrow">Relatórios</div>
-            <h1 className="text-3xl font-semibold tracking-[-0.04em]">{`Leitura financeira de ${monthLabel}`}</h1>
+            <h1 className="text-3xl font-semibold tracking-[-0.04em]">{`Leitura financeira de ${periodLabel}`}</h1>
             <p className="text-sm leading-7 text-[var(--color-muted-foreground)]">
-              A competência mensal vem da navegação global. Os filtros abaixo refinam a leitura apenas dentro deste mês.
+              Use o mês ativo para uma leitura mensal ou o ano do mês ativo para um consolidado anual com comparativos.
             </p>
             {data?.isPlatformAdmin ? (
               <p className="attention-copy mt-3 text-sm">
@@ -303,7 +348,18 @@ export function ReportsClient() {
             </Button>
           )}
         </div>
-        <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+        <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-7">
+          <div className="space-y-2">
+            <Label htmlFor="reports-period-mode">Escopo</Label>
+            <Select
+              id="reports-period-mode"
+              value={periodMode}
+              onChange={(event) => setPeriodMode(event.target.value as "month" | "year")}
+            >
+              <option value="month">Mês ativo</option>
+              <option value="year">Ano do mês ativo</option>
+            </Select>
+          </div>
           <div className="space-y-2">
             <Label htmlFor="reports-filter-from">De</Label>
             <DatePickerInput
@@ -311,7 +367,7 @@ export function ReportsClient() {
               type="date"
               disabled
               readOnly
-              value={monthRange.from}
+              value={activeRange.from}
             />
           </div>
           <div className="space-y-2">
@@ -321,7 +377,7 @@ export function ReportsClient() {
               type="date"
               disabled
               readOnly
-              value={monthRange.to}
+              value={activeRange.to}
             />
           </div>
           <div className="space-y-2">
@@ -393,7 +449,7 @@ export function ReportsClient() {
           </div>
         </div>
         <div className="muted-panel mt-4 flex flex-wrap items-start justify-between gap-3 text-sm text-[var(--color-muted-foreground)]">
-          <p className="shrink-0">{`Mês ativo: ${monthLabel}.`}</p>
+          <p className="shrink-0">{`Base de navegação: ${monthLabel} • Escopo em análise: ${periodLabel}.`}</p>
           <p className="min-w-0 flex-1 break-words text-left sm:text-right">
             {activeRefinements.length > 0 ? activeRefinements.join(" • ") : "Sem refinamentos adicionais."}
           </p>
@@ -419,7 +475,7 @@ export function ReportsClient() {
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <article className="metric-card">
-          <p className="metric-label">Saldo inicial do mês</p>
+          <p className="metric-label">Saldo inicial do período</p>
           <p className={`metric-value ${(data?.periodBalances.opening ?? 0) < 0 ? "amount-negative" : "amount-positive"}`}>
             {formatCurrency(data?.periodBalances.opening ?? 0)}
           </p>
@@ -431,9 +487,47 @@ export function ReportsClient() {
           </p>
         </article>
         <article className="metric-card">
-          <p className="metric-label">Saldo final do mês</p>
+          <p className="metric-label">Saldo final do período</p>
           <p className={`metric-value ${(data?.periodBalances.closing ?? 0) < 0 ? "amount-negative" : "amount-positive"}`}>
             {formatCurrency(data?.periodBalances.closing ?? 0)}
+          </p>
+        </article>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <article className="metric-card">
+          <p className="metric-label">Média mensal de receitas</p>
+          <p className="metric-value amount-positive">{formatCurrency(data?.comparison.averageIncome ?? 0)}</p>
+        </article>
+        <article className="metric-card">
+          <p className="metric-label">Média mensal de despesas</p>
+          <p className="metric-value amount-negative">{formatCurrency(data?.comparison.averageExpense ?? 0)}</p>
+        </article>
+        <article className="metric-card">
+          <p className="metric-label">Transferências no fluxo</p>
+          <p className="metric-value">{`${Math.round((data?.comparison.transferShare ?? 0) * 100)}%`}</p>
+        </article>
+        <article className="metric-card">
+          <p className="metric-label">Conta com maior impacto</p>
+          <p className="metric-value text-base">{data?.comparison.topAccount?.name ?? "Sem dados"}</p>
+          <p className={`mt-2 text-sm ${(data?.comparison.topAccount?.net ?? 0) < 0 ? "amount-negative" : "amount-positive"}`}>
+            {formatCurrency(data?.comparison.topAccount?.net ?? 0)}
+          </p>
+        </article>
+        <article className="metric-card">
+          <p className="metric-label">Cartão com maior impacto</p>
+          <p className="metric-value text-base">{data?.comparison.topCard?.name ?? "Sem dados"}</p>
+          <p className={`mt-2 text-sm ${(data?.comparison.topCard?.netStatement ?? 0) < 0 ? "amount-negative" : "amount-positive"}`}>
+            {formatCurrency(data?.comparison.topCard?.netStatement ?? 0)}
+          </p>
+        </article>
+        <article className="metric-card">
+          <p className="metric-label">Categoria líder em gastos</p>
+          <p className="metric-value text-base">{data?.comparison.topCategory?.name ?? "Sem dados"}</p>
+          <p className="mt-2 text-sm text-[var(--color-muted-foreground)]">
+            {data?.comparison.topCategory
+              ? `${formatCurrency(data.comparison.topCategory.total)} • ${Math.round(data.comparison.topCategory.share * 100)}% das despesas`
+              : "Ainda sem despesa consolidada no recorte atual."}
           </p>
         </article>
       </div>
@@ -441,7 +535,7 @@ export function ReportsClient() {
       <div className="muted-panel flex flex-wrap items-start justify-between gap-3 text-sm text-[var(--color-muted-foreground)]">
         <p className="min-w-0 flex-1 break-words">
           Resultado do período segue a competência financeira. Saldos inicial e final usam o caixa real das contas nas
-          datas registradas, então podem divergir quando compras no cartão ainda não viraram pagamento.
+          datas registradas do recorte atual, então podem divergir quando compras no cartão ainda não viraram pagamento.
         </p>
       </div>
 
@@ -486,7 +580,7 @@ export function ReportsClient() {
             <div>
               <h2 className="text-xl font-semibold">Leitura de gasto</h2>
               <p className="mt-1 text-sm text-[var(--color-muted-foreground)]">
-                {`Síntese para entender peso de gastos fixos, estilo de vida e maior pressão dentro de ${monthLabel}.`}
+                {`Síntese para entender peso de gastos fixos, estilo de vida e maior pressão dentro de ${periodLabel}.`}
               </p>
             </div>
           </div>
@@ -647,7 +741,7 @@ export function ReportsClient() {
             ))
           ) : (
             <div className="muted-panel border border-dashed px-4 py-6 text-sm text-[var(--color-muted-foreground)]">
-              {`Nenhum vencimento relevante foi encontrado em ${monthLabel}.`}
+              {`Nenhum vencimento relevante foi encontrado em ${periodLabel}.`}
             </div>
           )}
         </div>

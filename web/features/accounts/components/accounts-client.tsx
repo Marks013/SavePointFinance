@@ -2,6 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -14,6 +15,7 @@ import { PresetChip } from "@/components/ui/preset-chip";
 import { Select } from "@/components/ui/select";
 import { accountFormSchema, type AccountFormValues } from "@/features/accounts/schemas/account-schema";
 import { accountColorPresets, brazilianInstitutions, findPreset } from "@/lib/finance/presets";
+import { formatMonthKeyLabel, normalizeMonthKey } from "@/lib/month";
 import { formatCurrency } from "@/lib/utils";
 
 type AccountItem = {
@@ -25,10 +27,16 @@ type AccountItem = {
   currency: string;
   color: string;
   institution?: string | null;
+  accumulatedNet: number;
+  periodIncome: number;
+  periodExpense: number;
+  periodTransferIn: number;
+  periodTransferOut: number;
+  periodNet: number;
 };
 
-async function getAccounts() {
-  const response = await fetch("/api/accounts", { cache: "no-store" });
+async function getAccounts(month: string) {
+  const response = await fetch(`/api/accounts?month=${month}`, { cache: "no-store" });
   if (!response.ok) throw new Error("Falha ao carregar contas");
   return (await response.json()) as { items: AccountItem[] };
 }
@@ -72,13 +80,18 @@ async function deleteAccount(id: string) {
 
 export function AccountsClient() {
   const queryClient = useQueryClient();
+  const searchParams = useSearchParams();
+  const month = normalizeMonthKey(searchParams.get("month"));
+  const monthLabel = formatMonthKeyLabel(month);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(true);
   const formSectionRef = useRef<HTMLElement | null>(null);
-  const accountsQuery = useQuery({ queryKey: ["accounts"], queryFn: getAccounts });
+  const accountsQuery = useQuery({ queryKey: ["accounts", month], queryFn: () => getAccounts(month) });
   const accounts = accountsQuery.data?.items ?? [];
   const activeBalance = accounts.reduce((sum, account) => sum + account.balance, 0);
   const openingBalance = accounts.reduce((sum, account) => sum + account.openingBalance, 0);
+  const periodNet = accounts.reduce((sum, account) => sum + account.periodNet, 0);
+  const accumulatedNet = accounts.reduce((sum, account) => sum + account.accumulatedNet, 0);
   const form = useForm<AccountFormValues>({
     resolver: zodResolver(accountFormSchema),
     defaultValues: {
@@ -201,6 +214,7 @@ export function AccountsClient() {
           Cadastre contas bancárias e carteiras usadas no dia a dia. O saldo atual é recalculado a partir do saldo de
           referência mais as movimentações vinculadas a cada conta.
         </p>
+        <p className="mt-3 text-sm font-medium text-[var(--color-primary)]">Período ativo: {monthLabel}</p>
 
         {showEditor ? (
           <form className="mt-8 space-y-5" onSubmit={form.handleSubmit((values) => saveMutation.mutate(values))}>
@@ -305,13 +319,21 @@ export function AccountsClient() {
           <div>
             <h2 className="text-2xl font-semibold tracking-[-0.03em]">Contas disponíveis</h2>
             <p className="mt-2 text-sm leading-7 text-[var(--color-muted-foreground)]">
-              Use esta visão para conferir o efeito real dos lançamentos por conta.
+              Use esta visão para separar o movimento do período selecionado do acumulado total da conta.
             </p>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <article className="metric-card">
               <p className="metric-label">Saldo atual total</p>
               <p className={`metric-value ${activeBalance < 0 ? "amount-negative" : ""}`}>{formatCurrency(activeBalance)}</p>
+            </article>
+            <article className="metric-card">
+              <p className="metric-label">{`Movimento de ${monthLabel}`}</p>
+              <p className={`metric-value ${periodNet < 0 ? "amount-negative" : ""}`}>{formatCurrency(periodNet)}</p>
+            </article>
+            <article className="metric-card">
+              <p className="metric-label">Variação acumulada</p>
+              <p className={`metric-value ${accumulatedNet < 0 ? "amount-negative" : ""}`}>{formatCurrency(accumulatedNet)}</p>
             </article>
             <article className="metric-card">
               <p className="metric-label">Base cadastrada</p>
@@ -348,7 +370,16 @@ export function AccountsClient() {
                 Saldo de referência: {formatCurrency(account.openingBalance)}
               </p>
               <p className="mt-2 break-words text-sm text-[var(--color-muted-foreground)]">
-                Variação operacional: <span className={(account.balance - account.openingBalance) < 0 ? "amount-negative" : undefined}>{formatCurrency(account.balance - account.openingBalance)}</span>
+                {`Movimento de ${monthLabel}`}:{" "}
+                <span className={account.periodNet < 0 ? "amount-negative" : undefined}>{formatCurrency(account.periodNet)}</span>
+              </p>
+              <p className="mt-2 break-words text-sm text-[var(--color-muted-foreground)]">
+                Entradas {formatCurrency(account.periodIncome)} • Saídas {formatCurrency(account.periodExpense)} •
+                Transferências líquidas {formatCurrency(account.periodTransferIn - account.periodTransferOut)}
+              </p>
+              <p className="mt-2 break-words text-sm text-[var(--color-muted-foreground)]">
+                Variação acumulada:{" "}
+                <span className={account.accumulatedNet < 0 ? "amount-negative" : undefined}>{formatCurrency(account.accumulatedNet)}</span>
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button onClick={() => startEditing(account)} type="button" variant="secondary">

@@ -2,8 +2,7 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 import { requireSessionUser } from "@/lib/auth/session";
-import { classifyTransactionCategory } from "@/lib/finance/category-classifier";
-import { ensureFallbackCategory } from "@/lib/finance/default-categories";
+import { resolveTransactionClassification } from "@/lib/finance/transaction-classification";
 import { assertTenantTransactionReferences, TenantReferenceError } from "@/lib/finance/tenant-reference-guard";
 import { ensureTitheCategory, syncTitheForTransactionDates } from "@/lib/finance/tithe";
 import { prisma } from "@/lib/prisma/client";
@@ -56,65 +55,16 @@ export async function PATCH(request: Request, context: Params) {
       categoryId: body.categoryId
     });
 
-    const categories = await prisma.category.findMany({
-      where: {
-        tenantId: user.tenantId
-      },
-      select: {
-        id: true,
-        name: true,
-        type: true,
-        keywords: true
-      }
+    const classification = await resolveTransactionClassification({
+      tenantId: user.tenantId,
+      type: body.type,
+      description: body.description,
+      notes,
+      paymentMethod: body.paymentMethod,
+      categoryId: body.categoryId || null,
+      excludeTransactionId: id
     });
-    const history = await prisma.transaction.findMany({
-      where: {
-        tenantId: user.tenantId,
-        type: body.type,
-        categoryId: {
-          not: null
-        },
-        id: {
-          not: id
-        }
-      },
-      select: {
-        categoryId: true,
-        description: true,
-        notes: true,
-        aiClassified: true,
-        aiConfidence: true
-      },
-      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-      take: 120
-    });
-    const classification =
-      body.categoryId || body.type === "transfer"
-        ? {
-            categoryId: body.categoryId || null,
-            confidence: null,
-            aiClassified: false
-          }
-        : await classifyTransactionCategory({
-            type: body.type,
-            description: body.description,
-            notes,
-            paymentMethod: body.paymentMethod,
-            categories,
-            history: history
-              .filter((item): item is typeof item & { categoryId: string } => Boolean(item.categoryId))
-              .map((item) => ({
-                categoryId: item.categoryId,
-                description: item.description,
-                notes: item.notes,
-                aiClassified: item.aiClassified,
-                aiConfidence: item.aiConfidence ? Number(item.aiConfidence) : null
-              }))
-          });
-
-    const categoryId =
-      classification.categoryId ||
-      (body.type !== "transfer" ? await ensureFallbackCategory(user.tenantId, body.type) : null);
+    const categoryId = classification.categoryId;
     const applyTithe = body.type === "income" && body.applyTithe;
     const titheCategoryId = applyTithe ? await ensureTitheCategory(user.tenantId) : null;
     const updatedDate = new Date(`${body.date}T12:00:00`);

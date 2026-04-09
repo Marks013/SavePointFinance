@@ -73,6 +73,12 @@ type TransactionItem = {
 
 type ReviewSelectionState = Record<string, string>;
 
+type ProfilePreferencesPayload = {
+  preferences: {
+    autoTithe: boolean;
+  };
+};
+
 function getBaseInstallmentDescription(description: string) {
   return description.replace(/\s\(\d+\/\d+\)$/, "");
 }
@@ -206,6 +212,12 @@ function buildEmptyTransactionValues(): TransactionFormValues {
   };
 }
 
+async function getProfilePreferences() {
+  const response = await fetch("/api/profile", { cache: "no-store" });
+  if (!response.ok) throw new Error("Falha ao carregar preferências");
+  return (await response.json()) as ProfilePreferencesPayload;
+}
+
 const invalidFieldClassName =
   "border-[var(--color-destructive)] focus:border-[var(--color-destructive)] focus:ring-[var(--color-destructive)]/12";
 
@@ -233,6 +245,7 @@ export function TransactionsClient() {
   const categoriesQuery = useQuery({ queryKey: ["categories"], queryFn: getCategories, staleTime: 30_000 });
   const accountsQuery = useQuery({ queryKey: ["accounts"], queryFn: getAccounts, staleTime: 30_000 });
   const cardsQuery = useQuery({ queryKey: ["cards"], queryFn: getCards, staleTime: 30_000 });
+  const profileQuery = useQuery({ queryKey: ["profile"], queryFn: getProfilePreferences, staleTime: 30_000 });
   const transactionsQuery = useQuery({
     queryKey: ["transactions", deferredFilters],
     queryFn: () => getTransactionsWithFilters(deferredFilters),
@@ -243,6 +256,7 @@ export function TransactionsClient() {
   const accounts = useMemo(() => accountsQuery.data?.items ?? [], [accountsQuery.data?.items]);
   const cards = useMemo(() => cardsQuery.data?.items ?? [], [cardsQuery.data?.items]);
   const transactions = useMemo(() => transactionsQuery.data?.items ?? [], [transactionsQuery.data?.items]);
+  const preferredAutoTithe = Boolean(profileQuery.data?.preferences.autoTithe);
   const { expenseTotal, incomeTotal, transferTotal, automaticSuggestions } = useMemo(() => {
     let expense = 0;
     let income = 0;
@@ -463,8 +477,16 @@ export function TransactionsClient() {
       return;
     }
 
+    if (selectedType === "income" && !editingId && !form.getFieldState("applyTithe").isDirty) {
+      form.setValue("applyTithe", preferredAutoTithe);
+    }
+
+    if (selectedType !== "income") {
+      form.setValue("applyTithe", false);
+    }
+
     form.setValue("destinationAccountId", "");
-  }, [form, selectedType]);
+  }, [editingId, form, preferredAutoTithe, selectedType]);
 
   useEffect(() => {
     if (isCreditCard) {

@@ -106,7 +106,7 @@ CREATE TABLE "UserPreference" (
     "monthlyReports" BOOLEAN NOT NULL DEFAULT true,
     "budgetAlerts" BOOLEAN NOT NULL DEFAULT true,
     "dueReminders" BOOLEAN NOT NULL DEFAULT true,
-    "autoTithe" BOOLEAN NOT NULL DEFAULT true,
+    "autoTithe" BOOLEAN NOT NULL DEFAULT false,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 

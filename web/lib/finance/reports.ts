@@ -43,11 +43,60 @@ type AccountBalancePoint = {
   closing: number;
 };
 
+type PeriodScope = "month" | "year" | "custom";
+
 function monthLabel(date: Date) {
   return new Intl.DateTimeFormat("pt-BR", {
     month: "short",
     year: "2-digit"
   }).format(date);
+}
+
+function getMonthBucketKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function monthLabelFromKey(monthKey: string) {
+  const [year, month] = monthKey.split("-").map(Number);
+  return monthLabel(new Date(year, (month ?? 1) - 1, 1, 12, 0, 0, 0));
+}
+
+function listMonthKeysBetween(start: Date, end: Date) {
+  const keys: string[] = [];
+  const cursor = new Date(start.getFullYear(), start.getMonth(), 1, 12, 0, 0, 0);
+  const limit = new Date(end.getFullYear(), end.getMonth(), 1, 12, 0, 0, 0);
+
+  while (cursor <= limit) {
+    keys.push(getMonthBucketKey(cursor));
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+
+  return keys;
+}
+
+function detectPeriodScope(start: Date, end: Date): PeriodScope {
+  const isWholeMonth =
+    start.getDate() === 1 &&
+    end.getDate() === new Date(end.getFullYear(), end.getMonth() + 1, 0).getDate() &&
+    start.getMonth() === end.getMonth() &&
+    start.getFullYear() === end.getFullYear();
+
+  if (isWholeMonth) {
+    return "month";
+  }
+
+  const isWholeYear =
+    start.getMonth() === 0 &&
+    start.getDate() === 1 &&
+    end.getMonth() === 11 &&
+    end.getDate() === 31 &&
+    start.getFullYear() === end.getFullYear();
+
+  if (isWholeYear) {
+    return "year";
+  }
+
+  return "custom";
 }
 
 function getFilterRange(filters: FinanceReportFilters) {
@@ -299,9 +348,9 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
     const competenceDate = transaction.card
       ? getCardExpenseCompetenceDate(transaction.card, transaction.date)
       : transaction.date;
-    const label = monthLabel(competenceDate);
+    const monthKey = getMonthBucketKey(competenceDate);
     const amount = Number(transaction.amount);
-    const monthly = monthlyMap.get(label) ?? { income: 0, expense: 0, transfer: 0 };
+    const monthly = monthlyMap.get(monthKey) ?? { income: 0, expense: 0, transfer: 0 };
     transactionsInRange += 1;
 
     if (transaction.type === TransactionType.income) {
@@ -410,7 +459,7 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
       cardMap.set(transaction.cardId, card);
     }
 
-    monthlyMap.set(label, monthly);
+    monthlyMap.set(monthKey, monthly);
   }
 
   summary.transactions = transactionsInRange;
@@ -680,11 +729,33 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
       closing: 0
     }
   );
+  const periodMonthKeys = listMonthKeysBetween(projectionStart, projectionEnd);
+  const periodScope = detectPeriodScope(projectionStart, projectionEnd);
+  const periodMonths = periodMonthKeys.length;
   const currentBalance = accounts
     .filter((account) => account.isActive)
     .reduce((sum, account) => sum + account.currentBalance, 0);
+  const monthlySeries = periodMonthKeys.map((monthKey) => {
+    const values = monthlyMap.get(monthKey) ?? { income: 0, expense: 0, transfer: 0 };
+
+    return {
+      label: monthLabelFromKey(monthKey),
+      income: values.income,
+      expense: values.expense,
+      transfer: values.transfer
+    };
+  });
+  const byAccount = Array.from(accountMap.values()).sort((a, b) => Math.abs(b.net) - Math.abs(a.net));
+  const byCard = Array.from(cardMap.values()).sort((a, b) => b.netStatement - a.netStatement);
+  const totalFlow = summary.income + summary.expense + summary.transfer;
 
   return {
+    period: {
+      from: projectionStart.toISOString(),
+      to: projectionEnd.toISOString(),
+      scope: periodScope,
+      months: periodMonths
+    },
     summary,
     classification: {
       autoClassified: classifiedAutomatically,
@@ -726,16 +797,21 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
       closing: periodBalanceTotals.closing,
       net: periodBalanceTotals.closing - periodBalanceTotals.opening
     },
+    comparison: {
+      averageIncome: periodMonths > 0 ? summary.income / periodMonths : 0,
+      averageExpense: periodMonths > 0 ? summary.expense / periodMonths : 0,
+      averageTransfer: periodMonths > 0 ? summary.transfer / periodMonths : 0,
+      expenseToIncomeRatio: summary.income > 0 ? summary.expense / summary.income : null,
+      transferShare: totalFlow > 0 ? summary.transfer / totalFlow : 0,
+      topAccount: byAccount[0] ?? null,
+      topCard: byCard[0] ?? null,
+      topCategory
+    },
     filters,
-    monthly: Array.from(monthlyMap.entries()).map(([label, values]) => ({
-      label,
-      income: values.income,
-      expense: values.expense,
-      transfer: values.transfer
-    })),
+    monthly: monthlySeries,
     byCategory: categoryInsights,
-    byAccount: Array.from(accountMap.values()).sort((a, b) => Math.abs(b.net) - Math.abs(a.net)),
-    byCard: Array.from(cardMap.values()).sort((a, b) => b.netStatement - a.netStatement),
+    byAccount,
+    byCard,
     upcoming: upcoming.slice(0, 12),
     recent: filteredTransactions
       .slice(-12)

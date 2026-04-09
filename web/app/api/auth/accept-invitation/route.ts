@@ -115,7 +115,9 @@ export async function POST(request: Request) {
         role: invitation.role,
         isActive: true,
         preferences: {
-          create: {}
+          create: {
+            autoTithe: false
+          }
         }
       }
     });

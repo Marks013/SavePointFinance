@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { subscriptionFormSchema } from "@/features/subscriptions/schemas/subscription-schema";
 import { syncDueSubscriptionTransactions } from "@/lib/automation/subscriptions";
 import { requireSessionUser } from "@/lib/auth/session";
+import { resolveTransactionClassification } from "@/lib/finance/transaction-classification";
 import { assertTenantTransactionReferences, TenantReferenceError } from "@/lib/finance/tenant-reference-guard";
 import { getMonthRange, normalizeMonthKey } from "@/lib/month";
 import { prisma } from "@/lib/prisma/client";
@@ -101,6 +102,14 @@ export async function POST(request: Request) {
       categoryId: body.categoryId
     });
 
+    const classification = await resolveTransactionClassification({
+      tenantId: user.tenantId,
+      type: body.type,
+      description: body.name,
+      paymentMethod: body.cardId ? "credit_card" : "money",
+      categoryId: body.categoryId || null
+    });
+
     const subscription = await prisma.subscription.create({
       data: {
         tenantId: user.tenantId,
@@ -108,7 +117,7 @@ export async function POST(request: Request) {
         name: body.name,
         amount: body.amount,
         billingDay: body.billingDay,
-        categoryId: body.categoryId || null,
+        categoryId: classification.categoryId,
         accountId: body.accountId || null,
         cardId: body.cardId || null,
         nextBillingDate: new Date(`${body.nextBillingDate}T12:00:00`),

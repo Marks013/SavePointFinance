@@ -1,4 +1,4 @@
-import { NotificationChannel, PaymentMethod, TransactionSource, TransactionType } from "@prisma/client";
+import { NotificationChannel, PaymentMethod, Prisma, TransactionSource, TransactionType } from "@prisma/client";
 
 import { deliverNotification } from "@/lib/notifications/delivery";
 import {
@@ -7,6 +7,7 @@ import {
   getStatementPaymentDate
 } from "@/lib/cards/statement";
 import { getFinanceReport } from "@/lib/finance/reports";
+import { resolveTransactionClassification } from "@/lib/finance/transaction-classification";
 import { ensureTitheCategory, getMonthKey, syncMonthlyTitheTransaction } from "@/lib/finance/tithe";
 import { prisma } from "@/lib/prisma/client";
 import { advanceSubscriptionBillingDate } from "@/lib/subscriptions/recurrence";
@@ -167,6 +168,13 @@ export async function generateSubscriptionTransaction(subscriptionId: string, te
 
   const nextBillingDate = new Date(subscription.nextBillingDate);
   const followingBillingDate = advanceSubscriptionBillingDate(nextBillingDate, subscription.billingDay);
+  const classification = await resolveTransactionClassification({
+    tenantId,
+    type: subscription.type,
+    description: subscription.name,
+    paymentMethod: subscription.cardId ? PaymentMethod.credit_card : PaymentMethod.money,
+    categoryId: subscription.categoryId
+  });
   const existing = await prisma.transaction.findFirst({
     where: {
       tenantId,
@@ -208,11 +216,16 @@ export async function generateSubscriptionTransaction(subscriptionId: string, te
       description: `Assinatura: ${subscription.name}`,
       type: subscription.type === "income" ? TransactionType.income : TransactionType.expense,
       paymentMethod: subscription.cardId ? PaymentMethod.credit_card : PaymentMethod.money,
-      categoryId: subscription.categoryId,
+      categoryId: classification.categoryId,
       accountId: subscription.accountId,
       cardId: subscription.cardId,
       source: TransactionSource.manual,
       notes: "Gerado via assinatura recorrente",
+      aiClassified: classification.aiClassified,
+      aiConfidence:
+        classification.confidence !== null
+          ? new Prisma.Decimal(classification.confidence.toFixed(2))
+          : null,
       titheAmount:
         subscription.type === "income" && subscription.autoTithe
           ? Number(subscription.amount) * 0.1
@@ -227,6 +240,7 @@ export async function generateSubscriptionTransaction(subscriptionId: string, te
       tenantId
     },
     data: {
+      categoryId: classification.categoryId,
       nextBillingDate: followingBillingDate
     }
   });

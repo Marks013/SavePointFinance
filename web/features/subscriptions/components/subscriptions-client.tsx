@@ -41,6 +41,12 @@ type SubscriptionItem = {
   card: RefItem | null;
 };
 
+type ProfilePreferencesPayload = {
+  preferences: {
+    autoTithe: boolean;
+  };
+};
+
 function buildEmptySubscriptionValues(): SubscriptionFormValues {
   return {
     name: "",
@@ -90,6 +96,12 @@ async function getCards() {
   const response = await fetch("/api/cards", { cache: "no-store" });
   if (!response.ok) throw new Error("Falha ao carregar cartões");
   return (await response.json()) as { items: RefItem[] };
+}
+
+async function getProfilePreferences() {
+  const response = await fetch("/api/profile", { cache: "no-store" });
+  if (!response.ok) throw new Error("Falha ao carregar preferências");
+  return (await response.json()) as ProfilePreferencesPayload;
 }
 
 function SubscriptionServiceCard({
@@ -146,7 +158,9 @@ export function SubscriptionsClient() {
   const categoriesQuery = useQuery({ queryKey: ["categories"], queryFn: getCategories });
   const accountsQuery = useQuery({ queryKey: ["accounts"], queryFn: getAccounts });
   const cardsQuery = useQuery({ queryKey: ["cards"], queryFn: getCards });
+  const profileQuery = useQuery({ queryKey: ["profile"], queryFn: getProfilePreferences, staleTime: 30_000 });
   const subscriptions = subscriptionsQuery.data?.items ?? [];
+  const preferredAutoTithe = Boolean(profileQuery.data?.preferences.autoTithe);
   const activeSubscriptions = subscriptions.filter((item) => item.isActive);
   const monthlyExpenses = activeSubscriptions
     .filter((item) => item.type === "expense")
@@ -282,13 +296,21 @@ export function SubscriptionsClient() {
   useEffect(() => {
     if (selectedType === "income" && selectedCardId) {
       form.setValue("cardId", "");
-      return;
     }
 
     if (selectedCardId && selectedAccountId) {
       form.setValue("accountId", "");
     }
-  }, [form, selectedAccountId, selectedCardId, selectedType]);
+
+    if (selectedType === "income" && !editingId && !form.getFieldState("autoTithe").isDirty) {
+      form.setValue("autoTithe", preferredAutoTithe);
+      return;
+    }
+
+    if (selectedType !== "income") {
+      form.setValue("autoTithe", false);
+    }
+  }, [editingId, form, preferredAutoTithe, selectedAccountId, selectedCardId, selectedType]);
 
   useEffect(() => {
     if (!editingId) {

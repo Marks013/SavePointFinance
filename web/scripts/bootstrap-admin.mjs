@@ -181,8 +181,8 @@ async function ensureAdmin(client) {
 
   await client.query(
     `
-      INSERT INTO "UserPreference" ("id", "userId", "createdAt", "updatedAt")
-      VALUES ('pref-bootstrap-admin', $1, NOW(), NOW())
+      INSERT INTO "UserPreference" ("id", "userId", "autoTithe", "createdAt", "updatedAt")
+      VALUES ('pref-bootstrap-admin', $1, false, NOW(), NOW())
       ON CONFLICT ("userId") DO NOTHING
     `,
     [userId]
