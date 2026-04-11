@@ -19,6 +19,7 @@ export async function GET(request: Request) {
     const report = await getFinanceReport(user.tenantId, {
       from: searchParams.get("from") ?? monthRange?.from ?? null,
       to: searchParams.get("to") ?? monthRange?.to ?? null,
+      baseMonth: resolvedMonth,
       type: searchParams.get("type"),
       accountId: searchParams.get("accountId"),
       cardId: searchParams.get("cardId"),

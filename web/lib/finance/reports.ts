@@ -1,7 +1,7 @@
 import { Prisma, TransactionType } from "@prisma/client";
 
 import { getAccountsWithComputedBalance } from "@/lib/finance/accounts";
-import { getCurrentMonthKey, getMonthRange } from "@/lib/month";
+import { formatMonthKeyLabel, getCurrentMonthKey, getMonthRange } from "@/lib/month";
 import {
   calculateStatementTotal,
   getCardExpenseCompetenceDate,
@@ -15,6 +15,7 @@ import { advanceSubscriptionBillingDate } from "@/lib/subscriptions/recurrence";
 export type FinanceReportFilters = {
   from?: string | null;
   to?: string | null;
+  baseMonth?: string | null;
   type?: string | null;
   accountId?: string | null;
   cardId?: string | null;
@@ -44,6 +45,36 @@ type AccountBalancePoint = {
 };
 
 type PeriodScope = "month" | "year" | "custom";
+type InsightTone = "positive" | "attention" | "warning";
+
+type MonthlySnapshot = {
+  key: string;
+  label: string;
+  income: number;
+  expense: number;
+  transfer: number;
+  balance: number;
+  savingsRate: number;
+  transactions: number;
+  uncategorizedExpense: number;
+};
+
+type QuarterSnapshot = {
+  label: string;
+  income: number;
+  expense: number;
+  transfer: number;
+  balance: number;
+};
+
+type PeriodHighlight = {
+  key: string;
+  label: string;
+  income: number;
+  expense: number;
+  transfer: number;
+  balance: number;
+};
 
 function monthLabel(date: Date) {
   return new Intl.DateTimeFormat("pt-BR", {
@@ -59,6 +90,24 @@ function getMonthBucketKey(date: Date) {
 function monthLabelFromKey(monthKey: string) {
   const [year, month] = monthKey.split("-").map(Number);
   return monthLabel(new Date(year, (month ?? 1) - 1, 1, 12, 0, 0, 0));
+}
+
+function formatShortDate(date: Date) {
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "2-digit",
+    month: "short"
+  }).format(date);
+}
+
+function quarterKeyFromMonthKey(monthKey: string) {
+  const [year, month] = monthKey.split("-").map(Number);
+  const quarter = Math.floor((((month ?? 1) - 1) / 3)) + 1;
+  return `${year}-T${quarter}`;
+}
+
+function quarterLabelFromKey(quarterKey: string) {
+  const [year, quarter] = quarterKey.split("-T");
+  return `T${quarter} ${year}`;
 }
 
 function listMonthKeysBetween(start: Date, end: Date) {
@@ -97,6 +146,85 @@ function detectPeriodScope(start: Date, end: Date): PeriodScope {
   }
 
   return "custom";
+}
+
+function formatPeriodTitle(scope: PeriodScope, baseMonthKey: string, start: Date, end: Date) {
+  if (scope === "year") {
+    return `Panorama anual de ${baseMonthKey.slice(0, 4)}`;
+  }
+
+  if (scope === "month") {
+    return `Leitura financeira de ${formatMonthKeyLabel(baseMonthKey)}`;
+  }
+
+  return `Leitura financeira de ${formatShortDate(start)} a ${formatShortDate(end)}`;
+}
+
+function formatPeriodSubtitle(scope: PeriodScope, baseMonthKey: string, start: Date, end: Date) {
+  if (scope === "year") {
+    return "Consolidado anual com comparativos internos, ritmo mensal e sinais de concentração de gastos.";
+  }
+
+  if (scope === "month") {
+    return `Resumo operacional de ${formatMonthKeyLabel(baseMonthKey)} com caixa, categorias e próximos compromissos.`;
+  }
+
+  return `Recorte personalizado entre ${formatShortDate(start)} e ${formatShortDate(end)} com visão consolidada do período.`;
+}
+
+function getScopeLabel(scope: PeriodScope) {
+  if (scope === "year") {
+    return "Consolidado anual";
+  }
+
+  if (scope === "month") {
+    return "Leitura mensal";
+  }
+
+  return "Período personalizado";
+}
+
+function pickMonthlyHighlight(
+  monthly: MonthlySnapshot[],
+  selector: (item: MonthlySnapshot) => number,
+  direction: "max" | "min",
+  predicate?: (item: MonthlySnapshot) => boolean
+): PeriodHighlight | null {
+  const candidates = predicate ? monthly.filter(predicate) : monthly;
+
+  if (!candidates.length) {
+    return null;
+  }
+
+  const sorted = [...candidates].sort((left, right) =>
+    direction === "max" ? selector(right) - selector(left) : selector(left) - selector(right)
+  );
+  const winner = sorted[0];
+
+  if (!winner) {
+    return null;
+  }
+
+  return {
+    key: winner.key,
+    label: winner.label,
+    income: winner.income,
+    expense: winner.expense,
+    transfer: winner.transfer,
+    balance: winner.balance
+  };
+}
+
+function pickQuarterHighlight(quarters: QuarterSnapshot[], direction: "max" | "min") {
+  if (!quarters.length) {
+    return null;
+  }
+
+  const sorted = [...quarters].sort((left, right) =>
+    direction === "max" ? right.balance - left.balance : left.balance - right.balance
+  );
+
+  return sorted[0] ?? null;
 }
 
 function getFilterRange(filters: FinanceReportFilters) {
@@ -297,7 +425,16 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
     })
   ]);
 
-  const monthlyMap = new Map<string, { income: number; expense: number; transfer: number }>();
+  const monthlyMap = new Map<
+    string,
+    {
+      income: number;
+      expense: number;
+      transfer: number;
+      transactions: number;
+      uncategorizedExpense: number;
+    }
+  >();
   const categoryMap = new Map<string, { id: string | null; name: string; total: number; items: number }>();
   const accountMap = new Map<
     string,
@@ -351,8 +488,15 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
       : transaction.date;
     const monthKey = getMonthBucketKey(competenceDate);
     const amount = Number(transaction.amount);
-    const monthly = monthlyMap.get(monthKey) ?? { income: 0, expense: 0, transfer: 0 };
+    const monthly = monthlyMap.get(monthKey) ?? {
+      income: 0,
+      expense: 0,
+      transfer: 0,
+      transactions: 0,
+      uncategorizedExpense: 0
+    };
     transactionsInRange += 1;
+    monthly.transactions += 1;
 
     if (transaction.type === TransactionType.income) {
       summary.income += amount;
@@ -367,6 +511,7 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
       if (!transaction.categoryId) {
         summary.uncategorizedExpense += amount;
         uncategorizedTransactions += 1;
+        monthly.uncategorizedExpense += amount;
       }
       if (
         transaction.classificationSource !== "manual_input" &&
@@ -737,22 +882,156 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
   const periodMonthKeys = listMonthKeysBetween(projectionStart, projectionEnd);
   const periodScope = detectPeriodScope(projectionStart, projectionEnd);
   const periodMonths = periodMonthKeys.length;
+  const baseMonthKey = filters.baseMonth ?? periodMonthKeys.at(periodMonthKeys.length - 1) ?? getCurrentMonthKey(projectionEnd);
   const currentBalance = accounts
     .filter((account) => account.isActive)
     .reduce((sum, account) => sum + account.currentBalance, 0);
-  const monthlySeries = periodMonthKeys.map((monthKey) => {
-    const values = monthlyMap.get(monthKey) ?? { income: 0, expense: 0, transfer: 0 };
+  const monthlySeries: MonthlySnapshot[] = periodMonthKeys.map((monthKey) => {
+    const values = monthlyMap.get(monthKey) ?? {
+      income: 0,
+      expense: 0,
+      transfer: 0,
+      transactions: 0,
+      uncategorizedExpense: 0
+    };
+    const balance = values.income - values.expense;
 
     return {
+      key: monthKey,
       label: monthLabelFromKey(monthKey),
       income: values.income,
       expense: values.expense,
-      transfer: values.transfer
+      transfer: values.transfer,
+      balance,
+      savingsRate: values.income > 0 ? balance / values.income : 0,
+      transactions: values.transactions,
+      uncategorizedExpense: values.uncategorizedExpense
     };
   });
+  const quarterlyMap = new Map<string, QuarterSnapshot>();
+
+  for (const month of monthlySeries) {
+    const quarterKey = quarterKeyFromMonthKey(month.key);
+    const quarter = quarterlyMap.get(quarterKey) ?? {
+      label: quarterLabelFromKey(quarterKey),
+      income: 0,
+      expense: 0,
+      transfer: 0,
+      balance: 0
+    };
+
+    quarter.income += month.income;
+    quarter.expense += month.expense;
+    quarter.transfer += month.transfer;
+    quarter.balance += month.balance;
+    quarterlyMap.set(quarterKey, quarter);
+  }
+
+  const quarters = Array.from(quarterlyMap.values());
   const byAccount = Array.from(accountMap.values()).sort((a, b) => Math.abs(b.net) - Math.abs(a.net));
   const byCard = Array.from(cardMap.values()).sort((a, b) => b.netStatement - a.netStatement);
   const totalFlow = summary.income + summary.expense + summary.transfer;
+  const topCategoriesShare =
+    summary.expense > 0
+      ? categoryInsights.slice(0, 3).reduce((sum, item) => sum + item.total, 0) / summary.expense
+      : 0;
+  const uncategorizedExpenseShare = summary.expense > 0 ? summary.uncategorizedExpense / summary.expense : 0;
+  const positiveMonths = monthlySeries.filter((item) => item.balance > 0).length;
+  const negativeMonths = monthlySeries.filter((item) => item.balance < 0).length;
+  const neutralMonths = monthlySeries.filter((item) => item.balance === 0).length;
+  const activeMonths = monthlySeries.filter((item) => item.transactions > 0).length;
+  const bestMonth = pickMonthlyHighlight(monthlySeries, (item) => item.balance, "max", (item) => item.transactions > 0);
+  const worstMonth = pickMonthlyHighlight(monthlySeries, (item) => item.balance, "min", (item) => item.transactions > 0);
+  const highestIncomeMonth = pickMonthlyHighlight(
+    monthlySeries,
+    (item) => item.income,
+    "max",
+    (item) => item.income > 0
+  );
+  const highestExpenseMonth = pickMonthlyHighlight(
+    monthlySeries,
+    (item) => item.expense,
+    "max",
+    (item) => item.expense > 0
+  );
+  const strongestQuarter = pickQuarterHighlight(quarters, "max");
+  const weakestQuarter = pickQuarterHighlight(quarters, "min");
+  const balanceSpread =
+    bestMonth && worstMonth ? Math.max(bestMonth.balance - worstMonth.balance, 0) : 0;
+
+  const narrativeTone: InsightTone =
+    summary.transactions === 0
+      ? "attention"
+      : summary.balance < 0 || negativeMonths > positiveMonths
+        ? "warning"
+        : summary.savingsRate >= 0.12
+          ? "positive"
+          : "attention";
+  const narrativeHeadline =
+    summary.transactions === 0
+      ? "Ainda não há movimentação suficiente para uma leitura anual consistente"
+      : narrativeTone === "warning"
+        ? periodScope === "year"
+          ? "O ano fechou sob pressão e pede correção de rota"
+          : "O período fechou pressionado e exige ajuste operacional"
+        : narrativeTone === "positive"
+          ? periodScope === "year"
+            ? "O ano fechou com resultado saudável e margem de manobra"
+            : "O período terminou com folga operacional"
+          : periodScope === "year"
+            ? "O ano ficou positivo, mas com sinais de atenção"
+            : "O período ficou positivo, mas ainda sem folga confortável";
+  const narrativeSummary =
+    summary.transactions === 0
+      ? "O recorte atual ainda não tem volume de transações para sustentar uma leitura executiva confiável."
+      : periodScope === "year"
+        ? `${positiveMonths} meses positivos, ${negativeMonths} meses negativos e resultado acumulado de ${summary.balance.toLocaleString(
+            "pt-BR",
+            { style: "currency", currency: "BRL" }
+          )}.`
+        : `${summary.transactions} lançamentos analisados com resultado de ${summary.balance.toLocaleString("pt-BR", {
+            style: "currency",
+            currency: "BRL"
+          })} no período.`;
+  const narrativeFocus =
+    topCategoriesShare >= 0.5
+      ? `As três maiores categorias concentram ${Math.round(topCategoriesShare * 100)}% das despesas.`
+      : worstMonth
+        ? `O ponto mais pressionado foi ${worstMonth.label}, com saldo de ${worstMonth.balance.toLocaleString(
+            "pt-BR",
+            { style: "currency", currency: "BRL" }
+          )}.`
+        : "A distribuição de despesas segue relativamente equilibrada no recorte atual.";
+  const alerts = [
+    summary.balance < 0
+      ? {
+          tone: "warning" as const,
+          title: "Resultado acumulado negativo",
+          detail: "As despesas superaram as receitas no recorte analisado."
+        }
+      : null,
+    uncategorizedExpenseShare >= 0.1
+      ? {
+          tone: "attention" as const,
+          title: "Despesa sem categoria relevante",
+          detail: `${Math.round(uncategorizedExpenseShare * 100)}% das despesas ainda estão sem categorização.`
+        }
+      : null,
+    topCategoriesShare >= 0.55
+      ? {
+          tone: "attention" as const,
+          title: "Alta concentração de gastos",
+          detail: `As três maiores categorias representam ${Math.round(topCategoriesShare * 100)}% da despesa total.`
+        }
+      : null,
+    positiveMonths >= Math.max(1, Math.ceil(periodMonths * 0.7)) && summary.balance > 0
+      ? {
+          tone: "positive" as const,
+          title: "Cadência financeira estável",
+          detail: `${positiveMonths} de ${periodMonths} meses fecharam positivos.`
+        }
+      : null
+  ].filter((item): item is { tone: InsightTone; title: string; detail: string } => item !== null);
 
   return {
     period: {
@@ -760,6 +1039,12 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
       to: projectionEnd.toISOString(),
       scope: periodScope,
       months: periodMonths
+    },
+    labels: {
+      periodTitle: formatPeriodTitle(periodScope, baseMonthKey, projectionStart, projectionEnd),
+      periodSubtitle: formatPeriodSubtitle(periodScope, baseMonthKey, projectionStart, projectionEnd),
+      scopeLabel: getScopeLabel(periodScope),
+      baseMonthLabel: formatMonthKeyLabel(baseMonthKey)
     },
     summary,
     classification: {
@@ -811,6 +1096,36 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
       topAccount: byAccount[0] ?? null,
       topCard: byCard[0] ?? null,
       topCategory
+    },
+    annualInsights: {
+      narrative: {
+        tone: narrativeTone,
+        headline: narrativeHeadline,
+        summary: narrativeSummary,
+        focus: narrativeFocus
+      },
+      highlights: {
+        bestMonth,
+        worstMonth,
+        highestIncomeMonth,
+        highestExpenseMonth,
+        strongestQuarter,
+        weakestQuarter
+      },
+      cadence: {
+        activeMonths,
+        positiveMonths,
+        negativeMonths,
+        neutralMonths,
+        averageMonthlyBalance: periodMonths > 0 ? summary.balance / periodMonths : 0,
+        balanceSpread
+      },
+      concentration: {
+        topCategoriesShare,
+        uncategorizedExpenseShare
+      },
+      quarters,
+      alerts
     },
     filters,
     monthly: monthlySeries,
