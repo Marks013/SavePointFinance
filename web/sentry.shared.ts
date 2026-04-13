@@ -1,4 +1,11 @@
-import type { Event, EventHint, StackFrame } from "@sentry/nextjs";
+import type {
+  BrowserOptions,
+  EdgeOptions,
+  ErrorEvent as SentryErrorEvent,
+  EventHint,
+  NodeOptions,
+  StackFrame
+} from "@sentry/nextjs";
 
 import { isExpectedError } from "./lib/observability/errors";
 
@@ -22,12 +29,12 @@ function isBrowserExtensionFrame(frame: StackFrame) {
   return filename.startsWith("chrome-extension://") || filename.startsWith("moz-extension://");
 }
 
-function shouldDropThirdPartyExtensionEvent(event: Event) {
+function shouldDropThirdPartyExtensionEvent(event: SentryErrorEvent) {
   const frames = event.exception?.values?.flatMap((value) => value.stacktrace?.frames ?? []) ?? [];
   return frames.length > 0 && frames.every(isBrowserExtensionFrame);
 }
 
-function beforeSend(event: Event, hint: EventHint) {
+function beforeSend(event: SentryErrorEvent, hint: EventHint): SentryErrorEvent | null {
   if (isExpectedError(hint.originalException)) {
     return null;
   }
@@ -39,7 +46,7 @@ function beforeSend(event: Event, hint: EventHint) {
   return event;
 }
 
-export function getClientSentryOptions() {
+export function getClientSentryOptions(): BrowserOptions {
   return {
     dsn: clientDsn,
     enabled: Boolean(clientDsn),
@@ -55,7 +62,7 @@ export function getClientSentryOptions() {
   };
 }
 
-export function getServerSentryOptions() {
+export function getServerSentryOptions(): NodeOptions | EdgeOptions {
   return {
     dsn: serverDsn,
     enabled: Boolean(serverDsn),
