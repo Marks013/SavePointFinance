@@ -2,12 +2,13 @@ import { NextResponse } from "next/server";
 
 import { requireSessionUser } from "@/lib/auth/session";
 import { serverEnv } from "@/lib/env/server";
+import { captureRequestError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
 import { getSharingAuthority } from "@/lib/sharing/access";
 import { deleteUserWithAllData } from "@/lib/users/delete-user";
 import { formatWhatsAppDisplayPhone, formatWhatsAppPhone } from "@/lib/whatsapp/phone";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const user = await requireSessionUser();
     const profile = await prisma.user.findUnique({
@@ -73,6 +74,7 @@ export async function GET() {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
+    captureRequestError(error, { request, feature: "profile" });
     return NextResponse.json({ message: "Failed to load profile" }, { status: 500 });
   }
 }
@@ -132,11 +134,12 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
+    captureRequestError(error, { request, feature: "profile" });
     return NextResponse.json({ message: "Failed to update profile" }, { status: 400 });
   }
 }
 
-export async function DELETE() {
+export async function DELETE(request: Request) {
   try {
     const user = await requireSessionUser();
     const deleted = await deleteUserWithAllData({ userId: user.id });
@@ -153,6 +156,7 @@ export async function DELETE() {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
+    captureRequestError(error, { request, feature: "profile" });
     return NextResponse.json(
       {
         message: error instanceof Error ? error.message : "Falha ao excluir a conta"

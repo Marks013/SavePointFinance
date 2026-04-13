@@ -7,6 +7,7 @@ import { requireSessionUser } from "@/lib/auth/session";
 import { formatDateTimeDisplay } from "@/lib/date";
 import { getFinanceReport } from "@/lib/finance/reports";
 import { getMonthRange, normalizeMonthKey } from "@/lib/month";
+import { captureRequestError } from "@/lib/observability/sentry";
 
 type ExtendedReport = Awaited<ReturnType<typeof getFinanceReport>>;
 type ExecutiveSummary = {
@@ -167,6 +168,7 @@ export async function GET(request: Request) {
       return new Response("Unauthorized", { status: 401 });
     }
 
+    captureRequestError(error, { request, feature: "reports" });
     return new Response("Failed to generate PDF", { status: 500 });
   }
 }

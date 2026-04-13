@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { requireSessionUser } from "@/lib/auth/session";
 import { getCardStatementSnapshot, statementMonthSchema } from "@/lib/cards/statement";
+import { captureRequestError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
 
 type Params = {
@@ -156,6 +157,7 @@ export async function GET(request: Request, context: Params) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
+    captureRequestError(error, { request, feature: "cards" });
     return NextResponse.json({ message: "Failed to load statement" }, { status: 500 });
   }
 }

@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 
 import { requireSessionUser } from "@/lib/auth/session";
+import { captureRequestError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const user = await requireSessionUser({ feature: "automation" });
     const deliveries = await prisma.notificationDelivery.findMany({
@@ -45,6 +46,7 @@ export async function GET() {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
+    captureRequestError(error, { request, feature: "notifications" });
     return NextResponse.json({ message: "Failed to load notifications" }, { status: 500 });
   }
 }

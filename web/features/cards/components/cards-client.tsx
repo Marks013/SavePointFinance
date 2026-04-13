@@ -17,6 +17,7 @@ import { Select } from "@/components/ui/select";
 import { cardFormSchema, type CardFormValues } from "@/features/cards/schemas/card-schema";
 import { brazilianInstitutions, cardBrandPresets, cardColorPresets, findPreset } from "@/lib/finance/presets";
 import { formatMonthKeyLabel, normalizeMonthKey } from "@/lib/month";
+import { ensureApiResponse } from "@/lib/observability/http";
 import { formatCurrency } from "@/lib/utils";
 
 type CardItem = {
@@ -100,12 +101,14 @@ const invalidFieldClassName =
 
 async function getCards(month: string) {
   const response = await fetch(`/api/cards?month=${month}`, { cache: "no-store" });
+  await ensureApiResponse(response, { fallbackMessage: "Falha ao carregar cartoes", method: "GET", path: "/api/cards" });
   if (!response.ok) throw new Error("Falha ao carregar cartões");
   return (await response.json()) as { items: CardItem[] };
 }
 
 async function getAccounts() {
   const response = await fetch("/api/accounts", { cache: "no-store" });
+  await ensureApiResponse(response, { fallbackMessage: "Falha ao carregar contas", method: "GET", path: "/api/accounts" });
   if (!response.ok) throw new Error("Falha ao carregar contas");
   return (await response.json()) as { items: AccountItem[] };
 }
@@ -118,6 +121,7 @@ async function createCard(values: CardFormValues) {
     },
     body: JSON.stringify(values)
   });
+  await ensureApiResponse(response, { fallbackMessage: "Falha ao criar cartao", method: "POST", path: "/api/cards" });
 
   if (!response.ok) throw new Error("Falha ao criar cartão");
   return response.json();
@@ -131,6 +135,7 @@ async function updateCard(id: string, values: CardFormValues) {
     },
     body: JSON.stringify(values)
   });
+  await ensureApiResponse(response, { fallbackMessage: "Falha ao atualizar cartao", method: "PATCH", path: `/api/cards/${id}` });
 
   if (!response.ok) throw new Error("Falha ao atualizar cartão");
   return response.json();
@@ -140,6 +145,7 @@ async function deleteCard(id: string) {
   const response = await fetch(`/api/cards/${id}`, {
     method: "DELETE"
   });
+  await ensureApiResponse(response, { fallbackMessage: "Falha ao excluir cartao", method: "DELETE", path: `/api/cards/${id}` });
 
   if (!response.ok) {
     const payload = (await response.json()) as { message?: string };
@@ -157,6 +163,11 @@ async function payStatement(cardId: string, month: string, accountId: string) {
       month,
       accountId
     })
+  });
+  await ensureApiResponse(response, {
+    fallbackMessage: "Falha ao pagar fatura",
+    method: "POST",
+    path: `/api/cards/${cardId}/statement/pay`
   });
 
   if (!response.ok) {
@@ -205,6 +216,11 @@ export function CardsClient() {
           cache: "no-store"
         }
       );
+      await ensureApiResponse(response, {
+        fallbackMessage: "Falha ao carregar fatura",
+        method: "GET",
+        path: `/api/cards/${selectedStatementCardId}/statement`
+      });
       if (!response.ok) throw new Error("Falha ao carregar fatura");
       return (await response.json()) as StatementPayload;
     },

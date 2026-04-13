@@ -2,9 +2,10 @@ import { NextResponse } from "next/server";
 
 import { runRecurringAutomation } from "@/lib/automation/subscriptions";
 import { requireSessionUser } from "@/lib/auth/session";
+import { captureRequestError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const user = await requireSessionUser({ feature: "automation" });
     const now = new Date();
@@ -42,11 +43,12 @@ export async function GET() {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
+    captureRequestError(error, { request, feature: "automation" });
     return NextResponse.json({ message: "Failed to load automation summary" }, { status: 500 });
   }
 }
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
     const user = await requireSessionUser({ feature: "automation" });
     const result = await runRecurringAutomation(user.tenantId, user.id);
@@ -57,6 +59,7 @@ export async function POST() {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
+    captureRequestError(error, { request, feature: "automation" });
     return NextResponse.json({ message: "Failed to run automation" }, { status: 400 });
   }
 }

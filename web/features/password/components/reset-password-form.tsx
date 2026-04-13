@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { resetPasswordSchema, type ResetPasswordValues } from "@/features/password/schemas/password-schema";
+import { ensureApiResponse } from "@/lib/observability/http";
+import { captureUnexpectedError } from "@/lib/observability/sentry";
 
 type ResetPasswordFormProps = {
   initialToken?: string;
@@ -28,19 +30,29 @@ export function ResetPasswordForm({ initialToken = "" }: ResetPasswordFormProps)
       className="space-y-5"
       onSubmit={form.handleSubmit(
         async (values) => {
-          const response = await fetch("/api/auth/reset-password", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(values)
-          });
+          try {
+            const response = await fetch("/api/auth/reset-password", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(values)
+            });
 
-          if (!response.ok) {
-            const payload = (await response.json()) as { message?: string };
-            toast.error(payload.message ?? "Falha ao redefinir senha");
-            return;
+            await ensureApiResponse(response, {
+              fallbackMessage: "Falha ao redefinir senha",
+              method: "POST",
+              path: "/api/auth/reset-password"
+            });
+
+            toast.success("Senha redefinida");
+          } catch (error) {
+            captureUnexpectedError(error, {
+              surface: "client-form",
+              route: "/reset-password",
+              operation: "submit",
+              feature: "auth-password"
+            });
+            toast.error(error instanceof Error ? error.message : "Falha ao redefinir senha");
           }
-
-          toast.success("Senha redefinida");
         },
         (errors) => {
           const firstError =

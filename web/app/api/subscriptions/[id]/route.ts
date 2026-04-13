@@ -5,6 +5,7 @@ import { syncDueSubscriptionTransactions } from "@/lib/automation/subscriptions"
 import { requireSessionUser } from "@/lib/auth/session";
 import { resolveTransactionClassification } from "@/lib/finance/transaction-classification";
 import { assertTenantTransactionReferences, TenantReferenceError } from "@/lib/finance/tenant-reference-guard";
+import { captureRequestError, captureUnexpectedError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
 
 type Params = {
@@ -52,7 +53,18 @@ export async function PATCH(request: Request, context: Params) {
     await syncDueSubscriptionTransactions({
       tenantId: user.tenantId,
       userId: user.id
-    }).catch(err => console.error("Post-Update Sync Error:", err));
+    }).catch((error) =>
+      captureUnexpectedError(error, {
+        surface: "api-post-processing",
+        route: `/api/subscriptions/${id}`,
+        operation: "PATCH",
+        feature: "subscriptions",
+        tenantId: user.tenantId,
+        userId: user.id,
+        entityId: id,
+        dedupeKey: `subscriptions:post-update-sync:${id}`
+      })
+    );
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -64,11 +76,12 @@ export async function PATCH(request: Request, context: Params) {
       return NextResponse.json({ message: error.message }, { status: 404 });
     }
 
+    captureRequestError(error, { request, feature: "subscriptions" });
     return NextResponse.json({ message: "Failed to update subscription" }, { status: 400 });
   }
 }
 
-export async function DELETE(_request: Request, context: Params) {
+export async function DELETE(request: Request, context: Params) {
   try {
     const user = await requireSessionUser();
     const { id } = await context.params;
@@ -83,6 +96,7 @@ export async function DELETE(_request: Request, context: Params) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
+    captureRequestError(error, { request, feature: "subscriptions" });
     return NextResponse.json({ message: "Failed to delete subscription" }, { status: 400 });
   }
 }

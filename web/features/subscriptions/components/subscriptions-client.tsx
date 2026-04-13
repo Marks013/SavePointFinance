@@ -20,6 +20,7 @@ import {
   type SubscriptionServicePreset
 } from "@/lib/finance/presets";
 import { formatMonthKeyLabel, normalizeMonthKey } from "@/lib/month";
+import { ensureApiResponse } from "@/lib/observability/http";
 import { advanceSubscriptionBillingDate } from "@/lib/subscriptions/recurrence";
 import { formatCurrency } from "@/lib/utils";
 
@@ -76,30 +77,32 @@ function getOccurrenceDateForMonth(item: SubscriptionItem, monthKey: string) {
 
 async function getSubscriptions(month: string) {
   const response = await fetch(`/api/subscriptions?month=${month}`, { cache: "no-store" });
-  if (!response.ok) throw new Error("Falha ao carregar assinaturas");
+  await ensureApiResponse(response, { fallbackMessage: "Falha ao carregar assinaturas", method: "GET", path: "/api/subscriptions" });
   return (await response.json()) as { items: SubscriptionItem[] };
 }
 
 async function getCategories() {
   const response = await fetch("/api/categories", { cache: "no-store" });
-  if (!response.ok) throw new Error("Falha ao carregar categorias");
+  await ensureApiResponse(response, { fallbackMessage: "Falha ao carregar categorias", method: "GET", path: "/api/categories" });
   return (await response.json()) as { items: Array<{ id: string; name: string; type: "income" | "expense" }> };
 }
 
 async function getAccounts() {
   const response = await fetch("/api/accounts", { cache: "no-store" });
-  if (!response.ok) throw new Error("Falha ao carregar contas");
+  await ensureApiResponse(response, { fallbackMessage: "Falha ao carregar contas", method: "GET", path: "/api/accounts" });
   return (await response.json()) as { items: RefItem[] };
 }
 
 async function getCards() {
   const response = await fetch("/api/cards", { cache: "no-store" });
+  await ensureApiResponse(response, { fallbackMessage: "Falha ao carregar cartoes", method: "GET", path: "/api/cards" });
   if (!response.ok) throw new Error("Falha ao carregar cartões");
   return (await response.json()) as { items: RefItem[] };
 }
 
 async function getProfilePreferences() {
   const response = await fetch("/api/profile", { cache: "no-store" });
+  await ensureApiResponse(response, { fallbackMessage: "Falha ao carregar preferencias", method: "GET", path: "/api/profile" });
   if (!response.ok) throw new Error("Falha ao carregar preferências");
   return (await response.json()) as ProfilePreferencesPayload;
 }
@@ -181,7 +184,11 @@ export function SubscriptionsClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(values)
       });
-      if (!response.ok) throw new Error(editingId ? "Falha ao atualizar assinatura" : "Falha ao criar assinatura");
+      await ensureApiResponse(response, {
+        fallbackMessage: editingId ? "Falha ao atualizar assinatura" : "Falha ao criar assinatura",
+        method: editingId ? "PATCH" : "POST",
+        path: editingId ? `/api/subscriptions/${editingId}` : "/api/subscriptions"
+      });
       return response.json();
     },
     onSuccess: async () => {
@@ -208,6 +215,11 @@ export function SubscriptionsClient() {
       const response = await fetch(`/api/subscriptions/${id}/generate-transaction`, {
         method: "POST"
       });
+      await ensureApiResponse(response, {
+        fallbackMessage: "Falha ao gerar transacao",
+        method: "POST",
+        path: `/api/subscriptions/${id}/generate-transaction`
+      });
       if (!response.ok) throw new Error("Falha ao gerar transação");
       return response.json();
     },
@@ -226,7 +238,7 @@ export function SubscriptionsClient() {
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       const response = await fetch(`/api/subscriptions/${id}`, { method: "DELETE" });
-      if (!response.ok) throw new Error("Falha ao excluir assinatura");
+      await ensureApiResponse(response, { fallbackMessage: "Falha ao excluir assinatura", method: "DELETE", path: `/api/subscriptions/${id}` });
     },
     onSuccess: async () => {
       toast.success("Assinatura excluída");

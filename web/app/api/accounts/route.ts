@@ -5,6 +5,7 @@ import { requireSessionUser } from "@/lib/auth/session";
 import { getAccountsWithComputedBalance } from "@/lib/finance/accounts";
 import { canCreateAccount } from "@/lib/licensing/server";
 import { getMonthRange, normalizeMonthKey } from "@/lib/month";
+import { captureRequestError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
 
 export async function GET(request: Request) {
@@ -48,6 +49,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
+    captureRequestError(error, { request, feature: "accounts" });
     return NextResponse.json({ message: "Failed to load accounts" }, { status: 500 });
   }
 }
@@ -132,6 +134,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "Já existe uma conta com esse nome" }, { status: 409 });
     }
 
+    captureRequestError(error, { request, feature: "accounts" });
     return NextResponse.json({ message: "Failed to create account" }, { status: 400 });
   }
 }

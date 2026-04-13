@@ -6,6 +6,7 @@ import { forgotPasswordSchema } from "@/features/password/schemas/password-schem
 import { normalizeEmail } from "@/lib/auth/normalize-email";
 import { deliverNotification } from "@/lib/notifications/delivery";
 import { buildPasswordResetMessage } from "@/lib/notifications/password-reset";
+import { captureRequestError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
 import { getClientIpAddress, takeThrottleHit } from "@/lib/security/request-throttle";
 
@@ -107,7 +108,8 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (error) {
+    captureRequestError(error, { request, feature: "auth-password" });
     return NextResponse.json({ message: "Failed to start reset flow" }, { status: 400 });
   }
 }

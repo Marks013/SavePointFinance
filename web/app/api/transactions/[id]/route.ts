@@ -5,6 +5,7 @@ import { requireSessionUser } from "@/lib/auth/session";
 import { resolveTransactionClassification } from "@/lib/finance/transaction-classification";
 import { assertTenantTransactionReferences, TenantReferenceError } from "@/lib/finance/tenant-reference-guard";
 import { ensureTitheCategory, syncTitheForTransactionDates } from "@/lib/finance/tithe";
+import { captureRequestError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
 import { addMonthsClamped } from "@/lib/utils";
 import { transactionUpdateSchema } from "@/features/transactions/schemas/transaction-schema";
@@ -209,11 +210,12 @@ export async function PATCH(request: Request, context: Params) {
       return NextResponse.json({ message: error.message }, { status: 404 });
     }
 
+    captureRequestError(error, { request, feature: "transactions" });
     return NextResponse.json({ message: error instanceof Error ? error.message : "Failed to update transaction" }, { status: 400 });
   }
 }
 
-export async function DELETE(_request: Request, context: Params) {
+export async function DELETE(request: Request, context: Params) {
   try {
     const user = await requireSessionUser();
     const { id } = await context.params;
@@ -254,6 +256,7 @@ export async function DELETE(_request: Request, context: Params) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
+    captureRequestError(error, { request, feature: "transactions" });
     return NextResponse.json({ message: "Failed to delete transaction" }, { status: 400 });
   }
 }

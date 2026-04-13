@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { formatDateTimeDisplay } from "@/lib/date";
+import { ensureApiResponse } from "@/lib/observability/http";
 
 type ProfilePayload = {
   id: string;
@@ -150,18 +151,20 @@ function formatBrazilWhatsAppInput(value: string) {
 
 async function getProfile() {
   const response = await fetch("/api/profile", { cache: "no-store" });
-  if (!response.ok) throw new Error("Falha ao carregar perfil");
+  await ensureApiResponse(response, { fallbackMessage: "Falha ao carregar perfil", method: "GET", path: "/api/profile" });
   return (await response.json()) as ProfilePayload;
 }
 
 async function getAutomationSummary() {
   const response = await fetch("/api/automation", { cache: "no-store" });
+  await ensureApiResponse(response, { fallbackMessage: "Falha ao carregar automacoes", method: "GET", path: "/api/automation" });
   if (!response.ok) throw new Error("Falha ao carregar automações");
   return (await response.json()) as AutomationSummary;
 }
 
 async function getNotifications() {
   const response = await fetch("/api/notifications", { cache: "no-store" });
+  await ensureApiResponse(response, { fallbackMessage: "Falha ao carregar notificacoes", method: "GET", path: "/api/notifications" });
   if (!response.ok) throw new Error("Falha ao carregar notificações");
   return (await response.json()) as NotificationListPayload;
 }
@@ -232,6 +235,7 @@ export function SettingsClient() {
           }
         })
       });
+      await ensureApiResponse(response, { fallbackMessage: "Falha ao salvar configuracoes", method: "PATCH", path: "/api/profile" });
 
       if (!response.ok) throw new Error("Falha ao salvar configurações");
     },
@@ -249,6 +253,7 @@ export function SettingsClient() {
       const response = await fetch("/api/automation", {
         method: "POST"
       });
+      await ensureApiResponse(response, { fallbackMessage: "Falha ao executar automacoes", method: "POST", path: "/api/automation" });
 
       if (!response.ok) throw new Error("Falha ao executar automações");
       return (await response.json()) as AutomationRunResult;
@@ -277,6 +282,7 @@ export function SettingsClient() {
       const response = await fetch("/api/profile", {
         method: "DELETE"
       });
+      await ensureApiResponse(response, { fallbackMessage: "Nao foi possivel excluir a conta", method: "DELETE", path: "/api/profile" });
 
       const payload = (await response.json().catch(() => ({}))) as { message?: string };
 

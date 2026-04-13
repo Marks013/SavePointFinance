@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { prisma } from "@/lib/prisma/client";
+import { captureUnexpectedError } from "@/lib/observability/sentry";
 import { processIncomingWhatsAppTextMessage } from "@/lib/whatsapp/assistant";
 import { sendWhatsAppTextMessage } from "@/lib/whatsapp/cloud-api";
 import { type WhatsAppWebhookPayload } from "@/lib/whatsapp/webhook-payload";
@@ -36,6 +37,14 @@ async function markWebhookStatus(eventId: string, status: "SUCCESS" | "FAILED", 
       WHERE "eventId" = ${eventId}
     `;
   } catch (updateError) {
+    captureUnexpectedError(updateError, {
+      surface: "webhook-status-update",
+      route: "/api/integrations/whatsapp/webhook",
+      operation: "POST",
+      feature: "whatsapp",
+      entityId: eventId,
+      dedupeKey: `whatsapp:webhook-status:${eventId}`
+    });
     console.error(`[WhatsApp] Failed to update webhook event ${eventId}`, updateError);
   }
 }
@@ -126,6 +135,14 @@ export async function processWhatsAppMessageAsync(input: ProcessWhatsAppMessageA
     await markWebhookStatus(input.eventId, "SUCCESS");
   } catch (error) {
     const errorMessage = getErrorMessage(error);
+    captureUnexpectedError(error, {
+      surface: "webhook-processing",
+      route: "/api/integrations/whatsapp/webhook",
+      operation: "POST",
+      feature: "whatsapp",
+      entityId: input.eventId,
+      dedupeKey: `whatsapp:webhook:${input.eventId}`
+    });
     console.error(`[WhatsApp] Failed to process webhook event ${input.eventId}`, error);
     if (input.eventId) {
       await markWebhookStatus(input.eventId, "FAILED", errorMessage);

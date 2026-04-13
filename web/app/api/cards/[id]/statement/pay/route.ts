@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { requireSessionUser } from "@/lib/auth/session";
 import { getCardStatementSnapshot, getStatementPaymentDate, statementMonthSchema } from "@/lib/cards/statement";
+import { captureRequestError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
 
 type Params = {
@@ -128,6 +129,7 @@ export async function POST(request: Request, context: Params) {
       return NextResponse.json({ message: "Invalid statement payment payload" }, { status: 400 });
     }
 
+    captureRequestError(error, { request, feature: "cards" });
     return NextResponse.json({ message: "Failed to pay statement" }, { status: 500 });
   }
 }

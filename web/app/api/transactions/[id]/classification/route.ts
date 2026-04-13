@@ -4,6 +4,7 @@ import { z } from "zod";
 import { requireSessionUser } from "@/lib/auth/session";
 import { deriveRuleKeyword } from "@/lib/finance/category-rules";
 import { invalidateTenantClassificationCache } from "@/lib/finance/classification-cache";
+import { captureRequestError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
 
 type Params = {
@@ -181,6 +182,7 @@ export async function PATCH(request: Request, context: Params) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
+    captureRequestError(error, { request, feature: "transactions" });
     return NextResponse.json({ message: "Failed to review classification" }, { status: 400 });
   }
 }

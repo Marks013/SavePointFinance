@@ -7,6 +7,7 @@ import { getCardExpenseCompetenceDate, getCardExpenseDueDate } from "@/lib/cards
 import { resolveTransactionClassification } from "@/lib/finance/transaction-classification";
 import { assertTenantTransactionReferences, TenantReferenceError } from "@/lib/finance/tenant-reference-guard";
 import { ensureTitheCategory, syncTitheForTransactionDates } from "@/lib/finance/tithe";
+import { captureRequestError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
 import { addMonthsClamped, splitAmountIntoInstallments } from "@/lib/utils";
 import { transactionFiltersSchema, transactionFormSchema } from "@/features/transactions/schemas/transaction-schema";
@@ -149,6 +150,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
+    captureRequestError(error, { request, feature: "transactions" });
     return NextResponse.json({ message: "Failed to load transactions" }, { status: 500 });
   }
 }
@@ -310,6 +312,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: error.message }, { status: 404 });
     }
 
+    captureRequestError(error, { request, feature: "transactions" });
     return NextResponse.json({ message: "Failed to create transaction" }, { status: 400 });
   }
 }

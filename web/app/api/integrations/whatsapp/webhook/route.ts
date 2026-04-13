@@ -1,6 +1,7 @@
 import { after, NextResponse } from "next/server";
 
 import { serverEnv } from "@/lib/env/server";
+import { captureUnexpectedError } from "@/lib/observability/sentry";
 import { processWhatsAppMessageAsync } from "@/lib/whatsapp/async-processor";
 import { verifyWhatsAppSignature } from "@/lib/whatsapp/cloud-api";
 import {
@@ -71,6 +72,14 @@ export async function POST(request: Request) {
 
       for (const [index, result] of processingResults.entries()) {
         if (result.status === "rejected") {
+          captureUnexpectedError(result.reason, {
+            surface: "webhook-after",
+            route: "/api/integrations/whatsapp/webhook",
+            operation: "POST",
+            feature: "whatsapp",
+            entityId: messages[index]?.eventId ?? null,
+            dedupeKey: `whatsapp:webhook:rejected:${messages[index]?.eventId ?? index}`
+          });
           console.error(
             `[WhatsApp] Fatal async error for webhook event ${messages[index]?.eventId ?? "unknown"}`,
             result.reason
@@ -78,6 +87,13 @@ export async function POST(request: Request) {
         }
       }
     } catch (error) {
+      captureUnexpectedError(error, {
+        surface: "webhook-after",
+        route: "/api/integrations/whatsapp/webhook",
+        operation: "POST",
+        feature: "whatsapp",
+        dedupeKey: "whatsapp:webhook:after"
+      });
       console.error("[WhatsApp] Unhandled after() failure", error);
     }
   });

@@ -6,13 +6,14 @@ import {
 } from "@/features/installments/schemas/installment-schema";
 import { requireSessionUser } from "@/lib/auth/session";
 import { assertTenantCategoryReference, TenantReferenceError } from "@/lib/finance/tenant-reference-guard";
+import { captureRequestError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
 
 type Params = {
   params: Promise<{ id: string }>;
 };
 
-export async function DELETE(_request: Request, context: Params) {
+export async function DELETE(request: Request, context: Params) {
   try {
     const user = await requireSessionUser();
     const { id } = await context.params;
@@ -30,6 +31,7 @@ export async function DELETE(_request: Request, context: Params) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
+    captureRequestError(error, { request, feature: "installments" });
     return NextResponse.json({ message: "Failed to delete installment group" }, { status: 400 });
   }
 }
@@ -121,6 +123,7 @@ export async function PATCH(request: Request, context: Params) {
       return NextResponse.json({ message: error.message }, { status: 404 });
     }
 
+    captureRequestError(error, { request, feature: "installments" });
     return NextResponse.json({ message: "Failed to update installment group" }, { status: 400 });
   }
 }

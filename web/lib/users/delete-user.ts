@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 
+import { BusinessRuleError } from "@/lib/observability/errors";
 import { prisma } from "@/lib/prisma/client";
 
 type DeleteUserOptions = {
@@ -33,7 +34,7 @@ export async function getDeletableUser(userId: string) {
   }
 
   if (user.isPlatformAdmin) {
-    throw new Error("A conta superadmin da plataforma não pode ser excluída por este fluxo");
+    throw new BusinessRuleError("A conta superadmin da plataforma não pode ser excluída por este fluxo");
   }
 
   if (user.role === "admin" && user.isActive) {
@@ -49,7 +50,7 @@ export async function getDeletableUser(userId: string) {
     });
 
     if (otherActiveAdmins === 0) {
-      throw new Error("Esta carteira compartilhada precisa manter ao menos um administrador ativo.");
+      throw new BusinessRuleError("Esta carteira compartilhada precisa manter ao menos um administrador ativo.");
     }
   }
 
@@ -60,7 +61,7 @@ export async function deleteUserWithAllData(options: DeleteUserOptions): Promise
   const user = await getDeletableUser(options.userId);
 
   if (!user) {
-    throw new Error("Usuário não encontrado");
+    throw new BusinessRuleError("Usuário não encontrado");
   }
 
   await prisma.$transaction(async (tx) => {

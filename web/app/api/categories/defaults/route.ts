@@ -3,9 +3,10 @@ import { NextResponse } from "next/server";
 import { requireSessionUser } from "@/lib/auth/session";
 import { invalidateTenantClassificationCache } from "@/lib/finance/classification-cache";
 import { ensureTenantDefaultCategories } from "@/lib/finance/default-categories";
+import { captureRequestError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
 
-export async function POST() {
+export async function POST(request: Request) {
   try {
     const user = await requireSessionUser();
     const before = await prisma.category.count({
@@ -33,6 +34,7 @@ export async function POST() {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
+    captureRequestError(error, { request, feature: "categories" });
     return NextResponse.json({ message: "Failed to restore default categories" }, { status: 400 });
   }
 }

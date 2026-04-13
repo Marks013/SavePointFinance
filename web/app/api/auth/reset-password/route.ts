@@ -3,6 +3,7 @@ import { hash } from "bcryptjs";
 import { NextResponse } from "next/server";
 
 import { resetPasswordSchema } from "@/features/password/schemas/password-schema";
+import { captureRequestError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
 
 export async function POST(request: Request) {
@@ -29,7 +30,8 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (error) {
+    captureRequestError(error, { request, feature: "auth-password" });
     return NextResponse.json({ message: "Failed to reset password" }, { status: 400 });
   }
 }

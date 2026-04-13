@@ -15,6 +15,7 @@ import { Select } from "@/components/ui/select";
 import { goalFormSchema, type GoalFormValues } from "@/features/goals/schemas/goal-schema";
 import { formatDateDisplay, formatDateKey } from "@/lib/date";
 import { categoryColorPresets, findPreset } from "@/lib/finance/presets";
+import { ensureApiResponse } from "@/lib/observability/http";
 import { formatCurrency } from "@/lib/utils";
 
 type GoalItem = {
@@ -37,13 +38,13 @@ type AccountItem = {
 
 async function getGoals() {
   const response = await fetch("/api/goals", { cache: "no-store" });
-  if (!response.ok) throw new Error("Falha ao carregar metas");
+  await ensureApiResponse(response, { fallbackMessage: "Falha ao carregar metas", method: "GET", path: "/api/goals" });
   return (await response.json()) as { items: GoalItem[] };
 }
 
 async function getAccounts() {
   const response = await fetch("/api/accounts", { cache: "no-store" });
-  if (!response.ok) throw new Error("Falha ao carregar contas");
+  await ensureApiResponse(response, { fallbackMessage: "Falha ao carregar contas", method: "GET", path: "/api/accounts" });
   return (await response.json()) as { items: AccountItem[] };
 }
 
@@ -56,7 +57,7 @@ async function createGoal(values: GoalFormValues) {
     body: JSON.stringify(values)
   });
 
-  if (!response.ok) throw new Error("Falha ao criar meta");
+  await ensureApiResponse(response, { fallbackMessage: "Falha ao criar meta", method: "POST", path: "/api/goals" });
   return response.json();
 }
 
@@ -69,7 +70,7 @@ async function updateGoal(id: string, values: GoalFormValues) {
     body: JSON.stringify(values)
   });
 
-  if (!response.ok) throw new Error("Falha ao atualizar meta");
+  await ensureApiResponse(response, { fallbackMessage: "Falha ao atualizar meta", method: "PATCH", path: `/api/goals/${id}` });
   return response.json();
 }
 
@@ -78,7 +79,7 @@ async function deleteGoal(id: string) {
     method: "DELETE"
   });
 
-  if (!response.ok) throw new Error("Falha ao excluir meta");
+  await ensureApiResponse(response, { fallbackMessage: "Falha ao excluir meta", method: "DELETE", path: `/api/goals/${id}` });
 }
 
 export function GoalsClient() {

@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { invitationSchema } from "@/features/password/schemas/password-schema";
 import { formatDateDisplay } from "@/lib/date";
+import { ensureApiResponse } from "@/lib/observability/http";
 
 type SharingProfile = {
   id: string;
@@ -79,19 +80,14 @@ const sharingInviteSchema = invitationSchema.pick({
 
 async function getProfile() {
   const response = await fetch("/api/profile", { cache: "no-store" });
-  if (!response.ok) {
-    throw new Error("Falha ao carregar perfil");
-  }
+  await ensureApiResponse(response, { fallbackMessage: "Falha ao carregar perfil", method: "GET", path: "/api/profile" });
 
   return (await response.json()) as SharingProfile;
 }
 
 async function getSharingState() {
   const response = await fetch("/api/sharing", { cache: "no-store" });
-  if (!response.ok) {
-    const payload = (await response.json().catch(() => ({}))) as { message?: string };
-    throw new Error(payload.message ?? "Falha ao carregar compartilhamento");
-  }
+  await ensureApiResponse(response, { fallbackMessage: "Falha ao carregar compartilhamento", method: "GET", path: "/api/sharing" });
 
   return (await response.json()) as SharingState;
 }
@@ -142,10 +138,8 @@ export function SharingClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(values)
       });
+      await ensureApiResponse(response, { fallbackMessage: "Falha ao criar convite", method: "POST", path: "/api/sharing" });
       const payload = (await response.json()) as SharingInviteResponse & { message?: string };
-      if (!response.ok) {
-        throw new Error(payload.message ?? "Falha ao criar convite");
-      }
 
       return payload;
     },
@@ -172,10 +166,7 @@ export function SharingClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ invitationId })
       });
-      const payload = (await response.json()) as { message?: string };
-      if (!response.ok) {
-        throw new Error(payload.message ?? "Falha ao revogar convite");
-      }
+      await ensureApiResponse(response, { fallbackMessage: "Falha ao revogar convite", method: "DELETE", path: "/api/sharing" });
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["sharing-state"] });
@@ -193,10 +184,7 @@ export function SharingClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ memberId })
       });
-      const payload = (await response.json()) as { message?: string };
-      if (!response.ok) {
-        throw new Error(payload.message ?? "Falha ao revogar acesso");
-      }
+      await ensureApiResponse(response, { fallbackMessage: "Falha ao revogar acesso", method: "DELETE", path: "/api/sharing" });
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["sharing-state"] });

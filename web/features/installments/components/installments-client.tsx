@@ -19,6 +19,7 @@ import {
 } from "@/features/installments/schemas/installment-schema";
 import { formatDateDisplay } from "@/lib/date";
 import { formatMonthKeyLabel, getMonthRange, normalizeMonthKey } from "@/lib/month";
+import { ensureApiResponse } from "@/lib/observability/http";
 import { formatCurrency } from "@/lib/utils";
 
 type InstallmentGroup = {
@@ -54,18 +55,21 @@ async function getInstallments(filters: { from: string; to: string; cardId: stri
   if (filters.cardId) searchParams.set("cardId", filters.cardId);
 
   const response = await fetch(`/api/installments?${searchParams.toString()}`, { cache: "no-store" });
+  await ensureApiResponse(response, { fallbackMessage: "Falha ao carregar parcelamentos", method: "GET", path: "/api/installments" });
   if (!response.ok) throw new Error("Falha ao carregar parcelamentos");
   return (await response.json()) as { items: InstallmentGroup[] };
 }
 
 async function getCards() {
   const response = await fetch("/api/cards", { cache: "no-store" });
+  await ensureApiResponse(response, { fallbackMessage: "Falha ao carregar cartoes", method: "GET", path: "/api/cards" });
   if (!response.ok) throw new Error("Falha ao carregar cartões");
   return (await response.json()) as { items: CardItem[] };
 }
 
 async function getCategories() {
   const response = await fetch("/api/categories", { cache: "no-store" });
+  await ensureApiResponse(response, { fallbackMessage: "Falha ao carregar categorias", method: "GET", path: "/api/categories" });
   if (!response.ok) throw new Error("Falha ao carregar categorias");
   return (await response.json()) as { items: CategoryItem[] };
 }
@@ -129,6 +133,7 @@ export function InstallmentsClient() {
       const response = await fetch(`/api/installments/${id}`, {
         method: "DELETE"
       });
+      await ensureApiResponse(response, { fallbackMessage: "Falha ao excluir parcelamento", method: "DELETE", path: `/api/installments/${id}` });
 
       if (!response.ok) {
         throw new Error("Falha ao excluir parcelamento");
@@ -160,6 +165,7 @@ export function InstallmentsClient() {
         },
         body: JSON.stringify(values)
       });
+      await ensureApiResponse(response, { fallbackMessage: "Falha ao atualizar parcelamento", method: "PATCH", path: `/api/installments/${editingGroupId}` });
 
       if (!response.ok) {
         const payload = (await response.json().catch(() => null)) as { message?: string } | null;
@@ -197,6 +203,7 @@ export function InstallmentsClient() {
           action: "reconcile_due"
         })
       });
+      await ensureApiResponse(response, { fallbackMessage: "Falha ao conciliar parcelamento", method: "PATCH", path: `/api/installments/${id}` });
 
       if (!response.ok) throw new Error("Falha ao conciliar parcelamento");
       return (await response.json()) as { reconciled: number };

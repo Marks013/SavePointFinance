@@ -4,6 +4,7 @@ import { syncDueSubscriptionTransactions } from "@/lib/automation/subscriptions"
 import { requireSessionUser } from "@/lib/auth/session";
 import { getFinanceReport } from "@/lib/finance/reports";
 import { getMonthRange, normalizeMonthKey } from "@/lib/month";
+import { captureRequestError } from "@/lib/observability/sentry";
 
 export async function GET(request: Request) {
   try {
@@ -42,6 +43,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
+    captureRequestError(error, { request, feature: "reports" });
     return NextResponse.json({ message: "Failed to load report summary" }, { status: 500 });
   }
 }

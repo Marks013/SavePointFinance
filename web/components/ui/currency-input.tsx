@@ -116,13 +116,14 @@ export function CurrencyInput<TFieldValues extends FieldValues>({
       }}
       onFocus={(event) => {
         setIsFocused(true);
+        const inputElement = event.currentTarget;
         const parsed = parseCurrencyInputValue(displayValue);
         const nextDisplay =
           parsed === null || (!nullable && parsed === 0) ? "" : formatEditableCurrencyValue(parsed);
         setDisplayValue(nextDisplay);
         queueMicrotask(() => {
-          if (nextDisplay) {
-            event.currentTarget.select();
+          if (nextDisplay && inputElement.ownerDocument.activeElement === inputElement) {
+            inputElement.select();
           }
         });
       }}

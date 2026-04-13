@@ -6,6 +6,7 @@ import { z } from "zod";
 import { acceptInvitationSchema } from "@/features/password/schemas/password-schema";
 import { normalizeEmail } from "@/lib/auth/normalize-email";
 import { getTenantSeatSummary } from "@/lib/licensing/server";
+import { captureRequestError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
 import { assessUserReassignment, buildReassignmentBlockReason } from "@/lib/users/reassign-user";
 
@@ -144,6 +145,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: error.issues[0]?.message ?? "Dados inválidos" }, { status: 400 });
     }
 
+    captureRequestError(error, { request, feature: "auth-invitation" });
     return NextResponse.json({ message: "Failed to accept invitation" }, { status: 400 });
   }
 }

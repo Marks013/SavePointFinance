@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { runRecurringAutomation } from "@/lib/automation/subscriptions";
 import { serverEnv } from "@/lib/env/server";
 import { resolveTenantLicenseState } from "@/lib/licensing/policy";
+import { captureRequestError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
 
 function isAuthorized(request: Request) {
@@ -102,7 +103,8 @@ export async function POST(request: Request) {
       prunedWebhookEvents,
       results
     });
-  } catch {
+  } catch (error) {
+    captureRequestError(error, { request, feature: "automation-cron", surface: "cron" });
     return NextResponse.json({ message: "Failed to run automation cron" }, { status: 500 });
   }
 }

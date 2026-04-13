@@ -1,5 +1,9 @@
+import * as Sentry from "@sentry/nextjs";
+
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma/client";
+import { AuthError } from "@/lib/observability/errors";
+import { syncSentryAccessScope } from "@/lib/observability/sentry";
 import {
   type LicenseFeature,
   getLicenseBlockedReason,
@@ -15,7 +19,7 @@ export async function getCurrentTenantAccess(options: CurrentAccessOptions = {})
   const session = await auth();
 
   if (!session?.user?.id || !session.user.tenantId) {
-    throw new Error("Unauthorized");
+    throw new AuthError();
   }
 
   const user = await prisma.user.findUnique({
@@ -60,7 +64,7 @@ export async function getCurrentTenantAccess(options: CurrentAccessOptions = {})
   });
 
   if (!user || !user.isActive || !user.tenant) {
-    throw new Error("Unauthorized");
+    throw new AuthError();
   }
 
   const resolvedLicense = resolveTenantLicenseState(user.tenant);
@@ -85,12 +89,26 @@ export async function getCurrentTenantAccess(options: CurrentAccessOptions = {})
     : resolvedLicense;
 
   if (!options.allowBlocked && !license.canAccessApp) {
-    throw new Error("Unauthorized");
+    throw new AuthError();
   }
 
   if (!options.allowBlocked && options.feature && !license.features[options.feature]) {
-    throw new Error("Unauthorized");
+    throw new AuthError();
   }
+
+  syncSentryAccessScope({
+    id: user.id,
+    tenantId: user.tenantId,
+    role: user.role,
+    isPlatformAdmin: user.isPlatformAdmin,
+    plan: license.plan,
+    licenseStatus: license.status
+  });
+  Sentry.setContext("tenant", {
+    id: user.tenant.id,
+    slug: user.tenant.slug,
+    planSlug: user.tenant.planConfig?.slug ?? null
+  });
 
   return {
     id: user.id,

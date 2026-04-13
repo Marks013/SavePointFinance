@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { acceptInvitationSchema, type AcceptInvitationValues } from "@/features/password/schemas/password-schema";
+import { ensureApiResponse } from "@/lib/observability/http";
+import { captureUnexpectedError } from "@/lib/observability/sentry";
 
 type InvitationPayload = {
   email: string;
@@ -67,10 +69,11 @@ export function AcceptInvitationForm({ initialToken = "" }: AcceptInvitationForm
       cache: "no-store"
     })
       .then(async (response) => {
-        if (!response.ok) {
-          const payload = (await response.json()) as { message?: string };
-          throw new Error(payload.message ?? "Convite invalido");
-        }
+        await ensureApiResponse(response, {
+          fallbackMessage: "Convite invalido",
+          method: "GET",
+          path: "/api/auth/invitation"
+        });
 
         return (await response.json()) as InvitationPayload;
       })
@@ -80,6 +83,12 @@ export function AcceptInvitationForm({ initialToken = "" }: AcceptInvitationForm
       })
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
+        captureUnexpectedError(error, {
+          surface: "client-form",
+          route: "/accept-invitation",
+          operation: "load",
+          feature: "auth-invitation"
+        });
         toast.error(error instanceof Error ? error.message : "Convite invalido");
       })
       .finally(() => {
@@ -94,21 +103,31 @@ export function AcceptInvitationForm({ initialToken = "" }: AcceptInvitationForm
       className="space-y-5"
       onSubmit={form.handleSubmit(
         async (values) => {
-          const response = await fetch("/api/auth/accept-invitation", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(values)
-          });
+          try {
+            const response = await fetch("/api/auth/accept-invitation", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(values)
+            });
 
-          if (!response.ok) {
-            const payload = (await response.json()) as { message?: string };
-            toast.error(payload.message ?? "Falha ao aceitar convite");
-            return;
+            await ensureApiResponse(response, {
+              fallbackMessage: "Falha ao aceitar convite",
+              method: "POST",
+              path: "/api/auth/accept-invitation"
+            });
+
+            toast.success("Convite aceito");
+            router.push("/login");
+            router.refresh();
+          } catch (error) {
+            captureUnexpectedError(error, {
+              surface: "client-form",
+              route: "/accept-invitation",
+              operation: "submit",
+              feature: "auth-invitation"
+            });
+            toast.error(error instanceof Error ? error.message : "Falha ao aceitar convite");
           }
-
-          toast.success("Convite aceito");
-          router.push("/login");
-          router.refresh();
         },
         (errors) => {
           const firstError = errors.confirmPassword?.message || errors.password?.message || errors.name?.message;

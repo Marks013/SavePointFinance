@@ -16,6 +16,7 @@ import { Select } from "@/components/ui/select";
 import { accountFormSchema, type AccountFormValues } from "@/features/accounts/schemas/account-schema";
 import { accountColorPresets, brazilianInstitutions, findPreset } from "@/lib/finance/presets";
 import { formatMonthKeyLabel, normalizeMonthKey } from "@/lib/month";
+import { ensureApiResponse } from "@/lib/observability/http";
 import { formatCurrency } from "@/lib/utils";
 
 type AccountItem = {
@@ -37,7 +38,7 @@ type AccountItem = {
 
 async function getAccounts(month: string) {
   const response = await fetch(`/api/accounts?month=${month}`, { cache: "no-store" });
-  if (!response.ok) throw new Error("Falha ao carregar contas");
+  await ensureApiResponse(response, { fallbackMessage: "Falha ao carregar contas", method: "GET", path: "/api/accounts" });
   return (await response.json()) as { items: AccountItem[] };
 }
 
@@ -50,7 +51,7 @@ async function createAccount(values: AccountFormValues) {
     body: JSON.stringify(values)
   });
 
-  if (!response.ok) throw new Error("Falha ao criar conta");
+  await ensureApiResponse(response, { fallbackMessage: "Falha ao criar conta", method: "POST", path: "/api/accounts" });
   return response.json();
 }
 
@@ -63,7 +64,7 @@ async function updateAccount(id: string, values: AccountFormValues) {
     body: JSON.stringify(values)
   });
 
-  if (!response.ok) throw new Error("Falha ao atualizar conta");
+  await ensureApiResponse(response, { fallbackMessage: "Falha ao atualizar conta", method: "PATCH", path: `/api/accounts/${id}` });
   return response.json();
 }
 
@@ -72,10 +73,7 @@ async function deleteAccount(id: string) {
     method: "DELETE"
   });
 
-  if (!response.ok) {
-    const payload = (await response.json()) as { message?: string };
-    throw new Error(payload.message ?? "Falha ao excluir conta");
-  }
+  await ensureApiResponse(response, { fallbackMessage: "Falha ao excluir conta", method: "DELETE", path: `/api/accounts/${id}` });
 }
 
 export function AccountsClient() {

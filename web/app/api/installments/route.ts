@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import { requireSessionUser } from "@/lib/auth/session";
 import { getCardExpenseCompetenceDate } from "@/lib/cards/statement";
+import { captureRequestError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
 
 export async function GET(request: Request) {
@@ -134,6 +135,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
+    captureRequestError(error, { request, feature: "installments" });
     return NextResponse.json({ message: "Failed to load installments" }, { status: 500 });
   }
 }

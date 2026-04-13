@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { forgotPasswordSchema, type ForgotPasswordValues } from "@/features/password/schemas/password-schema";
+import { ensureApiResponse } from "@/lib/observability/http";
+import { captureUnexpectedError } from "@/lib/observability/sentry";
 
 export function ForgotPasswordForm() {
   const form = useForm<ForgotPasswordValues>({
@@ -22,22 +24,32 @@ export function ForgotPasswordForm() {
       className="space-y-5"
       onSubmit={form.handleSubmit(
         async (values) => {
-          const response = await fetch("/api/auth/forgot-password", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(values)
-          });
+          try {
+            const response = await fetch("/api/auth/forgot-password", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(values)
+            });
 
-          if (!response.ok) {
-            const payload = (await response.json().catch(() => null)) as { message?: string } | null;
-            toast.error(payload?.message ?? "Nao foi possivel iniciar a recuperacao");
-            return;
+            await ensureApiResponse(response, {
+              fallbackMessage: "Nao foi possivel iniciar a recuperacao",
+              method: "POST",
+              path: "/api/auth/forgot-password"
+            });
+
+            await response.json();
+            toast.success("Solicitacao registrada", {
+              description: "Se o e-mail existir, enviaremos o link de redefinicao."
+            });
+          } catch (error) {
+            captureUnexpectedError(error, {
+              surface: "client-form",
+              route: "/forgot-password",
+              operation: "submit",
+              feature: "auth-password"
+            });
+            toast.error(error instanceof Error ? error.message : "Nao foi possivel iniciar a recuperacao");
           }
-
-          await response.json();
-          toast.success("Solicitação registrada", {
-            description: "Se o e-mail existir, enviaremos o link de redefinição."
-          });
         },
         (errors) => {
           toast.error(errors.email?.message ?? "Revise o e-mail informado");
@@ -51,7 +63,7 @@ export function ForgotPasswordForm() {
           <p className="text-sm text-[var(--color-destructive)]">{form.formState.errors.email.message}</p>
         ) : null}
       </div>
-      <Button className="w-full" type="submit">Enviar link de redefinição</Button>
+      <Button className="w-full" type="submit">Enviar link de redefinicao</Button>
     </form>
   );
 }

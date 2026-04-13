@@ -9,6 +9,7 @@ import { normalizeEmail } from "@/lib/auth/normalize-email";
 import { getTenantSeatSummary } from "@/lib/licensing/server";
 import { deliverNotification } from "@/lib/notifications/delivery";
 import { buildInvitationMessage } from "@/lib/notifications/invitation";
+import { captureRequestError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
 import { getSharingAuthority } from "@/lib/sharing/access";
 
@@ -48,7 +49,7 @@ function getActiveFamilyInvitationEmails(invitations: Awaited<ReturnType<typeof 
   return invitations.flatMap((invitation) => (invitation.acceptedAt && !invitation.revokedAt ? [invitation.email] : []));
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const user = await requireSessionUser();
     const authority = await getSharingAuthority(user);
@@ -104,6 +105,7 @@ export async function GET() {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
+    captureRequestError(error, { request, feature: "sharing" });
     return NextResponse.json({ message: "Failed to load sharing state" }, { status: 500 });
   }
 }
@@ -228,6 +230,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: error.issues[0]?.message ?? "Dados invalidos" }, { status: 400 });
     }
 
+    captureRequestError(error, { request, feature: "sharing" });
     return NextResponse.json({ message: "Failed to create sharing invitation" }, { status: 400 });
   }
 }
@@ -334,6 +337,7 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
+    captureRequestError(error, { request, feature: "sharing" });
     return NextResponse.json({ message: "Failed to update sharing access" }, { status: 400 });
   }
 }

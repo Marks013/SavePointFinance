@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { type ReactNode } from "react";
 
+import { auth } from "@/auth";
 import { GlobalThemeToggle } from "@/components/layout/global-theme-toggle";
 import { AppProviders } from "@/components/providers/app-providers";
+import { captureUnexpectedError } from "@/lib/observability/sentry";
 
 import "./globals.css";
 
@@ -35,6 +37,15 @@ export default async function RootLayout({ children }: RootLayoutProps) {
   const cookieStore = await cookies();
   const storedTheme = cookieStore.get("savepoint-theme")?.value;
   const initialTheme = storedTheme === "light" ? "light" : "dark";
+  const initialSession = await auth().catch((error) => {
+    captureUnexpectedError(error, {
+      surface: "server-layout",
+      route: "/",
+      operation: "render",
+      feature: "auth"
+    });
+    return null;
+  });
 
   return (
     <html data-theme={initialTheme} lang="pt-BR" suppressHydrationWarning>
@@ -43,7 +54,7 @@ export default async function RootLayout({ children }: RootLayoutProps) {
           Pular para o conteudo principal
         </a>
         <script dangerouslySetInnerHTML={{ __html: themeBootstrapScript }} />
-        <AppProviders initialTheme={initialTheme}>
+        <AppProviders initialSession={initialSession} initialTheme={initialTheme}>
           <div className="grain" />
           <GlobalThemeToggle />
           {children}

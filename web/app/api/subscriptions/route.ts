@@ -6,6 +6,7 @@ import { requireSessionUser } from "@/lib/auth/session";
 import { resolveTransactionClassification } from "@/lib/finance/transaction-classification";
 import { assertTenantTransactionReferences, TenantReferenceError } from "@/lib/finance/tenant-reference-guard";
 import { getMonthRange, normalizeMonthKey } from "@/lib/month";
+import { captureRequestError, captureUnexpectedError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
 import { getSubscriptionBillingDate } from "@/lib/subscriptions/recurrence";
 
@@ -86,6 +87,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
+    captureRequestError(error, { request, feature: "subscriptions" });
     return NextResponse.json({ message: "Failed to load subscriptions" }, { status: 500 });
   }
 }
@@ -131,7 +133,17 @@ export async function POST(request: Request) {
     await syncDueSubscriptionTransactions({
       tenantId: user.tenantId,
       userId: user.id
-    }).catch(err => console.error("Post-Create Sync Error:", err));
+    }).catch((error) =>
+      captureUnexpectedError(error, {
+        surface: "api-post-processing",
+        route: "/api/subscriptions",
+        operation: "POST",
+        feature: "subscriptions",
+        tenantId: user.tenantId,
+        userId: user.id,
+        dedupeKey: "subscriptions:post-create-sync"
+      })
+    );
 
     return NextResponse.json({ id: subscription.id }, { status: 201 });
   } catch (error) {
@@ -143,6 +155,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: error.message }, { status: 404 });
     }
 
+    captureRequestError(error, { request, feature: "subscriptions" });
     return NextResponse.json({ message: "Failed to create subscription" }, { status: 400 });
   }
 }

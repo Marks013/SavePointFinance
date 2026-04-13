@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { formatDateDisplay, formatDateKey } from "@/lib/date";
 import { formatMonthKeyLabel, getMonthRange, normalizeMonthKey } from "@/lib/month";
+import { ensureApiResponse } from "@/lib/observability/http";
 import { cn, formatCurrency } from "@/lib/utils";
 import {
   transactionFormSchema,
@@ -85,13 +86,13 @@ function getBaseInstallmentDescription(description: string) {
 
 async function getCategories() {
   const response = await fetch("/api/categories", { cache: "no-store" });
-  if (!response.ok) throw new Error("Falha ao carregar categorias");
+  await ensureApiResponse(response, { fallbackMessage: "Falha ao carregar categorias", method: "GET", path: "/api/categories" });
   return (await response.json()) as { items: CategoryItem[] };
 }
 
 async function getAccounts() {
   const response = await fetch("/api/accounts", { cache: "no-store" });
-  if (!response.ok) throw new Error("Falha ao carregar contas");
+  await ensureApiResponse(response, { fallbackMessage: "Falha ao carregar contas", method: "GET", path: "/api/accounts" });
   return (await response.json()) as { items: AccountItem[] };
 }
 
@@ -108,13 +109,13 @@ async function getTransactionsWithFilters(filters: TransactionFiltersValues) {
   if (filters.cardId) searchParams.set("cardId", filters.cardId);
 
   const response = await fetch(`/api/transactions?${searchParams.toString()}`, { cache: "no-store" });
-  if (!response.ok) throw new Error("Falha ao carregar transacoes");
+  await ensureApiResponse(response, { fallbackMessage: "Falha ao carregar transacoes", method: "GET", path: "/api/transactions" });
   return (await response.json()) as { items: TransactionItem[] };
 }
 
 async function getCards() {
   const response = await fetch("/api/cards", { cache: "no-store" });
-  if (!response.ok) throw new Error("Falha ao carregar cartoes");
+  await ensureApiResponse(response, { fallbackMessage: "Falha ao carregar cartoes", method: "GET", path: "/api/cards" });
   return (await response.json()) as { items: CardItem[] };
 }
 
@@ -127,10 +128,7 @@ async function createTransaction(values: TransactionFormValues) {
     body: JSON.stringify(values)
   });
 
-  if (!response.ok) {
-    const payload = (await response.json().catch(() => null)) as { message?: string } | null;
-    throw new Error(payload?.message ?? "Falha ao criar transacao");
-  }
+  await ensureApiResponse(response, { fallbackMessage: "Falha ao criar transacao", method: "POST", path: "/api/transactions" });
 
   return response.json();
 }
@@ -144,10 +142,11 @@ async function updateTransaction(id: string, values: TransactionUpdateValues) {
     body: JSON.stringify(values)
   });
 
-  if (!response.ok) {
-    const payload = (await response.json().catch(() => null)) as { message?: string } | null;
-    throw new Error(payload?.message ?? "Falha ao atualizar transacao");
-  }
+  await ensureApiResponse(response, {
+    fallbackMessage: "Falha ao atualizar transacao",
+    method: "PATCH",
+    path: `/api/transactions/${id}`
+  });
 
   return response.json();
 }
@@ -157,9 +156,7 @@ async function deleteTransaction(id: string) {
     method: "DELETE"
   });
 
-  if (!response.ok) {
-    throw new Error("Falha ao excluir transacao");
-  }
+  await ensureApiResponse(response, { fallbackMessage: "Falha ao excluir transacao", method: "DELETE", path: `/api/transactions/${id}` });
 }
 
 async function reviewClassification(id: string, categoryId: string, applyToInstallments = false) {
@@ -169,6 +166,11 @@ async function reviewClassification(id: string, categoryId: string, applyToInsta
       "Content-Type": "application/json"
     },
     body: JSON.stringify({ categoryId, applyToInstallments })
+  });
+  await ensureApiResponse(response, {
+    fallbackMessage: "Falha ao revisar classificacao",
+    method: "PATCH",
+    path: `/api/transactions/${id}/classification`
   });
 
   if (!response.ok) {
@@ -214,6 +216,7 @@ function buildEmptyTransactionValues(): TransactionFormValues {
 
 async function getProfilePreferences() {
   const response = await fetch("/api/profile", { cache: "no-store" });
+  await ensureApiResponse(response, { fallbackMessage: "Falha ao carregar preferencias", method: "GET", path: "/api/profile" });
   if (!response.ok) throw new Error("Falha ao carregar preferências");
   return (await response.json()) as ProfilePreferencesPayload;
 }

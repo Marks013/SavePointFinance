@@ -3,9 +3,10 @@ import { NextResponse } from "next/server";
 import { goalFormSchema } from "@/features/goals/schemas/goal-schema";
 import { requireSessionUser } from "@/lib/auth/session";
 import { assertTenantAccountReference, TenantReferenceError } from "@/lib/finance/tenant-reference-guard";
+import { captureRequestError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const user = await requireSessionUser();
     const goals = await prisma.goal.findMany({
@@ -42,6 +43,7 @@ export async function GET() {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
+    captureRequestError(error, { request, feature: "goals" });
     return NextResponse.json({ message: "Failed to load goals" }, { status: 500 });
   }
 }
@@ -85,6 +87,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: error.message }, { status: 404 });
     }
 
+    captureRequestError(error, { request, feature: "goals" });
     return NextResponse.json({ message: "Failed to create goal" }, { status: 400 });
   }
 }

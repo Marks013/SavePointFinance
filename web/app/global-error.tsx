@@ -1,7 +1,9 @@
 "use client";
 
-import * as Sentry from "@sentry/nextjs";
 import { useEffect } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
+
+import { captureUnexpectedError } from "@/lib/observability/sentry";
 
 type GlobalErrorProps = {
   error: Error & {
@@ -11,9 +13,21 @@ type GlobalErrorProps = {
 };
 
 export default function GlobalError({ error, reset }: GlobalErrorProps) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
   useEffect(() => {
-    Sentry.captureException(error);
-  }, [error]);
+    captureUnexpectedError(error, {
+      surface: "global-error",
+      route: pathname ?? undefined,
+      operation: "render",
+      feature: "app-router",
+      extra: {
+        digest: error.digest ?? null,
+        search: searchParams.toString() || null
+      }
+    });
+  }, [error, pathname, searchParams]);
 
   return (
     <html lang="pt-BR">

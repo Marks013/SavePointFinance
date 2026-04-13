@@ -4,6 +4,7 @@ import { categoryFormSchema } from "@/features/categories/schemas/category-schem
 import { requireSessionUser } from "@/lib/auth/session";
 import { invalidateTenantClassificationCache } from "@/lib/finance/classification-cache";
 import { buildCategoryKeywords, getDefaultCategorySystemKey, normalizeCategoryName } from "@/lib/finance/default-categories";
+import { captureRequestError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
 
 type Params = {
@@ -79,11 +80,12 @@ export async function PATCH(request: Request, context: Params) {
       return NextResponse.json({ message: "Já existe uma categoria com esse nome nesse tipo" }, { status: 409 });
     }
 
+    captureRequestError(error, { request, feature: "categories" });
     return NextResponse.json({ message: "Failed to update category" }, { status: 400 });
   }
 }
 
-export async function DELETE(_request: Request, context: Params) {
+export async function DELETE(request: Request, context: Params) {
   try {
     const user = await requireSessionUser();
     const { id } = await context.params;
@@ -118,6 +120,7 @@ export async function DELETE(_request: Request, context: Params) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
+    captureRequestError(error, { request, feature: "categories" });
     return NextResponse.json({ message: "Failed to delete category" }, { status: 400 });
   }
 }

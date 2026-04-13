@@ -5,6 +5,7 @@ import { requireSessionUser } from "@/lib/auth/session";
 import { getCardStatementSnapshot, getNextPayableStatementSnapshot, statementMonthSchema } from "@/lib/cards/statement";
 import { canCreateCard } from "@/lib/licensing/server";
 import { getCurrentMonthKey, getMonthRange } from "@/lib/month";
+import { captureRequestError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
 
 function getStatementReferenceDate(month?: string) {
@@ -76,6 +77,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
+    captureRequestError(error, { request, feature: "cards" });
     return NextResponse.json({ message: "Failed to load cards" }, { status: 500 });
   }
 }
@@ -163,6 +165,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "Já existe um cartão com esse nome" }, { status: 409 });
     }
 
+    captureRequestError(error, { request, feature: "cards" });
     return NextResponse.json({ message: "Failed to create card" }, { status: 400 });
   }
 }

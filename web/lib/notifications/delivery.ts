@@ -2,6 +2,7 @@ import { NotificationChannel, NotificationStatus } from "@prisma/client";
 
 import { serverEnv } from "@/lib/env/server";
 import { buildGenericNotificationEmail } from "@/lib/notifications/email-template";
+import { captureUnexpectedError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
 import { sendWhatsAppTextMessage } from "@/lib/whatsapp/cloud-api";
 
@@ -230,6 +231,18 @@ export async function deliverNotification(input: NotificationInput) {
       }
     });
   } catch (error) {
+    captureUnexpectedError(error, {
+      surface: "notification-delivery",
+      feature: "notifications",
+      tenantId: input.tenantId,
+      userId: input.userId ?? null,
+      entityId: input.goalId ?? null,
+      tags: {
+        channel: input.channel
+      },
+      dedupeKey: `notification-delivery:${input.channel}:${input.tenantId}`
+    });
+
     return prisma.notificationDelivery.create({
       data: {
         tenantId: input.tenantId,

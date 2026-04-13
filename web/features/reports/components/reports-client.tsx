@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { formatDateDisplay } from "@/lib/date";
 import { formatMonthKeyLabel, formatYearLabel, getMonthRange, getYearRange, normalizeMonthKey } from "@/lib/month";
+import { ensureApiResponse } from "@/lib/observability/http";
 import { formatCurrency } from "@/lib/utils";
 
 type Tone = "positive" | "attention" | "warning";
@@ -210,6 +211,7 @@ function ChartTooltipContent({
 
 async function getOptions<T>(url: string) {
   const response = await fetch(url, { cache: "no-store" });
+  await ensureApiResponse(response, { fallbackMessage: "Falha ao carregar opcoes", method: "GET", path: url });
   if (!response.ok) throw new Error("Falha ao carregar opções");
   return ((await response.json()) as { items: T[] }).items;
 }
@@ -226,6 +228,7 @@ async function getReportSummary(filters: {
   const searchParams = new URLSearchParams();
   Object.entries(filters).forEach(([key, value]) => value && searchParams.set(key, value));
   const response = await fetch(`/api/reports/summary?${searchParams.toString()}`, { cache: "no-store" });
+  await ensureApiResponse(response, { fallbackMessage: "Falha ao carregar relatorio", method: "GET", path: "/api/reports/summary" });
   if (!response.ok) throw new Error("Falha ao carregar relatório");
   return (await response.json()) as ReportResponse;
 }

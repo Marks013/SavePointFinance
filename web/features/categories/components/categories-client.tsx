@@ -14,6 +14,7 @@ import { PresetChip } from "@/components/ui/preset-chip";
 import { Select } from "@/components/ui/select";
 import { categoryFormSchema, type CategoryFormValues } from "@/features/categories/schemas/category-schema";
 import { categoryColorPresets, findPreset } from "@/lib/finance/presets";
+import { ensureApiResponse } from "@/lib/observability/http";
 
 type CategoryItem = {
   id: string;
@@ -28,7 +29,7 @@ type CategoryItem = {
 
 async function getCategories() {
   const response = await fetch("/api/categories", { cache: "no-store" });
-  if (!response.ok) throw new Error("Falha ao carregar categorias");
+  await ensureApiResponse(response, { fallbackMessage: "Falha ao carregar categorias", method: "GET", path: "/api/categories" });
   return (await response.json()) as { items: CategoryItem[] };
 }
 
@@ -41,10 +42,7 @@ async function createCategory(values: CategoryFormValues) {
     body: JSON.stringify(values)
   });
 
-  if (!response.ok) {
-    const payload = (await response.json()) as { message?: string };
-    throw new Error(payload.message ?? "Falha ao criar categoria");
-  }
+  await ensureApiResponse(response, { fallbackMessage: "Falha ao criar categoria", method: "POST", path: "/api/categories" });
   return response.json();
 }
 
@@ -57,10 +55,7 @@ async function updateCategory(id: string, values: CategoryFormValues) {
     body: JSON.stringify(values)
   });
 
-  if (!response.ok) {
-    const payload = (await response.json()) as { message?: string };
-    throw new Error(payload.message ?? "Falha ao atualizar categoria");
-  }
+  await ensureApiResponse(response, { fallbackMessage: "Falha ao atualizar categoria", method: "PATCH", path: `/api/categories/${id}` });
   return response.json();
 }
 
@@ -69,15 +64,17 @@ async function deleteCategory(id: string) {
     method: "DELETE"
   });
 
-  if (!response.ok) {
-    const payload = (await response.json()) as { message?: string };
-    throw new Error(payload.message ?? "Falha ao excluir categoria");
-  }
+  await ensureApiResponse(response, { fallbackMessage: "Falha ao excluir categoria", method: "DELETE", path: `/api/categories/${id}` });
 }
 
 async function restoreDefaultCategories() {
   const response = await fetch("/api/categories/defaults", {
     method: "POST"
+  });
+  await ensureApiResponse(response, {
+    fallbackMessage: "Falha ao restaurar categorias padrao",
+    method: "POST",
+    path: "/api/categories/defaults"
   });
 
   if (!response.ok) {

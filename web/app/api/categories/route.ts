@@ -9,9 +9,10 @@ import {
   getDefaultCategorySystemKey,
   normalizeCategoryName
 } from "@/lib/finance/default-categories";
+import { captureRequestError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const user = await requireSessionUser();
     await dedupeTenantCategories(user.tenantId);
@@ -40,6 +41,7 @@ export async function GET() {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
+    captureRequestError(error, { request, feature: "categories" });
     return NextResponse.json({ message: "Failed to load categories" }, { status: 500 });
   }
 }
@@ -118,6 +120,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "Já existe uma categoria com esse nome nesse tipo" }, { status: 409 });
     }
 
+    captureRequestError(error, { request, feature: "categories" });
     return NextResponse.json({ message: "Failed to create category" }, { status: 400 });
   }
 }
