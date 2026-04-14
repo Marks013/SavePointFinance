@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -116,7 +117,7 @@ export function SharingClient() {
   const queryClient = useQueryClient();
   const profileQuery = useQuery({ queryKey: ["profile"], queryFn: getProfile, staleTime: 30_000 });
   const sharingQuery = useQuery({ queryKey: ["sharing-state"], queryFn: getSharingState, staleTime: 15_000 });
-  const form = useForm<SharingInviteValues>({
+  const form = useForm<z.input<typeof sharingInviteSchema>, unknown, SharingInviteValues>({
     resolver: zodResolver(sharingInviteSchema),
     defaultValues: {
       name: "",

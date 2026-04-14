@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
 import { CurrencyInput } from "@/components/ui/currency-input";
@@ -254,7 +255,7 @@ export function CardsClient() {
       });
     }
   });
-  const form = useForm<CardFormValues>({
+  const form = useForm<z.input<typeof cardFormSchema>, unknown, CardFormValues>({
     resolver: zodResolver(cardFormSchema),
     defaultValues: {
       name: "",
@@ -348,9 +349,9 @@ export function CardsClient() {
   const statementIsPaid = Boolean(statementQuery.data?.payment);
   const statementOutstandingAmount = statementQuery.data?.summary.statementOutstandingAmount ?? 0;
   const canPayStatement = Boolean(statementQuery.data && !statementIsPaid && statementOutstandingAmount > 0);
-  const selectedBrand = form.watch("brand");
-  const selectedInstitution = form.watch("institution");
-  const selectedColor = form.watch("color");
+  const selectedBrand = form.watch("brand") ?? cardBrandPresets[0].value;
+  const selectedInstitution = form.watch("institution") ?? "";
+  const selectedColor = form.watch("color") ?? cardColorPresets[0].value;
 
   const getDefaultStatementMonth = (card: CardItem) =>
     card.payableStatementAmount > 0 ? card.payableStatementMonth : card.statementMonth;

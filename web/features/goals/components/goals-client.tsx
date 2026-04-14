@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
 import { CurrencyInput } from "@/components/ui/currency-input";
@@ -92,7 +93,7 @@ export function GoalsClient() {
   const reservedAmount = goals.reduce((sum, goal) => sum + goal.currentAmount, 0);
   const targetAmount = goals.reduce((sum, goal) => sum + goal.targetAmount, 0);
   const completedGoals = goals.filter((goal) => goal.isCompleted).length;
-  const form = useForm<GoalFormValues>({
+  const form = useForm<z.input<typeof goalFormSchema>, unknown, GoalFormValues>({
     resolver: zodResolver(goalFormSchema),
     defaultValues: {
       name: "",
@@ -176,7 +177,7 @@ export function GoalsClient() {
 
   const isEditing = editingId !== null;
   const showEditor = isEditorOpen || isEditing || goals.length === 0;
-  const selectedColor = form.watch("color");
+  const selectedColor = form.watch("color") ?? categoryColorPresets[0].value;
 
   return (
     <div className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">

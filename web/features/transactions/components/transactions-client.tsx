@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
 import { CurrencyInput } from "@/components/ui/currency-input";
@@ -294,7 +295,7 @@ export function TransactionsClient() {
     [automaticSuggestionIds, transactions]
   );
 
-  const form = useForm<TransactionFormValues>({
+  const form = useForm<z.input<typeof transactionFormSchema>, unknown, TransactionFormValues>({
     resolver: zodResolver(transactionFormSchema),
     defaultValues: buildEmptyTransactionValues()
   });
@@ -433,9 +434,9 @@ export function TransactionsClient() {
     form.reset(buildEmptyTransactionValues());
   };
 
-  const selectedType = form.watch("type");
-  const selectedPaymentMethod = form.watch("paymentMethod");
-  const selectedApplyTithe = form.watch("applyTithe");
+  const selectedType = form.watch("type") ?? "expense";
+  const selectedPaymentMethod = form.watch("paymentMethod") ?? "pix";
+  const selectedApplyTithe = form.watch("applyTithe") ?? false;
   const selectedFilterCard = useMemo(
     () => cards.find((card) => card.id === (filters.cardId ?? "")),
     [cards, filters.cardId]

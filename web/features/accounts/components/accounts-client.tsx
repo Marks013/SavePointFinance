@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
 import { CurrencyInput } from "@/components/ui/currency-input";
@@ -90,7 +91,7 @@ export function AccountsClient() {
   const openingBalance = accounts.reduce((sum, account) => sum + account.openingBalance, 0);
   const periodNet = accounts.reduce((sum, account) => sum + account.periodNet, 0);
   const accumulatedNet = accounts.reduce((sum, account) => sum + account.accumulatedNet, 0);
-  const form = useForm<AccountFormValues>({
+  const form = useForm<z.input<typeof accountFormSchema>, unknown, AccountFormValues>({
     resolver: zodResolver(accountFormSchema),
     defaultValues: {
       name: "",
@@ -176,8 +177,8 @@ export function AccountsClient() {
 
   const isEditing = editingId !== null;
   const showEditor = isEditorOpen || isEditing || accounts.length === 0;
-  const selectedColor = form.watch("color");
-  const selectedInstitution = form.watch("institution");
+  const selectedColor = form.watch("color") ?? accountColorPresets[0].value;
+  const selectedInstitution = form.watch("institution") ?? "";
 
   useEffect(() => {
     if (!editingId) {

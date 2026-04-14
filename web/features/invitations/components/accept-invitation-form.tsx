@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,7 +47,7 @@ export function AcceptInvitationForm({ initialToken = "" }: AcceptInvitationForm
   const [invitation, setInvitation] = useState<InvitationPayload | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const normalizedToken = sanitizeToken(initialToken);
-  const form = useForm<AcceptInvitationValues>({
+  const form = useForm<z.input<typeof acceptInvitationSchema>, unknown, AcceptInvitationValues>({
     resolver: zodResolver(acceptInvitationSchema),
     defaultValues: {
       token: normalizedToken,

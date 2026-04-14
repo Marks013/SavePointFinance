@@ -3,6 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +13,7 @@ import { ensureApiResponse } from "@/lib/observability/http";
 import { captureUnexpectedError } from "@/lib/observability/sentry";
 
 export function ForgotPasswordForm() {
-  const form = useForm<ForgotPasswordValues>({
+  const form = useForm<z.input<typeof forgotPasswordSchema>, unknown, ForgotPasswordValues>({
     resolver: zodResolver(forgotPasswordSchema),
     defaultValues: {
       email: ""

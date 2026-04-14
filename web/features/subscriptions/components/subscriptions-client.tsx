@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
 import { CurrencyInput } from "@/components/ui/currency-input";
@@ -172,7 +173,7 @@ export function SubscriptionsClient() {
     .filter((item) => item.type === "income")
     .reduce((sum, item) => sum + item.amount, 0);
 
-  const form = useForm<SubscriptionFormValues>({
+  const form = useForm<z.input<typeof subscriptionFormSchema>, unknown, SubscriptionFormValues>({
     resolver: zodResolver(subscriptionFormSchema),
     defaultValues: buildEmptySubscriptionValues()
   });
@@ -287,13 +288,13 @@ export function SubscriptionsClient() {
     form.reset(buildEmptySubscriptionValues());
   };
 
-  const selectedType = form.watch("type");
-  const selectedAccountId = form.watch("accountId");
-  const selectedCardId = form.watch("cardId");
+  const selectedType = form.watch("type") ?? "expense";
+  const selectedAccountId = form.watch("accountId") ?? "";
+  const selectedCardId = form.watch("cardId") ?? "";
   const filteredCategories = (categoriesQuery.data?.items ?? []).filter((item) => item.type === selectedType);
   const isEditing = editingId !== null;
   const showEditor = isEditorOpen || isEditing || subscriptions.length === 0;
-  const selectedName = form.watch("name");
+  const selectedName = form.watch("name") ?? "";
   const streamingCategoryId =
     (categoriesQuery.data?.items ?? []).find(
       (item) => item.type === "expense" && item.name === "Streaming e assinaturas"

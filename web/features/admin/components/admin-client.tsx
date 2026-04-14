@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -290,7 +291,7 @@ export function AdminClient() {
   const [auditSearch, setAuditSearch] = useState("");
   const [auditTenantFilter, setAuditTenantFilter] = useState("");
   const [auditActionFilter, setAuditActionFilter] = useState("");
-  const invitationForm = useForm<InvitationValues>({
+  const invitationForm = useForm<z.input<typeof invitationSchema>, unknown, InvitationValues>({
     resolver: zodResolver(invitationSchema),
     defaultValues: {
       email: "",

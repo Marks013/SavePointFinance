@@ -3,6 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,7 +17,7 @@ type ResetPasswordFormProps = {
 };
 
 export function ResetPasswordForm({ initialToken = "" }: ResetPasswordFormProps) {
-  const form = useForm<ResetPasswordValues>({
+  const form = useForm<z.input<typeof resetPasswordSchema>, unknown, ResetPasswordValues>({
     resolver: zodResolver(resetPasswordSchema),
     defaultValues: {
       token: initialToken,

@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
 import { CurrencyInput } from "@/components/ui/currency-input";
@@ -97,7 +98,7 @@ export function InstallmentsClient() {
   const totalAmount = groups.reduce((sum, item) => sum + item.totalAmount, 0);
   const overdueItems = groups.reduce((sum, item) => sum + item.overdueOpenInstallments, 0);
   const remainingInstallments = groups.reduce((sum, item) => sum + item.installmentsRemaining, 0);
-  const form = useForm<InstallmentGroupUpdateValues>({
+  const form = useForm<z.input<typeof installmentGroupUpdateSchema>, unknown, InstallmentGroupUpdateValues>({
     resolver: zodResolver(installmentGroupUpdateSchema),
     defaultValues: {
       description: "",

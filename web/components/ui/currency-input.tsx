@@ -45,8 +45,11 @@ function formatEditableCurrencyValue(value: number | null | undefined) {
   }).format(value);
 }
 
-type CurrencyInputProps<TFieldValues extends FieldValues> = {
-  control: Control<TFieldValues>;
+type CurrencyInputProps<
+  TFieldValues extends FieldValues,
+  TTransformedValues extends FieldValues = TFieldValues
+> = {
+  control: Control<TFieldValues, unknown, TTransformedValues>;
   name: FieldPath<TFieldValues>;
   id?: string;
   placeholder?: string;
@@ -54,15 +57,18 @@ type CurrencyInputProps<TFieldValues extends FieldValues> = {
   nullable?: boolean;
 };
 
-export function CurrencyInput<TFieldValues extends FieldValues>({
+export function CurrencyInput<
+  TFieldValues extends FieldValues,
+  TTransformedValues extends FieldValues = TFieldValues
+>({
   control,
   name,
   id,
   placeholder,
   disabled,
   nullable = false
-}: CurrencyInputProps<TFieldValues>) {
-  const { field } = useController({ control, name });
+}: CurrencyInputProps<TFieldValues, TTransformedValues>) {
+  const { field } = useController<TFieldValues, FieldPath<TFieldValues>, TTransformedValues>({ control, name });
   const [isFocused, setIsFocused] = useState(false);
   const [displayValue, setDisplayValue] = useState(() => {
     if (typeof field.value === "number") {

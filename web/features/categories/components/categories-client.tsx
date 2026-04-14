@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
 import { CurrencyInput } from "@/components/ui/currency-input";
@@ -94,7 +95,7 @@ export function CategoriesClient() {
   const categories = categoriesQuery.data?.items ?? [];
   const expenseCategories = categories.filter((category) => category.type === "expense").length;
   const incomeCategories = categories.filter((category) => category.type === "income").length;
-  const form = useForm<CategoryFormValues>({
+  const form = useForm<z.input<typeof categoryFormSchema>, unknown, CategoryFormValues>({
     resolver: zodResolver(categoryFormSchema),
     defaultValues: {
       name: "",
@@ -206,8 +207,8 @@ export function CategoriesClient() {
 
   const isEditing = editingId !== null;
   const showEditor = isEditorOpen || isEditing || categories.length === 0;
-  const selectedColor = form.watch("color");
-  const selectedType = form.watch("type");
+  const selectedColor = form.watch("color") ?? categoryColorPresets[0].value;
+  const selectedType = form.watch("type") ?? "expense";
 
   useEffect(() => {
     if (!editingId) {
