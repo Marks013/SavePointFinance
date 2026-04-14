@@ -12,7 +12,7 @@ const contentSecurityPolicy = [
   "img-src 'self' data: blob:",
   "font-src 'self' data:",
   isProduction ? "connect-src 'self'" : "connect-src 'self' ws: wss: http: https:",
-  `script-src 'self' 'unsafe-inline'${isProduction ? "" : " 'unsafe-eval'"}`,
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
   "style-src 'self' 'unsafe-inline'",
   "worker-src 'self' blob:",
   "manifest-src 'self'",
