@@ -37,6 +37,11 @@ type GeminiRefinementResult = {
   failureReason: string | null;
 };
 
+const DEFAULT_GEMINI_TIMEOUT_MS = 2_500;
+const DEFAULT_GEMINI_RETRY_ATTEMPTS = 1;
+const DEFAULT_GEMINI_CANDIDATE_LIMIT = 24;
+const MIN_TRUSTWORTHY_FALLBACK_SCORE = 4;
+
 const contextualAliases: Record<string, string[]> = {
   mercado: ["supermercado", "mercado", "compras mercado", "compras casa"],
   mercadinho: ["supermercado", "mercado"],
@@ -457,6 +462,56 @@ function resolveClassificationKeyword(matchedKeywords: string[]) {
   return matchedKeywords.find((item) => !INTERNAL_MATCH_REASONS.has(normalizeText(item))) ?? null;
 }
 
+function resolveBoundedNumberFromEnv(params: {
+  value: string | undefined;
+  fallback: number;
+  min: number;
+  max: number;
+}) {
+  const parsed = Number(params.value);
+
+  if (!Number.isFinite(parsed)) {
+    return params.fallback;
+  }
+
+  return Math.min(Math.max(Math.round(parsed), params.min), params.max);
+}
+
+function buildGeminiCandidatePool(
+  ranked: Array<{ id: string; name: string; score: number }>,
+  limit: number
+) {
+  if (ranked.length <= limit) {
+    return ranked;
+  }
+
+  const selected = new Map<string, { id: string; name: string; score: number }>();
+
+  for (const candidate of ranked) {
+    if (candidate.score > 0) {
+      selected.set(candidate.id, candidate);
+    }
+
+    if (selected.size >= limit) {
+      break;
+    }
+  }
+
+  if (selected.size < limit) {
+    for (const candidate of ranked) {
+      if (!selected.has(candidate.id)) {
+        selected.set(candidate.id, candidate);
+      }
+
+      if (selected.size >= limit) {
+        break;
+      }
+    }
+  }
+
+  return Array.from(selected.values());
+}
+
 async function refineWithGemini(
   input: ClassifyTransactionInput,
   candidates: Array<{ id: string; name: string; score: number }>
@@ -491,14 +546,18 @@ async function refineWithGemini(
     })
     .join("\n");
   const candidateNames = candidates.map((item) => item.name);
-  const configuredTimeout = Number(process.env.GEMINI_TIMEOUT_MS ?? 5000);
-  const timeoutMs = Number.isFinite(configuredTimeout)
-    ? Math.min(Math.max(Math.round(configuredTimeout), 1000), 15000)
-    : 5000;
-  const configuredAttempts = Number(process.env.GEMINI_RETRY_ATTEMPTS ?? 3);
-  const maxAttempts = Number.isFinite(configuredAttempts)
-    ? Math.min(Math.max(Math.round(configuredAttempts), 1), 4)
-    : 3;
+  const timeoutMs = resolveBoundedNumberFromEnv({
+    value: process.env.GEMINI_TIMEOUT_MS,
+    fallback: DEFAULT_GEMINI_TIMEOUT_MS,
+    min: 800,
+    max: 15_000
+  });
+  const maxAttempts = resolveBoundedNumberFromEnv({
+    value: process.env.GEMINI_RETRY_ATTEMPTS,
+    fallback: DEFAULT_GEMINI_RETRY_ATTEMPTS,
+    min: 1,
+    max: 4
+  });
   let lastFailureReason: string | null = null;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
@@ -709,7 +768,13 @@ export async function classifyTransactionCategory(
       name: category.name,
       ...scoreCategory(category, haystack, tokens, input.paymentMethod, input.history)
     }))
-    .sort((a, b) => b.score - a.score);
+    .sort((a, b) => {
+      if (b.score !== a.score) {
+        return b.score - a.score;
+      }
+
+      return a.name.localeCompare(b.name, "pt-BR");
+    });
 
   const best = ranked[0];
   const second = ranked[1];
@@ -739,11 +804,20 @@ export async function classifyTransactionCategory(
   }
 
   const fallback = typedCategories.find((item) => item.name === getFallbackCategoryName(typedType));
+  const geminiCandidateLimit = resolveBoundedNumberFromEnv({
+    value: process.env.GEMINI_CANDIDATE_LIMIT,
+    fallback: DEFAULT_GEMINI_CANDIDATE_LIMIT,
+    min: 8,
+    max: 40
+  });
   const aiAttempt =
     serverEnv.GEMINI_ENABLED === "true"
       ? await refineWithGemini(
           input,
-          ranked.slice(0, 8).map((item) => ({ id: item.id, name: item.name, score: item.score }))
+          buildGeminiCandidatePool(
+            ranked.map((item) => ({ id: item.id, name: item.name, score: item.score })),
+            geminiCandidateLimit
+          )
         )
       : null;
 
@@ -751,15 +825,17 @@ export async function classifyTransactionCategory(
     return aiAttempt.classification;
   }
 
+  const fallbackToApproximateBest = Boolean(best && best.score >= MIN_TRUSTWORTHY_FALLBACK_SCORE);
+
   return {
-    categoryId: fallback?.id ?? best?.id ?? null,
-    confidence: best?.score ? Math.min(0.68, 0.32 + best.score / 28) : 0.24,
+    categoryId: fallbackToApproximateBest ? best?.id ?? fallback?.id ?? null : fallback?.id ?? best?.id ?? null,
+    confidence: fallbackToApproximateBest && best?.score ? Math.min(0.68, 0.32 + best.score / 28) : 0.24,
     aiClassified: false,
-    classificationSource: best?.score ? "category_keyword" : "fallback",
-    classificationKeyword: best ? resolveClassificationKeyword(best.matchedKeywords) : null,
+    classificationSource: fallbackToApproximateBest ? "category_keyword" : "fallback",
+    classificationKeyword: fallbackToApproximateBest && best ? resolveClassificationKeyword(best.matchedKeywords) : null,
     reason: aiAttempt?.failureReason
       ? `Fallback local após indisponibilidade do Gemini: ${aiAttempt.failureReason}`
-      : best?.score
+      : fallbackToApproximateBest
         ? "Classificação aproximada por contexto"
         : "Categoria padrão aplicada"
   };

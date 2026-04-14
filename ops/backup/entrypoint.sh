@@ -4,6 +4,8 @@ set -Eeuo pipefail
 
 BACKUP_CRON_SCHEDULE="${BACKUP_CRON_SCHEDULE:-0 3 * * *}"
 BACKUP_RUN_ON_STARTUP="${BACKUP_RUN_ON_STARTUP:-false}"
+mkdir -p /backups
+date --iso-8601=seconds >/backups/health-started.txt
 
 if [[ "$#" -gt 0 ]]; then
   exec "$@"

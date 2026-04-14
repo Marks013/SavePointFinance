@@ -16,10 +16,11 @@ RUN apk add --no-cache \
 WORKDIR /app
 
 COPY entrypoint.sh /usr/local/bin/backup-entrypoint.sh
+COPY healthcheck.sh /usr/local/bin/backup-healthcheck.sh
 COPY run-backup.sh /usr/local/bin/run-backup.sh
 COPY restore-backup.sh /usr/local/bin/restore-backup.sh
 
-RUN chmod +x /usr/local/bin/backup-entrypoint.sh /usr/local/bin/run-backup.sh /usr/local/bin/restore-backup.sh \
+RUN chmod +x /usr/local/bin/backup-entrypoint.sh /usr/local/bin/backup-healthcheck.sh /usr/local/bin/run-backup.sh /usr/local/bin/restore-backup.sh \
   && mkdir -p /backups /workspace /var/log
 
 ENTRYPOINT ["/usr/local/bin/backup-entrypoint.sh"]

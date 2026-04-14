@@ -87,6 +87,57 @@ export function deriveRuleKeyword(params: {
   return tokens.join(" ").trim() || null;
 }
 
+const WEAK_AI_LEARNED_RULE_TOKENS = new Set([
+  "anual",
+  "assinatura",
+  "boleto",
+  "cartao",
+  "compra",
+  "credito",
+  "debito",
+  "mensal",
+  "mensalidade",
+  "pagamento",
+  "parcela",
+  "pix",
+  "renovacao",
+  "servico",
+  "taxa",
+  "transferencia"
+]);
+
+function canPersistAiLearnedKeyword(keyword: string) {
+  const tokens = tokenizeClassificationText(keyword);
+
+  if (!tokens.length) {
+    return false;
+  }
+
+  const meaningfulTokens = tokens.filter(
+    (token) => token.length >= 4 && !WEAK_AI_LEARNED_RULE_TOKENS.has(token)
+  );
+
+  if (!meaningfulTokens.length) {
+    return false;
+  }
+
+  return tokens.length >= 2 || meaningfulTokens.some((token) => token.length >= 6);
+}
+
+export function deriveAiLearnedRuleKeyword(params: {
+  existingKeyword?: string | null;
+  description: string;
+  notes?: string | null;
+}) {
+  const normalizedKeyword = deriveRuleKeyword(params);
+
+  if (!normalizedKeyword || !canPersistAiLearnedKeyword(normalizedKeyword)) {
+    return null;
+  }
+
+  return normalizedKeyword;
+}
+
 export function matchTenantCategoryRules(
   rules: RuleRecord[],
   input: {
@@ -219,6 +270,59 @@ export async function upsertManualCategoryRule(input: {
       source: "manual",
       priority: 1000,
       confidence: 0.99,
+      createdFromTransactionId: input.createdFromTransactionId ?? null
+    }
+  });
+}
+
+export async function upsertAiLearnedCategoryRule(input: {
+  tenantId: string;
+  categoryId: string;
+  type: "income" | "expense";
+  description: string;
+  notes?: string | null;
+  existingKeyword?: string | null;
+  confidence?: number | null;
+  createdFromTransactionId?: string | null;
+}) {
+  const normalizedKeyword = deriveAiLearnedRuleKeyword({
+    existingKeyword: input.existingKeyword,
+    description: input.description,
+    notes: input.notes ?? null
+  });
+
+  if (!normalizedKeyword) {
+    return null;
+  }
+
+  const confidence = Math.max(0.51, Math.min(input.confidence ?? 0.84, 0.99));
+
+  return prisma.categoryRule.upsert({
+    where: {
+      tenantId_type_normalizedKeyword_source_matchMode: {
+        tenantId: input.tenantId,
+        type: input.type,
+        normalizedKeyword,
+        source: "ai_learned",
+        matchMode: "exact_phrase"
+      }
+    },
+    update: {
+      categoryId: input.categoryId,
+      priority: 700,
+      confidence,
+      isActive: true,
+      createdFromTransactionId: input.createdFromTransactionId ?? undefined
+    },
+    create: {
+      tenantId: input.tenantId,
+      categoryId: input.categoryId,
+      type: input.type,
+      normalizedKeyword,
+      matchMode: "exact_phrase",
+      source: "ai_learned",
+      priority: 700,
+      confidence,
       createdFromTransactionId: input.createdFromTransactionId ?? null
     }
   });

@@ -6,13 +6,19 @@ import {
 } from "@prisma/client";
 
 import { classifyTransactionCategory } from "@/lib/finance/category-classifier";
-import { getTenantClassificationContext } from "@/lib/finance/classification-cache";
 import {
+  getTenantClassificationContext,
+  invalidateTenantClassificationCache
+} from "@/lib/finance/classification-cache";
+import {
+  deriveAiLearnedRuleKeyword,
   matchCategoryKeywords,
-  matchTenantCategoryRules
+  matchTenantCategoryRules,
+  upsertAiLearnedCategoryRule
 } from "@/lib/finance/category-rules";
 import { ensureFallbackCategory } from "@/lib/finance/default-categories";
 import { matchGlobalKeywordContext } from "@/lib/finance/global-keywords";
+import { captureUnexpectedError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
 
 type ClassificationInput = {
@@ -33,6 +39,8 @@ type ClassificationOutput = {
   classificationKeyword: string | null;
   reason: string;
 };
+
+const MIN_AI_LEARNING_CONFIDENCE = 0.82;
 
 export async function resolveTransactionClassification(
   input: ClassificationInput
@@ -161,6 +169,7 @@ export async function resolveTransactionClassification(
       categoryId: true,
       description: true,
       notes: true,
+      classificationSource: true,
       aiClassified: true,
       aiConfidence: true
     },
@@ -175,18 +184,64 @@ export async function resolveTransactionClassification(
     paymentMethod: input.paymentMethod,
     categories,
     history: history
-      .filter((item): item is typeof item & { categoryId: string } => Boolean(item.categoryId))
+      .filter(
+        (item): item is typeof item & { categoryId: string } =>
+          Boolean(item.categoryId) &&
+          !item.aiClassified &&
+          item.classificationSource !== "fallback" &&
+          item.classificationSource !== "unknown"
+      )
       .map((item) => ({
         categoryId: item.categoryId,
         description: item.description,
         notes: item.notes,
-        aiClassified: item.aiClassified,
+        aiClassified: false,
         aiConfidence: item.aiConfidence ? Number(item.aiConfidence) : null
       }))
   });
 
+  let classificationKeyword = classification.classificationKeyword;
+
+  if (
+    classification.aiClassified &&
+    classification.categoryId &&
+    (classification.confidence ?? 0) >= MIN_AI_LEARNING_CONFIDENCE
+  ) {
+    const learnedKeyword = deriveAiLearnedRuleKeyword({
+      existingKeyword: classification.classificationKeyword,
+      description: input.description,
+      notes: input.notes ?? null
+    });
+
+    if (learnedKeyword) {
+      classificationKeyword = learnedKeyword;
+
+      try {
+        await upsertAiLearnedCategoryRule({
+          tenantId: input.tenantId,
+          categoryId: classification.categoryId,
+          type: input.type,
+          description: input.description,
+          notes: input.notes ?? null,
+          existingKeyword: learnedKeyword,
+          confidence: classification.confidence
+        });
+        invalidateTenantClassificationCache(input.tenantId);
+      } catch (error) {
+        captureUnexpectedError(error, {
+          surface: "classification",
+          operation: "learn-ai-rule",
+          feature: "transactions",
+          tenantId: input.tenantId,
+          dedupeKey: `classification:ai-learned:${input.tenantId}:${classification.categoryId}:${learnedKeyword}`
+        });
+      }
+    }
+  }
+
   return {
     ...classification,
+    classificationKeyword,
     categoryId: classification.categoryId ?? (await ensureFallbackCategory(input.tenantId, input.type))
   };
 }

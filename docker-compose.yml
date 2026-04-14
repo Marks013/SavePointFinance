@@ -92,7 +92,7 @@ services:
     container_name: savepoint_backup
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "test -f /backups/last-success.txt && find /backups/last-success.txt -mtime -2 | grep -q ."]
+      test: ["CMD-SHELL", "/usr/local/bin/backup-healthcheck.sh"]
       interval: 30m
       timeout: 10s
       retries: 1
