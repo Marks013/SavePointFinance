@@ -32,17 +32,14 @@ export async function GET(request: Request) {
       orderBy: [{ isActive: "desc" }, { nextBillingDate: "asc" }, { name: "asc" }]
     });
     const monthlyTransactions =
-      monthRange && subscriptions.length > 0
+      month && subscriptions.length > 0
         ? await prisma.transaction.findMany({
             where: {
               tenantId: user.tenantId,
               subscriptionId: {
                 in: subscriptions.map((subscription) => subscription.id)
               },
-              date: {
-                gte: new Date(`${monthRange.from}T00:00:00`),
-                lte: new Date(`${monthRange.to}T23:59:59`)
-              }
+              competence: month
             },
             select: {
               subscriptionId: true,

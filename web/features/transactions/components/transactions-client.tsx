@@ -51,6 +51,7 @@ type CardItem = {
 type TransactionItem = {
   id: string;
   date: string;
+  competence: string | null;
   competenceDate: string | null;
   payableDate: string | null;
   amount: number;
@@ -402,7 +403,7 @@ export function TransactionsClient() {
     setEditingScope("single");
     setEditingInstallmentsTotal(transaction.installmentsTotal);
     form.reset({
-      date: formatDateKey(new Date(transaction.date)),
+      date: new Date(transaction.date),
       amount: transaction.amount,
       description: getBaseInstallmentDescription(transaction.description),
       type: transaction.type,
@@ -413,6 +414,7 @@ export function TransactionsClient() {
       cardId: transaction.card?.id ?? "",
       notes: transaction.notes ?? "",
       installments: transaction.installmentsTotal,
+      competence: transaction.competence ?? getMonthKeyFromDate(transaction.date),
       applyTithe: transaction.applyTithe
     });
   };
@@ -475,10 +477,9 @@ export function TransactionsClient() {
   useEffect(() => {
     setFilters((current) => ({
       ...current,
-      from: monthRange.from,
-      to: monthRange.to
+      month: month
     }));
-  }, [monthRange.from, monthRange.to]);
+  }, [month]);
 
   useEffect(() => {
     if (selectedType === "transfer") {
