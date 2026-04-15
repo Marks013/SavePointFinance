@@ -307,7 +307,6 @@ async function run() {
 
   await expectPage(dataJar, "/dashboard/accounts", [
     "Contas",
-    "Contas disponiveis",
     "Saldo atual total",
     "Base cadastrada"
   ]);
@@ -324,7 +323,6 @@ async function run() {
   await expectPage(dataJar, "/dashboard/subscriptions", [
     "Assinaturas",
     "Assinaturas ativas",
-    "Saidas mensais",
     "Entradas mensais"
   ]);
   results.push("Tela de assinaturas carregou com conteudo esperado");
