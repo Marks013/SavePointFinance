@@ -14,7 +14,7 @@ import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { formatDateDisplay, formatDateKey } from "@/lib/date";
+import { formatDateDisplay, formatDateKey, normalizeCalendarDate } from "@/lib/date";
 import { formatMonthKeyLabel, getMonthRange, normalizeMonthKey } from "@/lib/month";
 import { ensureApiResponse } from "@/lib/observability/http";
 import { cn, formatCurrency } from "@/lib/utils";
@@ -403,7 +403,7 @@ export function TransactionsClient() {
     setEditingScope("single");
     setEditingInstallmentsTotal(transaction.installmentsTotal);
     form.reset({
-      date: new Date(transaction.date),
+      date: normalizeCalendarDate(transaction.date),
       amount: transaction.amount,
       description: getBaseInstallmentDescription(transaction.description),
       type: transaction.type,

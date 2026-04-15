@@ -31,6 +31,24 @@ export function formatDateKey(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
+export function normalizeCalendarDate(value: Date | string) {
+  const source = value instanceof Date ? value : new Date(value);
+
+  if (Number.isNaN(source.getTime())) {
+    return source;
+  }
+
+  return new Date(
+    source.getUTCFullYear(),
+    source.getUTCMonth(),
+    source.getUTCDate(),
+    12,
+    0,
+    0,
+    0
+  );
+}
+
 function toDisplayDate(value: Date | string) {
   if (typeof value !== "string") {
     return value;

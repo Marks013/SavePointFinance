@@ -127,7 +127,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const parsedData = transactionFormSchema.parse(body);
     const accountId = body.accountId || null;
-	const competenceKey = parsedData.competence || format(new Date(parsedData.date), "yyyy-MM");
+	const competenceKey = parsedData.competence || format(parsedData.date, "yyyy-MM");
 	const baseCompetenceDate = new Date(`${competenceKey}-15T12:00:00`);
 	const destinationAccountId = body.destinationAccountId || null;
 	const cardId = body.cardId || null;
@@ -178,7 +178,7 @@ export async function POST(request: Request) {
 	let firstTransactionId: string | null = null;
 
 	for (let index = 0; index < body.installments; index += 1) {
-	  const transactionDate = addMonthsClamped(new Date(parsedData.date), index);
+	  const transactionDate = addMonthsClamped(parsedData.date, index);
 	  const competenceDate = addMonthsClamped(baseCompetenceDate, index);
 	  const competenceForInstallment = format(competenceDate, "yyyy-MM");
 

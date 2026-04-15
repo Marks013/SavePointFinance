@@ -69,7 +69,7 @@ export async function PATCH(request: Request, context: Params) {
     const categoryId = classification.categoryId;
     const applyTithe = body.type === "income" && body.applyTithe;
     const titheCategoryId = applyTithe ? await ensureTitheCategory(user.tenantId) : null;
-    const updatedDate = new Date(`${body.date}T12:00:00`);
+    const updatedDate = new Date(body.date);
     const selectedCard =
       body.paymentMethod === "credit_card" && body.cardId
         ? await prisma.card.findFirst({

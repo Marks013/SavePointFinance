@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { dateKeySchema } from "@/lib/date";
+import { dateKeySchema, normalizeCalendarDate } from "@/lib/date";
 
 export const transactionTypeValues = ["income", "expense", "transfer"] as const;
 export const paymentMethodValues = ["pix", "money", "credit_card", "debit_card", "transfer"] as const;
@@ -8,7 +8,7 @@ export const transactionEditScopeValues = ["single", "group"] as const;
 
 export const transactionFormSchema =
   z.object({
-    date: z.coerce.date(),
+    date: z.coerce.date().transform((value) => normalizeCalendarDate(value)),
     amount: z.coerce.number().positive("Informe um valor maior que zero"),
     description: z.string().trim().min(3, "Informe uma descricao"),
     type: z.enum(transactionTypeValues),

@@ -412,6 +412,42 @@ async function main() {
     assertCondition(Math.abs(installmentTotal - 300.01) < 0.0001, "O parcelamento perdeu o total ao dividir centavos");
     results.push("Parcelamento respeita meses curtos e mantém o total com centavos");
 
+    const updateIncomeWithTithe = await getJson<{ id: string; scope: string }>(jar, `/api/transactions/${salaryOne.payload.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        date: "2026-01-31",
+        amount: 1200,
+        description: "Salário Janeiro Ajustado",
+        type: "income",
+        paymentMethod: "pix",
+        categoryId: salaryCategory.id,
+        accountId: accountA.payload.id,
+        destinationAccountId: null,
+        cardId: null,
+        notes: "Ajuste de auditoria",
+        installments: 1,
+        competence: "2026-01",
+        applyTithe: true,
+        editScope: "single"
+      })
+    });
+    assertCondition(updateIncomeWithTithe.status === 200, `Edição da receita com dízimo respondeu ${updateIncomeWithTithe.status}`);
+    assertCondition(updateIncomeWithTithe.payload.scope === "single", "Edição da receita com dízimo não retornou escopo single");
+
+    const updatedSalary = await prisma.transaction.findUniqueOrThrow({
+      where: {
+        id: salaryOne.payload.id
+      }
+    });
+    assertCondition(
+      updatedSalary.description === "Salário Janeiro Ajustado" &&
+        Math.abs(Number(updatedSalary.amount) - 1200) < 0.0001 &&
+        Math.abs(Number(updatedSalary.titheAmount ?? 0) - 120) < 0.0001,
+      "A receita editada com dízimo não foi persistida corretamente"
+    );
+    results.push("Edição de receita com dízimo mantém a transação e o dízimo individual coerentes");
+
     const titheTransactions = await prisma.transaction.findMany({
       where: {
         tenantId: tenant.id,
@@ -419,12 +455,44 @@ async function main() {
       }
     });
     assertCondition(titheTransactions.length === 1, "O dízimo consolidado não foi mantido em lançamento único");
-    assertCondition(Math.abs(Number(titheTransactions[0]?.amount ?? 0) - 150) < 0.0001, "O valor do dízimo consolidado ficou incorreto");
+    assertCondition(Math.abs(Number(titheTransactions[0]?.amount ?? 0) - 170) < 0.0001, "O valor do dízimo consolidado ficou incorreto");
     assertCondition(
       [user.id, collaborator.id].includes(titheTransactions[0]?.userId ?? ""),
       "O dízimo consolidado não ficou atribuído a um membro válido da carteira"
     );
     results.push("Dízimo consolida 10% das receitas marcadas em um único lançamento da carteira compartilhada");
+
+    const updateInstallmentGroup = await getJson<{ success: boolean }>(jar, `/api/installments/${cardInstallments.payload.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        description: "Notebook auditado",
+        amount: 120.55,
+        categoryId: marketCategory.id,
+        notes: "Parcelamento auditado"
+      })
+    });
+    assertCondition(updateInstallmentGroup.status === 200, `Edição do grupo parcelado respondeu ${updateInstallmentGroup.status}`);
+
+    const updatedInstallments = await prisma.transaction.findMany({
+      where: {
+        tenantId: tenant.id,
+        OR: [{ id: cardInstallments.payload.id }, { parentId: cardInstallments.payload.id }]
+      },
+      orderBy: {
+        installmentNumber: "asc"
+      }
+    });
+    assertCondition(
+      updatedInstallments.every(
+        (item) =>
+          item.description === `Notebook auditado (${item.installmentNumber}/${item.installmentsTotal})` &&
+          Math.abs(Number(item.amount) - 120.55) < 0.0001 &&
+          item.notes === "Parcelamento auditado"
+      ),
+      "A edição do grupo parcelado não atualizou todas as parcelas"
+    );
+    results.push("Edição do grupo parcelado reaplica descrição, valor e observações em todas as parcelas");
 
     const accountsWithBalance = await getAccountsWithComputedBalance(tenant.id);
     const accountAModel = accountsWithBalance.find((item) => item.id === accountA.payload.id);
