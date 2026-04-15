@@ -274,7 +274,7 @@ async function run() {
   const adminJar = await signIn(adminEmail, adminPassword);
   results.push("Login por credenciais estabelece sessao valida");
 
-  await expectPage(adminJar, "/dashboard", ["Encerrar sessao"]);
+  await expectPage(adminJar, "/dashboard", ["Encerrar sessão"]);
   results.push("Dashboard autenticado responde para o admin");
 
   const adminProfile = await getJson<ProfilePayload>(adminJar, "/api/profile");
@@ -297,11 +297,11 @@ async function run() {
   }
 
   await expectPage(dataJar, "/dashboard", [
-    "Visao central da operacao",
+    "Visão central da operação",
     "Movimento recente",
     "Resumo das contas",
-    "Cartoes em operacao",
-    "Encerrar sessao"
+    "Cartões em operação",
+    "Encerrar sessão"
   ]);
   results.push("Dashboard principal carregou com conteudo esperado");
 
