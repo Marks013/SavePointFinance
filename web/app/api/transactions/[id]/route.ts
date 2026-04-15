@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 import { requireSessionUser } from "@/lib/auth/session";
+import { buildCardBillingSnapshot } from "@/lib/cards/statement";
 import { resolveTransactionClassification } from "@/lib/finance/transaction-classification";
 import { assertTenantTransactionReferences, TenantReferenceError } from "@/lib/finance/tenant-reference-guard";
 import { ensureTitheCategory, syncTitheForTransactionDates } from "@/lib/finance/tithe";
@@ -34,6 +35,10 @@ export async function PATCH(request: Request, context: Params) {
       select: {
         id: true,
         date: true,
+        paymentMethod: true,
+        accountId: true,
+        destinationAccountId: true,
+        cardId: true,
         titheAmount: true,
         notes: true,
         userId: true,
@@ -48,14 +53,37 @@ export async function PATCH(request: Request, context: Params) {
     }
 
     const notes = body.notes?.trim() || null;
+    const updatedDate = new Date(body.date);
+    const nextAccountId = body.accountId || null;
+    const nextDestinationAccountId = body.destinationAccountId || null;
+    const nextCardId = body.cardId || null;
+    const isLockedCreditTransaction =
+      existingTransaction.paymentMethod === "credit_card" || Boolean(existingTransaction.cardId);
 
     await assertTenantTransactionReferences({
       tenantId: user.tenantId,
-      accountId: body.accountId,
-      destinationAccountId: body.destinationAccountId,
-      cardId: body.cardId,
+      accountId: nextAccountId,
+      destinationAccountId: nextDestinationAccountId,
+      cardId: nextCardId,
       categoryId: body.categoryId
     });
+
+    if (
+      isLockedCreditTransaction &&
+      (body.paymentMethod !== existingTransaction.paymentMethod ||
+        nextAccountId !== (existingTransaction.accountId ?? null) ||
+        nextDestinationAccountId !== (existingTransaction.destinationAccountId ?? null) ||
+        nextCardId !== (existingTransaction.cardId ?? null) ||
+        updatedDate.getTime() !== existingTransaction.date.getTime())
+    ) {
+      return NextResponse.json(
+        {
+          message:
+            "Para alterar data, conta ou cartão neste lançamento de crédito, recrie o lançamento."
+        },
+        { status: 400 }
+      );
+    }
 
     const classification = await resolveTransactionClassification({
       tenantId: user.tenantId,
@@ -69,7 +97,6 @@ export async function PATCH(request: Request, context: Params) {
     const categoryId = classification.categoryId;
     const applyTithe = body.type === "income" && body.applyTithe;
     const titheCategoryId = applyTithe ? await ensureTitheCategory(user.tenantId) : null;
-    const updatedDate = new Date(body.date);
     const selectedCard =
       body.paymentMethod === "credit_card" && body.cardId
         ? await prisma.card.findFirst({
@@ -81,7 +108,8 @@ export async function PATCH(request: Request, context: Params) {
             select: {
               id: true,
               closeDay: true,
-              dueDay: true
+              dueDay: true,
+              statementMonthAnchor: true
             }
           })
         : null;
@@ -117,6 +145,7 @@ export async function PATCH(request: Request, context: Params) {
           const monthOffset = installment.installmentNumber - existingTransaction.installmentNumber;
           const nextDate = addMonthsClamped(updatedDate, monthOffset);
           const nextCompetenceDate = addMonthsClamped(baseCompetenceDate, monthOffset);
+          const cardSnapshot = selectedCard ? buildCardBillingSnapshot(selectedCard, nextDate) : null;
 
           return prisma.transaction.update({
             where: {
@@ -124,15 +153,17 @@ export async function PATCH(request: Request, context: Params) {
             },
             data: {
               date: nextDate,
-              competence: format(nextCompetenceDate, "yyyy-MM"),
+              competence: cardSnapshot?.competence ?? format(nextCompetenceDate, "yyyy-MM"),
               amount: new Prisma.Decimal(body.amount.toFixed(2)),
               description: buildInstallmentDescription(body.description, installment.installmentNumber, installment.installmentsTotal),
               type: body.type,
               paymentMethod: body.paymentMethod,
               categoryId,
-              accountId: body.accountId || null,
-              destinationAccountId: body.destinationAccountId || null,
-              cardId: body.cardId || null,
+              accountId: nextAccountId,
+              destinationAccountId: nextDestinationAccountId,
+              cardId: nextCardId,
+              statementCloseDate: cardSnapshot?.closeDate ?? null,
+              statementDueDate: cardSnapshot?.dueDate ?? null,
               notes,
               titheAmount: applyTithe ? new Prisma.Decimal((body.amount * 0.1).toFixed(2)) : null,
               titheCategoryId,
@@ -167,21 +198,25 @@ export async function PATCH(request: Request, context: Params) {
       });
     }
 
+    const singleCardSnapshot = selectedCard ? buildCardBillingSnapshot(selectedCard, updatedDate) : null;
+
     const updated = await prisma.transaction.update({
       where: {
         id
       },
       data: {
         date: updatedDate,
-        competence: competenceForSingleUpdate,
+        competence: singleCardSnapshot?.competence ?? competenceForSingleUpdate,
         amount: new Prisma.Decimal(body.amount.toFixed(2)),
         description: buildInstallmentDescription(body.description, existingTransaction.installmentNumber, existingTransaction.installmentsTotal),
         type: body.type,
         paymentMethod: body.paymentMethod,
         categoryId,
-        accountId: body.accountId || null,
-        destinationAccountId: body.destinationAccountId || null,
-        cardId: body.cardId || null,
+        accountId: nextAccountId,
+        destinationAccountId: nextDestinationAccountId,
+        cardId: nextCardId,
+        statementCloseDate: singleCardSnapshot?.closeDate ?? null,
+        statementDueDate: singleCardSnapshot?.dueDate ?? null,
         notes,
         titheAmount: applyTithe ? new Prisma.Decimal((body.amount * 0.1).toFixed(2)) : null,
         titheCategoryId,

@@ -2,12 +2,8 @@ import { Prisma, TransactionType } from "@prisma/client";
 
 import { getAccountsWithComputedBalance } from "@/lib/finance/accounts";
 import { formatMonthKeyLabel, getCurrentMonthKey, getMonthRange } from "@/lib/month";
-import {
-  calculateStatementTotal,
-  getCardExpenseDueDate, // Keep this, used in upcoming calculations
-  getStatementPaymentDate,
-  getStatementRange
-} from "@/lib/cards/statement";
+import { getCardExpenseDueDate } from "@/lib/cards/statement";
+import { ensureTenantCardStatementSnapshots } from "@/lib/cards/snapshot-sync";
 import { prisma } from "@/lib/prisma/client";
 import { advanceSubscriptionBillingDate } from "@/lib/subscriptions/recurrence";
 
@@ -287,6 +283,7 @@ function buildTransactionWhere(
 
 export async function getFinanceReport(tenantId: string, filters: FinanceReportFilters, userId?: string) {
   const { start: projectionStart, end: projectionEnd } = getFilterRange(filters);
+  await ensureTenantCardStatementSnapshots(tenantId);
 
   const [transactions, subscriptions, cards, goals, accounts, balanceTransactions] = await Promise.all([
     prisma.transaction.findMany({
@@ -326,7 +323,8 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
             name: true,
             brand: true,
             closeDay: true,
-            dueDay: true
+            dueDay: true,
+            statementMonthAnchor: true
           }
         }
       },
@@ -349,7 +347,8 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
           select: {
             id: true,
             closeDay: true,
-            dueDay: true
+            dueDay: true,
+            statementMonthAnchor: true
           }
         }
       },
@@ -367,6 +366,7 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
         name: true,
         dueDay: true,
         closeDay: true,
+        statementMonthAnchor: true,
         isActive: true
       },
       orderBy: {
@@ -645,11 +645,6 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
   statementMonthStart.setHours(12, 0, 0, 0);
   const statementMonths = listStatementMonthsBetween(statementMonthStart, projectionEnd);
   const cardsWithStatements = cards.filter((card) => card.isActive);
-  const earliestStatementStart = new Date(projectionStart);
-  earliestStatementStart.setMonth(earliestStatementStart.getMonth() - 1);
-  earliestStatementStart.setDate(1);
-  earliestStatementStart.setHours(0, 0, 0, 0);
-
   const [statementPayments, statementTransactions] =
     cardsWithStatements.length > 0 && statementMonths.length > 0
       ? await Promise.all([
@@ -675,67 +670,89 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
               cardId: {
                 in: cardsWithStatements.map((card) => card.id)
               },
-              date: {
-                gte: earliestStatementStart,
+              statementDueDate: {
+                gte: projectionStart,
                 lte: projectionEnd
               }
             },
             select: {
               cardId: true,
-              date: true,
+              competence: true,
               amount: true,
-              type: true
+              type: true,
+              statementDueDate: true
             }
           })
         ])
       : [[], []];
 
   const paidStatementSet = new Set(statementPayments.map((item) => `${item.cardId}:${item.month}`));
-  const transactionsByCard = new Map<string, typeof statementTransactions>();
+  const statementGroups = new Map<
+    string,
+    {
+      cardId: string;
+      statementMonth: string;
+      dueDate: Date;
+      items: typeof statementTransactions;
+    }
+  >();
 
   for (const transaction of statementTransactions) {
-    if (!transaction.cardId) {
+    if (!transaction.cardId || !transaction.statementDueDate || !transaction.competence) {
       continue;
     }
 
-    const current = transactionsByCard.get(transaction.cardId) ?? [];
-    current.push(transaction);
-    transactionsByCard.set(transaction.cardId, current);
+    const groupKey = `${transaction.cardId}:${transaction.competence}`;
+    const current = statementGroups.get(groupKey) ?? {
+      cardId: transaction.cardId,
+      statementMonth: transaction.competence,
+      dueDate: transaction.statementDueDate,
+      items: []
+    };
+    current.items.push(transaction);
+    statementGroups.set(groupKey, current);
   }
 
-  const cardStatementEvents = cardsWithStatements.flatMap((card) =>
-    statementMonths
-      .map((statementMonth) => {
-        const dueDate = getStatementPaymentDate(statementMonth, card.dueDay, card.closeDay);
+  const cardsById = new Map(cardsWithStatements.map((card) => [card.id, card]));
+  const cardStatementEvents = Array.from(statementGroups.values())
+    .map((group) => {
+      if (paidStatementSet.has(`${group.cardId}:${group.statementMonth}`)) {
+        return null;
+      }
 
-        if (dueDate < projectionStart || dueDate > projectionEnd) {
-          return null;
+      const card = cardsById.get(group.cardId);
+      if (!card) {
+        return null;
+      }
+
+      const statementAmount = group.items.reduce((sum, item) => {
+        const amount = Number(item.amount);
+
+        if (item.type === TransactionType.expense) {
+          return sum + amount;
         }
 
-        if (paidStatementSet.has(`${card.id}:${statementMonth}`)) {
-          return null;
+        if (item.type === TransactionType.income) {
+          return sum - amount;
         }
 
-        const { start, end } = getStatementRange(statementMonth, card.closeDay, card.dueDay);
-        const statementAmount = calculateStatementTotal(
-          (transactionsByCard.get(card.id) ?? []).filter((item) => item.date >= start && item.date <= end)
-        );
+        return sum;
+      }, 0);
 
-        if (statementAmount <= 0) {
-          return null;
-        }
+      if (statementAmount <= 0) {
+        return null;
+      }
 
-        return {
-          date: dueDate.toISOString(),
-          label: `Fatura ${card.name}`,
-          amount: statementAmount,
-          type: "expense" as const,
-          source: "card_statement" as const,
-          reference: `${card.id}-${statementMonth}`
-        };
-      })
-      .filter((item): item is NonNullable<typeof item> => item !== null)
-  );
+      return {
+        date: group.dueDate.toISOString(),
+        label: `Fatura ${card.name}`,
+        amount: statementAmount,
+        type: "expense" as const,
+        source: "card_statement" as const,
+        reference: `${group.cardId}-${group.statementMonth}`
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null);
 
   upcoming.push(...cardStatementEvents);
 

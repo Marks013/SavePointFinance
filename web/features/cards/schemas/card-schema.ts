@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+export const statementMonthAnchorValues = ["close_month", "previous_month"] as const;
+
 export const cardFormSchema = z.object({
   name: z.string().trim().min(2, "Informe um nome"),
   brand: z.string().trim().min(2, "Informe a bandeira"),
@@ -11,6 +13,7 @@ export const cardFormSchema = z.object({
   limitAmount: z.coerce.number().min(0).default(0),
   dueDay: z.coerce.number().int().min(1).max(31).default(10),
   closeDay: z.coerce.number().int().min(1).max(31).default(3),
+  statementMonthAnchor: z.enum(statementMonthAnchorValues).default("close_month"),
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Cor invalida").default("#374151"),
   institution: z.string().trim().optional().nullable()
 });

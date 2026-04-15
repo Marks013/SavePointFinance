@@ -71,6 +71,11 @@ enum PaymentMethod {
   transfer
 }
 
+enum StatementMonthAnchor {
+  close_month
+  previous_month
+}
+
 enum GoalMilestoneMode {
   disabled
   enabled
@@ -293,6 +298,7 @@ model Card {
   limitAmount  Decimal       @default(0) @db.Decimal(15, 2)
   dueDay       Int           @default(10)
   closeDay     Int           @default(3)
+  statementMonthAnchor StatementMonthAnchor @default(close_month)
   color        String        @default("#374151")
   institution  String?
   isActive     Boolean       @default(true)
@@ -336,6 +342,8 @@ model Transaction {
   classificationVersion Int               @default(2)
   aiClassified      Boolean           @default(false)
   aiConfidence      Decimal?          @db.Decimal(3, 2)
+  statementCloseDate DateTime?
+  statementDueDate   DateTime?
   titheAmount       Decimal?          @db.Decimal(15, 2)
   titheCategoryId   String?
   createdAt         DateTime          @default(now())
@@ -354,6 +362,8 @@ model Transaction {
 
   @@index([tenantId, date])
   @@index([tenantId, type])
+  @@index([tenantId, cardId, competence])
+  @@index([tenantId, statementDueDate])
   @@index([userId])
   @@index([subscriptionId])
   @@index([parentId])

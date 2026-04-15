@@ -16,6 +16,7 @@ function assertCondition(condition: unknown, message: string): asserts condition
 async function main() {
   const { prisma } = await import("../lib/prisma/client");
   const { getCardStatementSnapshot, getNextPayableStatementSnapshot } = await import("../lib/cards/statement");
+  const { ensureTenantCardStatementSnapshots } = await import("../lib/cards/snapshot-sync");
 
   const plan = await prisma.plan.findFirst({
     where: {
@@ -98,6 +99,7 @@ async function main() {
         }
       ]
     });
+    await ensureTenantCardStatementSnapshots(tenant.id, prisma);
 
     const marchStatement = await getCardStatementSnapshot({
       tenantId: tenant.id,

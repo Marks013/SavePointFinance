@@ -1,4 +1,4 @@
-import { TransactionType, type PrismaClient } from "@prisma/client";
+import { StatementMonthAnchor, TransactionType, type PrismaClient } from "@prisma/client";
 import { z } from "zod";
 
 import { prisma } from "@/lib/prisma/client";
@@ -11,6 +11,7 @@ type CardStatementCard = {
   id: string;
   closeDay: number;
   dueDay: number;
+  statementMonthAnchor: StatementMonthAnchor;
   limitAmount: number | { toString(): string };
 };
 
@@ -49,6 +50,10 @@ function getCompetenceMonthDate(month: string) {
   return new Date(year, parsedMonth - 1, 1, 12, 0, 0, 0);
 }
 
+function getStatementMonthAnchorOffset(anchor: StatementMonthAnchor) {
+  return anchor === "previous_month" ? -1 : 0;
+}
+
 function getStatementMonthOffsetForDue(closeDay: number, dueDay: number) {
   return dueDay > closeDay ? 0 : 1;
 }
@@ -79,19 +84,21 @@ function getNextClosingDate(referenceDate: Date, closeDay: number) {
   };
 }
 
-function getStatementMonthFromClosingDate(closing: { year: number; month: number }, closeDay: number) {
+function getStatementMonthFromClosingDate(
+  closing: { year: number; month: number },
+  anchor: StatementMonthAnchor
+) {
   const anchorDate = new Date(closing.year, closing.month - 1, 1, 12, 0, 0, 0);
-  anchorDate.setMonth(anchorDate.getMonth() + (closeDay > 15 ? 0 : -1));
+  anchorDate.setMonth(anchorDate.getMonth() + getStatementMonthAnchorOffset(anchor));
 
   return formatStatementMonth(anchorDate.getFullYear(), anchorDate.getMonth() + 1);
 }
 
-function getClosingMonthDate(statementMonth: string, closeDay: number, _dueDay: number) {
-  void _dueDay;
+function getClosingMonthDate(statementMonth: string, closeDay: number, anchor: StatementMonthAnchor) {
   const competenceMonthDate = getCompetenceMonthDate(statementMonth);
   const closingMonthDate = new Date(
     competenceMonthDate.getFullYear(),
-    competenceMonthDate.getMonth() + (closeDay > 15 ? 0 : 1),
+    competenceMonthDate.getMonth() - getStatementMonthAnchorOffset(anchor),
     1,
     12,
     0,
@@ -109,23 +116,33 @@ function getClosingMonthDate(statementMonth: string, closeDay: number, _dueDay: 
   };
 }
 
-function getExpenseCompetenceMonth(card: Pick<CardStatementCard, "closeDay" | "dueDay">, referenceDate: Date) {
+function getExpenseCompetenceMonth(
+  card: Pick<CardStatementCard, "closeDay" | "dueDay" | "statementMonthAnchor">,
+  referenceDate: Date
+) {
   const nextClosing = getNextClosingDate(referenceDate, card.closeDay);
-  void card.dueDay;
-  return getStatementMonthFromClosingDate(nextClosing, card.closeDay);
+  return getStatementMonthFromClosingDate(nextClosing, card.statementMonthAnchor);
 }
 
-export function getCurrentStatementMonth(card: Pick<CardStatementCard, "closeDay" | "dueDay">, referenceDate = new Date()) {
+export function getCurrentStatementMonth(
+  card: Pick<CardStatementCard, "closeDay" | "dueDay" | "statementMonthAnchor">,
+  referenceDate = new Date()
+) {
   return getExpenseCompetenceMonth(card, referenceDate);
 }
 
 export function getCurrentPayableStatementMonth(
-  card: Pick<CardStatementCard, "closeDay" | "dueDay">,
+  card: Pick<CardStatementCard, "closeDay" | "dueDay" | "statementMonthAnchor">,
   referenceDate = new Date()
 ) {
   const currentStatementMonth = getCurrentStatementMonth(card, referenceDate);
   const previousStatementMonth = addMonthsToStatementMonth(currentStatementMonth, -1);
-  const previousDueDate = getStatementPaymentDate(previousStatementMonth, card.dueDay, card.closeDay);
+  const previousDueDate = getStatementPaymentDate(
+    previousStatementMonth,
+    card.dueDay,
+    card.closeDay,
+    card.statementMonthAnchor
+  );
   const dayReference = new Date(referenceDate);
   dayReference.setHours(0, 0, 0, 0);
 
@@ -139,22 +156,25 @@ export function addMonthsToStatementMonth(month: string, amount: number) {
   return formatStatementMonth(shifted.getFullYear(), shifted.getMonth() + 1);
 }
 
-export function getStatementRange(month: string, closeDay: number, _dueDay: number) {
-  const currentClose = getClosingMonthDate(month, closeDay, _dueDay);
-  const previousMonthDate = new Date(currentClose.year, currentClose.month - 2, 1, 12, 0, 0, 0);
-  const previousYear = previousMonthDate.getFullYear();
-  const previousMonth = previousMonthDate.getMonth() + 1;
-  const previousClosingDay = clampDay(previousYear, previousMonth, closeDay);
+export function getStatementRange(month: string, closeDay: number, statementMonthAnchor: StatementMonthAnchor) {
+  const currentClose = getClosingMonthDate(month, closeDay, statementMonthAnchor);
+  const previousStatementMonth = addMonthsToStatementMonth(month, -1);
+  const previousClose = getClosingMonthDate(previousStatementMonth, closeDay, statementMonthAnchor);
   const currentCloseBoundary = new Date(currentClose.year, currentClose.month - 1, currentClose.day, 0, 0, 0, 0);
 
   return {
-    start: new Date(previousYear, previousMonth - 1, previousClosingDay, 0, 0, 0, 0),
+    start: new Date(previousClose.year, previousClose.month - 1, previousClose.day, 0, 0, 0, 0),
     end: new Date(currentCloseBoundary.getTime() - 1)
   };
 }
 
-export function getStatementPaymentDate(month: string, dueDay: number, closeDay: number) {
-  const closing = getClosingMonthDate(month, closeDay, dueDay);
+export function getStatementPaymentDate(
+  month: string,
+  dueDay: number,
+  closeDay: number,
+  statementMonthAnchor: StatementMonthAnchor
+) {
+  const closing = getClosingMonthDate(month, closeDay, statementMonthAnchor);
   const dueMonthDate = new Date(
     closing.year,
     closing.month - 1 + getStatementMonthOffsetForDue(closeDay, dueDay),
@@ -170,33 +190,45 @@ export function getStatementPaymentDate(month: string, dueDay: number, closeDay:
   return new Date(dueYear, dueMonth - 1, paymentDay, 12, 0, 0, 0);
 }
 
-export function getStatementCloseDate(month: string, closeDay: number, _dueDay: number) {
-  const closing = getClosingMonthDate(month, closeDay, _dueDay);
+export function getStatementCloseDate(month: string, closeDay: number, statementMonthAnchor: StatementMonthAnchor) {
+  const closing = getClosingMonthDate(month, closeDay, statementMonthAnchor);
   return new Date(closing.year, closing.month - 1, closing.day, 12, 0, 0, 0);
 }
 
 export function getCardExpenseDueDate(
-  card: Pick<CardStatementCard, "closeDay" | "dueDay">,
+  card: Pick<CardStatementCard, "closeDay" | "dueDay" | "statementMonthAnchor">,
   referenceDate: Date,
   installmentOffset = 0
 ) {
-  const baseStatementMonth = getExpenseCompetenceMonth(card, referenceDate);
-  const installmentStatementMonth = addMonthsToStatementMonth(baseStatementMonth, installmentOffset);
-
-  return getStatementPaymentDate(installmentStatementMonth, card.dueDay, card.closeDay);
+  return buildCardBillingSnapshot(card, referenceDate, installmentOffset).dueDate;
 }
 
 export function getCardExpenseCompetenceDate(
-  card: Pick<CardStatementCard, "closeDay" | "dueDay">,
+  card: Pick<CardStatementCard, "closeDay" | "dueDay" | "statementMonthAnchor">,
   referenceDate: Date
 ) {
-  const competenceMonthKey = getExpenseCompetenceMonth(card, referenceDate);
+  const competenceMonthKey = buildCardBillingSnapshot(card, referenceDate).competence;
   const competenceMonthDate = getCompetenceMonthDate(competenceMonthKey);
   const competenceYear = competenceMonthDate.getFullYear();
   const competenceMonth = competenceMonthDate.getMonth() + 1;
   const competenceDay = clampDay(competenceYear, competenceMonth, referenceDate.getDate());
 
   return new Date(competenceYear, competenceMonth - 1, competenceDay, 12, 0, 0, 0);
+}
+
+export function buildCardBillingSnapshot(
+  card: Pick<CardStatementCard, "closeDay" | "dueDay" | "statementMonthAnchor">,
+  referenceDate: Date,
+  installmentOffset = 0
+) {
+  const baseStatementMonth = getExpenseCompetenceMonth(card, referenceDate);
+  const competence = addMonthsToStatementMonth(baseStatementMonth, installmentOffset);
+
+  return {
+    competence,
+    closeDate: getStatementCloseDate(competence, card.closeDay, card.statementMonthAnchor),
+    dueDate: getStatementPaymentDate(competence, card.dueDay, card.closeDay, card.statementMonthAnchor)
+  };
 }
 
 export function calculateStatementTotal(transactions: StatementTransactionLike[]) {
@@ -236,16 +268,13 @@ export async function getCardStatementSnapshot({
   client?: StatementClient;
 }) {
   const statementMonth = month ?? getCurrentStatementMonth(card);
-  const { start, end } = getStatementRange(statementMonth, card.closeDay, card.dueDay);
+  const { start, end } = getStatementRange(statementMonth, card.closeDay, card.statementMonthAnchor);
   const [statementTransactions, allCardTransactions, payments] = await Promise.all([
     client.transaction.findMany({
       where: {
         tenantId,
         cardId: card.id,
-        date: {
-          gte: start,
-          lte: end
-        }
+        competence: statementMonth
       },
       select: {
         amount: true,
@@ -288,8 +317,8 @@ export async function getCardStatementSnapshot({
     statementOutstandingAmount,
     outstandingAmount,
     availableLimit: Number(card.limitAmount) - outstandingAmount,
-    closeDate: getStatementCloseDate(statementMonth, card.closeDay, card.dueDay),
-    dueDate: getStatementPaymentDate(statementMonth, card.dueDay, card.closeDay)
+    closeDate: getStatementCloseDate(statementMonth, card.closeDay, card.statementMonthAnchor),
+    dueDate: getStatementPaymentDate(statementMonth, card.dueDay, card.closeDay, card.statementMonthAnchor)
   };
 }
 
@@ -308,127 +337,19 @@ export async function getCardStatementSnapshots({
     return [];
   }
 
-  const snapshots = cards.map((card) => {
-    const statementMonth = month ?? getCurrentStatementMonth(card);
-    const { start, end } = getStatementRange(statementMonth, card.closeDay, card.dueDay);
-
-    return {
-      card,
-      month: statementMonth,
-      start,
-      end,
-      closeDate: getStatementCloseDate(statementMonth, card.closeDay, card.dueDay),
-      dueDate: getStatementPaymentDate(statementMonth, card.dueDay, card.closeDay)
-    };
-  });
-
-  const earliestStart = snapshots.reduce(
-    (current, item) => (item.start < current ? item.start : current),
-    snapshots[0]!.start
+  return Promise.all(
+    cards.map((card) =>
+      getCardStatementSnapshot({
+        tenantId,
+        card,
+        month,
+        client
+      }).then((snapshot) => ({
+        ...snapshot,
+        card
+      }))
+    )
   );
-  const latestEnd = snapshots.reduce(
-    (current, item) => (item.end > current ? item.end : current),
-    snapshots[0]!.end
-  );
-
-  const [statementTransactions, allCardTransactions, payments] = await Promise.all([
-    client.transaction.findMany({
-      where: {
-        tenantId,
-        cardId: {
-          in: cards.map((card) => card.id)
-        },
-        date: {
-          gte: earliestStart,
-          lte: latestEnd
-        }
-      },
-      select: {
-        cardId: true,
-        amount: true,
-        type: true,
-        date: true
-      }
-    }),
-    client.transaction.findMany({
-      where: {
-        tenantId,
-        cardId: {
-          in: cards.map((card) => card.id)
-        }
-      },
-      select: {
-        cardId: true,
-        amount: true,
-        type: true
-      }
-    }),
-    client.statementPayment.findMany({
-      where: {
-        tenantId,
-        cardId: {
-          in: cards.map((card) => card.id)
-        }
-      },
-      select: {
-        cardId: true,
-        amount: true,
-        month: true
-      }
-    })
-  ]);
-
-  const transactionsByCard = new Map<string, typeof statementTransactions>();
-  for (const transaction of statementTransactions) {
-    if (!transaction.cardId) {
-      continue;
-    }
-
-    const current = transactionsByCard.get(transaction.cardId) ?? [];
-    current.push(transaction);
-    transactionsByCard.set(transaction.cardId, current);
-  }
-
-  const allTransactionsByCard = new Map<string, typeof allCardTransactions>();
-  for (const transaction of allCardTransactions) {
-    if (!transaction.cardId) {
-      continue;
-    }
-
-    const current = allTransactionsByCard.get(transaction.cardId) ?? [];
-    current.push(transaction);
-    allTransactionsByCard.set(transaction.cardId, current);
-  }
-
-  const paymentsByCard = new Map<string, typeof payments>();
-  for (const payment of payments) {
-    const current = paymentsByCard.get(payment.cardId) ?? [];
-    current.push(payment);
-    paymentsByCard.set(payment.cardId, current);
-  }
-
-  return snapshots.map((snapshot) => {
-    const cardPayments = paymentsByCard.get(snapshot.card.id) ?? [];
-    const totalAmount = calculateStatementTotal(
-      (transactionsByCard.get(snapshot.card.id) ?? []).filter(
-        (transaction) => transaction.date >= snapshot.start && transaction.date <= snapshot.end
-      )
-    );
-    const statementOutstandingAmount = Math.max(0, totalAmount - calculateStatementPaymentsTotal(cardPayments, snapshot.month));
-    const outstandingAmount = Math.max(
-      0,
-      calculateStatementTotal(allTransactionsByCard.get(snapshot.card.id) ?? []) -
-        calculatePaymentsTotal(cardPayments)
-    );
-
-    return {
-      ...snapshot,
-      totalAmount,
-      statementOutstandingAmount,
-      outstandingAmount,
-      availableLimit: Number(snapshot.card.limitAmount) - outstandingAmount
-    };
-  });
 }
 
 export async function getNextPayableStatementSnapshot({

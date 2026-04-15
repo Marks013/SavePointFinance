@@ -1,9 +1,11 @@
 import { Prisma, TransactionSource, TransactionType } from "@prisma/client";
 import { NextResponse } from "next/server";
+import { format } from "date-fns";
 import { z } from "zod";
 
 import { requireSessionUser } from "@/lib/auth/session";
 import { getCardStatementSnapshot, getStatementPaymentDate, statementMonthSchema } from "@/lib/cards/statement";
+import { ensureTenantCardStatementSnapshots } from "@/lib/cards/snapshot-sync";
 import { captureRequestError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
 
@@ -21,6 +23,7 @@ export async function POST(request: Request, context: Params) {
     const user = await requireSessionUser();
     const { id } = await context.params;
     const body = statementPaymentSchema.parse(await request.json());
+    await ensureTenantCardStatementSnapshots(user.tenantId);
 
     const [card, account] = await Promise.all([
       prisma.card.findFirst({
@@ -71,7 +74,7 @@ export async function POST(request: Request, context: Params) {
       return NextResponse.json({ message: "Statement has no balance to pay" }, { status: 400 });
     }
 
-    const paidAt = getStatementPaymentDate(body.month, card.dueDay, card.closeDay);
+    const paidAt = getStatementPaymentDate(body.month, card.dueDay, card.closeDay, card.statementMonthAnchor);
     const amount = new Prisma.Decimal(statement.statementOutstandingAmount.toFixed(2));
 
     const payment = await prisma.$transaction(async (tx) => {
@@ -81,6 +84,7 @@ export async function POST(request: Request, context: Params) {
           userId: user.id,
           accountId: account.id,
           date: paidAt,
+          competence: format(paidAt, "yyyy-MM"),
           amount,
           description: `Pagamento fatura ${card.name} ${body.month}`,
           notes: `Baixa automatica da competencia ${body.month}.`,

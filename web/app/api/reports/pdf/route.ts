@@ -6,7 +6,7 @@ import { syncDueSubscriptionTransactions } from "@/lib/automation/subscriptions"
 import { requireSessionUser } from "@/lib/auth/session";
 import { formatDateTimeDisplay } from "@/lib/date";
 import { getFinanceReport } from "@/lib/finance/reports";
-import { getMonthRange, normalizeMonthKey } from "@/lib/month";
+import { normalizeMonthKey } from "@/lib/month";
 import { captureRequestError } from "@/lib/observability/sentry";
 
 type ExtendedReport = Awaited<ReturnType<typeof getFinanceReport>>;
@@ -102,7 +102,6 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const month = searchParams.get("month");
     const resolvedMonth = month ? normalizeMonthKey(month) : null;
-    const monthRange = resolvedMonth ? getMonthRange(resolvedMonth) : null;
     const report = (await getFinanceReport(user.tenantId, {
       month: resolvedMonth,
       baseMonth: resolvedMonth,

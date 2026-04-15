@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { cardFormSchema } from "@/features/cards/schemas/card-schema";
 import { requireSessionUser } from "@/lib/auth/session";
 import { getCardStatementSnapshot, getNextPayableStatementSnapshot, statementMonthSchema } from "@/lib/cards/statement";
+import { ensureTenantCardStatementSnapshots } from "@/lib/cards/snapshot-sync";
 import { canCreateCard } from "@/lib/licensing/server";
 import { getCurrentMonthKey, getMonthRange } from "@/lib/month";
 import { captureRequestError } from "@/lib/observability/sentry";
@@ -22,6 +23,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const month = statementMonthSchema.optional().parse(searchParams.get("month") ?? undefined);
     const referenceDate = getStatementReferenceDate(month);
+    await ensureTenantCardStatementSnapshots(user.tenantId);
     const cards = await prisma.card.findMany({
       where: {
         tenantId: user.tenantId
@@ -63,6 +65,7 @@ export async function GET(request: Request) {
           payableDueDate: payableStatement.dueDate.toISOString(),
           dueDay: card.dueDay,
           closeDay: card.closeDay,
+          statementMonthAnchor: card.statementMonthAnchor,
           color: card.color,
           institution: card.institution
         };
@@ -132,6 +135,7 @@ export async function POST(request: Request) {
         limitAmount: body.limitAmount,
         dueDay: body.dueDay,
         closeDay: body.closeDay,
+        statementMonthAnchor: body.statementMonthAnchor,
         color: body.color,
         institution: body.institution?.trim() || null
       }
@@ -146,6 +150,7 @@ export async function POST(request: Request) {
         limitAmount: Number(card.limitAmount),
         dueDay: card.dueDay,
         closeDay: card.closeDay,
+        statementMonthAnchor: card.statementMonthAnchor,
         color: card.color,
         institution: card.institution
       },

@@ -39,6 +39,7 @@ type CardItem = {
   payableDueDate: string;
   dueDay: number;
   closeDay: number;
+  statementMonthAnchor: "close_month" | "previous_month";
   color: string;
   institution?: string | null;
 };
@@ -49,15 +50,16 @@ type AccountItem = {
 };
 
 type StatementPayload = {
-  card: {
-    id: string;
-    name: string;
-    brand: string;
-    last4?: string | null;
-    limitAmount: number;
-    closeDay: number;
-    dueDay: number;
-  };
+    card: {
+      id: string;
+      name: string;
+      brand: string;
+      last4?: string | null;
+      limitAmount: number;
+      closeDay: number;
+      dueDay: number;
+      statementMonthAnchor: "close_month" | "previous_month";
+    };
   month: string;
   summary: {
     totalAmount: number;
@@ -264,6 +266,7 @@ export function CardsClient() {
       limitAmount: 0,
       dueDay: 10,
       closeDay: 3,
+      statementMonthAnchor: "close_month",
       color: cardColorPresets[0].value,
       institution: brazilianInstitutions[0].value
     }
@@ -326,6 +329,7 @@ export function CardsClient() {
       limitAmount: card.limitAmount,
       dueDay: card.dueDay,
       closeDay: card.closeDay,
+      statementMonthAnchor: card.statementMonthAnchor,
       color: card.color,
       institution: card.institution ?? ""
     });
@@ -475,7 +479,7 @@ export function CardsClient() {
               />
             </div>
           </div>
-          <div className="grid gap-4 lg:grid-cols-3">
+          <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
             <div className="space-y-2">
               <Label htmlFor="card-limit">Limite</Label>
               <CurrencyInput control={form.control} id="card-limit" name="limitAmount" />
@@ -502,7 +506,22 @@ export function CardsClient() {
                 {...form.register("closeDay")}
               />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="card-anchor">Regra da competência</Label>
+              <Select
+                className={form.formState.errors.statementMonthAnchor ? invalidFieldClassName : undefined}
+                id="card-anchor"
+                {...form.register("statementMonthAnchor")}
+              >
+                <option value="close_month">Mês do fechamento</option>
+                <option value="previous_month">Mês anterior ao fechamento</option>
+              </Select>
+            </div>
           </div>
+          <p className="text-xs leading-6 text-[var(--color-muted-foreground)]">
+            Use <strong>mês do fechamento</strong> quando a fatura de abril fecha em abril. Use{" "}
+            <strong>mês anterior ao fechamento</strong> quando a fatura de abril fecha em maio.
+          </p>
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="card-institution">Instituição</Label>

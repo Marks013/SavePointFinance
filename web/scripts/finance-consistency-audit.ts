@@ -141,42 +141,64 @@ async function main() {
   const userPassword = "FinanceAudit123!";
   const results: string[] = [];
   assertCondition(
-    getCurrentStatementMonth({ closeDay: 24, dueDay: 8 }, new Date(2026, 3, 2, 12, 0, 0, 0)) === "2026-04",
+    getCurrentStatementMonth(
+      { closeDay: 24, dueDay: 8, statementMonthAnchor: "close_month" },
+      new Date(2026, 3, 2, 12, 0, 0, 0)
+    ) === "2026-04",
     "Competencia padrao da fatura aberta ficou incorreta para cartao com fechamento apos vencimento"
   );
   assertCondition(
-    formatLocalDateKey(getCardExpenseCompetenceDate({ closeDay: 24, dueDay: 8 }, new Date(2026, 2, 20, 12, 0, 0, 0))) ===
+    formatLocalDateKey(
+      getCardExpenseCompetenceDate(
+        { closeDay: 24, dueDay: 8, statementMonthAnchor: "close_month" },
+        new Date(2026, 2, 20, 12, 0, 0, 0)
+      )
+    ) ===
       "2026-03-20",
     "Compra antes do fechamento nao entrou na fatura esperada"
   );
   const expenseAfterCloseDate = getCardExpenseCompetenceDate(
-    { closeDay: 24, dueDay: 8 },
+    { closeDay: 24, dueDay: 8, statementMonthAnchor: "close_month" },
     new Date(2026, 2, 25, 12, 0, 0, 0)
   );
   const expenseAfterCloseMonth = `${expenseAfterCloseDate.getFullYear()}-${String(expenseAfterCloseDate.getMonth() + 1).padStart(2, "0")}`;
   assertCondition(expenseAfterCloseMonth === "2026-04", "Compra apos o fechamento nao foi empurrada para a fatura seguinte");
   assertCondition(
-    formatLocalDateKey(getCardExpenseDueDate({ closeDay: 24, dueDay: 8 }, new Date(2026, 2, 24, 12, 0, 0, 0))) ===
+    formatLocalDateKey(
+      getCardExpenseDueDate(
+        { closeDay: 24, dueDay: 8, statementMonthAnchor: "close_month" },
+        new Date(2026, 2, 24, 12, 0, 0, 0)
+      )
+    ) ===
       "2026-05-08",
     "Compra no proprio dia do fechamento nao foi empurrada para o vencimento seguinte"
   );
   assertCondition(
-    formatLocalDateKey(getStatementPaymentDate(expenseAfterCloseMonth, 8, 24)) === "2026-05-08",
+    formatLocalDateKey(getStatementPaymentDate(expenseAfterCloseMonth, 8, 24, "close_month")) === "2026-05-08",
     "Vencimento calculado da compra pos-fechamento ficou incorreto"
   );
-  const rolloverStatementRange = getStatementRange("2026-03", 24, 8);
+  const rolloverStatementRange = getStatementRange("2026-03", 24, "close_month");
   assertCondition(
     formatLocalDateKey(rolloverStatementRange.start) === "2026-02-24" &&
       formatLocalDateKey(rolloverStatementRange.end) === "2026-03-23",
     "Intervalo da fatura com fechamento no dia 24 ficou inconsistente"
   );
   assertCondition(
-    formatLocalDateKey(getCardExpenseCompetenceDate({ closeDay: 1, dueDay: 10 }, new Date(2026, 2, 31, 12, 0, 0, 0))) ===
-      "2026-04-30",
-    "Compra antes do fechamento no dia 1 nao caiu na fatura de abril"
+    formatLocalDateKey(
+      getCardExpenseCompetenceDate(
+        { closeDay: 1, dueDay: 10, statementMonthAnchor: "previous_month" },
+        new Date(2026, 2, 31, 12, 0, 0, 0)
+      )
+    ) === "2026-03-31",
+    "Compra em 31/03 deveria permanecer na competencia de março quando o fechamento ocorre em 01/05 para abril"
   );
   assertCondition(
-    formatLocalDateKey(getCardExpenseDueDate({ closeDay: 1, dueDay: 10 }, new Date(2026, 3, 1, 12, 0, 0, 0))) ===
+    formatLocalDateKey(
+      getCardExpenseDueDate(
+        { closeDay: 1, dueDay: 10, statementMonthAnchor: "previous_month" },
+        new Date(2026, 3, 1, 12, 0, 0, 0)
+      )
+    ) ===
       "2026-05-10",
     "Compra no proprio dia do fechamento nao foi empurrada para a fatura de maio"
   );
@@ -499,16 +521,16 @@ async function main() {
     const accountBModel = accountsWithBalance.find((item) => item.id === accountB.payload.id);
     assertCondition(accountAModel, "Conta principal não encontrada no cálculo de saldo");
     assertCondition(accountBModel, "Conta reserva não encontrada no cálculo de saldo");
-    assertCondition(Math.abs(accountAModel.currentBalance - 2100) < 0.0001, `Saldo da conta principal incorreto: ${accountAModel.currentBalance}`);
+    assertCondition(Math.abs(accountAModel.currentBalance - 2280) < 0.0001, `Saldo da conta principal incorreto: ${accountAModel.currentBalance}`);
     assertCondition(Math.abs(accountBModel.currentBalance - 200) < 0.0001, `Saldo da conta reserva incorreto: ${accountBModel.currentBalance}`);
-    results.push("Saldos das contas refletem receitas, dízimo, despesas e transferências");
+    results.push("Saldos das contas refletem caixa real, sem antecipar compras no crédito antes da baixa da fatura");
 
     const febStatement = await getJson<{
       summary: { totalAmount: number; dueDate: string; closeDate: string };
       items: Array<{ installmentLabel: string | null }>;
     }>(jar, `/api/cards/${card.payload.id}/statement?month=2026-02`);
     assertCondition(febStatement.status === 200, `Fatura de fevereiro respondeu ${febStatement.status}`);
-    assertCondition(Math.abs(febStatement.payload.summary.totalAmount - 100.01) < 0.0001, "Fatura de fevereiro não refletiu a competência correta");
+    assertCondition(Math.abs(febStatement.payload.summary.totalAmount - 120.55) < 0.0001, "Fatura de fevereiro não refletiu a competência correta");
     assertCondition(febStatement.payload.summary.closeDate.startsWith("2026-02-03"), "Fechamento da competência de fevereiro ficou incorreto");
     assertCondition(febStatement.payload.summary.dueDate.startsWith("2026-02-10"), "Vencimento da competência de fevereiro ficou incorreto");
 
@@ -517,7 +539,7 @@ async function main() {
       items: Array<{ installmentLabel: string | null }>;
     }>(jar, `/api/cards/${card.payload.id}/statement?month=2026-03`);
     assertCondition(marStatement.status === 200, `Fatura de março respondeu ${marStatement.status}`);
-    assertCondition(Math.abs(marStatement.payload.summary.totalAmount - 100) < 0.0001, "Fatura de março não refletiu a parcela correta");
+    assertCondition(Math.abs(marStatement.payload.summary.totalAmount - 120.55) < 0.0001, "Fatura de março não refletiu a parcela correta");
     results.push("Faturas respeitam competência, fechamento e vencimento do cartão");
 
     const installmentsApi = await getJson<{
@@ -531,7 +553,7 @@ async function main() {
     assertCondition(installmentsApi.status === 200, `Resumo de parcelamentos respondeu ${installmentsApi.status}`);
     const installmentGroup = installmentsApi.payload.items.find((item) => item.id === cardInstallments.payload.id);
     assertCondition(installmentGroup, "Grupo de parcelamento não apareceu na API de parcelamentos");
-    assertCondition(Math.abs(installmentGroup.totalAmount - 300.01) < 0.0001, "Resumo do parcelamento ficou inconsistente");
+    assertCondition(Math.abs(installmentGroup.totalAmount - 361.65) < 0.0001, "Resumo do parcelamento ficou inconsistente");
     assertCondition(installmentGroup.installmentsRemaining === 3, "Parcelas restantes iniciais incorretas");
 
     const reconcile = await getJson<{ reconciled: number }>(jar, `/api/installments/${cardInstallments.payload.id}`, {
@@ -669,31 +691,41 @@ async function main() {
         month: "2026-01"
       }
     );
-    assertCondition(Math.abs(report.summary.income - 1500) < 0.0001, `Receitas do relatório incoerentes: ${report.summary.income}`);
-    assertCondition(Math.abs(report.summary.expense - 300.01) < 0.0001, `Despesas do relatório incoerentes: ${report.summary.expense}`);
-    assertCondition(Math.abs(report.summary.transfer - 200) < 0.0001, `Transferências do relatório incoerentes: ${report.summary.transfer}`);
-    assertCondition(Math.abs(report.summary.balance - 1199.99) < 0.0001, `Saldo do relatório incoerente: ${report.summary.balance}`);
+    assertCondition(Math.abs(report.summary.income - 1700) < 0.0001, `Receitas do relatório incoerentes: ${report.summary.income}`);
+    assertCondition(Math.abs(report.summary.expense - 170) < 0.0001, `Despesas do relatório incoerentes: ${report.summary.expense}`);
+    assertCondition(Math.abs(report.summary.transfer) < 0.0001, `Transferências do relatório incoerentes: ${report.summary.transfer}`);
+    assertCondition(Math.abs(report.summary.balance - 1530) < 0.0001, `Saldo do relatório incoerente: ${report.summary.balance}`);
     assertCondition(
-      report.byCard.some((item) => item.id === card.payload.id && Math.abs(item.netStatement - 100.01) < 0.0001),
-      "Resumo por cartão do relatório não bate com as parcelas nas competências"
+      report.byCard.every((item) => item.id !== card.payload.id || Math.abs(item.netStatement) < 0.0001),
+      "Resumo por cartão de janeiro não deveria antecipar parcelas da competência de fevereiro"
     );
     assertCondition(
-      report.byAccount.some((item) => item.id === accountA.payload.id && Math.abs(item.net - 1100) < 0.0001),
+      report.byAccount.some((item) => item.id === accountA.payload.id && Math.abs(item.net - 1530) < 0.0001),
       "Movimentação por conta do relatório não bate com o período auditado"
     );
-    results.push("Relatórios consolidam receitas, despesas, transferências, contas e cartões com coerência");
+    const febReport = await getFinanceReport(
+      tenant.id,
+      {
+        month: "2026-02"
+      }
+    );
+    assertCondition(
+      febReport.byCard.some((item) => item.id === card.payload.id && Math.abs(item.netStatement - 120.55) < 0.0001),
+      "Resumo por cartão do relatório não bate com as parcelas na competência de fevereiro"
+    );
+    results.push("Relatórios consolidam competência, caixa, contas e cartões com coerência");
 
     const reportApi = await getJson<{
       summary: { income: number; expense: number; transfer: number; balance: number };
       byCard: Array<{ id: string; netStatement: number }>;
-    }>(jar, "/api/reports/summary?from=2026-01-01&to=2026-02-28");
+    }>(jar, "/api/reports/summary?month=2026-01");
     assertCondition(reportApi.status === 200, `API de relatório respondeu ${reportApi.status}`);
     assertCondition(Math.abs(reportApi.payload.summary.balance - report.summary.balance) < 0.0001, "API de relatório diverge do cálculo central");
     results.push("API de relatórios e cálculo central retornam o mesmo consolidado");
 
     const marchTransactions = await getJson<{
       items: Array<{ id: string }>;
-    }>(jar, `/api/transactions?from=2026-03-01&to=2026-03-31&cardId=${rolloverCard.payload.id}`);
+    }>(jar, `/api/transactions?month=2026-03&cardId=${rolloverCard.payload.id}`);
     assertCondition(marchTransactions.status === 200, `Transações de março responderam ${marchTransactions.status}`);
     assertCondition(
       !marchTransactions.payload.items.some((item) => item.id === rolloverExpense.payload.id),
@@ -702,7 +734,7 @@ async function main() {
 
     const aprilTransactions = await getJson<{
       items: Array<{ id: string }>;
-    }>(jar, `/api/transactions?from=2026-04-01&to=2026-04-30&cardId=${rolloverCard.payload.id}`);
+    }>(jar, `/api/transactions?month=2026-04&cardId=${rolloverCard.payload.id}`);
     assertCondition(aprilTransactions.status === 200, `Transações de abril responderam ${aprilTransactions.status}`);
     assertCondition(
       aprilTransactions.payload.items.some((item) => item.id === rolloverExpense.payload.id),
@@ -711,7 +743,7 @@ async function main() {
 
     const marchReport = await getJson<{
       byCard: Array<{ id: string; netStatement: number }>;
-    }>(jar, `/api/reports/summary?from=2026-03-01&to=2026-03-31&cardId=${rolloverCard.payload.id}`);
+    }>(jar, `/api/reports/summary?month=2026-03&cardId=${rolloverCard.payload.id}`);
     assertCondition(marchReport.status === 200, `Relatório de março respondeu ${marchReport.status}`);
     assertCondition(
       !marchReport.payload.byCard.some((item) => item.id === rolloverCard.payload.id && item.netStatement > 0),
@@ -720,7 +752,7 @@ async function main() {
 
     const aprilReport = await getJson<{
       byCard: Array<{ id: string; netStatement: number }>;
-    }>(jar, `/api/reports/summary?from=2026-04-01&to=2026-04-30&cardId=${rolloverCard.payload.id}`);
+    }>(jar, `/api/reports/summary?month=2026-04&cardId=${rolloverCard.payload.id}`);
     assertCondition(aprilReport.status === 200, `Relatório de abril respondeu ${aprilReport.status}`);
     assertCondition(
       aprilReport.payload.byCard.some(

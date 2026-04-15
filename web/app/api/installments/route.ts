@@ -2,13 +2,14 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 import { requireSessionUser } from "@/lib/auth/session";
-import { getCardExpenseCompetenceDate } from "@/lib/cards/statement";
+import { ensureTenantCardStatementSnapshots } from "@/lib/cards/snapshot-sync";
 import { captureRequestError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
 
 export async function GET(request: Request) {
   try {
     const user = await requireSessionUser();
+    await ensureTenantCardStatementSnapshots(user.tenantId);
     const { searchParams } = new URL(request.url);
     const cardId = searchParams.get("cardId");
     const from = searchParams.get("from");
@@ -98,6 +99,7 @@ export async function GET(request: Request) {
           installmentsRemaining: root.installmentsTotal - settledInstallments,
           overdueOpenInstallments,
           nextInstallmentDate: nextInstallment?.date.toISOString() ?? null,
+          competenceDates: installments.map((item) => new Date(`${item.competence}-01T12:00:00`).toISOString()),
           card: root.card ? { id: root.card.id, name: root.card.name } : null,
           category: root.category ? { id: root.category.id, name: root.category.name } : null,
           notes: root.notes
@@ -108,28 +110,29 @@ export async function GET(request: Request) {
     const filteredGroups =
       filterStart || filterEnd
         ? groups.filter((group) => {
-            const matchingRoot = roots.find((root) => root.id === group.id);
-            if (!matchingRoot) {
-              return false;
-            }
+            return group.competenceDates.some((competenceDateValue) => {
+              const competenceDate = new Date(competenceDateValue);
 
-            const competenceDate = matchingRoot.card
-              ? getCardExpenseCompetenceDate(matchingRoot.card, matchingRoot.date)
-              : matchingRoot.date;
+              if (filterStart && competenceDate < filterStart) {
+                return false;
+              }
 
-            if (filterStart && competenceDate < filterStart) {
-              return false;
-            }
+              if (filterEnd && competenceDate > filterEnd) {
+                return false;
+              }
 
-            if (filterEnd && competenceDate > filterEnd) {
-              return false;
-            }
-
-            return true;
+              return true;
+            });
           })
         : groups;
 
-    return NextResponse.json({ items: filteredGroups });
+    return NextResponse.json({
+      items: filteredGroups.map((group) => {
+        const { competenceDates, ...sanitizedGroup } = group;
+        void competenceDates;
+        return sanitizedGroup;
+      })
+    });
   } catch (error) {
     if (error instanceof Error && error.message === "Unauthorized") {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });

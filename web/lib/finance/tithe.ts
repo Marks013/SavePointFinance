@@ -157,6 +157,7 @@ export async function syncMonthlyTitheTransaction({
       },
       data: {
         date: dueDate,
+        competence: monthKey,
         amount: new Prisma.Decimal(total.toFixed(2)),
         description: title,
         notes: notesTag,
@@ -178,6 +179,7 @@ export async function syncMonthlyTitheTransaction({
       tenantId,
       userId: userId ?? null,
       date: dueDate,
+      competence: monthKey,
       amount: new Prisma.Decimal(total.toFixed(2)),
       description: title,
       notes: notesTag,

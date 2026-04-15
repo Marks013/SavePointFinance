@@ -1,11 +1,10 @@
 import { PaymentMethod, Prisma, Transaction, TransactionSource, TransactionType } from "@prisma/client";
 
 import {
+  getCardStatementSnapshot,
   getCurrentPayableStatementMonth,
-  getStatementCloseDate,
-  getStatementPaymentDate,
-  getStatementRange
 } from "@/lib/cards/statement";
+import { ensureTenantCardStatementSnapshots } from "@/lib/cards/snapshot-sync";
 import { getAccountsWithComputedBalance } from "@/lib/finance/accounts";
 import { normalizeClassificationText } from "@/lib/finance/classification-normalization";
 import { ensureFallbackCategory } from "@/lib/finance/default-categories";
@@ -421,6 +420,7 @@ async function replyWithBalance(user: WhatsAppUser, body: string) {
 }
 
 async function replyWithCardInfo(user: WhatsAppUser, body: string) {
+  await ensureTenantCardStatementSnapshots(user.tenantId);
   const cards = await prisma.card.findMany({
     where: {
       tenantId: user.tenantId,
@@ -457,42 +457,20 @@ async function replyWithCardInfo(user: WhatsAppUser, body: string) {
   }
 
   const month = getCurrentPayableStatementMonth(card, new Date());
-  const { start, end } = getStatementRange(month, card.closeDay, card.dueDay);
-  const transactions = await prisma.transaction.findMany({
-    where: {
-      tenantId: user.tenantId,
-      cardId: card.id,
-      date: {
-        gte: start,
-        lte: end
-      }
-    },
-    select: {
-      amount: true,
-      type: true
-    }
+  const statement = await getCardStatementSnapshot({
+    tenantId: user.tenantId,
+    card,
+    month,
+    client: prisma
   });
-  const statementAmount = transactions.reduce((sum, item) => {
-    const amount = Number(item.amount);
-    if (item.type === TransactionType.expense) {
-      return sum + amount;
-    }
-    if (item.type === TransactionType.income) {
-      return sum - amount;
-    }
-    return sum;
-  }, 0);
-  const availableLimit = Number(card.limitAmount) - statementAmount;
 
   return {
     intent: "card_info",
     status: "ok",
     response:
-      `Cartão ${card.name}. Fatura atual: ${formatCurrency(statementAmount)}. ` +
-      `Limite disponível: ${formatCurrency(availableLimit)} de ${formatCurrency(Number(card.limitAmount))}. ` +
-      `Fecha em ${formatDate(getStatementCloseDate(month, card.closeDay, card.dueDay))} e vence em ${formatDate(
-          getStatementPaymentDate(month, card.dueDay, card.closeDay)
-      )}.`
+      `Cartão ${card.name}. Fatura atual: ${formatCurrency(statement.totalAmount)}. ` +
+      `Limite disponível: ${formatCurrency(statement.availableLimit)} de ${formatCurrency(Number(card.limitAmount))}. ` +
+      `Fecha em ${formatDate(statement.closeDate)} e vence em ${formatDate(statement.dueDate)}.`
   } satisfies AssistantResult;
 }
 

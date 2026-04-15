@@ -232,6 +232,7 @@ export function TransactionsClient() {
   const month = normalizeMonthKey(searchParams.get("month"));
   const monthRange = getMonthRange(month);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [isCreditEditLocked, setIsCreditEditLocked] = useState(false);
   const [isEditorOpen, setIsEditorOpen] = useState(true);
   const formSectionRef = useRef<HTMLElement | null>(null);
   const [editingScope, setEditingScope] = useState<"single" | "group">("single");
@@ -321,6 +322,7 @@ export function TransactionsClient() {
           : "Transação criada"
       );
       setEditingId(null);
+      setIsCreditEditLocked(false);
       if (wasEditing) {
         setIsEditorOpen(false);
       }
@@ -353,6 +355,7 @@ export function TransactionsClient() {
       toast.success("Transação excluída");
       if (editingId) {
         setEditingId(null);
+        setIsCreditEditLocked(false);
         setIsEditorOpen(false);
         form.reset(buildEmptyTransactionValues(month));
       }
@@ -400,6 +403,7 @@ export function TransactionsClient() {
   const startEditing = (transaction: TransactionItem) => {
     setIsEditorOpen(true);
     setEditingId(transaction.id);
+    setIsCreditEditLocked(transaction.paymentMethod === "credit_card" || Boolean(transaction.card));
     setEditingScope("single");
     setEditingInstallmentsTotal(transaction.installmentsTotal);
     form.reset({
@@ -421,6 +425,7 @@ export function TransactionsClient() {
 
   const cancelEditing = () => {
     setEditingId(null);
+    setIsCreditEditLocked(false);
     setIsEditorOpen(false);
     setEditingScope("single");
     setEditingInstallmentsTotal(1);
@@ -429,6 +434,7 @@ export function TransactionsClient() {
 
   const openCreateForm = () => {
     setEditingId(null);
+    setIsCreditEditLocked(false);
     setIsEditorOpen(true);
     setEditingScope("single");
     setEditingInstallmentsTotal(1);
@@ -567,6 +573,7 @@ export function TransactionsClient() {
               <Label htmlFor="date">Data</Label>
               <Input
                 className={form.formState.errors.date ? invalidFieldClassName : undefined}
+                disabled={isEditing && isCreditEditLocked}
                 id="date"
                 type="date"
                 {...form.register("date")}
@@ -593,6 +600,7 @@ export function TransactionsClient() {
               <Label htmlFor="type">Tipo</Label>
               <Select
                 className={form.formState.errors.type ? invalidFieldClassName : undefined}
+                disabled={isEditing && isCreditEditLocked}
                 id="type"
                 {...form.register("type")}
               >
@@ -605,6 +613,7 @@ export function TransactionsClient() {
               <Label htmlFor="paymentMethod">Pagamento</Label>
               <Select
                 className={form.formState.errors.paymentMethod ? invalidFieldClassName : undefined}
+                disabled={isEditing && isCreditEditLocked}
                 id="paymentMethod"
                 {...form.register("paymentMethod")}
               >
@@ -644,6 +653,7 @@ export function TransactionsClient() {
               {isCreditCard ? (
                 <Select
                   className={form.formState.errors.cardId ? invalidFieldClassName : undefined}
+                  disabled={isEditing && isCreditEditLocked}
                   id="cardId"
                   {...form.register("cardId")}
                 >
@@ -657,6 +667,7 @@ export function TransactionsClient() {
               ) : (
                 <Select
                   className={form.formState.errors.accountId ? invalidFieldClassName : undefined}
+                  disabled={isEditing && isCreditEditLocked}
                   id="accountId"
                   {...form.register("accountId")}
                 >
@@ -723,6 +734,12 @@ export function TransactionsClient() {
                 ? "Esta receita entrará no consolidado mensal de dízimo, gerando uma única despesa somada no período."
                 : "Despesas e receitas devem ficar vinculadas à conta correta para melhorar relatórios e conciliação."}
           </div>
+
+          {isEditing && isCreditEditLocked ? (
+            <div className="warning-copy text-sm">
+              Para alterar data, conta ou cartão neste lançamento de crédito, recrie o lançamento.
+            </div>
+          ) : null}
 
           {isEditing ? (
             <p className="warning-copy text-sm">

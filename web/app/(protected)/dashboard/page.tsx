@@ -7,11 +7,10 @@ import { SummaryCards } from "@/features/dashboard/components/summary-cards";
 import { syncDueSubscriptionTransactions } from "@/lib/automation/subscriptions";
 import { requireSessionUser } from "@/lib/auth/session";
 import {
-  getCardExpenseCompetenceDate,
-  getCardExpenseDueDate,
   getNextPayableStatementSnapshot,
-  getCardStatementSnapshots,
+  getCardStatementSnapshots
 } from "@/lib/cards/statement";
+import { ensureTenantCardStatementSnapshots } from "@/lib/cards/snapshot-sync";
 import { getAccountsWithComputedBalance } from "@/lib/finance/accounts";
 import { getFinanceReport } from "@/lib/finance/reports";
 import { formatMonthKeyLabel, getCurrentMonthKey, getMonthRange, normalizeMonthKey } from "@/lib/month";
@@ -27,11 +26,6 @@ function formatDate(value: Date | string | null | undefined) {
     day: "2-digit",
     month: "short"
   }).format(new Date(value));
-}
-
-function formatMonthFromDate(value: Date | string) {
-  const date = new Date(value);
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
 
 function getMonthPerspective(month: string) {
@@ -55,6 +49,7 @@ function getStatementReferenceDate(month: string) {
 async function getDashboardData(tenantId: string, month: string) {
   const { start, end } = getMonthRange(month);
   const statementReferenceDate = getStatementReferenceDate(month);
+  await ensureTenantCardStatementSnapshots(tenantId);
 
   try {
     const [accounts, monthlyReport, goals, recentTransactions, upcomingSubscriptions, upcomingGoals, activeCards] =
@@ -73,10 +68,7 @@ async function getDashboardData(tenantId: string, month: string) {
         prisma.transaction.findMany({
           where: {
             tenantId,
-            date: {
-              gte: new Date(start.getFullYear(), start.getMonth() - 1, 1, 0, 0, 0, 0),
-              lte: end
-            }
+            competence: month
           },
           include: {
             category: true,
@@ -85,7 +77,7 @@ async function getDashboardData(tenantId: string, month: string) {
             card: true
           },
           orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-          take: 200
+          take: 6
         }),
         prisma.subscription.findMany({
           where: {
@@ -183,20 +175,11 @@ async function getDashboardData(tenantId: string, month: string) {
       periodExpenseForecast,
       upcomingProjection: monthlyReport.upcoming.slice(0, 5),
       goals: Number(goals._sum.currentAmount ?? 0),
-      recentTransactions: recentTransactions
-        .filter((transaction) => {
-          const competenceDate = transaction.card
-            ? getCardExpenseCompetenceDate(transaction.card, transaction.date)
-            : transaction.date;
-
-          return competenceDate >= start && competenceDate <= end;
-        })
-        .slice(0, 6)
-        .map((transaction) => ({
-          ...transaction,
-          competenceDate: transaction.card ? getCardExpenseCompetenceDate(transaction.card, transaction.date) : null,
-          payableDate: transaction.card ? getCardExpenseDueDate(transaction.card, transaction.date) : null
-        })),
+      recentTransactions: recentTransactions.map((transaction) => ({
+        ...transaction,
+        competenceDate: transaction.competence ? new Date(`${transaction.competence}-01T12:00:00`) : null,
+        payableDate: transaction.statementDueDate
+      })),
       upcomingSubscriptions,
       upcomingGoals,
       activeAccounts: accounts
@@ -492,7 +475,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                     </p>
                     {transaction.card && transaction.competenceDate && transaction.payableDate ? (
                       <p className="mt-1 break-words text-xs text-[var(--color-muted-foreground)]">
-                        Competência {formatMonthKeyLabel(formatMonthFromDate(transaction.competenceDate))} • vence{" "}
+                        Competência {formatMonthKeyLabel(transaction.competence)} • vence{" "}
                         {formatDate(transaction.payableDate)}
                       </p>
                     ) : null}

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { cardFormSchema } from "@/features/cards/schemas/card-schema";
 import { requireSessionUser } from "@/lib/auth/session";
+import { freezeCardStatementSnapshotsBeforeCardUpdate } from "@/lib/cards/snapshot-sync";
 import { captureRequestError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
 
@@ -37,6 +38,8 @@ export async function PATCH(request: Request, context: Params) {
       return NextResponse.json({ message: "Já existe um cartão com esse nome" }, { status: 409 });
     }
 
+    await freezeCardStatementSnapshotsBeforeCardUpdate(user.tenantId, id);
+
     const updated = await prisma.card.update({
       where: {
         id,
@@ -49,6 +52,7 @@ export async function PATCH(request: Request, context: Params) {
         limitAmount: body.limitAmount,
         dueDay: body.dueDay,
         closeDay: body.closeDay,
+        statementMonthAnchor: body.statementMonthAnchor,
         color: body.color,
         institution: body.institution?.trim() || null
       }

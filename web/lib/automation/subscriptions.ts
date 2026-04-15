@@ -2,6 +2,7 @@ import { NotificationChannel, PaymentMethod, Prisma, TransactionSource, Transact
 
 import { deliverNotification } from "@/lib/notifications/delivery";
 import {
+  buildCardBillingSnapshot,
   getCardStatementSnapshot,
   getCurrentPayableStatementMonth,
   getStatementPaymentDate
@@ -157,7 +158,8 @@ export async function generateSubscriptionTransaction(subscriptionId: string, te
         select: {
           id: true,
           closeDay: true,
-          dueDay: true
+          dueDay: true,
+          statementMonthAnchor: true
         }
       }
     }
@@ -207,19 +209,23 @@ export async function generateSubscriptionTransaction(subscriptionId: string, te
 
   const titheCategoryId =
     subscription.type === "income" && subscription.autoTithe ? await ensureTitheCategory(tenantId) : null;
+  const cardSnapshot = subscription.card ? buildCardBillingSnapshot(subscription.card, nextBillingDate) : null;
   const transaction = await prisma.transaction.create({
     data: {
       tenantId,
       userId: subscription.userId ?? userId,
       subscriptionId: subscription.id,
       date: nextBillingDate,
-      competence: format(nextBillingDate, "yyyy-MM"), // Add competence here
+      competence: cardSnapshot?.competence ?? format(nextBillingDate, "yyyy-MM"),
       amount: subscription.amount,
       description: `Assinatura: ${subscription.name}`,
-      type: subscription.type === "income" ? TransactionType.income : TransactionType.expense,      paymentMethod: subscription.cardId ? PaymentMethod.credit_card : PaymentMethod.money,
+      type: subscription.type === "income" ? TransactionType.income : TransactionType.expense,
+      paymentMethod: subscription.cardId ? PaymentMethod.credit_card : PaymentMethod.money,
       categoryId: classification.categoryId,
       accountId: subscription.accountId,
       cardId: subscription.cardId,
+      statementCloseDate: cardSnapshot?.closeDate ?? null,
+      statementDueDate: cardSnapshot?.dueDate ?? null,
       source: TransactionSource.manual,
       notes: "Gerado via assinatura recorrente",
       classificationSource: classification.classificationSource,
@@ -481,7 +487,7 @@ export async function runRecurringAutomation(tenantId: string, userId: string) {
 
   for (const card of cards) {
     const statementMonth = getCurrentPayableStatementMonth(card, now);
-    const dueDate = getStatementPaymentDate(statementMonth, card.dueDay, card.closeDay);
+    const dueDate = getStatementPaymentDate(statementMonth, card.dueDay, card.closeDay, card.statementMonthAnchor);
 
     if (dueDate <= now || dueDate > reminderWindow) {
       continue;

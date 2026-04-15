@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { requireSessionUser } from "@/lib/auth/session";
 import { getCardStatementSnapshot, statementMonthSchema } from "@/lib/cards/statement";
+import { ensureTenantCardStatementSnapshots } from "@/lib/cards/snapshot-sync";
 import { captureRequestError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
 
@@ -25,6 +26,7 @@ export async function GET(request: Request, context: Params) {
       month: searchParams.get("month") ?? undefined,
       limit: searchParams.get("limit") ?? 50
     });
+    await ensureTenantCardStatementSnapshots(user.tenantId);
 
     const card = await prisma.card.findFirst({
       where: {
@@ -47,10 +49,7 @@ export async function GET(request: Request, context: Params) {
     const statementItemsWhere: Prisma.TransactionWhereInput = {
       tenantId: user.tenantId,
       cardId: id,
-      date: {
-        gte: statement.start,
-        lte: statement.end
-      }
+      competence: statement.month
     };
 
     const [transactions, transactionsCount, installmentItems, payment] = await Promise.all([
@@ -107,7 +106,8 @@ export async function GET(request: Request, context: Params) {
         last4: card.last4,
         limitAmount: Number(card.limitAmount),
         closeDay: card.closeDay,
-        dueDay: card.dueDay
+        dueDay: card.dueDay,
+        statementMonthAnchor: card.statementMonthAnchor
       },
       month: statement.month,
       summary: {
