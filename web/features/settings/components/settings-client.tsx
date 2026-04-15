@@ -4,7 +4,11 @@ import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { signOut } from "next-auth/react";
 import { useState } from "react";
+<<<<<<< HEAD
 import { useForm, useWatch } from "react-hook-form";
+=======
+import { useForm } from "react-hook-form";
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -215,7 +219,10 @@ export function SettingsClient() {
         }
       : undefined
   });
+<<<<<<< HEAD
   const whatsappNumber = useWatch({ control: form.control, name: "whatsappNumber" }) ?? "";
+=======
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
 
   const profileMutation = useMutation({
     mutationFn: async (values: SettingsFormValues) => {
@@ -356,7 +363,11 @@ export function SettingsClient() {
                   id="settings-whatsapp"
                   inputMode="numeric"
                   placeholder="(DD) 9 0000-0000"
+<<<<<<< HEAD
                   value={whatsappNumber}
+=======
+                  value={form.watch("whatsappNumber")}
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
                   onChange={(event) =>
                     form.setValue("whatsappNumber", formatBrazilWhatsAppInput(event.target.value), {
                       shouldDirty: true,

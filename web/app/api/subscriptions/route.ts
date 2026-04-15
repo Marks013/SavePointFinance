@@ -10,6 +10,7 @@ import { captureRequestError, captureUnexpectedError } from "@/lib/observability
 import { prisma } from "@/lib/prisma/client";
 import { getSubscriptionBillingDate } from "@/lib/subscriptions/recurrence";
 
+<<<<<<< HEAD
 function getProjectedOccurrenceDate(subscription: { nextBillingDate: Date; billingDay: number }, month: string) {
   const nextBillingMonth = subscription.nextBillingDate.toISOString().slice(0, 7);
 
@@ -25,6 +26,8 @@ function getProjectedOccurrenceDate(subscription: { nextBillingDate: Date; billi
   return getSubscriptionBillingDate(Number(year), Number(monthNumber) - 1, subscription.billingDay);
 }
 
+=======
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
 export async function GET(request: Request) {
   try {
     const user = await requireSessionUser();
@@ -69,6 +72,7 @@ export async function GET(request: Request) {
         .map((transaction) => [transaction.subscriptionId, transaction])
     );
 
+<<<<<<< HEAD
     const items = subscriptions
       .map((subscription) => {
         const generatedTransaction = transactionBySubscriptionId.get(subscription.id) ?? null;
@@ -101,6 +105,33 @@ export async function GET(request: Request) {
       .filter((subscription): subscription is NonNullable<typeof subscription> => subscription !== null);
 
     return NextResponse.json({ items });
+=======
+    return NextResponse.json({
+      items: subscriptions.map((subscription) => ({
+        activeMonthDate:
+          monthRange
+            ? getSubscriptionBillingDate(
+                Number(month.split("-")[0]),
+                Number(month.split("-")[1]) - 1,
+                subscription.billingDay
+              ).toISOString()
+            : null,
+        activeMonthGenerated: monthRange ? transactionBySubscriptionId.has(subscription.id) : null,
+        activeMonthTransactionDate: transactionBySubscriptionId.get(subscription.id)?.date.toISOString() ?? null,
+        id: subscription.id,
+        name: subscription.name,
+        amount: Number(subscription.amount),
+        billingDay: subscription.billingDay,
+        nextBillingDate: subscription.nextBillingDate.toISOString(),
+        type: subscription.type,
+        isActive: subscription.isActive,
+        autoTithe: subscription.autoTithe,
+        category: subscription.category ? { id: subscription.category.id, name: subscription.category.name } : null,
+        account: subscription.account ? { id: subscription.account.id, name: subscription.account.name } : null,
+        card: subscription.card ? { id: subscription.card.id, name: subscription.card.name } : null
+      }))
+    });
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
   } catch (error) {
     if (error instanceof Error && error.message === "Unauthorized") {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });

@@ -1,6 +1,10 @@
 import { z } from "zod";
 
+<<<<<<< HEAD
 import { normalizeCalendarDate } from "@/lib/date";
+=======
+import { dateKeySchema, normalizeCalendarDate } from "@/lib/date";
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
 
 export const transactionTypeValues = ["income", "expense", "transfer"] as const;
 export const paymentMethodValues = ["pix", "money", "credit_card", "debit_card", "transfer"] as const;

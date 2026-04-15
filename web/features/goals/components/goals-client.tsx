@@ -3,7 +3,11 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+<<<<<<< HEAD
 import { useForm, useWatch } from "react-hook-form";
+=======
+import { useForm } from "react-hook-form";
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -177,7 +181,11 @@ export function GoalsClient() {
 
   const isEditing = editingId !== null;
   const showEditor = isEditorOpen || isEditing || goals.length === 0;
+<<<<<<< HEAD
   const selectedColor = useWatch({ control: form.control, name: "color" }) ?? categoryColorPresets[0].value;
+=======
+  const selectedColor = form.watch("color") ?? categoryColorPresets[0].value;
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
 
   return (
     <div className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">

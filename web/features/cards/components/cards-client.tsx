@@ -4,7 +4,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
+<<<<<<< HEAD
 import { useForm, useWatch } from "react-hook-form";
+=======
+import { useForm } from "react-hook-form";
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -353,6 +357,7 @@ export function CardsClient() {
   const statementIsPaid = Boolean(statementQuery.data?.payment);
   const statementOutstandingAmount = statementQuery.data?.summary.statementOutstandingAmount ?? 0;
   const canPayStatement = Boolean(statementQuery.data && !statementIsPaid && statementOutstandingAmount > 0);
+<<<<<<< HEAD
   const selectedBrand = useWatch({ control: form.control, name: "brand" }) ?? cardBrandPresets[0].value;
   const selectedInstitution = useWatch({ control: form.control, name: "institution" }) ?? "";
   const selectedColor = useWatch({ control: form.control, name: "color" }) ?? cardColorPresets[0].value;
@@ -367,6 +372,11 @@ export function CardsClient() {
 
     return () => window.clearTimeout(timeout);
   };
+=======
+  const selectedBrand = form.watch("brand") ?? cardBrandPresets[0].value;
+  const selectedInstitution = form.watch("institution") ?? "";
+  const selectedColor = form.watch("color") ?? cardColorPresets[0].value;
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
 
   const getDefaultStatementMonth = (card: CardItem) =>
     card.payableStatementAmount > 0 ? card.payableStatementMonth : card.statementMonth;
@@ -415,7 +425,16 @@ export function CardsClient() {
       return;
     }
 
+<<<<<<< HEAD
     return scrollEditorIntoView();
+=======
+    const timeout = window.setTimeout(() => {
+      formSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      document.getElementById("card-name")?.focus();
+    }, 80);
+
+    return () => window.clearTimeout(timeout);
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
   }, [editingId]);
 
   return (

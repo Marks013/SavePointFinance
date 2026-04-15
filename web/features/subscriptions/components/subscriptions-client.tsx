@@ -4,7 +4,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+<<<<<<< HEAD
 import { useForm, useWatch } from "react-hook-form";
+=======
+import { useForm } from "react-hook-form";
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -288,6 +292,7 @@ export function SubscriptionsClient() {
     form.reset(buildEmptySubscriptionValues());
   };
 
+<<<<<<< HEAD
   const selectedType = useWatch({ control: form.control, name: "type" }) ?? "expense";
   const selectedAccountId = useWatch({ control: form.control, name: "accountId" }) ?? "";
   const selectedCardId = useWatch({ control: form.control, name: "cardId" }) ?? "";
@@ -295,6 +300,15 @@ export function SubscriptionsClient() {
   const isEditing = editingId !== null;
   const showEditor = isEditorOpen || isEditing || subscriptions.length === 0;
   const selectedName = useWatch({ control: form.control, name: "name" }) ?? "";
+=======
+  const selectedType = form.watch("type") ?? "expense";
+  const selectedAccountId = form.watch("accountId") ?? "";
+  const selectedCardId = form.watch("cardId") ?? "";
+  const filteredCategories = (categoriesQuery.data?.items ?? []).filter((item) => item.type === selectedType);
+  const isEditing = editingId !== null;
+  const showEditor = isEditorOpen || isEditing || subscriptions.length === 0;
+  const selectedName = form.watch("name") ?? "";
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
   const streamingCategoryId =
     (categoriesQuery.data?.items ?? []).find(
       (item) => item.type === "expense" && item.name === "Streaming e assinaturas"
@@ -305,6 +319,7 @@ export function SubscriptionsClient() {
       activeMonthDateResolved: getOccurrenceDateForMonth(item, month)
     }))
     .sort((a, b) => a.activeMonthDateResolved.getTime() - b.activeMonthDateResolved.getTime());
+<<<<<<< HEAD
   const scrollEditorIntoView = () => {
     const timeout = window.setTimeout(() => {
       const target = document.getElementById("sub-name");
@@ -316,6 +331,8 @@ export function SubscriptionsClient() {
 
     return () => window.clearTimeout(timeout);
   };
+=======
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
 
   useEffect(() => {
     if (selectedType === "income" && selectedCardId) {
@@ -341,7 +358,16 @@ export function SubscriptionsClient() {
       return;
     }
 
+<<<<<<< HEAD
     return scrollEditorIntoView();
+=======
+    const timeout = window.setTimeout(() => {
+      formSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      document.getElementById("sub-name")?.focus();
+    }, 80);
+
+    return () => window.clearTimeout(timeout);
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
   }, [editingId]);
 
   const applyServicePreset = (preset: SubscriptionServicePreset) => {

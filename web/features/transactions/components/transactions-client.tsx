@@ -4,17 +4,29 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+<<<<<<< HEAD
 import { useForm, useWatch } from "react-hook-form";
+=======
+import { useForm } from "react-hook-form";
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
 import { toast } from "sonner";
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
 import { CurrencyInput } from "@/components/ui/currency-input";
+<<<<<<< HEAD
+=======
+import { DatePickerInput } from "@/components/ui/date-picker-input";
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { formatDateDisplay, formatDateKey, normalizeCalendarDate } from "@/lib/date";
+<<<<<<< HEAD
 import { formatMonthKeyLabel, normalizeMonthKey } from "@/lib/month";
+=======
+import { formatMonthKeyLabel, getMonthRange, normalizeMonthKey } from "@/lib/month";
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
 import { ensureApiResponse } from "@/lib/observability/http";
 import { cn, formatCurrency } from "@/lib/utils";
 import {
@@ -81,8 +93,11 @@ type ProfilePreferencesPayload = {
   };
 };
 
+<<<<<<< HEAD
 type TransactionFilterState = Omit<TransactionFiltersValues, "month">;
 
+=======
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
 function getBaseInstallmentDescription(description: string) {
   return description.replace(/\s\(\d+\/\d+\)$/, "");
 }
@@ -112,6 +127,7 @@ async function getTransactionsWithFilters(filters: TransactionFiltersValues) {
 
   const response = await fetch(`/api/transactions?${searchParams.toString()}`, { cache: "no-store" });
   await ensureApiResponse(response, { fallbackMessage: "Falha ao carregar transacoes", method: "GET", path: "/api/transactions" });
+<<<<<<< HEAD
   return (await response.json()) as {
     items: TransactionItem[];
     summary: {
@@ -124,6 +140,9 @@ async function getTransactionsWithFilters(filters: TransactionFiltersValues) {
       };
     };
   };
+=======
+  return (await response.json()) as { items: TransactionItem[] };
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
 }
 
 async function getCards() {
@@ -242,6 +261,10 @@ export function TransactionsClient() {
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const month = normalizeMonthKey(searchParams.get("month"));
+<<<<<<< HEAD
+=======
+  const monthRange = getMonthRange(month);
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isCreditEditLocked, setIsCreditEditLocked] = useState(false);
   const [isEditorOpen, setIsEditorOpen] = useState(true);
@@ -249,14 +272,24 @@ export function TransactionsClient() {
   const [editingScope, setEditingScope] = useState<"single" | "group">("single");
   const [editingInstallmentsTotal, setEditingInstallmentsTotal] = useState(1);
   const [reviewSelections, setReviewSelections] = useState<ReviewSelectionState>({});
+<<<<<<< HEAD
   const [filters, setFilters] = useState<TransactionFilterState>({
     limit: 30,
+=======
+  const [filters, setFilters] = useState<TransactionFiltersValues>({
+    limit: 30,
+    month: month,
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
     type: undefined,
     categoryId: "",
     accountId: "",
     cardId: ""
   });
+<<<<<<< HEAD
   const deferredFilters = useDeferredValue<TransactionFiltersValues>({ ...filters, month });
+=======
+  const deferredFilters = useDeferredValue(filters);
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
   const categoriesQuery = useQuery({ queryKey: ["categories"], queryFn: getCategories, staleTime: 30_000 });
   const accountsQuery = useQuery({ queryKey: ["accounts"], queryFn: getAccounts, staleTime: 30_000 });
   const cardsQuery = useQuery({ queryKey: ["cards"], queryFn: getCards, staleTime: 30_000 });
@@ -271,6 +304,7 @@ export function TransactionsClient() {
   const accounts = useMemo(() => accountsQuery.data?.items ?? [], [accountsQuery.data?.items]);
   const cards = useMemo(() => cardsQuery.data?.items ?? [], [cardsQuery.data?.items]);
   const transactions = useMemo(() => transactionsQuery.data?.items ?? [], [transactionsQuery.data?.items]);
+<<<<<<< HEAD
   const transactionSummary = transactionsQuery.data?.summary;
   const preferredAutoTithe = Boolean(profileQuery.data?.preferences.autoTithe);
   const automaticSuggestions = useMemo(() => {
@@ -282,6 +316,34 @@ export function TransactionsClient() {
   const incomeTotal = transactionSummary?.totals.income ?? 0;
   const expenseTotal = transactionSummary?.totals.expense ?? 0;
   const transferTotal = transactionSummary?.totals.transfer ?? 0;
+=======
+  const preferredAutoTithe = Boolean(profileQuery.data?.preferences.autoTithe);
+  const { expenseTotal, incomeTotal, transferTotal, automaticSuggestions } = useMemo(() => {
+    let expense = 0;
+    let income = 0;
+    let transfer = 0;
+
+    for (const item of transactions) {
+      if (item.type === "expense") {
+        expense += item.amount;
+      } else if (item.type === "income") {
+        income += item.amount;
+      } else {
+        transfer += item.amount;
+      }
+    }
+
+    return {
+      expenseTotal: expense,
+      incomeTotal: income,
+      transferTotal: transfer,
+      automaticSuggestions: transactions
+        .filter((item) => item.classification?.auto && item.type !== "transfer")
+        .sort((a, b) => (a.classification?.confidence ?? 0) - (b.classification?.confidence ?? 0))
+      .slice(0, 6)
+    };
+  }, [transactions]);
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
   const automaticSuggestionIds = useMemo(
     () => new Set(automaticSuggestions.map((item) => item.id)),
     [automaticSuggestions]
@@ -290,6 +352,7 @@ export function TransactionsClient() {
     () => transactions.filter((item) => !automaticSuggestionIds.has(item.id)),
     [automaticSuggestionIds, transactions]
   );
+<<<<<<< HEAD
   const scrollEditorIntoView = () => {
     const timeout = window.setTimeout(() => {
       const target = document.getElementById("description");
@@ -301,6 +364,8 @@ export function TransactionsClient() {
 
     return () => window.clearTimeout(timeout);
   };
+=======
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
 
   const form = useForm<z.input<typeof transactionFormSchema>, unknown, TransactionFormValues>({
     resolver: zodResolver(transactionFormSchema),
@@ -447,9 +512,15 @@ export function TransactionsClient() {
     form.reset(buildEmptyTransactionValues(month)); // Pass the 'month' variable
   };
 
+<<<<<<< HEAD
   const selectedType = useWatch({ control: form.control, name: "type" }) ?? "expense";
   const selectedPaymentMethod = useWatch({ control: form.control, name: "paymentMethod" }) ?? "pix";
   const selectedApplyTithe = useWatch({ control: form.control, name: "applyTithe" }) ?? false;
+=======
+  const selectedType = form.watch("type") ?? "expense";
+  const selectedPaymentMethod = form.watch("paymentMethod") ?? "pix";
+  const selectedApplyTithe = form.watch("applyTithe") ?? false;
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
   const selectedFilterCard = useMemo(
     () => cards.find((card) => card.id === (filters.cardId ?? "")),
     [cards, filters.cardId]
@@ -487,6 +558,16 @@ export function TransactionsClient() {
   const isCreditCard = selectedPaymentMethod === "credit_card";
 
   useEffect(() => {
+<<<<<<< HEAD
+=======
+    setFilters((current) => ({
+      ...current,
+      month: month
+    }));
+  }, [month]);
+
+  useEffect(() => {
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
     if (selectedType === "transfer") {
       form.setValue("cardId", "");
       form.setValue("installments", 1);
@@ -520,7 +601,16 @@ export function TransactionsClient() {
       return;
     }
 
+<<<<<<< HEAD
     return scrollEditorIntoView();
+=======
+    const timeout = window.setTimeout(() => {
+      formSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      document.getElementById("description")?.focus();
+    }, 80);
+
+    return () => window.clearTimeout(timeout);
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
   }, [editingId]);
 
   return (
@@ -952,7 +1042,11 @@ export function TransactionsClient() {
               onChange={(event) =>
                 setFilters((current) => ({
                   ...current,
+<<<<<<< HEAD
                   type: event.target.value ? (event.target.value as TransactionFilterState["type"]) : undefined
+=======
+                  type: event.target.value ? (event.target.value as TransactionFiltersValues["type"]) : undefined
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
                 }))
               }
             >
@@ -1038,6 +1132,10 @@ export function TransactionsClient() {
             onClick={() =>
               setFilters({
                 limit: 30,
+<<<<<<< HEAD
+=======
+                month: month,
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
                 type: undefined,
                 categoryId: "",
                 accountId: "",
@@ -1069,7 +1167,11 @@ export function TransactionsClient() {
           ) : null}
           {!transactionsQuery.isLoading && visibleTransactions.length > 0 ? (
             <p className="text-sm text-[var(--color-muted-foreground)]">
+<<<<<<< HEAD
               Mostrando {visibleTransactions.length} movimentações de {transactionSummary?.totalCount ?? visibleTransactions.length} no mês filtrado.
+=======
+              Mostrando {visibleTransactions.length} movimentações nesta amostra. Ajuste o limite para ampliar a leitura do mês.
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
             </p>
           ) : null}
           {visibleTransactions.map((transaction) => (

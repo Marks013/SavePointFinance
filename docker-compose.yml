@@ -47,6 +47,28 @@ services:
     command: ["npx", "prisma", "migrate", "deploy", "--schema", "prisma/schema.prisma"]
     networks:
       - savepoint
+      
+  audit-server-smoke::
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+      target: tools
+    profiles: ["ops"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      web:
+        condition: service_started
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      AUDIT_BASE_URL: ${AUDIT_BASE_URL:-http://web:3000}
+      SMOKE_USER_EMAIL: ${SMOKE_USER_EMAIL}
+      SMOKE_USER_PASSWORD: ${SMOKE_USER_PASSWORD}
+    command: ["npm", "run", "audit:server-smoke"]
+    networks:
+      - savepoint      
 
   bootstrap-admin:
     build:

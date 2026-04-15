@@ -82,12 +82,20 @@ export function InstallmentsClient() {
   const monthRange = getMonthRange(month);
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
   const editSectionRef = useRef<HTMLElement | null>(null);
+<<<<<<< HEAD
   const [cardId, setCardId] = useState("");
   const filters = {
     from: monthRange.from,
     to: monthRange.to,
     cardId
   };
+=======
+  const [filters, setFilters] = useState({
+    from: monthRange.from,
+    to: monthRange.to,
+    cardId: ""
+  });
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
   const installmentsQuery = useQuery({
     queryKey: ["installments", filters],
     queryFn: () => getInstallments(filters)
@@ -95,7 +103,11 @@ export function InstallmentsClient() {
   const cardsQuery = useQuery({ queryKey: ["cards"], queryFn: getCards });
   const categoriesQuery = useQuery({ queryKey: ["categories"], queryFn: getCategories });
   const groups = installmentsQuery.data?.items ?? [];
+<<<<<<< HEAD
   const selectedFilterCard = (cardsQuery.data?.items ?? []).find((card) => card.id === cardId);
+=======
+  const selectedFilterCard = (cardsQuery.data?.items ?? []).find((card) => card.id === filters.cardId);
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
   const totalAmount = groups.reduce((sum, item) => sum + item.totalAmount, 0);
   const overdueItems = groups.reduce((sum, item) => sum + item.overdueOpenInstallments, 0);
   const remainingInstallments = groups.reduce((sum, item) => sum + item.installmentsRemaining, 0);
@@ -110,6 +122,17 @@ export function InstallmentsClient() {
   });
 
   useEffect(() => {
+<<<<<<< HEAD
+=======
+    setFilters((current) => ({
+      ...current,
+      from: monthRange.from,
+      to: monthRange.to
+    }));
+  }, [monthRange.from, monthRange.to]);
+
+  useEffect(() => {
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
     if (!editingGroupId) {
       return;
     }
@@ -274,8 +297,13 @@ export function InstallmentsClient() {
             <Label htmlFor="installments-filter-card">Cartão</Label>
             <Select
               id="installments-filter-card"
+<<<<<<< HEAD
               value={cardId}
               onChange={(event) => setCardId(event.target.value)}
+=======
+              value={filters.cardId}
+              onChange={(event) => setFilters((current) => ({ ...current, cardId: event.target.value }))}
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
             >
               <option value="">Todos os cartões</option>
               {(cardsQuery.data?.items ?? []).map((card) => (
@@ -291,7 +319,11 @@ export function InstallmentsClient() {
           <p>{selectedFilterCard ? `Refinando por cartão: ${selectedFilterCard.name}.` : "Mostrando todos os cartões."}</p>
         </div>
         <div className="mt-4">
+<<<<<<< HEAD
           <Button onClick={() => setCardId("")} type="button" variant="ghost">
+=======
+          <Button onClick={() => setFilters({ from: monthRange.from, to: monthRange.to, cardId: "" })} type="button" variant="ghost">
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
             Limpar refinamentos
           </Button>
         </div>

@@ -48,6 +48,7 @@ export async function GET(request: Request) {
       where.OR = [{ accountId: filters.accountId }, { destinationAccountId: filters.accountId }];
     }
 
+<<<<<<< HEAD
     const [transactions, totalsByType, totalCount] = await Promise.all([
       prisma.transaction.findMany({
         where,
@@ -89,6 +90,19 @@ export async function GET(request: Request) {
         transfer: 0
       }
     );
+=======
+    const transactions = await prisma.transaction.findMany({
+      where,
+      include: {
+        category: true,
+        financialAccount: true,
+        destinationAccount: true,
+        card: true
+      },
+      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+      take: filters.limit // Direct limit, no complex card search logic
+    });
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
 
     return NextResponse.json({
       items: transactions.map((transaction) => ({
@@ -142,12 +156,16 @@ export async function GET(request: Request) {
               source: transaction.classificationSource
             }
           : null
+<<<<<<< HEAD
       })),
       summary: {
         totalCount,
         returnedCount: transactions.length,
         totals
       }
+=======
+      }))
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
     });
   } catch (error) {
     if (error instanceof Error && error.message === "Unauthorized") {

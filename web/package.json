@@ -16,8 +16,12 @@
     "db:seed": "tsx prisma/seed.ts",
     "data:import-legacy": "tsx scripts/import-legacy.ts",
     "audit:invitations": "tsx scripts/invitation-isolation-audit.ts",
+<<<<<<< HEAD
     "audit:cards-smoke": "tsx scripts/card-statement-smoke-audit.ts",
     "audit:server-smoke": "tsx scripts/server-smoke-audit.ts"
+=======
+    "audit:cards-smoke": "tsx scripts/card-statement-smoke-audit.ts"
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
   },
   "dependencies": {
     "@auth/prisma-adapter": "2.11.1",
@@ -28,7 +32,11 @@
     "@radix-ui/react-separator": "1.1.7",
     "@radix-ui/react-slot": "1.2.3",
     "@react-pdf/renderer": "4.3.0",
+<<<<<<< HEAD
     "@sentry/nextjs": "^10.48.0",
+=======
+    "@sentry/nextjs": "^10.47.0",
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
     "@tanstack/react-query": "5.66.9",
     "@tanstack/react-query-devtools": "5.66.9",
     "bcryptjs": "3.0.2",
@@ -37,16 +45,28 @@
     "date-fns": "4.1.0",
     "dotenv": "16.5.0",
     "lucide-react": "0.511.0",
+<<<<<<< HEAD
     "next": "^16.2.3",
+=======
+    "next": "15.5.14",
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
     "next-auth": "5.0.0-beta.30",
     "pg": "8.14.1",
     "react": "19.0.0",
     "react-dom": "19.0.0",
+<<<<<<< HEAD
     "react-hook-form": "^7.72.1",
     "recharts": "^3.8.1",
     "sonner": "^2.0.7",
     "tailwind-merge": "3.3.0",
     "zod": "^4.3.6"
+=======
+    "react-hook-form": "^7.62.0",
+    "recharts": "2.15.1",
+    "sonner": "2.0.1",
+    "tailwind-merge": "3.3.0",
+    "zod": "4.0.17"
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
   },
   "devDependencies": {
     "@eslint/eslintrc": "3.2.0",
@@ -56,10 +76,17 @@
     "@types/react": "19.0.10",
     "@types/react-dom": "19.0.4",
     "eslint": "9.39.4",
+<<<<<<< HEAD
     "eslint-config-next": "^16.2.3",
     "prisma": "7.7.0",
     "tailwindcss": "4.1.3",
     "tsx": "^4.21.0",
+=======
+    "eslint-config-next": "15.5.14",
+    "prisma": "7.7.0",
+    "tailwindcss": "4.1.3",
+    "tsx": "4.19.3",
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
     "typescript": "5.8.2"
   },
   "overrides": {

@@ -4,7 +4,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+<<<<<<< HEAD
 import { useForm, useWatch } from "react-hook-form";
+=======
+import { useForm } from "react-hook-form";
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -177,6 +181,7 @@ export function AccountsClient() {
 
   const isEditing = editingId !== null;
   const showEditor = isEditorOpen || isEditing || accounts.length === 0;
+<<<<<<< HEAD
   const selectedColor = useWatch({ control: form.control, name: "color" }) ?? accountColorPresets[0].value;
   const selectedInstitution = useWatch({ control: form.control, name: "institution" }) ?? "";
   const scrollEditorIntoView = () => {
@@ -190,13 +195,26 @@ export function AccountsClient() {
 
     return () => window.clearTimeout(timeout);
   };
+=======
+  const selectedColor = form.watch("color") ?? accountColorPresets[0].value;
+  const selectedInstitution = form.watch("institution") ?? "";
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
 
   useEffect(() => {
     if (!editingId) {
       return;
     }
 
+<<<<<<< HEAD
     return scrollEditorIntoView();
+=======
+    const timeout = window.setTimeout(() => {
+      formSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      document.getElementById("account-name")?.focus();
+    }, 80);
+
+    return () => window.clearTimeout(timeout);
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
   }, [editingId]);
 
   return (

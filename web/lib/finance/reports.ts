@@ -4,15 +4,21 @@ import { getAccountsWithComputedBalance } from "@/lib/finance/accounts";
 import { formatMonthKeyLabel, getCurrentMonthKey, getMonthRange } from "@/lib/month";
 import { getCardExpenseDueDate } from "@/lib/cards/statement";
 import { ensureTenantCardStatementSnapshots } from "@/lib/cards/snapshot-sync";
+<<<<<<< HEAD
 import { dateKeySchema } from "@/lib/date";
+=======
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
 import { prisma } from "@/lib/prisma/client";
 import { advanceSubscriptionBillingDate } from "@/lib/subscriptions/recurrence";
 
 export type FinanceReportFilters = {
   month?: string | null; // New field for YYYY-MM competence month
   baseMonth?: string | null;
+<<<<<<< HEAD
   from?: string | null;
   to?: string | null;
+=======
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
   type?: string | null;
   accountId?: string | null;
   cardId?: string | null;
@@ -225,6 +231,7 @@ function pickQuarterHighlight(quarters: QuarterSnapshot[], direction: "max" | "m
 }
 
 function getFilterRange(filters: FinanceReportFilters) {
+<<<<<<< HEAD
   if (filters.from && filters.to) {
     const parsedFrom = dateKeySchema.safeParse(filters.from);
     const parsedTo = dateKeySchema.safeParse(filters.to);
@@ -240,10 +247,18 @@ function getFilterRange(filters: FinanceReportFilters) {
   }
 
   if (filters.month) {
+=======
+  if (filters.month) {
+    // If month is provided, get the start and end of that month
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
     const { start, end } = getMonthRange(filters.month);
     return { start, end };
   }
 
+<<<<<<< HEAD
+=======
+  // Fallback to current month if no specific month filter is provided
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
   const month = getCurrentMonthKey();
   const { start, end } = getMonthRange(month);
   return { start, end };
@@ -267,8 +282,11 @@ function buildTransactionWhere(
   filters: FinanceReportFilters,
   userId?: string
 ): Prisma.TransactionWhereInput {
+<<<<<<< HEAD
   const { start, end } = getFilterRange(filters);
   const competenceMonths = listMonthKeysBetween(start, end);
+=======
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
   const where: Prisma.TransactionWhereInput = {
     tenantId,
     ...(userId ? { userId } : {}),
@@ -277,6 +295,7 @@ function buildTransactionWhere(
       : {})
   };
 
+<<<<<<< HEAD
   if (competenceMonths.length === 1) {
     where.competence = competenceMonths[0];
   } else if (competenceMonths.length > 1) {
@@ -284,6 +303,13 @@ function buildTransactionWhere(
       in: competenceMonths
     };
   }
+=======
+  if (filters.month) {
+    where.competence = filters.month; // Filter by competence month
+  }
+  // The date range logic based on 'from' and 'to' is removed.
+  // The competence filtering covers the primary use case.
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
 
   if (filters.accountId) {
     where.OR = [{ accountId: filters.accountId }, { destinationAccountId: filters.accountId }];
@@ -311,7 +337,11 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
         id: true,
         amount: true,
         date: true,
+<<<<<<< HEAD
         competence: true,
+=======
+        competence: true, // Include competence in the select
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
         description: true,
         type: true,
         categoryId: true,
@@ -483,8 +513,16 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
   };
   let classifiedAutomatically = 0;
   let uncategorizedTransactions = 0;
+<<<<<<< HEAD
   for (const transaction of transactions) {
     const monthKey = transaction.competence ?? getCurrentMonthKey(transaction.date);
+=======
+  // let transactionsInRange = 0; // No longer needed as all 'transactions' are in range by competence
+  // The transactions are already filtered by competence in the Prisma query.
+  // We will iterate directly over 'transactions' and use 'transaction.competence' for monthly aggregation.
+  for (const transaction of transactions) { // Iterate directly over 'transactions'
+    const monthKey = transaction.competence; // Use transaction.competence directly
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
     const amount = Number(transaction.amount);
     const monthly = monthlyMap.get(monthKey) ?? {
       income: 0,
@@ -493,6 +531,10 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
       transactions: 0,
       uncategorizedExpense: 0
     };
+<<<<<<< HEAD
+=======
+    // transactionsInRange += 1; // No longer needed
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
     monthly.transactions += 1;
 
     if (transaction.type === TransactionType.income) {
@@ -609,8 +651,14 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
     monthlyMap.set(monthKey, monthly);
   }
 
+<<<<<<< HEAD
   summary.transactions = transactions.length;
   summary.balance = summary.income - summary.expense;
+=======
+  summary.transactions = transactions.length; // Summary transactions count all fetched transactions
+  summary.balance = summary.income - summary.expense;
+  // The filterStart and filterEnd should be derived from the competence month range directly.
+>>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
   const filterStart = projectionStart;
   const filterEnd = projectionEnd;
 
