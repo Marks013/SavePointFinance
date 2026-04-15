@@ -360,7 +360,7 @@ async function run() {
   await expectPage(dataJar, "/dashboard/accounts", {
     markers: ['id="account-name"', 'id="account-type"', "Saldo atual total", "Base cadastrada", "Contas"],
 	minimumMatches: 3
-  ]);
+  });
   results.push("Tela de contas carregou com conteudo esperado");
 
   await expectPage(dataJar, "/dashboard/transactions", {
@@ -379,13 +379,13 @@ async function run() {
   await expectPage(dataJar, "/dashboard/subscriptions", {
     markers: ['id="sub-name"', 'id="sub-type"', "Assinaturas", "Assinaturas ativas", "Entradas mensais"],
     minimumMatches: 3
-  ]);
+  });
   results.push("Tela de assinaturas carregou com conteudo esperado");
 
   await expectPage(dataJar, "/dashboard/cards", {
     markers: ['id="card-name"', 'id="statement-card"', 'id="statement-month"', "Central de fatura", "Pagar fatura"],
     minimumMatches: 3
-  ]);
+  });
   results.push("Tela de cartoes carregou com conteudo esperado");
 
   await expectPage(dataJar, "/dashboard/reports", {
