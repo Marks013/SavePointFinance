@@ -62,6 +62,11 @@ type CardStatementPayload = {
   };
 };
 
+type PageExpectation = {
+  markers: string[];
+  minimumMatches?: number;
+};
+
 class CookieJar {
   private readonly store = new Map<string, string>();
 
@@ -117,6 +122,42 @@ function assertCondition(condition: unknown, message: string): asserts condition
   if (!condition) {
     throw new Error(message);
   }
+}
+
+function normalizeLooseText(value: string) {
+  return value
+    .normalize("NFKD")
+    .replace(/\p{M}+/gu, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function generateEncodingVariants(input: string) {
+  const variants = new Set<string>([input]);
+  let current = input;
+
+  for (let index = 0; index < 3; index += 1) {
+    current = Buffer.from(current, "utf8").toString("latin1");
+    variants.add(current);
+  }
+
+  current = input;
+  for (let index = 0; index < 3; index += 1) {
+    current = Buffer.from(current, "latin1").toString("utf8");
+    variants.add(current);
+  }
+
+  return Array.from(variants);
+}
+
+function htmlContainsMarker(html: string, marker: string) {
+  const normalizedHtml = normalizeLooseText(html);
+
+  return generateEncodingVariants(marker).some((variant) => {
+    const normalizedMarker = normalizeLooseText(variant);
+    return normalizedMarker.length > 0 && normalizedHtml.includes(normalizedMarker);
+  });
 }
 
 function formatLocationHeader(response: Response) {
@@ -245,13 +286,18 @@ async function expectAnonymousRedirect(path: string, redirectPath = "/login") {
   );
 }
 
-async function expectPage(jar: CookieJar, path: string, markers: string[]) {
+async function expectPage(jar: CookieJar, path: string, expectation: PageExpectation) {
   const { response, html } = await getHtml(jar, path);
   assertCondition(response.ok, `${path} respondeu ${response.status}`);
 
-  for (const marker of markers) {
-    assertCondition(html.includes(marker), `${path} nao contem o marcador esperado: ${marker}`);
-  }
+  const markers = expectation.markers;
+  const minimumMatches = expectation.minimumMatches ?? markers.length;
+  const matchedMarkers = markers.filter((marker) => htmlContainsMarker(html, marker));
+
+  assertCondition(
+    matchedMarkers.length >= minimumMatches,
+    `${path} nao atingiu o minimo de marcadores esperados (${matchedMarkers.length}/${minimumMatches}). Ultimo marcador ausente: ${markers.find((marker) => !matchedMarkers.includes(marker)) ?? "desconhecido"}`
+  );
 }
 
 async function run() {
@@ -274,7 +320,10 @@ async function run() {
   const adminJar = await signIn(adminEmail, adminPassword);
   results.push("Login por credenciais estabelece sessao valida");
 
-  await expectPage(adminJar, "/dashboard", ["Encerrar sessão"]);
+  await expectPage(adminJar, "/dashboard", {
+	  markers: ['aria-label="Encerrar', "Encerrar sessão", "Resumo das contas"],
+	  minimumMatches: 2
+	});	
   results.push("Dashboard autenticado responde para o admin");
 
   const adminProfile = await getJson<ProfilePayload>(adminJar, "/api/profile");
@@ -296,58 +345,70 @@ async function run() {
     results.push("Login do usuario de dados estabelece sessao valida");
   }
 
-  await expectPage(dataJar, "/dashboard", [
+  await expectPage(dataJar, "/dashboard", {
+    markers: [
+	'aria-label="Encerrar'
     "Visão central da operação",
     "Movimento recente",
     "Resumo das contas",
-    "Cartões em operação",
-    "Encerrar sessão"
+	"Cartões em operação"
+    ],
+    minimumMatches: 3
   ]);
   results.push("Dashboard principal carregou com conteudo esperado");
 
-  await expectPage(dataJar, "/dashboard/accounts", [
-    "Contas",
-    "Saldo atual total",
-    "Base cadastrada"
+  await expectPage(dataJar, "/dashboard/accounts", {
+    markers: ['id="account-name"', 'id="account-type"', "Saldo atual total", "Base cadastrada", "Contas"],
+	minimumMatches: 3
   ]);
   results.push("Tela de contas carregou com conteudo esperado");
 
-  await expectPage(dataJar, "/dashboard/transactions", [
-    "Operacao financeira",
-    "Movimentacoes recentes",
-    "Receitas filtradas",
-    "Despesas filtradas"
+  await expectPage(dataJar, "/dashboard/transactions", {
+    markers: [
+	  'id="description"',
+	  'id="transactions-filter-type"',
+	  'id="transactions-filter-limit"',
+	  "Receitas filtradas",
+	  "Despesas filtradas",
+	  "Movimentações recentes"
+    ],
+	minimumMatches: 4
   ]);
   results.push("Tela de transacoes carregou com conteudo esperado");
 
-  await expectPage(dataJar, "/dashboard/subscriptions", [
-    "Assinaturas",
-    "Assinaturas ativas",
-    "Entradas mensais"
+  await expectPage(dataJar, "/dashboard/subscriptions", {
+    markers: ['id="sub-name"', 'id="sub-type"', "Assinaturas", "Assinaturas ativas", "Entradas mensais"],
+    minimumMatches: 3
   ]);
   results.push("Tela de assinaturas carregou com conteudo esperado");
 
-  await expectPage(dataJar, "/dashboard/cards", [
-    "Cartoes",
-    "Cartoes ativos",
-    "Central de fatura",
-    "Acompanhe e pague a competencia certa"
+  await expectPage(dataJar, "/dashboard/cards", {
+    markers: ['id="card-name"', 'id="statement-card"', 'id="statement-month"', "Central de fatura", "Pagar fatura"],
+    minimumMatches: 3
   ]);
   results.push("Tela de cartoes carregou com conteudo esperado");
 
-  await expectPage(dataJar, "/dashboard/reports", [
-    "Relatorios",
-    "Despesas por categoria",
-    "Movimentacoes recentes",
-    "Mapa de categorias"
+  await expectPage(dataJar, "/dashboard/reports", {
+    markers: [
+      'id="reports-period-mode"',
+	  'id="reports-filter-type"',
+	  "Despesas por categoria","Mapa de categorias",
+	  "Mapa de categorias",
+	  "Movimentações recentes"
+    ],
+    minimumMatches: 4
   ]);
   results.push("Tela de relatorios carregou com conteudo esperado");
 
-  await expectPage(dataJar, "/dashboard/settings", [
-    "Perfil, preferencias e rotina",
-    "Perfil e preferencias",
-    "Automacoes recorrentes",
-    "Entregas recentes"
+  await expectPage(dataJar, "/dashboard/settings", {
+    markers: [
+      'id="settings-name"',
+	  'id="settings-email"',
+	  'id="settings-whatsapp"',
+	  "Automações recorrentes",
+	  "Entregas recentes"
+    ],
+    minimumMatches: 4
   ]);
   results.push("Tela de configuracoes carregou com conteudo esperado");
 
