@@ -54,6 +54,14 @@ type IncomingTextMessage = {
   body: string;
 };
 
+const regExpConstructor = RegExp as RegExpConstructor & {
+  escape?: (value: string) => string;
+};
+
+const escapeRegExp =
+  regExpConstructor.escape ??
+  ((value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+
 function normalizeText(value: string) {
   return normalizeClassificationText(value);
 }
@@ -131,7 +139,7 @@ function stripDescriptionNoise(text: string, amountRaw: string, accountHints: st
       continue;
     }
 
-    const escaped = hint.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const escaped = escapeRegExp(hint);
     description = description.replace(new RegExp(`\\b(?:na|no|em)\\s+${escaped}\\b`, "i"), "");
     description = description.replace(new RegExp(`\\b${escaped}\\b`, "i"), "");
   }

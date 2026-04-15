@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
 import { subscriptionFormSchema } from "@/features/subscriptions/schemas/subscription-schema";
 import { syncDueSubscriptionTransactions } from "@/lib/automation/subscriptions";
@@ -148,21 +148,22 @@ export async function POST(request: Request) {
       }
     });
 
-    // Instant sync after creation
-    await syncDueSubscriptionTransactions({
-      tenantId: user.tenantId,
-      userId: user.id
-    }).catch((error) =>
-      captureUnexpectedError(error, {
-        surface: "api-post-processing",
-        route: "/api/subscriptions",
-        operation: "POST",
-        feature: "subscriptions",
+    after(async () => {
+      await syncDueSubscriptionTransactions({
         tenantId: user.tenantId,
-        userId: user.id,
-        dedupeKey: "subscriptions:post-create-sync"
-      })
-    );
+        userId: user.id
+      }).catch((error) =>
+        captureUnexpectedError(error, {
+          surface: "api-post-processing",
+          route: "/api/subscriptions",
+          operation: "POST",
+          feature: "subscriptions",
+          tenantId: user.tenantId,
+          userId: user.id,
+          dedupeKey: "subscriptions:post-create-sync"
+        })
+      );
+    });
 
     return NextResponse.json({ id: subscription.id }, { status: 201 });
   } catch (error) {

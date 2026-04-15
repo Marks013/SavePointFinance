@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { after } from "next/server";
 import { redirect } from "next/navigation";
 
 import { DashboardShell } from "@/components/layout/dashboard-shell";
@@ -21,23 +22,31 @@ export default async function ProtectedLayout({ children }: ProtectedLayoutProps
       redirect(`/license?reason=${access.blockedReason ?? "expired"}`);
     }
 
-    // Lazy sync on login/access (only if automation feature is enabled)
     if (access.license.features.automation) {
-      await syncDueSubscriptionTransactions({
+      const syncContext = {
         tenantId: access.tenantId,
-        userId: access.id
-      }).catch((error) =>
-        captureUnexpectedError(error, {
-          surface: "layout",
-          route: "/dashboard",
-          operation: "sync",
-          feature: "subscriptions",
-          tenantId: access.tenantId,
-          userId: access.id,
-          role: access.role,
-          isPlatformAdmin: access.isPlatformAdmin
-        })
-      );
+        userId: access.id,
+        role: access.role,
+        isPlatformAdmin: access.isPlatformAdmin
+      };
+
+      after(async () => {
+        await syncDueSubscriptionTransactions({
+          tenantId: syncContext.tenantId,
+          userId: syncContext.userId
+        }).catch((error) =>
+          captureUnexpectedError(error, {
+            surface: "layout",
+            route: "/dashboard",
+            operation: "sync",
+            feature: "subscriptions",
+            tenantId: syncContext.tenantId,
+            userId: syncContext.userId,
+            role: syncContext.role,
+            isPlatformAdmin: syncContext.isPlatformAdmin
+          })
+        );
+      });
     }
   } catch (error) {
     if (isAuthError(error)) {

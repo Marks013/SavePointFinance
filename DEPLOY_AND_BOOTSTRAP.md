@@ -205,6 +205,14 @@ docker compose --profile storage up -d
 docker compose up -d --build web
 ```
 
+Em seguida, valide o deploy:
+
+```bash
+docker compose ps
+docker compose logs --tail=100 web
+docker compose --profile ops run --rm audit-server-smoke
+```
+
 ### Deploy com alteracao de banco
 
 ```bash
@@ -212,6 +220,21 @@ docker compose up -d postgres
 docker compose run --rm migrate
 docker compose up -d --build web
 ```
+
+Depois da subida, rode o mesmo smoke:
+
+```bash
+docker compose --profile ops run --rm audit-server-smoke
+```
+
+Variaveis importantes para o smoke:
+
+- `ADMIN_EMAIL`
+- `ADMIN_PASSWORD`
+- `SMOKE_USER_EMAIL`
+- `SMOKE_USER_PASSWORD`
+- `SMOKE_MONTH`
+- `AUDIT_BASE_URL`
 
 ### Ativar backup automatico
 

@@ -156,7 +156,7 @@ export async function GET(request: Request) {
 
     const pdf = await renderToBuffer(document);
 
-    return new Response(pdf, {
+    return new Response(new Uint8Array(pdf), {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `inline; filename="${filename}"`

@@ -1,6 +1,6 @@
 # SavePoint
 
-Aplicacao financeira fullstack em `Next.js 15`, `TypeScript 5`, `Prisma 7` e `PostgreSQL 17`, preparada para deploy com `Docker Compose` e proxy reverso como `Nginx Proxy Manager`.
+Aplicacao financeira fullstack em `Next.js 16`, `TypeScript 6`, `Prisma 7` e `PostgreSQL 17`, preparada para deploy com `Docker Compose` e proxy reverso como `Nginx Proxy Manager`.
 
 O banco foi consolidado em uma migration baseline unica para ambientes novos.
 
@@ -109,6 +109,47 @@ Com alteracao de schema:
 docker compose up -d postgres
 docker compose run --rm migrate
 docker compose up -d --build web
+```
+
+## Verificacao pos-deploy
+
+Depois de atualizar a aplicacao no servidor, rode um smoke autenticado contra o container `web`:
+
+```bash
+npm run verify:server-smoke
+```
+
+O script usa o servico `audit-server-smoke` do `docker-compose` e valida:
+
+- login e logout
+- carregamento das principais telas protegidas
+- respostas basicas das APIs de perfil, contas, cartoes, assinaturas, transacoes e relatorios
+- leitura da fatura do primeiro cartao, quando existir
+
+Variaveis usadas no smoke:
+
+- `ADMIN_EMAIL`
+- `ADMIN_PASSWORD`
+- `SMOKE_USER_EMAIL`
+- `SMOKE_USER_PASSWORD`
+- `SMOKE_MONTH`
+- `AUDIT_BASE_URL`
+
+Fluxo recomendado apos `docker compose up -d --build web`:
+
+```bash
+docker compose ps
+docker compose logs --tail=100 web
+npm run verify:server-smoke
+```
+
+Se o deploy tiver mudanca de banco, rode:
+
+```bash
+docker compose up -d postgres
+docker compose run --rm migrate
+docker compose up -d --build web
+npm run verify:server-smoke
 ```
 
 ## Backup automatico

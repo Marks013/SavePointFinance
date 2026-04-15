@@ -63,6 +63,9 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   output: "standalone",
   typedRoutes: true,
+  experimental: {
+    turbopackFileSystemCacheForDev: true
+  } as NextConfig["experimental"],
   async headers() {
     return [
       {
