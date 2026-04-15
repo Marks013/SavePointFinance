@@ -4,11 +4,7 @@ import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { signOut } from "next-auth/react";
 import { useState } from "react";
-<<<<<<< HEAD
 import { useForm, useWatch } from "react-hook-form";
-=======
-import { useForm } from "react-hook-form";
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -162,14 +158,14 @@ async function getProfile() {
 async function getAutomationSummary() {
   const response = await fetch("/api/automation", { cache: "no-store" });
   await ensureApiResponse(response, { fallbackMessage: "Falha ao carregar automacoes", method: "GET", path: "/api/automation" });
-  if (!response.ok) throw new Error("Falha ao carregar automações");
+  if (!response.ok) throw new Error("Falha ao carregar automaÃƒÂ§ÃƒÂµes");
   return (await response.json()) as AutomationSummary;
 }
 
 async function getNotifications() {
   const response = await fetch("/api/notifications", { cache: "no-store" });
   await ensureApiResponse(response, { fallbackMessage: "Falha ao carregar notificacoes", method: "GET", path: "/api/notifications" });
-  if (!response.ok) throw new Error("Falha ao carregar notificações");
+  if (!response.ok) throw new Error("Falha ao carregar notificaÃƒÂ§ÃƒÂµes");
   return (await response.json()) as NotificationListPayload;
 }
 
@@ -219,10 +215,7 @@ export function SettingsClient() {
         }
       : undefined
   });
-<<<<<<< HEAD
   const whatsappNumber = useWatch({ control: form.control, name: "whatsappNumber" }) ?? "";
-=======
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
 
   const profileMutation = useMutation({
     mutationFn: async (values: SettingsFormValues) => {
@@ -245,14 +238,14 @@ export function SettingsClient() {
       });
       await ensureApiResponse(response, { fallbackMessage: "Falha ao salvar configuracoes", method: "PATCH", path: "/api/profile" });
 
-      if (!response.ok) throw new Error("Falha ao salvar configurações");
+      if (!response.ok) throw new Error("Falha ao salvar configuraÃƒÂ§ÃƒÂµes");
     },
     onSuccess: async () => {
-      toast.success("Configurações salvas");
+      toast.success("ConfiguraÃƒÂ§ÃƒÂµes salvas");
       await queryClient.invalidateQueries({ queryKey: ["profile"] });
     },
     onError: () => {
-      toast.error("Não foi possível salvar configurações");
+      toast.error("NÃƒÂ£o foi possÃƒÂ­vel salvar configuraÃƒÂ§ÃƒÂµes");
     }
   });
 
@@ -263,12 +256,12 @@ export function SettingsClient() {
       });
       await ensureApiResponse(response, { fallbackMessage: "Falha ao executar automacoes", method: "POST", path: "/api/automation" });
 
-      if (!response.ok) throw new Error("Falha ao executar automações");
+      if (!response.ok) throw new Error("Falha ao executar automaÃƒÂ§ÃƒÂµes");
       return (await response.json()) as AutomationRunResult;
     },
     onSuccess: async (payload) => {
       setAutomationResult(payload);
-      toast.success("Automações executadas");
+      toast.success("AutomaÃƒÂ§ÃƒÂµes executadas");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["automation-summary"] }),
         queryClient.invalidateQueries({ queryKey: ["subscriptions"] }),
@@ -281,7 +274,7 @@ export function SettingsClient() {
       ]);
     },
     onError: () => {
-      toast.error("Não foi possível executar automações");
+      toast.error("NÃƒÂ£o foi possÃƒÂ­vel executar automaÃƒÂ§ÃƒÂµes");
     }
   });
 
@@ -295,11 +288,11 @@ export function SettingsClient() {
       const payload = (await response.json().catch(() => ({}))) as { message?: string };
 
       if (!response.ok) {
-        throw new Error(payload.message ?? "Não foi possível excluir a conta");
+        throw new Error(payload.message ?? "NÃƒÂ£o foi possÃƒÂ­vel excluir a conta");
       }
     },
     onSuccess: async () => {
-      toast.success("Conta excluída definitivamente");
+      toast.success("Conta excluÃƒÂ­da definitivamente");
       await signOut({ redirect: false });
       window.location.href = "/";
     },
@@ -317,7 +310,7 @@ export function SettingsClient() {
               <div className="eyebrow">Convidar parentes</div>
               <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em]">Compartilhamento familiar</h2>
               <p className="mt-2 max-w-3xl text-sm leading-7 text-[var(--color-muted-foreground)]">
-                Convide cônjuge, familiar ou alguém de confiança para usar a mesma carteira financeira da conta{" "}
+                Convide cÃƒÂ´njuge, familiar ou alguÃƒÂ©m de confianÃƒÂ§a para usar a mesma carteira financeira da conta{" "}
                 {profileQuery.data?.tenant.name ?? "principal"}.
               </p>
             </div>
@@ -330,15 +323,15 @@ export function SettingsClient() {
 
       <section className="surface content-section">
         <div className="page-intro">
-          <div className="eyebrow">Configurações</div>
-          <h1 className="text-3xl font-semibold tracking-[-0.03em]">Perfil, preferências e rotina</h1>
+          <div className="eyebrow">ConfiguraÃƒÂ§ÃƒÂµes</div>
+          <h1 className="text-3xl font-semibold tracking-[-0.03em]">Perfil, preferÃƒÂªncias e rotina</h1>
           <p className="max-w-2xl text-sm leading-7 text-[var(--color-muted-foreground)]">
-            Esta área centraliza preferências pessoais, lembretes recorrentes e os sinais operacionais do seu dia a dia.
+            Esta ÃƒÂ¡rea centraliza preferÃƒÂªncias pessoais, lembretes recorrentes e os sinais operacionais do seu dia a dia.
           </p>
         </div>
         {profileQuery.data?.isPlatformAdmin ? (
           <div className="warning-panel mt-6 text-sm">
-            Esta conta é o superadmin da plataforma. Recursos Premium e limites do plano ficam liberados aqui para
+            Esta conta ÃƒÂ© o superadmin da plataforma. Recursos Premium e limites do plano ficam liberados aqui para
             suporte e auditoria, mesmo que a conta vinculada esteja em um plano restritivo.
           </div>
         ) : null}
@@ -346,7 +339,7 @@ export function SettingsClient() {
 
       <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
         <section className="surface content-section">
-          <h2 className="text-2xl font-semibold tracking-[-0.03em]">Perfil e preferências</h2>
+          <h2 className="text-2xl font-semibold tracking-[-0.03em]">Perfil e preferÃƒÂªncias</h2>
           <form className="mt-6 space-y-4" onSubmit={form.handleSubmit((values) => profileMutation.mutate(values))}>
             <div className="space-y-2">
               <Label htmlFor="settings-name">Nome</Label>
@@ -363,11 +356,7 @@ export function SettingsClient() {
                   id="settings-whatsapp"
                   inputMode="numeric"
                   placeholder="(DD) 9 0000-0000"
-<<<<<<< HEAD
                   value={whatsappNumber}
-=======
-                  value={form.watch("whatsappNumber")}
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
                   onChange={(event) =>
                     form.setValue("whatsappNumber", formatBrazilWhatsAppInput(event.target.value), {
                       shouldDirty: true,
@@ -399,20 +388,20 @@ export function SettingsClient() {
               </div>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
-              <label className="muted-panel flex items-center gap-3 text-sm"><input className="app-checkbox" type="checkbox" {...form.register("emailNotifications")} /> Notificações por e-mail</label>
-              <label className="muted-panel flex items-center gap-3 text-sm"><input className="app-checkbox" type="checkbox" {...form.register("monthlyReports")} /> Relatórios mensais</label>
-              <label className="muted-panel flex items-center gap-3 text-sm"><input className="app-checkbox" type="checkbox" {...form.register("budgetAlerts")} /> Alertas de orçamento</label>
+              <label className="muted-panel flex items-center gap-3 text-sm"><input className="app-checkbox" type="checkbox" {...form.register("emailNotifications")} /> NotificaÃƒÂ§ÃƒÂµes por e-mail</label>
+              <label className="muted-panel flex items-center gap-3 text-sm"><input className="app-checkbox" type="checkbox" {...form.register("monthlyReports")} /> RelatÃƒÂ³rios mensais</label>
+              <label className="muted-panel flex items-center gap-3 text-sm"><input className="app-checkbox" type="checkbox" {...form.register("budgetAlerts")} /> Alertas de orÃƒÂ§amento</label>
               <label className="muted-panel flex items-center gap-3 text-sm"><input className="app-checkbox" type="checkbox" {...form.register("dueReminders")} /> Lembretes de vencimento</label>
-              <label className="muted-panel flex items-center gap-3 text-sm"><input className="app-checkbox" type="checkbox" {...form.register("autoTithe")} /> Marcar dízimo por padrão em novas receitas</label>
+              <label className="muted-panel flex items-center gap-3 text-sm"><input className="app-checkbox" type="checkbox" {...form.register("autoTithe")} /> Marcar dÃƒÂ­zimo por padrÃƒÂ£o em novas receitas</label>
             </div>
             <Button className="w-full" disabled={profileMutation.isPending} type="submit">
-              {profileMutation.isPending ? "Salvando..." : "Salvar configurações"}
+              {profileMutation.isPending ? "Salvando..." : "Salvar configuraÃƒÂ§ÃƒÂµes"}
             </Button>
           </form>
         </section>
 
         <section className="surface content-section">
-          <h2 className="text-2xl font-semibold tracking-[-0.03em]">Automações recorrentes</h2>
+          <h2 className="text-2xl font-semibold tracking-[-0.03em]">AutomaÃƒÂ§ÃƒÂµes recorrentes</h2>
           {automationEnabled ? (
             <>
               <div className="mt-6 grid gap-4 md:grid-cols-2">
@@ -421,17 +410,17 @@ export function SettingsClient() {
                   <p className="mt-2 text-2xl font-semibold">{automationQuery.data?.dueSubscriptions ?? 0}</p>
                 </article>
                 <article className="metric-card">
-                  <p className="text-sm text-[var(--color-muted-foreground)]">Metas com prazo próximo</p>
+                  <p className="text-sm text-[var(--color-muted-foreground)]">Metas com prazo prÃƒÂ³ximo</p>
                   <p className="mt-2 text-2xl font-semibold">{automationQuery.data?.upcomingGoals ?? 0}</p>
                 </article>
               </div>
               <Button className="mt-6 w-full" disabled={automationMutation.isPending} onClick={() => automationMutation.mutate()} type="button">
-                {automationMutation.isPending ? "Executando..." : "Executar automações agora"}
+                {automationMutation.isPending ? "Executando..." : "Executar automaÃƒÂ§ÃƒÂµes agora"}
               </Button>
 
               {automationResult ? (
                 <div className="muted-panel mt-6 text-sm">
-                  <p className="break-words"><strong>Transações geradas:</strong> {automationResult.processedSubscriptions}</p>
+                  <p className="break-words"><strong>TransaÃƒÂ§ÃƒÂµes geradas:</strong> {automationResult.processedSubscriptions}</p>
                   <p className="break-words"><strong>Lembretes emitidos:</strong> {automationResult.reminders}</p>
                   {automationResult.subscriptionResults.length > 0 ? (
                     <p className="mt-3 break-words text-[var(--color-muted-foreground)]">
@@ -456,8 +445,8 @@ export function SettingsClient() {
             </>
           ) : (
             <div className="warning-panel mt-6 text-sm">
-              O plano {profileQuery.data?.license.planLabel ?? "atual"} não inclui automações recorrentes. Faça upgrade
-              para liberar geração automática de lançamentos e lembretes.
+              O plano {profileQuery.data?.license.planLabel ?? "atual"} nÃƒÂ£o inclui automaÃƒÂ§ÃƒÂµes recorrentes. FaÃƒÂ§a upgrade
+              para liberar geraÃƒÂ§ÃƒÂ£o automÃƒÂ¡tica de lanÃƒÂ§amentos e lembretes.
             </div>
           )}
         </section>
@@ -467,17 +456,17 @@ export function SettingsClient() {
         <div className="eyebrow">WhatsApp</div>
         <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em]">Assistente virtual</h2>
         <p className="mt-4 max-w-3xl text-sm leading-7 text-[var(--color-muted-foreground)]">
-          Vincule o seu número para lançar receitas, despesas e consultar saldo, limite e fatura por mensagem. O
-          número salvo no perfil será usado para identificar apenas a sua conta.
+          Vincule o seu nÃƒÂºmero para lanÃƒÂ§ar receitas, despesas e consultar saldo, limite e fatura por mensagem. O
+          nÃƒÂºmero salvo no perfil serÃƒÂ¡ usado para identificar apenas a sua conta.
         </p>
         <div className="mt-6 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
           <article className="data-card p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold">Status da integração</p>
+                <p className="text-sm font-semibold">Status da integraÃƒÂ§ÃƒÂ£o</p>
                 <p className="mt-1 text-sm text-[var(--color-muted-foreground)]">
                   {!whatsappEnabledForPlan
-                    ? "Disponível apenas no plano Premium."
+                    ? "DisponÃƒÂ­vel apenas no plano Premium."
                     : profileQuery.data?.integrations.whatsappAssistantEnabled
                       ? "Assistente habilitado no ambiente."
                       : "Assistente ainda desabilitado no ambiente."}
@@ -496,17 +485,17 @@ export function SettingsClient() {
                     ? profileQuery.data?.integrations.whatsappConfigured
                       ? "Webhook configurado"
                       : "Webhook pendente"
-                    : "Upgrade necessário"}
+                    : "Upgrade necessÃƒÂ¡rio"}
                 </span>
               </div>
             </div>
             <div className="mt-5 grid gap-3 md:grid-cols-2">
               <div className="muted-panel">
                 <p className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">
-                  Número vinculado
+                  NÃƒÂºmero vinculado
                 </p>
                 <p className="mt-2 break-words text-sm">
-                  {profileQuery.data?.whatsappNumber || "Cadastre um número no formato (DD) 9 0000-0000"}
+                  {profileQuery.data?.whatsappNumber || "Cadastre um nÃƒÂºmero no formato (DD) 9 0000-0000"}
                 </p>
               </div>
               <div className="muted-panel">
@@ -514,17 +503,17 @@ export function SettingsClient() {
                   Endpoint
                 </p>
                 <p className="mt-2 break-all text-sm">
-                  {whatsappEnabledForPlan ? profileQuery.data?.integrations.whatsappWebhookPath : "Recurso indisponível no plano atual"}
+                  {whatsappEnabledForPlan ? profileQuery.data?.integrations.whatsappWebhookPath : "Recurso indisponÃƒÂ­vel no plano atual"}
                 </p>
               </div>
               <div className="muted-panel md:col-span-2">
                 <p className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">
-                  Classificação inteligente
+                  ClassificaÃƒÂ§ÃƒÂ£o inteligente
                 </p>
                 <p className="mt-2 break-words text-sm">
                   {profileQuery.data?.integrations.smartClassificationEnabled
-                    ? "Ativa para interpretar descrições e ajudar na categoria dos lançamentos."
-                    : "Desativada no ambiente. O sistema usa apenas regras locais e memória do histórico."}
+                    ? "Ativa para interpretar descriÃƒÂ§ÃƒÂµes e ajudar na categoria dos lanÃƒÂ§amentos."
+                    : "Desativada no ambiente. O sistema usa apenas regras locais e memÃƒÂ³ria do histÃƒÂ³rico."}
                 </p>
               </div>
             </div>
@@ -533,8 +522,8 @@ export function SettingsClient() {
             <p className="text-sm font-semibold">Exemplos de comando</p>
             <div className="mt-4 space-y-2 text-sm text-[var(--color-muted-foreground)]">
               <p className="break-words">`gastei 42,50 mercado na Nubank`</p>
-              <p className="break-words">`gastei 120 farmácia no cartão Visa 3x`</p>
-              <p className="break-words">`recebi 3200 salário no Itaú`</p>
+              <p className="break-words">`gastei 120 farmÃƒÂ¡cia no cartÃƒÂ£o Visa 3x`</p>
+              <p className="break-words">`recebi 3200 salÃƒÂ¡rio no ItaÃƒÂº`</p>
               <p className="break-words">`saldo`</p>
               <p className="break-words">`fatura Visa`</p>
               <p className="break-words">`limite Mastercard`</p>
@@ -544,10 +533,10 @@ export function SettingsClient() {
       </section>
 
       <section className="surface content-section">
-        <div className="eyebrow">Notificações</div>
+        <div className="eyebrow">NotificaÃƒÂ§ÃƒÂµes</div>
         <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em]">Entregas recentes</h2>
         <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--color-muted-foreground)]">
-          Os lembretes gerados pelas automações ficam registrados aqui com status de entrega por canal.
+          Os lembretes gerados pelas automaÃƒÂ§ÃƒÂµes ficam registrados aqui com status de entrega por canal.
         </p>
         <div className="mt-6 grid gap-4 md:grid-cols-3">
           <article className="metric-card">
@@ -570,7 +559,7 @@ export function SettingsClient() {
                 <div className="min-w-0 flex-1">
                   <p className="break-words font-semibold">{item.subject}</p>
                   <p className="mt-1 break-words text-sm text-[var(--color-muted-foreground)]">
-                    {formatChannel(item.channel)} • {formatNotificationStatus(item.status)} • {item.target}
+                    {formatChannel(item.channel)} Ã¢â‚¬Â¢ {formatNotificationStatus(item.status)} Ã¢â‚¬Â¢ {item.target}
                   </p>
                   {item.goal ? (
                     <p className="mt-1 break-words text-sm text-[var(--color-muted-foreground)]">Meta relacionada: {item.goal.name}</p>
@@ -592,7 +581,7 @@ export function SettingsClient() {
           ))}
           {notifications.length === 0 ? (
             <p className="text-sm text-[var(--color-muted-foreground)]">
-              Nenhuma notificação registrada ainda. Execute a rotina automática para gerar novos avisos.
+              Nenhuma notificaÃƒÂ§ÃƒÂ£o registrada ainda. Execute a rotina automÃƒÂ¡tica para gerar novos avisos.
             </p>
           ) : null}
         </div>
@@ -602,12 +591,12 @@ export function SettingsClient() {
         <div className="eyebrow">Zona de risco</div>
         <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em]">Excluir conta definitivamente</h2>
         <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--color-muted-foreground)]">
-          Esta ação apaga o seu login e todos os dados vinculados à sua conta, incluindo contas, cartões,
-          transações, metas, assinaturas e histórico próprio.
+          Esta aÃƒÂ§ÃƒÂ£o apaga o seu login e todos os dados vinculados ÃƒÂ  sua conta, incluindo contas, cartÃƒÂµes,
+          transaÃƒÂ§ÃƒÂµes, metas, assinaturas e histÃƒÂ³rico prÃƒÂ³prio.
         </p>
         {profileQuery.data?.isPlatformAdmin ? (
           <div className="warning-panel mt-6 text-sm">
-            A conta superadmin da plataforma não pode ser excluída por este fluxo.
+            A conta superadmin da plataforma nÃƒÂ£o pode ser excluÃƒÂ­da por este fluxo.
           </div>
         ) : (
           <div className="mt-6 flex flex-wrap items-center gap-3">
@@ -616,14 +605,14 @@ export function SettingsClient() {
               disabled={deleteAccountMutation.isPending}
               onClick={() => {
                 const email = profileQuery.data?.email ?? "";
-                const confirmation = window.prompt(`Digite ${email} para confirmar a exclusão definitiva da conta.`);
+                const confirmation = window.prompt(`Digite ${email} para confirmar a exclusÃƒÂ£o definitiva da conta.`);
 
                 if (!confirmation) {
                   return;
                 }
 
                 if (confirmation.trim().toLowerCase() !== email.trim().toLowerCase()) {
-                  toast.error("O e-mail informado não confere");
+                  toast.error("O e-mail informado nÃƒÂ£o confere");
                   return;
                 }
 

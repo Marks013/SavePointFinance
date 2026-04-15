@@ -45,13 +45,8 @@ function sanitizeToken(value: string) {
 export function AcceptInvitationForm({ initialToken = "" }: AcceptInvitationFormProps) {
   const router = useRouter();
   const [invitation, setInvitation] = useState<InvitationPayload | null>(null);
-<<<<<<< HEAD
   const normalizedToken = sanitizeToken(initialToken);
   const [isLoading, setIsLoading] = useState(() => Boolean(normalizedToken));
-=======
-  const [isLoading, setIsLoading] = useState(true);
-  const normalizedToken = sanitizeToken(initialToken);
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
   const form = useForm<z.input<typeof acceptInvitationSchema>, unknown, AcceptInvitationValues>({
     resolver: zodResolver(acceptInvitationSchema),
     defaultValues: {
@@ -64,10 +59,6 @@ export function AcceptInvitationForm({ initialToken = "" }: AcceptInvitationForm
 
   useEffect(() => {
     if (!normalizedToken) {
-<<<<<<< HEAD
-=======
-      setIsLoading(false);
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
       return;
     }
 

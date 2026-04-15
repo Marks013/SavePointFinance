@@ -4,21 +4,15 @@ import { getAccountsWithComputedBalance } from "@/lib/finance/accounts";
 import { formatMonthKeyLabel, getCurrentMonthKey, getMonthRange } from "@/lib/month";
 import { getCardExpenseDueDate } from "@/lib/cards/statement";
 import { ensureTenantCardStatementSnapshots } from "@/lib/cards/snapshot-sync";
-<<<<<<< HEAD
 import { dateKeySchema } from "@/lib/date";
-=======
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
 import { prisma } from "@/lib/prisma/client";
 import { advanceSubscriptionBillingDate } from "@/lib/subscriptions/recurrence";
 
 export type FinanceReportFilters = {
   month?: string | null; // New field for YYYY-MM competence month
   baseMonth?: string | null;
-<<<<<<< HEAD
   from?: string | null;
   to?: string | null;
-=======
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
   type?: string | null;
   accountId?: string | null;
   cardId?: string | null;
@@ -165,14 +159,14 @@ function formatPeriodTitle(scope: PeriodScope, baseMonthKey: string, start: Date
 
 function formatPeriodSubtitle(scope: PeriodScope, baseMonthKey: string, start: Date, end: Date) {
   if (scope === "year") {
-    return "Consolidado anual com comparativos internos, ritmo mensal e sinais de concentração de gastos.";
+    return "Consolidado anual com comparativos internos, ritmo mensal e sinais de concentraÃƒÂ§ÃƒÂ£o de gastos.";
   }
 
   if (scope === "month") {
-    return `Resumo operacional de ${formatMonthKeyLabel(baseMonthKey)} com caixa, categorias e próximos compromissos.`;
+    return `Resumo operacional de ${formatMonthKeyLabel(baseMonthKey)} com caixa, categorias e prÃƒÂ³ximos compromissos.`;
   }
 
-  return `Recorte personalizado entre ${formatShortDate(start)} e ${formatShortDate(end)} com visão consolidada do período.`;
+  return `Recorte personalizado entre ${formatShortDate(start)} e ${formatShortDate(end)} com visÃƒÂ£o consolidada do perÃƒÂ­odo.`;
 }
 
 function getScopeLabel(scope: PeriodScope) {
@@ -184,7 +178,7 @@ function getScopeLabel(scope: PeriodScope) {
     return "Leitura mensal";
   }
 
-  return "Período personalizado";
+  return "PerÃƒÂ­odo personalizado";
 }
 
 function pickMonthlyHighlight(
@@ -231,7 +225,6 @@ function pickQuarterHighlight(quarters: QuarterSnapshot[], direction: "max" | "m
 }
 
 function getFilterRange(filters: FinanceReportFilters) {
-<<<<<<< HEAD
   if (filters.from && filters.to) {
     const parsedFrom = dateKeySchema.safeParse(filters.from);
     const parsedTo = dateKeySchema.safeParse(filters.to);
@@ -247,18 +240,10 @@ function getFilterRange(filters: FinanceReportFilters) {
   }
 
   if (filters.month) {
-=======
-  if (filters.month) {
-    // If month is provided, get the start and end of that month
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
     const { start, end } = getMonthRange(filters.month);
     return { start, end };
   }
 
-<<<<<<< HEAD
-=======
-  // Fallback to current month if no specific month filter is provided
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
   const month = getCurrentMonthKey();
   const { start, end } = getMonthRange(month);
   return { start, end };
@@ -282,11 +267,8 @@ function buildTransactionWhere(
   filters: FinanceReportFilters,
   userId?: string
 ): Prisma.TransactionWhereInput {
-<<<<<<< HEAD
   const { start, end } = getFilterRange(filters);
   const competenceMonths = listMonthKeysBetween(start, end);
-=======
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
   const where: Prisma.TransactionWhereInput = {
     tenantId,
     ...(userId ? { userId } : {}),
@@ -295,7 +277,6 @@ function buildTransactionWhere(
       : {})
   };
 
-<<<<<<< HEAD
   if (competenceMonths.length === 1) {
     where.competence = competenceMonths[0];
   } else if (competenceMonths.length > 1) {
@@ -303,13 +284,6 @@ function buildTransactionWhere(
       in: competenceMonths
     };
   }
-=======
-  if (filters.month) {
-    where.competence = filters.month; // Filter by competence month
-  }
-  // The date range logic based on 'from' and 'to' is removed.
-  // The competence filtering covers the primary use case.
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
 
   if (filters.accountId) {
     where.OR = [{ accountId: filters.accountId }, { destinationAccountId: filters.accountId }];
@@ -337,11 +311,7 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
         id: true,
         amount: true,
         date: true,
-<<<<<<< HEAD
         competence: true,
-=======
-        competence: true, // Include competence in the select
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
         description: true,
         type: true,
         categoryId: true,
@@ -513,16 +483,8 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
   };
   let classifiedAutomatically = 0;
   let uncategorizedTransactions = 0;
-<<<<<<< HEAD
   for (const transaction of transactions) {
     const monthKey = transaction.competence ?? getCurrentMonthKey(transaction.date);
-=======
-  // let transactionsInRange = 0; // No longer needed as all 'transactions' are in range by competence
-  // The transactions are already filtered by competence in the Prisma query.
-  // We will iterate directly over 'transactions' and use 'transaction.competence' for monthly aggregation.
-  for (const transaction of transactions) { // Iterate directly over 'transactions'
-    const monthKey = transaction.competence; // Use transaction.competence directly
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
     const amount = Number(transaction.amount);
     const monthly = monthlyMap.get(monthKey) ?? {
       income: 0,
@@ -531,10 +493,6 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
       transactions: 0,
       uncategorizedExpense: 0
     };
-<<<<<<< HEAD
-=======
-    // transactionsInRange += 1; // No longer needed
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
     monthly.transactions += 1;
 
     if (transaction.type === TransactionType.income) {
@@ -651,14 +609,8 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
     monthlyMap.set(monthKey, monthly);
   }
 
-<<<<<<< HEAD
   summary.transactions = transactions.length;
   summary.balance = summary.income - summary.expense;
-=======
-  summary.transactions = transactions.length; // Summary transactions count all fetched transactions
-  summary.balance = summary.income - summary.expense;
-  // The filterStart and filterEnd should be derived from the competence month range directly.
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
   const filterStart = projectionStart;
   const filterEnd = projectionEnd;
 
@@ -1019,39 +971,39 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
           : "attention";
   const narrativeHeadline =
     summary.transactions === 0
-      ? "Ainda não há movimentação suficiente para uma leitura anual consistente"
+      ? "Ainda nÃƒÂ£o hÃƒÂ¡ movimentaÃƒÂ§ÃƒÂ£o suficiente para uma leitura anual consistente"
       : narrativeTone === "warning"
         ? periodScope === "year"
-          ? "O ano fechou sob pressão e pede correção de rota"
-          : "O período fechou pressionado e exige ajuste operacional"
+          ? "O ano fechou sob pressÃƒÂ£o e pede correÃƒÂ§ÃƒÂ£o de rota"
+          : "O perÃƒÂ­odo fechou pressionado e exige ajuste operacional"
         : narrativeTone === "positive"
           ? periodScope === "year"
-            ? "O ano fechou com resultado saudável e margem de manobra"
-            : "O período terminou com folga operacional"
+            ? "O ano fechou com resultado saudÃƒÂ¡vel e margem de manobra"
+            : "O perÃƒÂ­odo terminou com folga operacional"
           : periodScope === "year"
-            ? "O ano ficou positivo, mas com sinais de atenção"
-            : "O período ficou positivo, mas ainda sem folga confortável";
+            ? "O ano ficou positivo, mas com sinais de atenÃƒÂ§ÃƒÂ£o"
+            : "O perÃƒÂ­odo ficou positivo, mas ainda sem folga confortÃƒÂ¡vel";
   const narrativeSummary =
     summary.transactions === 0
-      ? "O recorte atual ainda não tem volume de transações para sustentar uma leitura executiva confiável."
+      ? "O recorte atual ainda nÃƒÂ£o tem volume de transaÃƒÂ§ÃƒÂµes para sustentar uma leitura executiva confiÃƒÂ¡vel."
       : periodScope === "year"
         ? `${positiveMonths} meses positivos, ${negativeMonths} meses negativos e resultado acumulado de ${summary.balance.toLocaleString(
             "pt-BR",
             { style: "currency", currency: "BRL" }
           )}.`
-        : `${summary.transactions} lançamentos analisados com resultado de ${summary.balance.toLocaleString("pt-BR", {
+        : `${summary.transactions} lanÃƒÂ§amentos analisados com resultado de ${summary.balance.toLocaleString("pt-BR", {
             style: "currency",
             currency: "BRL"
-          })} no período.`;
+          })} no perÃƒÂ­odo.`;
   const narrativeFocus =
     topCategoriesShare >= 0.5
-      ? `As três maiores categorias concentram ${Math.round(topCategoriesShare * 100)}% das despesas.`
+      ? `As trÃƒÂªs maiores categorias concentram ${Math.round(topCategoriesShare * 100)}% das despesas.`
       : worstMonth
         ? `O ponto mais pressionado foi ${worstMonth.label}, com saldo de ${worstMonth.balance.toLocaleString(
             "pt-BR",
             { style: "currency", currency: "BRL" }
           )}.`
-        : "A distribuição de despesas segue relativamente equilibrada no recorte atual.";
+        : "A distribuiÃƒÂ§ÃƒÂ£o de despesas segue relativamente equilibrada no recorte atual.";
   const alerts = [
     summary.balance < 0
       ? {
@@ -1064,20 +1016,20 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
       ? {
           tone: "attention" as const,
           title: "Despesa sem categoria relevante",
-          detail: `${Math.round(uncategorizedExpenseShare * 100)}% das despesas ainda estão sem categorização.`
+          detail: `${Math.round(uncategorizedExpenseShare * 100)}% das despesas ainda estÃƒÂ£o sem categorizaÃƒÂ§ÃƒÂ£o.`
         }
       : null,
     topCategoriesShare >= 0.55
       ? {
           tone: "attention" as const,
-          title: "Alta concentração de gastos",
-          detail: `As três maiores categorias representam ${Math.round(topCategoriesShare * 100)}% da despesa total.`
+          title: "Alta concentraÃƒÂ§ÃƒÂ£o de gastos",
+          detail: `As trÃƒÂªs maiores categorias representam ${Math.round(topCategoriesShare * 100)}% da despesa total.`
         }
       : null,
     positiveMonths >= Math.max(1, Math.ceil(periodMonths * 0.7)) && summary.balance > 0
       ? {
           tone: "positive" as const,
-          title: "Cadência financeira estável",
+          title: "CadÃƒÂªncia financeira estÃƒÂ¡vel",
           detail: `${positiveMonths} de ${periodMonths} meses fecharam positivos.`
         }
       : null
@@ -1109,14 +1061,14 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
       topCategory,
       essentialExpenses: categoryInsights
         .filter((item) =>
-          ["Moradia", "Condomínio", "Energia elétrica", "Água e saneamento", "Internet e telefonia", "Saúde"].includes(
+          ["Moradia", "CondomÃƒÂ­nio", "Energia elÃƒÂ©trica", "ÃƒÂgua e saneamento", "Internet e telefonia", "SaÃƒÂºde"].includes(
             item.name
           )
         )
         .reduce((sum, item) => sum + item.total, 0),
       lifestyleExpenses: categoryInsights
         .filter((item) =>
-          ["Restaurantes", "Delivery", "Lazer", "Streaming e assinaturas", "Viagem", "Café e padaria"].includes(
+          ["Restaurantes", "Delivery", "Lazer", "Streaming e assinaturas", "Viagem", "CafÃƒÂ© e padaria"].includes(
             item.name
           )
         )

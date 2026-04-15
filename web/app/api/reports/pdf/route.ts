@@ -105,11 +105,8 @@ export async function GET(request: Request) {
     const report = (await getFinanceReport(user.tenantId, {
       month: resolvedMonth,
       baseMonth: resolvedMonth,
-<<<<<<< HEAD
       from: searchParams.get("from"),
       to: searchParams.get("to"),
-=======
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
       type: searchParams.get("type"),
       accountId: searchParams.get("accountId"),
       cardId: searchParams.get("cardId"),
@@ -141,7 +138,7 @@ export async function GET(request: Request) {
             ? "Consolidado executivo com foco em desempenho, concentracao e leitura gerencial do ano."
             : "Consolidado executivo com foco em fluxo, despesas e desempenho operacional do periodo.",
         periodLabel: `Periodo analisado: ${scopeLabel}`,
-        filtersLabel: periodParts.length > 0 ? periodParts.join(" • ") : "Sem refinamentos adicionais",
+        filtersLabel: periodParts.length > 0 ? periodParts.join(" Ã¢â‚¬Â¢ ") : "Sem refinamentos adicionais",
         periodScope: report.period.scope,
         periodMonths: report.period.months,
         executiveSummary: buildExecutiveSummary(report),

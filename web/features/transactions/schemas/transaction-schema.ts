@@ -1,17 +1,13 @@
 import { z } from "zod";
 
-<<<<<<< HEAD
 import { normalizeCalendarDate } from "@/lib/date";
-=======
-import { dateKeySchema, normalizeCalendarDate } from "@/lib/date";
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
 
 export const transactionTypeValues = ["income", "expense", "transfer"] as const;
 export const paymentMethodValues = ["pix", "money", "credit_card", "debit_card", "transfer"] as const;
 export const transactionEditScopeValues = ["single", "group"] as const;
 
-export const transactionFormSchema =
-  z.object({
+export const transactionFormSchema = z
+  .object({
     date: z.coerce.date().transform((value) => normalizeCalendarDate(value)),
     amount: z.coerce.number().positive("Informe um valor maior que zero"),
     description: z.string().trim().min(3, "Informe uma descricao"),
@@ -23,14 +19,15 @@ export const transactionFormSchema =
     cardId: z.string().optional().nullable(),
     notes: z.string().optional().nullable(),
     installments: z.coerce.number().int().min(1).max(120).default(1),
-	competence: z.string().regex(/^\d{4}-\d{2}$/, "Formato inválido. Use YYYY-MM").optional(),
+    competence: z.string().regex(/^\d{4}-\d{2}$/, "Formato invalido. Use YYYY-MM").optional(),
     applyTithe: z.boolean().default(false)
-  }).superRefine((value, ctx) => {
+  })
+  .superRefine((value, ctx) => {
     if (value.type !== "income" && value.applyTithe) {
       ctx.addIssue({
         code: "custom",
         path: ["applyTithe"],
-        message: "O dízimo automático só pode ser marcado em receitas"
+        message: "O dizimo automatico so pode ser marcado em receitas"
       });
     }
 
@@ -38,7 +35,7 @@ export const transactionFormSchema =
       ctx.addIssue({
         code: "custom",
         path: ["accountId"],
-        message: "Selecione a conta de origem da transferência"
+        message: "Selecione a conta de origem da transferencia"
       });
     }
 
@@ -46,7 +43,7 @@ export const transactionFormSchema =
       ctx.addIssue({
         code: "custom",
         path: ["destinationAccountId"],
-        message: "Selecione a conta de destino da transferência"
+        message: "Selecione a conta de destino da transferencia"
       });
     }
 
@@ -67,7 +64,7 @@ export const transactionFormSchema =
       ctx.addIssue({
         code: "custom",
         path: ["cardId"],
-        message: "Transferência não deve ser vinculada a cartão"
+        message: "Transferencia nao deve ser vinculada a cartao"
       });
     }
 
@@ -75,7 +72,7 @@ export const transactionFormSchema =
       ctx.addIssue({
         code: "custom",
         path: ["destinationAccountId"],
-        message: "Conta de destino é usada apenas em transferências"
+        message: "Conta de destino e usada apenas em transferencias"
       });
     }
 
@@ -83,7 +80,7 @@ export const transactionFormSchema =
       ctx.addIssue({
         code: "custom",
         path: ["cardId"],
-        message: "Selecione o cartão para lançamentos no crédito"
+        message: "Selecione o cartao para lancamentos no credito"
       });
     }
 
@@ -91,7 +88,7 @@ export const transactionFormSchema =
       ctx.addIssue({
         code: "custom",
         path: ["accountId"],
-        message: "Compras no crédito devem ficar vinculadas ao cartão, não à conta"
+        message: "Compras no credito devem ficar vinculadas ao cartao, nao a conta"
       });
     }
 
@@ -99,7 +96,7 @@ export const transactionFormSchema =
       ctx.addIssue({
         code: "custom",
         path: ["cardId"],
-        message: "Selecione cartão apenas para compras no crédito"
+        message: "Selecione cartao apenas para compras no credito"
       });
     }
 
@@ -107,7 +104,7 @@ export const transactionFormSchema =
       ctx.addIssue({
         code: "custom",
         path: ["accountId"],
-        message: "Selecione a conta vinculada ao lançamento"
+        message: "Selecione a conta vinculada ao lancamento"
       });
     }
 
@@ -115,14 +112,14 @@ export const transactionFormSchema =
       ctx.addIssue({
         code: "custom",
         path: ["paymentMethod"],
-        message: "Parcelamento exige cartão de crédito"
+        message: "Parcelamento exige cartao de credito"
       });
     }
   });
 
 export const transactionFiltersSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
-  month: z.string().regex(/^\d{4}-\d{2}$/, "Formato inválido. Use YYYY-MM").optional().nullable(),
+  month: z.string().regex(/^\d{4}-\d{2}$/, "Formato invalido. Use YYYY-MM").optional().nullable(),
   type: z.enum(transactionTypeValues).optional().nullable(),
   categoryId: z.string().optional().nullable(),
   accountId: z.string().optional().nullable(),

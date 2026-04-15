@@ -4,29 +4,17 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
-<<<<<<< HEAD
 import { useForm, useWatch } from "react-hook-form";
-=======
-import { useForm } from "react-hook-form";
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
 import { toast } from "sonner";
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
 import { CurrencyInput } from "@/components/ui/currency-input";
-<<<<<<< HEAD
-=======
-import { DatePickerInput } from "@/components/ui/date-picker-input";
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { formatDateDisplay, formatDateKey, normalizeCalendarDate } from "@/lib/date";
-<<<<<<< HEAD
 import { formatMonthKeyLabel, normalizeMonthKey } from "@/lib/month";
-=======
-import { formatMonthKeyLabel, getMonthRange, normalizeMonthKey } from "@/lib/month";
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
 import { ensureApiResponse } from "@/lib/observability/http";
 import { cn, formatCurrency } from "@/lib/utils";
 import {
@@ -93,11 +81,8 @@ type ProfilePreferencesPayload = {
   };
 };
 
-<<<<<<< HEAD
 type TransactionFilterState = Omit<TransactionFiltersValues, "month">;
 
-=======
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
 function getBaseInstallmentDescription(description: string) {
   return description.replace(/\s\(\d+\/\d+\)$/, "");
 }
@@ -127,7 +112,6 @@ async function getTransactionsWithFilters(filters: TransactionFiltersValues) {
 
   const response = await fetch(`/api/transactions?${searchParams.toString()}`, { cache: "no-store" });
   await ensureApiResponse(response, { fallbackMessage: "Falha ao carregar transacoes", method: "GET", path: "/api/transactions" });
-<<<<<<< HEAD
   return (await response.json()) as {
     items: TransactionItem[];
     summary: {
@@ -140,9 +124,6 @@ async function getTransactionsWithFilters(filters: TransactionFiltersValues) {
       };
     };
   };
-=======
-  return (await response.json()) as { items: TransactionItem[] };
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
 }
 
 async function getCards() {
@@ -206,7 +187,7 @@ async function reviewClassification(id: string, categoryId: string, applyToInsta
   });
 
   if (!response.ok) {
-    throw new Error("Falha ao revisar classificação");
+    throw new Error("Falha ao revisar classificaÃƒÂ§ÃƒÂ£o");
   }
 
   return response.json();
@@ -219,7 +200,7 @@ function formatTransactionTypeLabel(type: TransactionItem["type"]) {
     case "expense":
       return "Despesa";
     case "transfer":
-      return "Transferência";
+      return "TransferÃƒÂªncia";
     default:
       return type;
   }
@@ -250,7 +231,7 @@ function buildEmptyTransactionValues(monthKey: string): TransactionFormValues {
 async function getProfilePreferences() {
   const response = await fetch("/api/profile", { cache: "no-store" });
   await ensureApiResponse(response, { fallbackMessage: "Falha ao carregar preferencias", method: "GET", path: "/api/profile" });
-  if (!response.ok) throw new Error("Falha ao carregar preferências");
+  if (!response.ok) throw new Error("Falha ao carregar preferÃƒÂªncias");
   return (await response.json()) as ProfilePreferencesPayload;
 }
 
@@ -261,10 +242,6 @@ export function TransactionsClient() {
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const month = normalizeMonthKey(searchParams.get("month"));
-<<<<<<< HEAD
-=======
-  const monthRange = getMonthRange(month);
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isCreditEditLocked, setIsCreditEditLocked] = useState(false);
   const [isEditorOpen, setIsEditorOpen] = useState(true);
@@ -272,24 +249,14 @@ export function TransactionsClient() {
   const [editingScope, setEditingScope] = useState<"single" | "group">("single");
   const [editingInstallmentsTotal, setEditingInstallmentsTotal] = useState(1);
   const [reviewSelections, setReviewSelections] = useState<ReviewSelectionState>({});
-<<<<<<< HEAD
   const [filters, setFilters] = useState<TransactionFilterState>({
     limit: 30,
-=======
-  const [filters, setFilters] = useState<TransactionFiltersValues>({
-    limit: 30,
-    month: month,
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
     type: undefined,
     categoryId: "",
     accountId: "",
     cardId: ""
   });
-<<<<<<< HEAD
   const deferredFilters = useDeferredValue<TransactionFiltersValues>({ ...filters, month });
-=======
-  const deferredFilters = useDeferredValue(filters);
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
   const categoriesQuery = useQuery({ queryKey: ["categories"], queryFn: getCategories, staleTime: 30_000 });
   const accountsQuery = useQuery({ queryKey: ["accounts"], queryFn: getAccounts, staleTime: 30_000 });
   const cardsQuery = useQuery({ queryKey: ["cards"], queryFn: getCards, staleTime: 30_000 });
@@ -304,7 +271,6 @@ export function TransactionsClient() {
   const accounts = useMemo(() => accountsQuery.data?.items ?? [], [accountsQuery.data?.items]);
   const cards = useMemo(() => cardsQuery.data?.items ?? [], [cardsQuery.data?.items]);
   const transactions = useMemo(() => transactionsQuery.data?.items ?? [], [transactionsQuery.data?.items]);
-<<<<<<< HEAD
   const transactionSummary = transactionsQuery.data?.summary;
   const preferredAutoTithe = Boolean(profileQuery.data?.preferences.autoTithe);
   const automaticSuggestions = useMemo(() => {
@@ -316,34 +282,6 @@ export function TransactionsClient() {
   const incomeTotal = transactionSummary?.totals.income ?? 0;
   const expenseTotal = transactionSummary?.totals.expense ?? 0;
   const transferTotal = transactionSummary?.totals.transfer ?? 0;
-=======
-  const preferredAutoTithe = Boolean(profileQuery.data?.preferences.autoTithe);
-  const { expenseTotal, incomeTotal, transferTotal, automaticSuggestions } = useMemo(() => {
-    let expense = 0;
-    let income = 0;
-    let transfer = 0;
-
-    for (const item of transactions) {
-      if (item.type === "expense") {
-        expense += item.amount;
-      } else if (item.type === "income") {
-        income += item.amount;
-      } else {
-        transfer += item.amount;
-      }
-    }
-
-    return {
-      expenseTotal: expense,
-      incomeTotal: income,
-      transferTotal: transfer,
-      automaticSuggestions: transactions
-        .filter((item) => item.classification?.auto && item.type !== "transfer")
-        .sort((a, b) => (a.classification?.confidence ?? 0) - (b.classification?.confidence ?? 0))
-      .slice(0, 6)
-    };
-  }, [transactions]);
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
   const automaticSuggestionIds = useMemo(
     () => new Set(automaticSuggestions.map((item) => item.id)),
     [automaticSuggestions]
@@ -352,7 +290,6 @@ export function TransactionsClient() {
     () => transactions.filter((item) => !automaticSuggestionIds.has(item.id)),
     [automaticSuggestionIds, transactions]
   );
-<<<<<<< HEAD
   const scrollEditorIntoView = () => {
     const timeout = window.setTimeout(() => {
       const target = document.getElementById("description");
@@ -364,8 +301,6 @@ export function TransactionsClient() {
 
     return () => window.clearTimeout(timeout);
   };
-=======
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
 
   const form = useForm<z.input<typeof transactionFormSchema>, unknown, TransactionFormValues>({
     resolver: zodResolver(transactionFormSchema),
@@ -389,8 +324,8 @@ export function TransactionsClient() {
         editingId
           ? payload?.scope === "group"
             ? "Grupo de parcelas atualizado"
-            : "Transação atualizada"
-          : "Transação criada"
+            : "TransaÃƒÂ§ÃƒÂ£o atualizada"
+          : "TransaÃƒÂ§ÃƒÂ£o criada"
       );
       setEditingId(null);
       setIsCreditEditLocked(false);
@@ -414,8 +349,8 @@ export function TransactionsClient() {
         error instanceof Error
           ? error.message
           : editingId
-            ? "Não foi possível atualizar a transação"
-            : "Não foi possível criar a transação"
+            ? "NÃƒÂ£o foi possÃƒÂ­vel atualizar a transaÃƒÂ§ÃƒÂ£o"
+            : "NÃƒÂ£o foi possÃƒÂ­vel criar a transaÃƒÂ§ÃƒÂ£o"
       );
     }
   });
@@ -423,7 +358,7 @@ export function TransactionsClient() {
   const deleteMutation = useMutation({
     mutationFn: deleteTransaction,
     onSuccess: async () => {
-      toast.success("Transação excluída");
+      toast.success("TransaÃƒÂ§ÃƒÂ£o excluÃƒÂ­da");
       if (editingId) {
         setEditingId(null);
         setIsCreditEditLocked(false);
@@ -440,7 +375,7 @@ export function TransactionsClient() {
       ]);
     },
     onError: () => {
-      toast.error("Não foi possível excluir a transação");
+      toast.error("NÃƒÂ£o foi possÃƒÂ­vel excluir a transaÃƒÂ§ÃƒÂ£o");
     }
   });
 
@@ -455,7 +390,7 @@ export function TransactionsClient() {
       applyToInstallments?: boolean;
     }) => reviewClassification(id, categoryId, applyToInstallments),
     onSuccess: async (_, variables) => {
-      toast.success("Classificação revisada");
+      toast.success("ClassificaÃƒÂ§ÃƒÂ£o revisada");
       setReviewSelections((current) => {
         const next = { ...current };
         delete next[variables.id];
@@ -467,7 +402,7 @@ export function TransactionsClient() {
       ]);
     },
     onError: () => {
-      toast.error("Não foi possível revisar a classificação");
+      toast.error("NÃƒÂ£o foi possÃƒÂ­vel revisar a classificaÃƒÂ§ÃƒÂ£o");
     }
   });
 
@@ -512,15 +447,9 @@ export function TransactionsClient() {
     form.reset(buildEmptyTransactionValues(month)); // Pass the 'month' variable
   };
 
-<<<<<<< HEAD
   const selectedType = useWatch({ control: form.control, name: "type" }) ?? "expense";
   const selectedPaymentMethod = useWatch({ control: form.control, name: "paymentMethod" }) ?? "pix";
   const selectedApplyTithe = useWatch({ control: form.control, name: "applyTithe" }) ?? false;
-=======
-  const selectedType = form.watch("type") ?? "expense";
-  const selectedPaymentMethod = form.watch("paymentMethod") ?? "pix";
-  const selectedApplyTithe = form.watch("applyTithe") ?? false;
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
   const selectedFilterCard = useMemo(
     () => cards.find((card) => card.id === (filters.cardId ?? "")),
     [cards, filters.cardId]
@@ -539,12 +468,12 @@ export function TransactionsClient() {
         ? "Receitas"
         : filters.type === "expense"
           ? "Despesas"
-          : "Transferências"
+          : "TransferÃƒÂªncias"
       : null,
     selectedFilterCategory ? `Categoria: ${selectedFilterCategory.name}` : null,
     selectedFilterAccount ? `Conta: ${selectedFilterAccount.name}` : null,
     selectedFilterCard
-      ? `Cartão: ${selectedFilterCard.name}${selectedFilterCard.last4 ? ` • ${selectedFilterCard.last4}` : ""}`
+      ? `CartÃƒÂ£o: ${selectedFilterCard.name}${selectedFilterCard.last4 ? ` Ã¢â‚¬Â¢ ${selectedFilterCard.last4}` : ""}`
       : null
   ].filter(Boolean) as string[], [filters.type, selectedFilterAccount, selectedFilterCard, selectedFilterCategory]);
   const isEditing = editingId !== null;
@@ -558,16 +487,6 @@ export function TransactionsClient() {
   const isCreditCard = selectedPaymentMethod === "credit_card";
 
   useEffect(() => {
-<<<<<<< HEAD
-=======
-    setFilters((current) => ({
-      ...current,
-      month: month
-    }));
-  }, [month]);
-
-  useEffect(() => {
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
     if (selectedType === "transfer") {
       form.setValue("cardId", "");
       form.setValue("installments", 1);
@@ -601,16 +520,7 @@ export function TransactionsClient() {
       return;
     }
 
-<<<<<<< HEAD
     return scrollEditorIntoView();
-=======
-    const timeout = window.setTimeout(() => {
-      formSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-      document.getElementById("description")?.focus();
-    }, 80);
-
-    return () => window.clearTimeout(timeout);
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
   }, [editingId]);
 
   return (
@@ -619,25 +529,25 @@ export function TransactionsClient() {
         <div className="page-intro">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <div className="eyebrow">{isEditing ? "Editar transação" : "Nova transação"}</div>
-              <h1 className="text-3xl font-semibold tracking-[-0.04em]">Operação financeira</h1>
+              <div className="eyebrow">{isEditing ? "Editar transaÃƒÂ§ÃƒÂ£o" : "Nova transaÃƒÂ§ÃƒÂ£o"}</div>
+              <h1 className="text-3xl font-semibold tracking-[-0.04em]">OperaÃƒÂ§ÃƒÂ£o financeira</h1>
             </div>
             {!showEditor ? (
               <Button onClick={openCreateForm} type="button" variant="secondary">
-                Nova transação
+                Nova transaÃƒÂ§ÃƒÂ£o
               </Button>
             ) : null}
           </div>
           <p className="text-sm leading-7 text-[var(--color-muted-foreground)]">
-            Registre lançamentos, vincule contas ou cartões e mantenha o histórico financeiro conectado ao painel,
-            à fatura e aos relatórios.
+            Registre lanÃƒÂ§amentos, vincule contas ou cartÃƒÂµes e mantenha o histÃƒÂ³rico financeiro conectado ao painel,
+            ÃƒÂ  fatura e aos relatÃƒÂ³rios.
           </p>
           <p className="text-sm font-medium text-[var(--color-primary)]">
-            Competência ativa: {formatMonthKeyLabel(month)}
+            CompetÃƒÂªncia ativa: {formatMonthKeyLabel(month)}
           </p>
           <p className="mt-3 text-sm leading-7 text-[var(--color-muted-foreground)]">
-            Se a categoria não for informada, o sistema tenta classificar automaticamente com base no contexto do
-            lançamento e em padrões brasileiros de consumo.
+            Se a categoria nÃƒÂ£o for informada, o sistema tenta classificar automaticamente com base no contexto do
+            lanÃƒÂ§amento e em padrÃƒÂµes brasileiros de consumo.
           </p>
         </div>
 
@@ -648,7 +558,7 @@ export function TransactionsClient() {
               (values) => saveMutation.mutate(values),
               (errors) => {
                 const firstError = Object.values(errors).find((error) => error?.message)?.message;
-                toast.error(firstError ?? "Revise os campos obrigatórios antes de continuar");
+                toast.error(firstError ?? "Revise os campos obrigatÃƒÂ³rios antes de continuar");
               }
             )}
           >
@@ -670,7 +580,7 @@ export function TransactionsClient() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="description">Descrição</Label>
+            <Label htmlFor="description">DescriÃƒÂ§ÃƒÂ£o</Label>
             <Input
               className={form.formState.errors.description ? invalidFieldClassName : undefined}
               id="description"
@@ -690,7 +600,7 @@ export function TransactionsClient() {
               >
                 <option value="expense">Despesa</option>
                 <option value="income">Receita</option>
-                <option value="transfer">Transferência</option>
+                <option value="transfer">TransferÃƒÂªncia</option>
               </Select>
             </div>
             <div className="space-y-2">
@@ -703,9 +613,9 @@ export function TransactionsClient() {
               >
                 <option value="pix">PIX</option>
                 <option value="money">Dinheiro</option>
-                <option value="debit_card">Cartão de débito</option>
-                <option value="credit_card">Cartão de crédito</option>
-                <option value="transfer">Transferência</option>
+                <option value="debit_card">CartÃƒÂ£o de dÃƒÂ©bito</option>
+                <option value="credit_card">CartÃƒÂ£o de crÃƒÂ©dito</option>
+                <option value="transfer">TransferÃƒÂªncia</option>
               </Select>
             </div>
           </div>
@@ -720,7 +630,7 @@ export function TransactionsClient() {
               >
                 <option value="">
                   {selectedType === "transfer"
-                    ? "Transferências não usam categoria"
+                    ? "TransferÃƒÂªncias nÃƒÂ£o usam categoria"
                     : "Classificar automaticamente"}
                 </option>
                 {filteredCategories.map((category) => (
@@ -732,7 +642,7 @@ export function TransactionsClient() {
             </div>
             <div className="space-y-2">
               <Label htmlFor={isCreditCard ? "cardId" : "accountId"}>
-                {isCreditCard ? "Cartão vinculado" : selectedType === "transfer" ? "Conta de origem" : "Conta vinculada"}
+                {isCreditCard ? "CartÃƒÂ£o vinculado" : selectedType === "transfer" ? "Conta de origem" : "Conta vinculada"}
               </Label>
               {isCreditCard ? (
                 <Select
@@ -741,10 +651,10 @@ export function TransactionsClient() {
                   id="cardId"
                   {...form.register("cardId")}
                 >
-                  <option value="">Selecione o cartão</option>
+                  <option value="">Selecione o cartÃƒÂ£o</option>
                   {cards.map((card) => (
                     <option key={card.id} value={card.id}>
-                      {card.name} {card.last4 ? `• ${card.last4}` : ""}
+                      {card.name} {card.last4 ? `Ã¢â‚¬Â¢ ${card.last4}` : ""}
                     </option>
                   ))}
                 </Select>
@@ -786,7 +696,7 @@ export function TransactionsClient() {
 
           <div className="grid gap-4 lg:grid-cols-[1fr_120px]">
             <div className="space-y-2">
-              <Label htmlFor="notes">Observações</Label>
+              <Label htmlFor="notes">ObservaÃƒÂ§ÃƒÂµes</Label>
               <Input id="notes" placeholder="Opcional" {...form.register("notes")} />
             </div>
             <div className="space-y-2">
@@ -805,37 +715,37 @@ export function TransactionsClient() {
           {selectedType === "income" ? (
             <label className="muted-panel flex items-center gap-3 text-sm">
               <input className="app-checkbox" type="checkbox" {...form.register("applyTithe")} />
-              Considerar dízimo nesta receita
+              Considerar dÃƒÂ­zimo nesta receita
             </label>
           ) : null}
 
           <div className="attention-panel text-sm leading-7 text-[var(--color-foreground)]">
             {isCreditCard
-              ? "Compras no crédito ficam vinculadas ao cartão e entram no controle de fatura e limite."
+              ? "Compras no crÃƒÂ©dito ficam vinculadas ao cartÃƒÂ£o e entram no controle de fatura e limite."
               : selectedType === "transfer"
-                ? "Transferências usam a conta de origem e não entram como despesa de cartão."
+                ? "TransferÃƒÂªncias usam a conta de origem e nÃƒÂ£o entram como despesa de cartÃƒÂ£o."
               : selectedType === "income" && selectedApplyTithe
-                ? "Esta receita entrará no consolidado mensal de dízimo, gerando uma única despesa somada no período."
-                : "Despesas e receitas devem ficar vinculadas à conta correta para melhorar relatórios e conciliação."}
+                ? "Esta receita entrarÃƒÂ¡ no consolidado mensal de dÃƒÂ­zimo, gerando uma ÃƒÂºnica despesa somada no perÃƒÂ­odo."
+                : "Despesas e receitas devem ficar vinculadas ÃƒÂ  conta correta para melhorar relatÃƒÂ³rios e conciliaÃƒÂ§ÃƒÂ£o."}
           </div>
 
           {isEditing && isCreditEditLocked ? (
             <div className="warning-copy text-sm">
-              Para alterar data, conta ou cartão neste lançamento de crédito, recrie o lançamento.
+              Para alterar data, conta ou cartÃƒÂ£o neste lanÃƒÂ§amento de crÃƒÂ©dito, recrie o lanÃƒÂ§amento.
             </div>
           ) : null}
 
           {isEditing ? (
             <p className="warning-copy text-sm">
               {editingInstallmentsTotal > 1
-                ? "Escolha se a alteração deve afetar apenas esta parcela ou todo o grupo parcelado."
-                : "Você está editando uma transação já registrada."}
+                ? "Escolha se a alteraÃƒÂ§ÃƒÂ£o deve afetar apenas esta parcela ou todo o grupo parcelado."
+                : "VocÃƒÂª estÃƒÂ¡ editando uma transaÃƒÂ§ÃƒÂ£o jÃƒÂ¡ registrada."}
             </p>
           ) : null}
 
           {isEditing && editingInstallmentsTotal > 1 ? (
             <div className="space-y-2">
-              <Label htmlFor="edit-scope">Aplicar edição</Label>
+              <Label htmlFor="edit-scope">Aplicar ediÃƒÂ§ÃƒÂ£o</Label>
               <Select id="edit-scope" value={editingScope} onChange={(event) => setEditingScope(event.target.value as "single" | "group")}>
                 <option value="single">Somente esta parcela</option>
                 <option value="group">Todo o parcelamento</option>
@@ -878,19 +788,19 @@ export function TransactionsClient() {
           ) : null}
 
           <Button className="w-full" disabled={saveMutation.isPending} type="submit">
-            {saveMutation.isPending ? "Salvando..." : isEditing ? "Salvar transação" : "Registrar transação"}
+            {saveMutation.isPending ? "Salvando..." : isEditing ? "Salvar transaÃƒÂ§ÃƒÂ£o" : "Registrar transaÃƒÂ§ÃƒÂ£o"}
           </Button>
           {isEditing ? (
             <Button className="w-full" onClick={cancelEditing} type="button" variant="ghost">
-              Cancelar edição
+              Cancelar ediÃƒÂ§ÃƒÂ£o
             </Button>
           ) : null}
           </form>
         ) : (
           <div className="muted-panel mt-8 flex flex-col gap-4 px-4 py-5 text-sm text-[var(--color-muted-foreground)]">
-            <p>O editor foi fechado após a última edição concluída.</p>
+            <p>O editor foi fechado apÃƒÂ³s a ÃƒÂºltima ediÃƒÂ§ÃƒÂ£o concluÃƒÂ­da.</p>
             <Button className="w-full sm:w-auto" onClick={openCreateForm} type="button" variant="secondary">
-              Nova transação
+              Nova transaÃƒÂ§ÃƒÂ£o
             </Button>
           </div>
         )}
@@ -899,8 +809,8 @@ export function TransactionsClient() {
       <section className="surface content-section">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <div className="eyebrow">Últimas transações</div>
-            <h2 className="mt-4 text-2xl font-semibold tracking-[-0.03em]">Movimentações recentes</h2>
+            <div className="eyebrow">ÃƒÅ¡ltimas transaÃƒÂ§ÃƒÂµes</div>
+            <h2 className="mt-4 text-2xl font-semibold tracking-[-0.03em]">MovimentaÃƒÂ§ÃƒÂµes recentes</h2>
           </div>
           <Button disabled={transactionsQuery.isFetching} onClick={() => transactionsQuery.refetch()} type="button" variant="secondary">
             {transactionsQuery.isFetching ? "Atualizando..." : "Atualizar"}
@@ -917,7 +827,7 @@ export function TransactionsClient() {
             <p className="metric-value amount-nowrap amount-negative">{formatCurrency(expenseTotal)}</p>
           </article>
           <article className="metric-card">
-            <p className="metric-label">Transferências filtradas</p>
+            <p className="metric-label">TransferÃƒÂªncias filtradas</p>
             <p className="metric-value amount-nowrap">{formatCurrency(transferTotal)}</p>
           </article>
         </div>
@@ -925,13 +835,13 @@ export function TransactionsClient() {
         <div className="mt-6">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <p className="metric-label">Sugestões para revisar</p>
+              <p className="metric-label">SugestÃƒÂµes para revisar</p>
               <p className="mt-1 text-sm text-[var(--color-muted-foreground)]">
-                Classificações automáticas recentes, priorizando as de menor confiança.
+                ClassificaÃƒÂ§ÃƒÂµes automÃƒÂ¡ticas recentes, priorizando as de menor confianÃƒÂ§a.
               </p>
             </div>
             <p className="shrink-0 text-sm font-medium text-[var(--color-muted-foreground)]">
-              {automaticSuggestions.length} em análise
+              {automaticSuggestions.length} em anÃƒÂ¡lise
             </p>
           </div>
 
@@ -947,12 +857,12 @@ export function TransactionsClient() {
                       <div className="min-w-0 flex-1">
                         <p className="break-words text-sm font-semibold">{transaction.description}</p>
                         <p className="mt-1 break-words text-xs text-[var(--color-muted-foreground)]">
-                          {formatDateDisplay(transaction.date)} • {formatCurrency(transaction.amount)} •{" "}
+                          {formatDateDisplay(transaction.date)} Ã¢â‚¬Â¢ {formatCurrency(transaction.amount)} Ã¢â‚¬Â¢{" "}
                           {transaction.account?.name ?? transaction.card?.name ?? "Sem origem"}
                         </p>
                         <p className="mt-2 break-words text-xs text-[var(--color-muted-foreground)]">
                           Sugerido: {transaction.category?.name ?? "Sem categoria"}{" "}
-                          {transaction.classification?.ai ? "por IA" : "por regras"} • confiança{" "}
+                          {transaction.classification?.ai ? "por IA" : "por regras"} Ã¢â‚¬Â¢ confianÃƒÂ§a{" "}
                           {Math.round((transaction.classification?.confidence ?? 0) * 100)}%
                         </p>
                       </div>
@@ -987,7 +897,7 @@ export function TransactionsClient() {
                             type="button"
                             variant="secondary"
                           >
-                            Confirmar sugestão
+                            Confirmar sugestÃƒÂ£o
                           </Button>
                           <Button
                             disabled={!selectedCategoryId || reviewMutation.isPending}
@@ -1026,7 +936,7 @@ export function TransactionsClient() {
               })
             ) : (
               <div className="muted-panel border border-dashed px-4 py-6 text-sm text-[var(--color-muted-foreground)]">
-                Nenhuma classificação automática pendente de revisão nesta amostra recente.
+                Nenhuma classificaÃƒÂ§ÃƒÂ£o automÃƒÂ¡tica pendente de revisÃƒÂ£o nesta amostra recente.
               </div>
             )}
           </div>
@@ -1042,18 +952,14 @@ export function TransactionsClient() {
               onChange={(event) =>
                 setFilters((current) => ({
                   ...current,
-<<<<<<< HEAD
                   type: event.target.value ? (event.target.value as TransactionFilterState["type"]) : undefined
-=======
-                  type: event.target.value ? (event.target.value as TransactionFiltersValues["type"]) : undefined
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
                 }))
               }
             >
               <option value="">Todos</option>
               <option value="expense">Despesa</option>
               <option value="income">Receita</option>
-              <option value="transfer">Transferência</option>
+              <option value="transfer">TransferÃƒÂªncia</option>
             </Select>
           </div>
           <div className="space-y-2">
@@ -1087,16 +993,16 @@ export function TransactionsClient() {
             </Select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="transactions-filter-card">Cartão</Label>
+            <Label htmlFor="transactions-filter-card">CartÃƒÂ£o</Label>
             <Select
               id="transactions-filter-card"
               value={filters.cardId ?? ""}
               onChange={(event) => setFilters((current) => ({ ...current, cardId: event.target.value }))}
             >
-              <option value="">Todos os cartões</option>
+              <option value="">Todos os cartÃƒÂµes</option>
               {cards.map((card) => (
                 <option key={card.id} value={card.id}>
-                  {card.name} {card.last4 ? `• ${card.last4}` : ""}
+                  {card.name} {card.last4 ? `Ã¢â‚¬Â¢ ${card.last4}` : ""}
                 </option>
               ))}
             </Select>
@@ -1104,9 +1010,9 @@ export function TransactionsClient() {
         </div>
 
         <div className="muted-panel mt-4 flex flex-wrap items-start justify-between gap-3 text-sm text-[var(--color-muted-foreground)]">
-          <p className="shrink-0">{`Mês ativo: ${formatMonthKeyLabel(month)}.`}</p>
+          <p className="shrink-0">{`MÃƒÂªs ativo: ${formatMonthKeyLabel(month)}.`}</p>
           <p className="min-w-0 flex-1 break-words text-left sm:text-right">
-            {activeRefinements.length > 0 ? activeRefinements.join(" • ") : "Sem refinamentos adicionais."}
+            {activeRefinements.length > 0 ? activeRefinements.join(" Ã¢â‚¬Â¢ ") : "Sem refinamentos adicionais."}
           </p>
         </div>
 
@@ -1132,10 +1038,6 @@ export function TransactionsClient() {
             onClick={() =>
               setFilters({
                 limit: 30,
-<<<<<<< HEAD
-=======
-                month: month,
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
                 type: undefined,
                 categoryId: "",
                 accountId: "",
@@ -1157,7 +1059,7 @@ export function TransactionsClient() {
                   key={`transactions-loading-${index}`}
                   className="muted-panel border border-dashed px-4 py-5 text-sm text-[var(--color-muted-foreground)]"
                 >
-                  Carregando movimentaÃ§Ãµes do mÃªs ativo...
+                  Carregando movimentaÃƒÆ’Ã‚Â§ÃƒÆ’Ã‚Âµes do mÃƒÆ’Ã‚Âªs ativo...
                 </div>
               ))}
             </div>
@@ -1167,11 +1069,7 @@ export function TransactionsClient() {
           ) : null}
           {!transactionsQuery.isLoading && visibleTransactions.length > 0 ? (
             <p className="text-sm text-[var(--color-muted-foreground)]">
-<<<<<<< HEAD
-              Mostrando {visibleTransactions.length} movimentações de {transactionSummary?.totalCount ?? visibleTransactions.length} no mês filtrado.
-=======
-              Mostrando {visibleTransactions.length} movimentações nesta amostra. Ajuste o limite para ampliar a leitura do mês.
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
+              Mostrando {visibleTransactions.length} movimentaÃƒÂ§ÃƒÂµes de {transactionSummary?.totalCount ?? visibleTransactions.length} no mÃƒÂªs filtrado.
             </p>
           ) : null}
           {visibleTransactions.map((transaction) => (
@@ -1201,12 +1099,12 @@ export function TransactionsClient() {
                   <p className="mt-3 break-words text-base font-semibold">{transaction.description}</p>
                   <p className="mt-1 break-words text-sm text-[var(--color-muted-foreground)]">
                     {transaction.type === "transfer"
-                      ? `${transaction.account?.name ?? "Sem origem"} → ${transaction.destinationAccount?.name ?? "Sem destino"}`
-                      : `${transaction.category?.name ?? "Sem categoria"} • ${transaction.account?.name ?? transaction.card?.name ?? "Sem origem"}`}
+                      ? `${transaction.account?.name ?? "Sem origem"} Ã¢â€ â€™ ${transaction.destinationAccount?.name ?? "Sem destino"}`
+                      : `${transaction.category?.name ?? "Sem categoria"} Ã¢â‚¬Â¢ ${transaction.account?.name ?? transaction.card?.name ?? "Sem origem"}`}
                   </p>
                   {transaction.card && transaction.competenceDate && transaction.payableDate ? (
                     <p className="mt-2 break-words text-xs text-[var(--color-muted-foreground)]">
-                      Competência {formatMonthKeyLabel(getMonthKeyFromDate(transaction.competenceDate))} • vence{" "}
+                      CompetÃƒÂªncia {formatMonthKeyLabel(getMonthKeyFromDate(transaction.competenceDate))} Ã¢â‚¬Â¢ vence{" "}
                       {formatDateDisplay(transaction.payableDate)}
                     </p>
                   ) : null}
@@ -1218,13 +1116,13 @@ export function TransactionsClient() {
                           : "Categoria sugerida por regra"
                         : null}
                       {transaction.classification?.auto && typeof transaction.classification.confidence === "number"
-                        ? ` • confiança ${Math.round(transaction.classification.confidence * 100)}%`
+                        ? ` Ã¢â‚¬Â¢ confianÃƒÂ§a ${Math.round(transaction.classification.confidence * 100)}%`
                         : ""}
                     </p>
                   ) : null}
                   {transaction.titheAmount ? (
                     <p className="mt-2 break-words text-xs text-[var(--color-muted-foreground)]">
-                      Dízimo {formatCurrency(transaction.titheAmount)}
+                      DÃƒÂ­zimo {formatCurrency(transaction.titheAmount)}
                     </p>
                   ) : null}
                 </div>
@@ -1266,7 +1164,7 @@ export function TransactionsClient() {
 
           {!transactionsQuery.isLoading && visibleTransactions.length === 0 ? (
             <div className="muted-panel border border-dashed px-4 py-6 text-sm text-[var(--color-muted-foreground)]">
-              Nenhuma transação foi encontrada para os filtros selecionados.
+              Nenhuma transaÃƒÂ§ÃƒÂ£o foi encontrada para os filtros selecionados.
             </div>
           ) : null}
         </div>

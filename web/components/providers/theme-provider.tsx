@@ -26,7 +26,6 @@ function persistTheme(theme: Theme) {
 }
 
 export function ThemeProvider({ children, initialTheme = DEFAULT_THEME }: { children: ReactNode; initialTheme?: Theme }) {
-<<<<<<< HEAD
   const [theme, setThemeState] = useState<Theme>(() => {
     if (typeof window === "undefined") {
       return initialTheme;
@@ -40,18 +39,6 @@ export function ThemeProvider({ children, initialTheme = DEFAULT_THEME }: { chil
   useEffect(() => {
     applyTheme(theme);
   }, [theme]);
-=======
-  const [theme, setThemeState] = useState<Theme>(initialTheme);
-
-  useEffect(() => {
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    const serverTheme = document.documentElement.dataset.theme;
-    const nextTheme: Theme =
-      stored === "light" || serverTheme === "light" ? "light" : DEFAULT_THEME;
-    setThemeState(nextTheme);
-    applyTheme(nextTheme);
-  }, []);
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
 
   const value = useMemo<ThemeContextValue>(
     () => ({
@@ -59,19 +46,11 @@ export function ThemeProvider({ children, initialTheme = DEFAULT_THEME }: { chil
       setTheme: (nextTheme) => {
         setThemeState(nextTheme);
         persistTheme(nextTheme);
-<<<<<<< HEAD
-=======
-        applyTheme(nextTheme);
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
       },
       toggleTheme: () => {
         const nextTheme: Theme = theme === "light" ? "dark" : "light";
         setThemeState(nextTheme);
         persistTheme(nextTheme);
-<<<<<<< HEAD
-=======
-        applyTheme(nextTheme);
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
       }
     }),
     [theme]

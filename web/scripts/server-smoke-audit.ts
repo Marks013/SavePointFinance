@@ -10,22 +10,14 @@ const adminEmail = process.env.ADMIN_EMAIL?.trim();
 const adminPassword = process.env.ADMIN_PASSWORD?.trim();
 const smokeUserEmail = process.env.SMOKE_USER_EMAIL?.trim() || adminEmail;
 const smokeUserPassword = process.env.SMOKE_USER_PASSWORD?.trim() || adminPassword;
+const smokeMonth = process.env.SMOKE_MONTH?.trim() || new Date().toISOString().slice(0, 7);
 
 type ProfilePayload = {
   email?: string;
-  tenant?: {
-    name?: string;
-  };
-  preferences?: {
-    currency?: string;
-  };
 };
 
 type AccountsPayload = {
-  items?: Array<{
-    id: string;
-    name: string;
-  }>;
+  items?: Array<{ id: string; name: string }>;
 };
 
 type CardsPayload = {
@@ -38,10 +30,7 @@ type CardsPayload = {
 };
 
 type TransactionsPayload = {
-  items?: Array<{
-    id: string;
-    description: string;
-  }>;
+  items?: Array<{ id: string; description: string }>;
   summary?: {
     totalCount?: number;
     totals?: {
@@ -53,10 +42,7 @@ type TransactionsPayload = {
 };
 
 type SubscriptionsPayload = {
-  items?: Array<{
-    id: string;
-    name: string;
-  }>;
+  items?: Array<{ id: string; name: string }>;
 };
 
 type ReportsPayload = {
@@ -64,7 +50,6 @@ type ReportsPayload = {
     balance?: number;
     transactions?: number;
   };
-  monthly?: Array<unknown>;
   byCategory?: Array<unknown>;
 };
 
@@ -169,7 +154,7 @@ async function getSession(jar: CookieJar) {
       Accept: "application/json"
     }
   });
-  assertCondition(response.ok, `Falha ao carregar sessão: ${response.status}`);
+  assertCondition(response.ok, `Falha ao carregar sessao: ${response.status}`);
   return (await response.json()) as { user?: { email?: string } } | null;
 }
 
@@ -181,7 +166,7 @@ async function getCsrfToken(jar: CookieJar) {
   });
   assertCondition(response.ok, `Falha ao carregar CSRF: ${response.status}`);
   const payload = (await response.json()) as { csrfToken?: string };
-  assertCondition(payload.csrfToken, "CSRF token não encontrado");
+  assertCondition(payload.csrfToken, "CSRF token nao encontrado");
   return payload.csrfToken;
 }
 
@@ -213,7 +198,7 @@ async function signIn(email: string, password: string) {
   const session = await getSession(jar);
   assertCondition(
     session?.user?.email?.toLowerCase() === email.toLowerCase(),
-    "Sessão não foi estabelecida após login"
+    "Sessao nao foi estabelecida apos login"
   );
 
   return jar;
@@ -242,7 +227,7 @@ async function signOut(jar: CookieJar) {
   );
 
   const session = await getSession(jar);
-  assertCondition(!session?.user?.email, "Sessão continuou ativa após logout");
+  assertCondition(!session?.user?.email, "Sessao continuou ativa apos logout");
 }
 
 async function expectAnonymousRedirect(path: string, redirectPath = "/login") {
@@ -260,129 +245,113 @@ async function expectAnonymousRedirect(path: string, redirectPath = "/login") {
   );
 }
 
-async function expectPage(
-  jar: CookieJar,
-  path: string,
-  markers: string[]
-) {
+async function expectPage(jar: CookieJar, path: string, markers: string[]) {
   const { response, html } = await getHtml(jar, path);
   assertCondition(response.ok, `${path} respondeu ${response.status}`);
 
   for (const marker of markers) {
-    assertCondition(
-      html.includes(marker),
-      `${path} não contém o marcador esperado: ${marker}`
-    );
+    assertCondition(html.includes(marker), `${path} nao contem o marcador esperado: ${marker}`);
   }
 }
 
 async function run() {
-  assertCondition(adminEmail, "ADMIN_EMAIL não definido");
-  assertCondition(adminPassword, "ADMIN_PASSWORD não definida");
-  assertCondition(smokeUserEmail, "SMOKE_USER_EMAIL não definido");
-  assertCondition(smokeUserPassword, "SMOKE_USER_PASSWORD não definida");
+  assertCondition(adminEmail, "ADMIN_EMAIL nao definido");
+  assertCondition(adminPassword, "ADMIN_PASSWORD nao definida");
+  assertCondition(smokeUserEmail, "SMOKE_USER_EMAIL nao definido");
+  assertCondition(smokeUserPassword, "SMOKE_USER_PASSWORD nao definida");
+  assertCondition(/^\d{4}-\d{2}$/.test(smokeMonth), "SMOKE_MONTH deve estar no formato YYYY-MM");
 
   const results: string[] = [];
 
   await expectAnonymousRedirect("/dashboard");
-  results.push("Área protegida redireciona para login sem sessão");
+  results.push("Area protegida redireciona para login sem sessao");
 
   const anonymousLogin = await getHtml(new CookieJar(), "/login");
   assertCondition(anonymousLogin.response.ok, `/login respondeu ${anonymousLogin.response.status}`);
-  assertCondition(
-    anonymousLogin.html.includes("Entrar no painel"),
-    "A página de login não exibiu o conteúdo esperado"
-  );
-  results.push("Página de login pública responde corretamente");
+  assertCondition(anonymousLogin.html.includes("Entrar no painel"), "A pagina de login nao exibiu o conteudo esperado");
+  results.push("Pagina de login publica responde corretamente");
 
-  const jar = await signIn(adminEmail, adminPassword);
-  results.push("Login por credenciais estabelece sessão válida");
+  const adminJar = await signIn(adminEmail, adminPassword);
+  results.push("Login por credenciais estabelece sessao valida");
 
-  await expectPage(jar, "/dashboard", [
-    "Encerrar sessão"
-  ]);
+  await expectPage(adminJar, "/dashboard", ["Encerrar sessao"]);
   results.push("Dashboard autenticado responde para o admin");
 
-  const profile = await getJson<ProfilePayload>(jar, "/api/profile");
-  assertCondition(profile.response.ok, `/api/profile respondeu ${profile.response.status}`);
+  const adminProfile = await getJson<ProfilePayload>(adminJar, "/api/profile");
+  assertCondition(adminProfile.response.ok, `/api/profile respondeu ${adminProfile.response.status}`);
   assertCondition(
-    profile.payload.email?.toLowerCase() === adminEmail.toLowerCase(),
-    "Perfil autenticado não corresponde ao admin configurado"
+    adminProfile.payload.email?.toLowerCase() === adminEmail.toLowerCase(),
+    "Perfil autenticado nao corresponde ao admin configurado"
   );
   results.push("API de perfil autenticada respondeu com o admin esperado");
 
+  let dataJar = adminJar;
+
   if (smokeUserEmail.toLowerCase() !== adminEmail.toLowerCase()) {
-    await signOut(jar);
-    results.push("Logout do admin encerra a sessão");
+    await signOut(adminJar);
+    results.push("Logout do admin encerra a sessao");
     await expectAnonymousRedirect("/dashboard");
-    results.push("Área protegida volta a exigir autenticação após logout do admin");
-  }
-
-  const dataJar =
-    smokeUserEmail.toLowerCase() === adminEmail.toLowerCase() && smokeUserPassword === adminPassword
-      ? jar
-      : await signIn(smokeUserEmail, smokeUserPassword);
-
-  if (smokeUserEmail.toLowerCase() !== adminEmail.toLowerCase()) {
-    results.push("Login do usuário de dados estabelece sessão válida");
+    results.push("Area protegida volta a exigir autenticacao apos logout do admin");
+    dataJar = await signIn(smokeUserEmail, smokeUserPassword);
+    results.push("Login do usuario de dados estabelece sessao valida");
   }
 
   await expectPage(dataJar, "/dashboard", [
-    "Visão central da operação",
+    "Visao central da operacao",
     "Movimento recente",
     "Resumo das contas",
-    "Cartões em operação",
-    "Encerrar sessão"
+    "Cartoes em operacao",
+    "Encerrar sessao"
   ]);
-  results.push("Dashboard principal carregou com conteúdo esperado");
+  results.push("Dashboard principal carregou com conteudo esperado");
 
   await expectPage(dataJar, "/dashboard/accounts", [
     "Contas",
-    "Contas disponíveis",
+    "Contas disponiveis",
     "Saldo atual total",
     "Base cadastrada"
   ]);
-  results.push("Tela de contas carregou com conteúdo esperado");
+  results.push("Tela de contas carregou com conteudo esperado");
 
   await expectPage(dataJar, "/dashboard/transactions", [
-    "Operação financeira",
-    "Movimentações recentes",
+    "Operacao financeira",
+    "Movimentacoes recentes",
     "Receitas filtradas",
     "Despesas filtradas"
   ]);
-  results.push("Tela de transações carregou com conteúdo esperado");
+  results.push("Tela de transacoes carregou com conteudo esperado");
 
   await expectPage(dataJar, "/dashboard/subscriptions", [
     "Assinaturas",
     "Assinaturas ativas",
-    "Saídas mensais",
+    "Saidas mensais",
     "Entradas mensais"
   ]);
-  results.push("Tela de assinaturas carregou com conteúdo esperado");
+  results.push("Tela de assinaturas carregou com conteudo esperado");
 
   await expectPage(dataJar, "/dashboard/cards", [
-    "Cartões",
-    "Cartões ativos",
+    "Cartoes",
+    "Cartoes ativos",
     "Central de fatura",
     "Acompanhe e pague a competencia certa"
   ]);
-  results.push("Tela de cartões carregou com conteúdo esperado");
+  results.push("Tela de cartoes carregou com conteudo esperado");
 
   await expectPage(dataJar, "/dashboard/reports", [
-    "Relatórios",
+    "Relatorios",
     "Despesas por categoria",
-    "Movimentações recentes",
+    "Movimentacoes recentes",
     "Mapa de categorias"
   ]);
-  results.push("Tela de relatórios carregou com conteúdo esperado");
+  results.push("Tela de relatorios carregou com conteudo esperado");
 
   await expectPage(dataJar, "/dashboard/settings", [
-    "Perfil, preferências e rotina",
-    "Perfil e preferências",
-    "Automações recorrentes",
+    "Perfil, preferencias e rotina",
+    "Perfil e preferencias",
+    "Automacoes recorrentes",
     "Entregas recentes"
   ]);
-  results.push("Tela de configurações carregou com conteúdo esperado");
+  results.push("Tela de configuracoes carregou com conteudo esperado");
 
   await expectPage(dataJar, "/dashboard/goals", [
     "Metas",
@@ -390,58 +359,52 @@ async function run() {
     "Reservado",
     "Objetivo total"
   ]);
-  results.push("Tela de metas carregou com conteúdo esperado");
+  results.push("Tela de metas carregou com conteudo esperado");
 
   const smokeProfile = await getJson<ProfilePayload>(dataJar, "/api/profile");
   assertCondition(smokeProfile.response.ok, `/api/profile respondeu ${smokeProfile.response.status}`);
   assertCondition(
     smokeProfile.payload.email?.toLowerCase() === smokeUserEmail.toLowerCase(),
-    "Perfil autenticado não corresponde ao usuário de smoke configurado"
+    "Perfil autenticado nao corresponde ao usuario de smoke configurado"
   );
-  results.push("API de perfil autenticada respondeu com o usuário de smoke esperado");
+  results.push("API de perfil autenticada respondeu com o usuario de smoke esperado");
 
   const accounts = await getJson<AccountsPayload>(dataJar, "/api/accounts");
   assertCondition(accounts.response.ok, `/api/accounts respondeu ${accounts.response.status}`);
-  assertCondition(Array.isArray(accounts.payload.items), "API de contas não retornou lista de itens");
-  results.push("API de contas autenticada respondeu com estrutura válida");
+  assertCondition(Array.isArray(accounts.payload.items), "API de contas nao retornou lista de itens");
+  results.push("API de contas autenticada respondeu com estrutura valida");
 
   const cards = await getJson<CardsPayload>(dataJar, "/api/cards");
   assertCondition(cards.response.ok, `/api/cards respondeu ${cards.response.status}`);
-  assertCondition(Array.isArray(cards.payload.items), "API de cartões não retornou lista de itens");
-  results.push("API de cartões autenticada respondeu com estrutura válida");
+  assertCondition(Array.isArray(cards.payload.items), "API de cartoes nao retornou lista de itens");
+  results.push("API de cartoes autenticada respondeu com estrutura valida");
 
   const subscriptions = await getJson<SubscriptionsPayload>(dataJar, "/api/subscriptions");
-  assertCondition(
-    subscriptions.response.ok,
-    `/api/subscriptions respondeu ${subscriptions.response.status}`
-  );
-  assertCondition(Array.isArray(subscriptions.payload.items), "API de assinaturas não retornou lista de itens");
-  results.push("API de assinaturas autenticada respondeu com estrutura válida");
+  assertCondition(subscriptions.response.ok, `/api/subscriptions respondeu ${subscriptions.response.status}`);
+  assertCondition(Array.isArray(subscriptions.payload.items), "API de assinaturas nao retornou lista de itens");
+  results.push("API de assinaturas autenticada respondeu com estrutura valida");
 
-  const transactions = await getJson<TransactionsPayload>(dataJar, "/api/transactions?limit=10");
-  assertCondition(
-    transactions.response.ok,
-    `/api/transactions respondeu ${transactions.response.status}`
+  const transactions = await getJson<TransactionsPayload>(
+    dataJar,
+    `/api/transactions?limit=10&month=${smokeMonth}`
   );
-  assertCondition(Array.isArray(transactions.payload.items), "API de transações não retornou lista de itens");
+  assertCondition(transactions.response.ok, `/api/transactions respondeu ${transactions.response.status}`);
+  assertCondition(Array.isArray(transactions.payload.items), "API de transacoes nao retornou lista de itens");
   assertCondition(
     typeof transactions.payload.summary?.totalCount === "number",
-    "API de transações não retornou summary.totalCount"
+    "API de transacoes nao retornou summary.totalCount"
   );
-  results.push("API de transações autenticada respondeu com totais e itens");
+  results.push("API de transacoes autenticada respondeu com totais e itens");
 
-  const reports = await getJson<ReportsPayload>(dataJar, "/api/reports/summary?month=2026-04");
-  assertCondition(
-    reports.response.ok,
-    `/api/reports/summary respondeu ${reports.response.status}`
-  );
-  assertCondition(reports.payload.summary !== undefined, "API de relatórios não retornou summary");
-  assertCondition(Array.isArray(reports.payload.byCategory), "API de relatórios não retornou categorias");
-  results.push("API de relatórios autenticada respondeu com estrutura válida");
+  const reports = await getJson<ReportsPayload>(dataJar, `/api/reports/summary?month=${smokeMonth}`);
+  assertCondition(reports.response.ok, `/api/reports/summary respondeu ${reports.response.status}`);
+  assertCondition(reports.payload.summary !== undefined, "API de relatorios nao retornou summary");
+  assertCondition(Array.isArray(reports.payload.byCategory), "API de relatorios nao retornou categorias");
+  results.push("API de relatorios autenticada respondeu com estrutura valida");
 
   const firstCard = cards.payload.items?.[0];
   if (firstCard?.id) {
-    const statementMonth = firstCard.payableStatementMonth ?? firstCard.statementMonth ?? "2026-04";
+    const statementMonth = firstCard.payableStatementMonth ?? firstCard.statementMonth ?? smokeMonth;
     const statement = await getJson<CardStatementPayload>(
       dataJar,
       `/api/cards/${firstCard.id}/statement?month=${statementMonth}&limit=25`
@@ -453,23 +416,24 @@ async function run() {
     );
     assertCondition(
       typeof statement.payload.summary?.transactions === "number",
-      "API de fatura do cartão não retornou summary.transactions"
+      "API de fatura do cartao nao retornou summary.transactions"
     );
-    results.push("API de fatura do primeiro cartão respondeu com estrutura válida");
+    results.push("API de fatura do primeiro cartao respondeu com estrutura valida");
   } else {
-    results.push("API de fatura do cartão foi ignorada porque não há cartões cadastrados nesse ambiente");
+    results.push("API de fatura do cartao foi ignorada porque nao ha cartoes cadastrados nesse ambiente");
   }
 
   await signOut(dataJar);
-  results.push("Logout encerra a sessão");
+  results.push("Logout encerra a sessao");
 
   await expectAnonymousRedirect("/dashboard");
-  results.push("Área protegida volta a exigir autenticação após logout");
+  results.push("Area protegida volta a exigir autenticacao apos logout");
 
   console.log("Server smoke audit OK");
   console.log(`Base URL: ${baseUrl}`);
   console.log(`Admin usado: ${adminEmail}`);
-  console.log(`Usuário de dados: ${smokeUserEmail}`);
+  console.log(`Usuario de dados: ${smokeUserEmail}`);
+  console.log(`Mes do smoke: ${smokeMonth}`);
   for (const item of results) {
     console.log(`- ${item}`);
   }

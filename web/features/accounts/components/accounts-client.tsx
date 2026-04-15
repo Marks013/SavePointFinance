@@ -4,11 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-<<<<<<< HEAD
 import { useForm, useWatch } from "react-hook-form";
-=======
-import { useForm } from "react-hook-form";
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -129,14 +125,14 @@ export function AccountsClient() {
       ]);
     },
     onError: () => {
-      toast.error(editingId ? "Não foi possível atualizar a conta" : "Não foi possível criar a conta");
+      toast.error(editingId ? "NÃƒÂ£o foi possÃƒÂ­vel atualizar a conta" : "NÃƒÂ£o foi possÃƒÂ­vel criar a conta");
     }
   });
 
   const deleteMutation = useMutation({
     mutationFn: deleteAccount,
     onSuccess: async () => {
-      toast.success("Conta excluída");
+      toast.success("Conta excluÃƒÂ­da");
       if (editingId) {
         setEditingId(null);
         setIsEditorOpen(false);
@@ -148,7 +144,7 @@ export function AccountsClient() {
       ]);
     },
     onError: (error) => {
-      toast.error("Não foi possível excluir a conta", {
+      toast.error("NÃƒÂ£o foi possÃƒÂ­vel excluir a conta", {
         description: error.message
       });
     }
@@ -181,7 +177,6 @@ export function AccountsClient() {
 
   const isEditing = editingId !== null;
   const showEditor = isEditorOpen || isEditing || accounts.length === 0;
-<<<<<<< HEAD
   const selectedColor = useWatch({ control: form.control, name: "color" }) ?? accountColorPresets[0].value;
   const selectedInstitution = useWatch({ control: form.control, name: "institution" }) ?? "";
   const scrollEditorIntoView = () => {
@@ -195,26 +190,13 @@ export function AccountsClient() {
 
     return () => window.clearTimeout(timeout);
   };
-=======
-  const selectedColor = form.watch("color") ?? accountColorPresets[0].value;
-  const selectedInstitution = form.watch("institution") ?? "";
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
 
   useEffect(() => {
     if (!editingId) {
       return;
     }
 
-<<<<<<< HEAD
     return scrollEditorIntoView();
-=======
-    const timeout = window.setTimeout(() => {
-      formSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-      document.getElementById("account-name")?.focus();
-    }, 80);
-
-    return () => window.clearTimeout(timeout);
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
   }, [editingId]);
 
   return (
@@ -234,10 +216,10 @@ export function AccountsClient() {
           ) : null}
         </div>
         <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--color-muted-foreground)]">
-          Cadastre contas bancárias e carteiras usadas no dia a dia. O saldo atual é recalculado a partir do saldo de
-          referência mais as movimentações vinculadas a cada conta.
+          Cadastre contas bancÃƒÂ¡rias e carteiras usadas no dia a dia. O saldo atual ÃƒÂ© recalculado a partir do saldo de
+          referÃƒÂªncia mais as movimentaÃƒÂ§ÃƒÂµes vinculadas a cada conta.
         </p>
-        <p className="mt-3 text-sm font-medium text-[var(--color-primary)]">Período ativo: {monthLabel}</p>
+        <p className="mt-3 text-sm font-medium text-[var(--color-primary)]">PerÃƒÂ­odo ativo: {monthLabel}</p>
 
         {showEditor ? (
           <form className="mt-8 space-y-5" onSubmit={form.handleSubmit((values) => saveMutation.mutate(values))}>
@@ -250,13 +232,13 @@ export function AccountsClient() {
                 <Label htmlFor="account-type">Tipo</Label>
                 <Select id="account-type" {...form.register("type")}>
                   <option value="checking">Corrente</option>
-                  <option value="savings">Poupança</option>
+                  <option value="savings">PoupanÃƒÂ§a</option>
                   <option value="investment">Investimento</option>
                   <option value="wallet">Carteira</option>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="account-balance">Saldo de referência</Label>
+                <Label htmlFor="account-balance">Saldo de referÃƒÂªncia</Label>
                 <CurrencyInput control={form.control} id="account-balance" name="balance" />
               </div>
             </div>
@@ -268,7 +250,7 @@ export function AccountsClient() {
                 </Select>
               </div>
               <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="account-institution">Instituição</Label>
+                <Label htmlFor="account-institution">InstituiÃƒÂ§ÃƒÂ£o</Label>
                 <Select id="account-institution" {...form.register("institution")}>
                   {brazilianInstitutions.map((institution) => (
                     <option key={institution.value} value={institution.value}>
@@ -306,30 +288,30 @@ export function AccountsClient() {
                 active
                 background={findPreset(accountColorPresets, selectedColor)?.background ?? "rgba(15,138,95,0.14)"}
                 color={findPreset(accountColorPresets, selectedColor)?.color ?? "#0F8A5F"}
-                description="Instituição selecionada"
+                description="InstituiÃƒÂ§ÃƒÂ£o selecionada"
                 label={selectedInstitution || "Banco"}
                 shortLabel={findPreset(brazilianInstitutions, selectedInstitution)?.shortLabel ?? "BK"}
               />
               <p className="text-sm text-[var(--color-muted-foreground)]">
-                A conta ficará identificada visualmente por cor e instituição nas telas de lançamento e resumo.
+                A conta ficarÃƒÂ¡ identificada visualmente por cor e instituiÃƒÂ§ÃƒÂ£o nas telas de lanÃƒÂ§amento e resumo.
               </p>
             </div>
             <p className="text-sm text-[var(--color-muted-foreground)]">
-              O saldo de referência é usado como base da conta. Para controle financeiro consistente,
-              vincule os lançamentos à conta correta no momento do registro.
+              O saldo de referÃƒÂªncia ÃƒÂ© usado como base da conta. Para controle financeiro consistente,
+              vincule os lanÃƒÂ§amentos ÃƒÂ  conta correta no momento do registro.
             </p>
             <Button className="w-full" disabled={saveMutation.isPending} type="submit">
               {saveMutation.isPending ? "Salvando..." : isEditing ? "Salvar conta" : "Criar conta"}
             </Button>
             {isEditing ? (
               <Button className="w-full" onClick={cancelEditing} type="button" variant="ghost">
-                Cancelar edição
+                Cancelar ediÃƒÂ§ÃƒÂ£o
               </Button>
             ) : null}
           </form>
         ) : (
           <div className="muted-panel mt-8 flex flex-col gap-4 px-4 py-5 text-sm text-[var(--color-muted-foreground)]">
-            <p>O editor foi fechado após a última edição concluída.</p>
+            <p>O editor foi fechado apÃƒÂ³s a ÃƒÂºltima ediÃƒÂ§ÃƒÂ£o concluÃƒÂ­da.</p>
             <Button className="w-full sm:w-auto" onClick={openCreateForm} type="button" variant="secondary">
               Nova conta
             </Button>
@@ -340,9 +322,9 @@ export function AccountsClient() {
       <section className="surface content-section">
         <div className="space-y-4">
           <div>
-            <h2 className="text-2xl font-semibold tracking-[-0.03em]">Contas disponíveis</h2>
+            <h2 className="text-2xl font-semibold tracking-[-0.03em]">Contas disponÃƒÂ­veis</h2>
             <p className="mt-2 text-sm leading-7 text-[var(--color-muted-foreground)]">
-              Use esta visão para separar o movimento do período selecionado do acumulado total da conta.
+              Use esta visÃƒÂ£o para separar o movimento do perÃƒÂ­odo selecionado do acumulado total da conta.
             </p>
           </div>
           <div className="metric-grid-compact">
@@ -359,7 +341,7 @@ export function AccountsClient() {
               </p>
             </article>
             <article className="metric-card">
-              <p className="metric-label">Variação acumulada</p>
+              <p className="metric-label">VariaÃƒÂ§ÃƒÂ£o acumulada</p>
               <p className={`metric-value amount-nowrap ${accumulatedNet < 0 ? "amount-negative" : ""}`}>
                 {formatCurrency(accumulatedNet)}
               </p>
@@ -400,7 +382,7 @@ export function AccountsClient() {
               </div>
               {account.institution ? <p className="mt-3 break-words text-sm text-[var(--color-muted-foreground)]">{account.institution}</p> : null}
               <p className="mt-2 break-words text-sm text-[var(--color-muted-foreground)]">
-                Saldo de referência: <span className="amount-nowrap">{formatCurrency(account.openingBalance)}</span>
+                Saldo de referÃƒÂªncia: <span className="amount-nowrap">{formatCurrency(account.openingBalance)}</span>
               </p>
               <p className="mt-2 break-words text-sm text-[var(--color-muted-foreground)]">
                 {`Movimento de ${monthLabel}`}:{" "}
@@ -409,12 +391,12 @@ export function AccountsClient() {
                 </span>
               </p>
               <p className="mt-2 break-words text-sm text-[var(--color-muted-foreground)]">
-                Entradas <span className="amount-nowrap">{formatCurrency(account.periodIncome)}</span> • Saídas{" "}
-                <span className="amount-nowrap">{formatCurrency(account.periodExpense)}</span> • Transferências
-                líquidas <span className="amount-nowrap">{formatCurrency(account.periodTransferIn - account.periodTransferOut)}</span>
+                Entradas <span className="amount-nowrap">{formatCurrency(account.periodIncome)}</span> Ã¢â‚¬Â¢ SaÃƒÂ­das{" "}
+                <span className="amount-nowrap">{formatCurrency(account.periodExpense)}</span> Ã¢â‚¬Â¢ TransferÃƒÂªncias
+                lÃƒÂ­quidas <span className="amount-nowrap">{formatCurrency(account.periodTransferIn - account.periodTransferOut)}</span>
               </p>
               <p className="mt-2 break-words text-sm text-[var(--color-muted-foreground)]">
-                Variação acumulada:{" "}
+                VariaÃƒÂ§ÃƒÂ£o acumulada:{" "}
                 <span className={`amount-nowrap ${account.accumulatedNet < 0 ? "amount-negative" : ""}`}>
                   {formatCurrency(account.accumulatedNet)}
                 </span>
@@ -437,7 +419,7 @@ export function AccountsClient() {
           {!accountsQuery.isLoading && accounts.length === 0 ? (
             <div className="muted-panel border border-dashed px-4 py-6 text-sm text-[var(--color-muted-foreground)] md:col-span-2">
               Nenhuma conta foi cadastrada ainda. Crie ao menos uma conta para centralizar despesas, receitas e
-              transferências.
+              transferÃƒÂªncias.
             </div>
           ) : null}
         </div>

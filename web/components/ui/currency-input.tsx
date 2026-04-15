@@ -1,10 +1,6 @@
 "use client";
 
-<<<<<<< HEAD
 import { useState } from "react";
-=======
-import { useEffect, useState } from "react";
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
 import type { Control, FieldPath, FieldValues } from "react-hook-form";
 import { useController } from "react-hook-form";
 
@@ -49,7 +45,6 @@ function formatEditableCurrencyValue(value: number | null | undefined) {
   }).format(value);
 }
 
-<<<<<<< HEAD
 function formatBlurredCurrencyValue(value: unknown, nullable: boolean) {
   if (typeof value === "number") {
     return formatCurrencyInputValue(value);
@@ -66,8 +61,6 @@ function formatFocusedCurrencyValue(value: unknown, nullable: boolean) {
   return "";
 }
 
-=======
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
 type CurrencyInputProps<
   TFieldValues extends FieldValues,
   TTransformedValues extends FieldValues = TFieldValues
@@ -93,38 +86,8 @@ export function CurrencyInput<
 }: CurrencyInputProps<TFieldValues, TTransformedValues>) {
   const { field } = useController<TFieldValues, FieldPath<TFieldValues>, TTransformedValues>({ control, name });
   const [isFocused, setIsFocused] = useState(false);
-<<<<<<< HEAD
   const [displayValue, setDisplayValue] = useState(() => formatFocusedCurrencyValue(field.value, nullable));
   const inputValue = isFocused ? displayValue : formatBlurredCurrencyValue(field.value, nullable);
-=======
-  const [displayValue, setDisplayValue] = useState(() => {
-    if (typeof field.value === "number") {
-      return formatCurrencyInputValue(field.value);
-    }
-
-    return nullable ? "" : formatCurrencyInputValue(0);
-  });
-
-  useEffect(() => {
-    if (isFocused) {
-      return;
-    }
-
-    if (typeof field.value === "number") {
-      setDisplayValue(formatCurrencyInputValue(field.value));
-      return;
-    }
-
-    if (field.value == null && nullable) {
-      setDisplayValue("");
-      return;
-    }
-
-    if (field.value == null) {
-      setDisplayValue(formatCurrencyInputValue(0));
-    }
-  }, [field.value, isFocused, nullable]);
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
 
   return (
     <Input
@@ -132,11 +95,7 @@ export function CurrencyInput<
       id={id}
       inputMode="decimal"
       placeholder={placeholder}
-<<<<<<< HEAD
       value={inputValue}
-=======
-      value={displayValue}
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
       onBlur={() => {
         setIsFocused(false);
         const parsed = parseCurrencyInputValue(displayValue);
@@ -155,13 +114,7 @@ export function CurrencyInput<
       onFocus={(event) => {
         setIsFocused(true);
         const inputElement = event.currentTarget;
-<<<<<<< HEAD
         const nextDisplay = formatFocusedCurrencyValue(field.value, nullable);
-=======
-        const parsed = parseCurrencyInputValue(displayValue);
-        const nextDisplay =
-          parsed === null || (!nullable && parsed === 0) ? "" : formatEditableCurrencyValue(parsed);
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
         setDisplayValue(nextDisplay);
         queueMicrotask(() => {
           if (nextDisplay && inputElement.ownerDocument.activeElement === inputElement) {

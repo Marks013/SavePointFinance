@@ -4,11 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-<<<<<<< HEAD
 import { useForm, useWatch } from "react-hook-form";
-=======
-import { useForm } from "react-hook-form";
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -101,14 +97,14 @@ async function getAccounts() {
 async function getCards() {
   const response = await fetch("/api/cards", { cache: "no-store" });
   await ensureApiResponse(response, { fallbackMessage: "Falha ao carregar cartoes", method: "GET", path: "/api/cards" });
-  if (!response.ok) throw new Error("Falha ao carregar cartões");
+  if (!response.ok) throw new Error("Falha ao carregar cartÃƒÂµes");
   return (await response.json()) as { items: RefItem[] };
 }
 
 async function getProfilePreferences() {
   const response = await fetch("/api/profile", { cache: "no-store" });
   await ensureApiResponse(response, { fallbackMessage: "Falha ao carregar preferencias", method: "GET", path: "/api/profile" });
-  if (!response.ok) throw new Error("Falha ao carregar preferências");
+  if (!response.ok) throw new Error("Falha ao carregar preferÃƒÂªncias");
   return (await response.json()) as ProfilePreferencesPayload;
 }
 
@@ -225,11 +221,11 @@ export function SubscriptionsClient() {
         method: "POST",
         path: `/api/subscriptions/${id}/generate-transaction`
       });
-      if (!response.ok) throw new Error("Falha ao gerar transação");
+      if (!response.ok) throw new Error("Falha ao gerar transaÃƒÂ§ÃƒÂ£o");
       return response.json();
     },
     onSuccess: async () => {
-      toast.success("Transação gerada");
+      toast.success("TransaÃƒÂ§ÃƒÂ£o gerada");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["subscriptions"] }),
         queryClient.invalidateQueries({ queryKey: ["transactions"] }),
@@ -246,7 +242,7 @@ export function SubscriptionsClient() {
       await ensureApiResponse(response, { fallbackMessage: "Falha ao excluir assinatura", method: "DELETE", path: `/api/subscriptions/${id}` });
     },
     onSuccess: async () => {
-      toast.success("Assinatura excluída");
+      toast.success("Assinatura excluÃƒÂ­da");
       if (editingId) {
         setEditingId(null);
         setIsEditorOpen(false);
@@ -292,7 +288,6 @@ export function SubscriptionsClient() {
     form.reset(buildEmptySubscriptionValues());
   };
 
-<<<<<<< HEAD
   const selectedType = useWatch({ control: form.control, name: "type" }) ?? "expense";
   const selectedAccountId = useWatch({ control: form.control, name: "accountId" }) ?? "";
   const selectedCardId = useWatch({ control: form.control, name: "cardId" }) ?? "";
@@ -300,15 +295,6 @@ export function SubscriptionsClient() {
   const isEditing = editingId !== null;
   const showEditor = isEditorOpen || isEditing || subscriptions.length === 0;
   const selectedName = useWatch({ control: form.control, name: "name" }) ?? "";
-=======
-  const selectedType = form.watch("type") ?? "expense";
-  const selectedAccountId = form.watch("accountId") ?? "";
-  const selectedCardId = form.watch("cardId") ?? "";
-  const filteredCategories = (categoriesQuery.data?.items ?? []).filter((item) => item.type === selectedType);
-  const isEditing = editingId !== null;
-  const showEditor = isEditorOpen || isEditing || subscriptions.length === 0;
-  const selectedName = form.watch("name") ?? "";
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
   const streamingCategoryId =
     (categoriesQuery.data?.items ?? []).find(
       (item) => item.type === "expense" && item.name === "Streaming e assinaturas"
@@ -319,7 +305,6 @@ export function SubscriptionsClient() {
       activeMonthDateResolved: getOccurrenceDateForMonth(item, month)
     }))
     .sort((a, b) => a.activeMonthDateResolved.getTime() - b.activeMonthDateResolved.getTime());
-<<<<<<< HEAD
   const scrollEditorIntoView = () => {
     const timeout = window.setTimeout(() => {
       const target = document.getElementById("sub-name");
@@ -331,8 +316,6 @@ export function SubscriptionsClient() {
 
     return () => window.clearTimeout(timeout);
   };
-=======
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
 
   useEffect(() => {
     if (selectedType === "income" && selectedCardId) {
@@ -358,16 +341,7 @@ export function SubscriptionsClient() {
       return;
     }
 
-<<<<<<< HEAD
     return scrollEditorIntoView();
-=======
-    const timeout = window.setTimeout(() => {
-      formSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-      document.getElementById("sub-name")?.focus();
-    }, 80);
-
-    return () => window.clearTimeout(timeout);
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
   }, [editingId]);
 
   const applyServicePreset = (preset: SubscriptionServicePreset) => {
@@ -388,26 +362,26 @@ export function SubscriptionsClient() {
           <div>
             <div className="eyebrow">Assinaturas</div>
             <h1 className="mt-3 text-3xl font-semibold tracking-[-0.03em]">
-              {isEditing ? "Editar recorrência" : "Nova recorrência"}
+              {isEditing ? "Editar recorrÃƒÂªncia" : "Nova recorrÃƒÂªncia"}
             </h1>
           </div>
           {!showEditor ? (
             <Button onClick={openCreateForm} type="button" variant="secondary">
-              Nova recorrência
+              Nova recorrÃƒÂªncia
             </Button>
           ) : null}
         </div>
         <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--color-muted-foreground)]">
-          Use recorrências para registrar despesas e receitas que se repetem todo mês e manter o dashboard coerente com
+          Use recorrÃƒÂªncias para registrar despesas e receitas que se repetem todo mÃƒÂªs e manter o dashboard coerente com
           a rotina financeira.
         </p>
         <p className="mt-3 text-sm font-medium text-[var(--color-primary)]">
-          Competência ativa: {formatMonthKeyLabel(month)}
+          CompetÃƒÂªncia ativa: {formatMonthKeyLabel(month)}
         </p>
         {showEditor ? (
           <>
             <div className="mt-6 space-y-3">
-              <Label>Serviços populares</Label>
+              <Label>ServiÃƒÂ§os populares</Label>
               <div className="grid gap-3 sm:grid-cols-2">
                 {subscriptionServicePresets.map((preset) => (
                   <SubscriptionServiceCard
@@ -437,7 +411,7 @@ export function SubscriptionsClient() {
               <Input id="sub-day" type="number" {...form.register("billingDay")} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="sub-next">{selectedType === "income" ? "Próximo recebimento" : "Próxima cobrança"}</Label>
+              <Label htmlFor="sub-next">{selectedType === "income" ? "PrÃƒÂ³ximo recebimento" : "PrÃƒÂ³xima cobranÃƒÂ§a"}</Label>
               <Input id="sub-next" type="date" {...form.register("nextBillingDate")} />
               {form.formState.errors.nextBillingDate ? (
                 <p className="text-sm text-[var(--color-destructive)]">{form.formState.errors.nextBillingDate.message}</p>
@@ -476,9 +450,9 @@ export function SubscriptionsClient() {
               ) : null}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="sub-card">Cartão</Label>
+              <Label htmlFor="sub-card">CartÃƒÂ£o</Label>
               <Select id="sub-card" {...form.register("cardId")}>
-                <option value="">Sem cartão</option>
+                <option value="">Sem cartÃƒÂ£o</option>
                 {(cardsQuery.data?.items ?? []).map((item) => (
                   <option key={item.id} value={item.id}>{item.name}</option>
                 ))}
@@ -491,11 +465,11 @@ export function SubscriptionsClient() {
           {selectedType === "income" ? (
             <label className="muted-panel flex items-center gap-3 text-sm">
               <input className="app-checkbox" type="checkbox" {...form.register("autoTithe")} />
-              Considerar dízimo nesta receita recorrente
+              Considerar dÃƒÂ­zimo nesta receita recorrente
             </label>
           ) : null}
           <p className="text-sm text-[var(--color-muted-foreground)]">
-            Vincule a recorrência à conta ou ao cartão correto para que relatórios, fatura e painel reflitam o impacto
+            Vincule a recorrÃƒÂªncia ÃƒÂ  conta ou ao cartÃƒÂ£o correto para que relatÃƒÂ³rios, fatura e painel reflitam o impacto
             financeiro no lugar certo.
           </p>
           <Button className="w-full" disabled={saveMutation.isPending} type="submit">
@@ -503,16 +477,16 @@ export function SubscriptionsClient() {
           </Button>
           {isEditing ? (
             <Button className="w-full" onClick={cancelEditing} type="button" variant="ghost">
-              Cancelar edição
+              Cancelar ediÃƒÂ§ÃƒÂ£o
             </Button>
           ) : null}
             </form>
           </>
         ) : (
           <div className="muted-panel mt-8 flex flex-col gap-4 px-4 py-5 text-sm text-[var(--color-muted-foreground)]">
-            <p>O editor foi fechado após a última edição concluída.</p>
+            <p>O editor foi fechado apÃƒÂ³s a ÃƒÂºltima ediÃƒÂ§ÃƒÂ£o concluÃƒÂ­da.</p>
             <Button className="w-full sm:w-auto" onClick={openCreateForm} type="button" variant="secondary">
-              Nova recorrência
+              Nova recorrÃƒÂªncia
             </Button>
           </div>
         )}
@@ -523,12 +497,12 @@ export function SubscriptionsClient() {
           <div>
             <h2 className="text-2xl font-semibold tracking-[-0.03em]">Assinaturas ativas</h2>
             <p className="mt-2 text-sm leading-7 text-[var(--color-muted-foreground)]">
-              Controle o custo fixo mensal e o próximo lançamento previsto de cada recorrência no mês selecionado.
+              Controle o custo fixo mensal e o prÃƒÂ³ximo lanÃƒÂ§amento previsto de cada recorrÃƒÂªncia no mÃƒÂªs selecionado.
             </p>
           </div>
           <div className="metric-grid-compact">
             <article className="metric-card">
-              <p className="metric-label">Saídas mensais</p>
+              <p className="metric-label">SaÃƒÂ­das mensais</p>
               <p className="metric-value amount-nowrap amount-negative">{formatCurrency(monthlyExpenses)}</p>
             </article>
             <article className="metric-card">
@@ -564,24 +538,24 @@ export function SubscriptionsClient() {
                       <p className="break-words font-semibold">{item.name}</p>
                     )}
                       <p className="break-words text-sm text-[var(--color-muted-foreground)]">
-                      {item.category?.name ?? "Sem categoria"} • {item.type === "income" ? "ocorrência no mês ativo em " : "cobrança no mês ativo em "}
+                      {item.category?.name ?? "Sem categoria"} Ã¢â‚¬Â¢ {item.type === "income" ? "ocorrÃƒÂªncia no mÃƒÂªs ativo em " : "cobranÃƒÂ§a no mÃƒÂªs ativo em "}
                       {formatDateDisplay(item.activeMonthDateResolved)}
                     </p>
                     <p className="break-words text-sm text-[var(--color-muted-foreground)]">
-                      {item.card?.name ?? item.account?.name ?? "Sem origem financeira"} •{" "}
+                      {item.card?.name ?? item.account?.name ?? "Sem origem financeira"} Ã¢â‚¬Â¢{" "}
                       {item.type === "expense" ? "Despesa recorrente" : "Receita recorrente"}
                     </p>
                     <p className="break-words text-xs text-[var(--color-muted-foreground)]">
-                      Competência {formatMonthKeyLabel(month)} • próxima cobrança real em {formatDateDisplay(item.nextBillingDate)}
+                      CompetÃƒÂªncia {formatMonthKeyLabel(month)} Ã¢â‚¬Â¢ prÃƒÂ³xima cobranÃƒÂ§a real em {formatDateDisplay(item.nextBillingDate)}
                     </p>
                     <p className="break-words text-xs text-[var(--color-muted-foreground)]">
                       {item.activeMonthGenerated
-                        ? `Lançamento já gerado em ${formatDateDisplay(item.activeMonthTransactionDate ?? item.activeMonthDateResolved)}`
-                        : `Lançamento ainda não gerado nesta competência`}
+                        ? `LanÃƒÂ§amento jÃƒÂ¡ gerado em ${formatDateDisplay(item.activeMonthTransactionDate ?? item.activeMonthDateResolved)}`
+                        : `LanÃƒÂ§amento ainda nÃƒÂ£o gerado nesta competÃƒÂªncia`}
                     </p>
                     {item.autoTithe ? (
                       <p className="break-words text-xs text-[var(--color-muted-foreground)]">
-                        Dízimo automático incluído nesta recorrência
+                        DÃƒÂ­zimo automÃƒÂ¡tico incluÃƒÂ­do nesta recorrÃƒÂªncia
                       </p>
                     ) : null}
                   </div>
@@ -599,7 +573,7 @@ export function SubscriptionsClient() {
                     type="button"
                     variant="secondary"
                   >
-                    {item.activeMonthGenerated ? "Já lançada" : "Gerar transação"}
+                    {item.activeMonthGenerated ? "JÃƒÂ¡ lanÃƒÂ§ada" : "Gerar transaÃƒÂ§ÃƒÂ£o"}
                   </Button>
                   <Button
                     disabled={deleteMutation.isPending}
@@ -615,8 +589,8 @@ export function SubscriptionsClient() {
           })}
           {!subscriptionsQuery.isLoading && subscriptions.length === 0 ? (
             <div className="muted-panel border border-dashed px-4 py-6 text-sm text-[var(--color-muted-foreground)]">
-              Nenhuma recorrência foi cadastrada ainda. Use assinaturas para automatizar cobranças fixas e manter o
-              resultado mensal mais previsível.
+              Nenhuma recorrÃƒÂªncia foi cadastrada ainda. Use assinaturas para automatizar cobranÃƒÂ§as fixas e manter o
+              resultado mensal mais previsÃƒÂ­vel.
             </div>
           ) : null}
         </div>

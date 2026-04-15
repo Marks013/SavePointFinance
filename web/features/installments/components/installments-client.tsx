@@ -64,7 +64,7 @@ async function getInstallments(filters: { from: string; to: string; cardId: stri
 async function getCards() {
   const response = await fetch("/api/cards", { cache: "no-store" });
   await ensureApiResponse(response, { fallbackMessage: "Falha ao carregar cartoes", method: "GET", path: "/api/cards" });
-  if (!response.ok) throw new Error("Falha ao carregar cartões");
+  if (!response.ok) throw new Error("Falha ao carregar cartÃƒÂµes");
   return (await response.json()) as { items: CardItem[] };
 }
 
@@ -82,20 +82,12 @@ export function InstallmentsClient() {
   const monthRange = getMonthRange(month);
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
   const editSectionRef = useRef<HTMLElement | null>(null);
-<<<<<<< HEAD
   const [cardId, setCardId] = useState("");
   const filters = {
     from: monthRange.from,
     to: monthRange.to,
     cardId
   };
-=======
-  const [filters, setFilters] = useState({
-    from: monthRange.from,
-    to: monthRange.to,
-    cardId: ""
-  });
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
   const installmentsQuery = useQuery({
     queryKey: ["installments", filters],
     queryFn: () => getInstallments(filters)
@@ -103,11 +95,7 @@ export function InstallmentsClient() {
   const cardsQuery = useQuery({ queryKey: ["cards"], queryFn: getCards });
   const categoriesQuery = useQuery({ queryKey: ["categories"], queryFn: getCategories });
   const groups = installmentsQuery.data?.items ?? [];
-<<<<<<< HEAD
   const selectedFilterCard = (cardsQuery.data?.items ?? []).find((card) => card.id === cardId);
-=======
-  const selectedFilterCard = (cardsQuery.data?.items ?? []).find((card) => card.id === filters.cardId);
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
   const totalAmount = groups.reduce((sum, item) => sum + item.totalAmount, 0);
   const overdueItems = groups.reduce((sum, item) => sum + item.overdueOpenInstallments, 0);
   const remainingInstallments = groups.reduce((sum, item) => sum + item.installmentsRemaining, 0);
@@ -122,17 +110,6 @@ export function InstallmentsClient() {
   });
 
   useEffect(() => {
-<<<<<<< HEAD
-=======
-    setFilters((current) => ({
-      ...current,
-      from: monthRange.from,
-      to: monthRange.to
-    }));
-  }, [monthRange.from, monthRange.to]);
-
-  useEffect(() => {
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
     if (!editingGroupId) {
       return;
     }
@@ -157,7 +134,7 @@ export function InstallmentsClient() {
       }
     },
     onSuccess: async () => {
-      toast.success("Grupo de parcelamento excluído");
+      toast.success("Grupo de parcelamento excluÃƒÂ­do");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["installments"] }),
         queryClient.invalidateQueries({ queryKey: ["transactions"] }),
@@ -166,13 +143,13 @@ export function InstallmentsClient() {
       ]);
     },
     onError: () => {
-      toast.error("Não foi possível excluir o parcelamento");
+      toast.error("NÃƒÂ£o foi possÃƒÂ­vel excluir o parcelamento");
     }
   });
   const updateMutation = useMutation({
     mutationFn: async (values: InstallmentGroupUpdateValues) => {
       if (!editingGroupId) {
-        throw new Error("Grupo não selecionado");
+        throw new Error("Grupo nÃƒÂ£o selecionado");
       }
 
       const response = await fetch(`/api/installments/${editingGroupId}`, {
@@ -206,7 +183,7 @@ export function InstallmentsClient() {
       ]);
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Não foi possível atualizar o parcelamento");
+      toast.error(error instanceof Error ? error.message : "NÃƒÂ£o foi possÃƒÂ­vel atualizar o parcelamento");
     }
   });
   const reconcileMutation = useMutation({
@@ -237,7 +214,7 @@ export function InstallmentsClient() {
       ]);
     },
     onError: () => {
-      toast.error("Não foi possível conciliar o parcelamento");
+      toast.error("NÃƒÂ£o foi possÃƒÂ­vel conciliar o parcelamento");
     }
   });
 
@@ -265,12 +242,12 @@ export function InstallmentsClient() {
     <div className="space-y-6">
       <section className="surface content-section">
         <div className="eyebrow">Parcelamentos</div>
-        <h1 className="mt-3 text-3xl font-semibold tracking-[-0.03em]">Cartões e parcelas</h1>
+        <h1 className="mt-3 text-3xl font-semibold tracking-[-0.03em]">CartÃƒÂµes e parcelas</h1>
         <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--color-muted-foreground)]">
-          Esta visão agrega automaticamente compras parceladas registradas em transações com mais de uma parcela.
+          Esta visÃƒÂ£o agrega automaticamente compras parceladas registradas em transaÃƒÂ§ÃƒÂµes com mais de uma parcela.
         </p>
         <p className="mt-3 text-sm font-medium text-[var(--color-primary)]">
-          Competência ativa: {formatMonthKeyLabel(month)}
+          CompetÃƒÂªncia ativa: {formatMonthKeyLabel(month)}
         </p>
         <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <div className="space-y-2">
@@ -284,7 +261,7 @@ export function InstallmentsClient() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="installments-filter-to">Até</Label>
+            <Label htmlFor="installments-filter-to">AtÃƒÂ©</Label>
             <DatePickerInput
               disabled
               id="installments-filter-to"
@@ -294,18 +271,13 @@ export function InstallmentsClient() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="installments-filter-card">Cartão</Label>
+            <Label htmlFor="installments-filter-card">CartÃƒÂ£o</Label>
             <Select
               id="installments-filter-card"
-<<<<<<< HEAD
               value={cardId}
               onChange={(event) => setCardId(event.target.value)}
-=======
-              value={filters.cardId}
-              onChange={(event) => setFilters((current) => ({ ...current, cardId: event.target.value }))}
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
             >
-              <option value="">Todos os cartões</option>
+              <option value="">Todos os cartÃƒÂµes</option>
               {(cardsQuery.data?.items ?? []).map((card) => (
                 <option key={card.id} value={card.id}>
                   {card.name}
@@ -315,15 +287,11 @@ export function InstallmentsClient() {
           </div>
         </div>
         <div className="muted-panel mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-[var(--color-muted-foreground)]">
-          <p>{`Mês ativo: ${formatMonthKeyLabel(month)}.`}</p>
-          <p>{selectedFilterCard ? `Refinando por cartão: ${selectedFilterCard.name}.` : "Mostrando todos os cartões."}</p>
+          <p>{`MÃƒÂªs ativo: ${formatMonthKeyLabel(month)}.`}</p>
+          <p>{selectedFilterCard ? `Refinando por cartÃƒÂ£o: ${selectedFilterCard.name}.` : "Mostrando todos os cartÃƒÂµes."}</p>
         </div>
         <div className="mt-4">
-<<<<<<< HEAD
           <Button onClick={() => setCardId("")} type="button" variant="ghost">
-=======
-          <Button onClick={() => setFilters({ from: monthRange.from, to: monthRange.to, cardId: "" })} type="button" variant="ghost">
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
             Limpar refinamentos
           </Button>
         </div>
@@ -332,12 +300,12 @@ export function InstallmentsClient() {
       {editingGroupId ? (
         <section className="surface content-section" ref={editSectionRef}>
           <p className="eyebrow">
-            Edição do grupo
+            EdiÃƒÂ§ÃƒÂ£o do grupo
           </p>
           <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em]">Atualizar parcelamento</h2>
           <form className="mt-6 space-y-4" onSubmit={form.handleSubmit((values) => updateMutation.mutate(values))}>
             <div className="space-y-2">
-              <Label htmlFor="installment-description">Descrição base</Label>
+              <Label htmlFor="installment-description">DescriÃƒÂ§ÃƒÂ£o base</Label>
               <Input id="installment-description" {...form.register("description")} />
             </div>
             <div className="space-y-2">
@@ -358,7 +326,7 @@ export function InstallmentsClient() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="installment-notes">Observações</Label>
+              <Label htmlFor="installment-notes">ObservaÃƒÂ§ÃƒÂµes</Label>
               <Input id="installment-notes" {...form.register("notes")} />
             </div>
             <div className="flex flex-wrap gap-3">
@@ -393,7 +361,7 @@ export function InstallmentsClient() {
           <article key={item.id} className="surface content-section">
             <p className="break-words text-lg font-semibold">{item.description}</p>
             <p className="mt-2 break-words text-sm text-[var(--color-muted-foreground)]">
-              {item.category?.name ?? "Sem categoria"} • {item.card?.name ?? "Sem cartão"}
+              {item.category?.name ?? "Sem categoria"} Ã¢â‚¬Â¢ {item.card?.name ?? "Sem cartÃƒÂ£o"}
             </p>
             <p className="amount-nowrap mt-4 text-2xl font-semibold">{formatCurrency(item.totalAmount)}</p>
             <p className="mt-2 break-words text-sm text-[var(--color-muted-foreground)]">
@@ -409,7 +377,7 @@ export function InstallmentsClient() {
               />
             </div>
             <p className="mt-4 break-words text-sm text-[var(--color-muted-foreground)]">
-              Próxima: {item.nextInstallmentDate ? formatDateDisplay(item.nextInstallmentDate) : "Finalizado"}
+              PrÃƒÂ³xima: {item.nextInstallmentDate ? formatDateDisplay(item.nextInstallmentDate) : "Finalizado"}
             </p>
             <p className="mt-2 break-words text-sm text-[var(--color-muted-foreground)]">
               Em atraso e abertas: {item.overdueOpenInstallments}

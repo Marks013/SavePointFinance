@@ -3,11 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-<<<<<<< HEAD
 import { useForm, useWatch } from "react-hook-form";
-=======
-import { useForm } from "react-hook-form";
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -84,7 +80,7 @@ async function restoreDefaultCategories() {
 
   if (!response.ok) {
     const payload = (await response.json()) as { message?: string };
-    throw new Error(payload.message ?? "Falha ao restaurar categorias padrão");
+    throw new Error(payload.message ?? "Falha ao restaurar categorias padrÃƒÂ£o");
   }
 
   return (await response.json()) as { restored: number; total: number };
@@ -134,7 +130,7 @@ export function CategoriesClient() {
       ]);
     },
     onError: (error) => {
-      toast.error(editingId ? "Não foi possível atualizar a categoria" : "Não foi possível criar a categoria", {
+      toast.error(editingId ? "NÃƒÂ£o foi possÃƒÂ­vel atualizar a categoria" : "NÃƒÂ£o foi possÃƒÂ­vel criar a categoria", {
         description: error.message
       });
     }
@@ -143,7 +139,7 @@ export function CategoriesClient() {
   const deleteMutation = useMutation({
     mutationFn: deleteCategory,
     onSuccess: async () => {
-      toast.success("Categoria excluída");
+      toast.success("Categoria excluÃƒÂ­da");
       if (editingId) {
         setEditingId(null);
         setIsEditorOpen(false);
@@ -156,7 +152,7 @@ export function CategoriesClient() {
       ]);
     },
     onError: (error) => {
-      toast.error("Não foi possível excluir a categoria", {
+      toast.error("NÃƒÂ£o foi possÃƒÂ­vel excluir a categoria", {
         description: error.message
       });
     }
@@ -165,11 +161,11 @@ export function CategoriesClient() {
   const restoreDefaultsMutation = useMutation({
     mutationFn: restoreDefaultCategories,
     onSuccess: async (payload) => {
-      toast.success("Categorias padrão restauradas", {
+      toast.success("Categorias padrÃƒÂ£o restauradas", {
         description:
           payload.restored > 0
             ? `${payload.restored} categoria(s) adicionada(s) sem duplicar as existentes.`
-            : "Nenhuma categoria nova foi adicionada porque a base já estava completa."
+            : "Nenhuma categoria nova foi adicionada porque a base jÃƒÂ¡ estava completa."
       });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["categories"] }),
@@ -178,7 +174,7 @@ export function CategoriesClient() {
       ]);
     },
     onError: (error) => {
-      toast.error("Não foi possível restaurar as categorias padrão", {
+      toast.error("NÃƒÂ£o foi possÃƒÂ­vel restaurar as categorias padrÃƒÂ£o", {
         description: error.message
       });
     }
@@ -211,7 +207,6 @@ export function CategoriesClient() {
 
   const isEditing = editingId !== null;
   const showEditor = isEditorOpen || isEditing || categories.length === 0;
-<<<<<<< HEAD
   const selectedColor = useWatch({ control: form.control, name: "color" }) ?? categoryColorPresets[0].value;
   const selectedType = useWatch({ control: form.control, name: "type" }) ?? "expense";
   const scrollEditorIntoView = () => {
@@ -225,26 +220,13 @@ export function CategoriesClient() {
 
     return () => window.clearTimeout(timeout);
   };
-=======
-  const selectedColor = form.watch("color") ?? categoryColorPresets[0].value;
-  const selectedType = form.watch("type") ?? "expense";
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
 
   useEffect(() => {
     if (!editingId) {
       return;
     }
 
-<<<<<<< HEAD
     return scrollEditorIntoView();
-=======
-    const timeout = window.setTimeout(() => {
-      formSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-      document.getElementById("category-name")?.focus();
-    }, 80);
-
-    return () => window.clearTimeout(timeout);
->>>>>>> 0dedb8a7d2d2c175ec23cd8d26bbf112193bdd5a
   }, [editingId]);
 
   return (
@@ -264,7 +246,7 @@ export function CategoriesClient() {
           ) : null}
         </div>
         <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--color-muted-foreground)]">
-          Cadastre categorias claras para organizar lançamentos e melhorar os relatórios.
+          Cadastre categorias claras para organizar lanÃƒÂ§amentos e melhorar os relatÃƒÂ³rios.
         </p>
 
         {showEditor ? (
@@ -307,7 +289,7 @@ export function CategoriesClient() {
             </div>
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="category-icon">Ícone</Label>
+                <Label htmlFor="category-icon">ÃƒÂcone</Label>
                 <Input id="category-icon" {...form.register("icon")} />
               </div>
               <div className="space-y-2">
@@ -324,7 +306,7 @@ export function CategoriesClient() {
             <div className="grid gap-4 md:grid-cols-1">
               <div className="space-y-2">
                 <Label htmlFor="category-keywords">Palavras-chave</Label>
-                <Input id="category-keywords" placeholder="mercado, casa, salário" {...form.register("keywords")} />
+                <Input id="category-keywords" placeholder="mercado, casa, salÃƒÂ¡rio" {...form.register("keywords")} />
               </div>
             </div>
             <div className="muted-panel flex flex-wrap items-center gap-3">
@@ -337,22 +319,22 @@ export function CategoriesClient() {
                 swatchOnly
               />
               <p className="text-sm text-[var(--color-muted-foreground)]">
-                A cor será usada na interface e nos gráficos.
+                A cor serÃƒÂ¡ usada na interface e nos grÃƒÂ¡ficos.
               </p>
             </div>
-            <p className="text-sm text-[var(--color-muted-foreground)]">Use palavras-chave para ajudar a classificação automática.</p>
+            <p className="text-sm text-[var(--color-muted-foreground)]">Use palavras-chave para ajudar a classificaÃƒÂ§ÃƒÂ£o automÃƒÂ¡tica.</p>
             <Button className="w-full" disabled={saveMutation.isPending} type="submit">
               {saveMutation.isPending ? "Salvando..." : isEditing ? "Salvar categoria" : "Criar categoria"}
             </Button>
             {isEditing ? (
               <Button className="w-full" onClick={cancelEditing} type="button" variant="ghost">
-                Cancelar edição
+                Cancelar ediÃƒÂ§ÃƒÂ£o
               </Button>
             ) : null}
           </form>
         ) : (
           <div className="muted-panel mt-8 flex flex-col gap-4 px-4 py-5 text-sm text-[var(--color-muted-foreground)]">
-            <p>O editor foi fechado após a última edição concluída.</p>
+            <p>O editor foi fechado apÃƒÂ³s a ÃƒÂºltima ediÃƒÂ§ÃƒÂ£o concluÃƒÂ­da.</p>
             <Button className="w-full sm:w-auto" onClick={openCreateForm} type="button" variant="secondary">
               Nova categoria
             </Button>
@@ -365,7 +347,7 @@ export function CategoriesClient() {
           <div className="min-w-0 flex-1">
             <h2 className="text-2xl font-semibold tracking-[-0.03em]">Categorias ativas</h2>
             <p className="mt-2 text-sm leading-7 text-[var(--color-muted-foreground)]">
-              Revise, edite ou restaure a base padrão sem duplicar itens existentes.
+              Revise, edite ou restaure a base padrÃƒÂ£o sem duplicar itens existentes.
             </p>
           </div>
           <div className="flex w-full flex-col gap-3 sm:w-auto sm:items-end">
@@ -376,7 +358,7 @@ export function CategoriesClient() {
               type="button"
               variant="secondary"
             >
-              {restoreDefaultsMutation.isPending ? "Restaurando..." : "Restaurar categorias padrão"}
+              {restoreDefaultsMutation.isPending ? "Restaurando..." : "Restaurar categorias padrÃƒÂ£o"}
             </Button>
             <div className="grid w-full gap-3 sm:grid-cols-2">
               <article className="metric-card w-full">
@@ -412,7 +394,7 @@ export function CategoriesClient() {
                       {category.type === "income" ? "Receita" : "Despesa"}
                     </span>
                     <span className="rounded-full border border-[var(--color-border)] px-2.5 py-1 text-xs text-[var(--color-muted-foreground)]">
-                      {category.isDefault ? "Padrão" : "Personalizada"}
+                      {category.isDefault ? "PadrÃƒÂ£o" : "Personalizada"}
                     </span>
                   </div>
                 </div>
@@ -445,8 +427,8 @@ export function CategoriesClient() {
           ))}
           {!categoriesQuery.isLoading && categories.length === 0 ? (
             <div className="muted-panel border border-dashed px-4 py-6 text-sm text-[var(--color-muted-foreground)] md:col-span-2">
-              Nenhuma categoria foi cadastrada ainda. Crie categorias para melhorar o agrupamento dos lançamentos e a
-              leitura dos relatórios.
+              Nenhuma categoria foi cadastrada ainda. Crie categorias para melhorar o agrupamento dos lanÃƒÂ§amentos e a
+              leitura dos relatÃƒÂ³rios.
             </div>
           ) : null}
         </div>
