@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { requireSessionUser } from "@/lib/auth/session";
 import { serverEnv } from "@/lib/env/server";
+import { getEmailChannelHealth, getWhatsAppChannelHealth } from "@/lib/notifications/channel-health";
 import { captureRequestError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
 import { getSharingAuthority } from "@/lib/sharing/access";
@@ -25,6 +26,8 @@ export async function GET(request: Request) {
     }
 
     const sharingAuthority = await getSharingAuthority(user);
+    const emailHealth = getEmailChannelHealth();
+    const whatsappHealth = getWhatsAppChannelHealth();
 
     return NextResponse.json({
       id: profile.id,
@@ -50,14 +53,15 @@ export async function GET(request: Request) {
       },
       integrations: {
         whatsappAssistantEnabled: serverEnv.WHATSAPP_ASSISTANT_ENABLED === "true",
-        whatsappConfigured: Boolean(
-          serverEnv.WHATSAPP_VERIFY_TOKEN &&
-          serverEnv.WHATSAPP_PHONE_NUMBER_ID &&
-          serverEnv.WHATSAPP_ACCESS_TOKEN
-        ),
+        whatsappConfigured: whatsappHealth.configured,
         whatsappWebhookPath: "/api/integrations/whatsapp/webhook",
         smartClassificationEnabled:
-          serverEnv.GEMINI_ENABLED === "true" && Boolean(serverEnv.GEMINI_API_KEY?.trim())
+          serverEnv.GEMINI_ENABLED === "true" && Boolean(serverEnv.GEMINI_API_KEY?.trim()),
+        emailProvider: emailHealth.provider,
+        emailConfigured: emailHealth.configured,
+        emailFrom: emailHealth.from,
+        emailIssue: emailHealth.issue,
+        whatsappIssue: whatsappHealth.issue
       },
       preferences: {
         currency: profile.preferences?.currency ?? "BRL",

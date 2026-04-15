@@ -152,6 +152,8 @@ docker compose up -d --build web
 npm run verify:server-smoke
 ```
 
+Checklist operacional curto: [PRODUCTION_CHECKLIST.md](/abs/path/C:/Users/User/Desktop/SavePointFinanca/PRODUCTION_CHECKLIST.md)
+
 ## Backup automatico
 
 O projeto agora inclui um servico dedicado de backup criptografado.

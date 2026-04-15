@@ -46,6 +46,12 @@ function getStatementReferenceDate(month: string) {
   return getMonthRange(month).end;
 }
 
+function startOfDay(date: Date) {
+  const next = new Date(date);
+  next.setHours(0, 0, 0, 0);
+  return next;
+}
+
 async function getDashboardData(tenantId: string, month: string) {
   const { start, end } = getMonthRange(month);
   const statementReferenceDate = getStatementReferenceDate(month);
@@ -163,6 +169,11 @@ async function getDashboardData(tenantId: string, month: string) {
 
     const monthlyCardPayments = monthlyReport.projection.cardPayments;
     const periodExpenseForecast = monthlyReport.projection.expense;
+    const today = startOfDay(new Date());
+    const upcomingProjection =
+      getMonthPerspective(month) === "current"
+        ? monthlyReport.upcoming.filter((item) => startOfDay(new Date(item.date)) >= today)
+        : monthlyReport.upcoming;
 
     return {
       periodBalances: monthlyReport.periodBalances,
@@ -174,7 +185,7 @@ async function getDashboardData(tenantId: string, month: string) {
       spendingInsights: monthlyReport.spendingInsights,
       monthlyCardPayments,
       periodExpenseForecast,
-      upcomingProjection: monthlyReport.upcoming.slice(0, 5),
+      upcomingProjection: upcomingProjection.slice(0, 5),
       goals: Number(goals._sum.currentAmount ?? 0),
       recentTransactions: recentTransactions.map((transaction) => ({
         ...transaction,
