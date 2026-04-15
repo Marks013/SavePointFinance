@@ -48,7 +48,7 @@ services:
     networks:
       - savepoint
       
-  audit-server-smoke::
+  audit-server-smoke:
     build:
       context: ./web
       dockerfile: Dockerfile
