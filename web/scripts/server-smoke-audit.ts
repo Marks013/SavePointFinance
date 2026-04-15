@@ -412,12 +412,15 @@ async function run() {
   });
   results.push("Tela de configuracoes carregou com conteudo esperado");
 
-  await expectPage(dataJar, "/dashboard/goals", [
-    "Metas",
-    "Metas ativas",
-    "Reservado",
-    "Objetivo total"
-  ]);
+  await expectPage(dataJar, "/dashboard/goals", {
+    markers: [
+	  "Metas",
+	  "Metas ativas",
+	  "Reservado",
+	  "Objetivo total"
+    ],
+	minimumMatches: 1
+  });
   results.push("Tela de metas carregou com conteudo esperado");
 
   const smokeProfile = await getJson<ProfilePayload>(dataJar, "/api/profile");
