@@ -347,7 +347,7 @@ async function run() {
 
   await expectPage(dataJar, "/dashboard", {
     markers: [
-	'aria-label="Encerrar'
+	'aria-label="Encerrar"',
     "Visão central da operação",
     "Movimento recente",
     "Resumo das contas",
