@@ -1,0 +1,581 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  admin
+  member
+}
+
+enum TenantPlan {
+  free
+  pro
+}
+
+enum CategoryType {
+  income
+  expense
+}
+
+enum ClassificationSource {
+  manual_input
+  manual_rule
+  category_keyword
+  global_context
+  ai_learned
+  ai_runtime
+  fallback
+  unknown
+}
+
+enum CategoryRuleSource {
+  manual
+  ai_learned
+  imported
+}
+
+enum CategoryRuleMatchMode {
+  exact_phrase
+  contains_phrase
+}
+
+enum AccountType {
+  checking
+  savings
+  investment
+  wallet
+}
+
+enum TransactionType {
+  income
+  expense
+  transfer
+}
+
+enum TransactionSource {
+  manual
+  whatsapp
+  import_csv
+  import_ofx
+}
+
+enum PaymentMethod {
+  pix
+  money
+  credit_card
+  debit_card
+  transfer
+}
+
+enum StatementMonthAnchor {
+  close_month
+  previous_month
+}
+
+enum GoalMilestoneMode {
+  disabled
+  enabled
+}
+
+enum SubscriptionType {
+  income
+  expense
+}
+
+enum NotificationChannel {
+  email
+  whatsapp
+}
+
+enum NotificationStatus {
+  pending
+  sent
+  failed
+  skipped
+}
+
+enum InvitationKind {
+  admin_isolated
+  shared_wallet
+}
+
+enum WhatsAppMessageDirection {
+  inbound
+  outbound
+}
+
+model Tenant {
+  id             String             @id @default(cuid())
+  name           String
+  slug           String             @unique
+  planId         String
+  isActive       Boolean            @default(true)
+  trialStart     DateTime?
+  trialDays      Int                @default(31)
+  trialExpiresAt DateTime?
+  expiresAt      DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  planConfig     Plan               @relation(fields: [planId], references: [id], onDelete: Restrict)
+  users          User[]
+  categories     Category[]
+  categoryRules  CategoryRule[]
+  financials     FinancialAccount[]
+  cards          Card[]
+  transactions   Transaction[]
+  goals          Goal[]
+  subscriptions  Subscription[]
+  invitations    Invitation[]
+  actorAuditLogs AdminAuditLog[] @relation("AuditActorTenant")
+  targetAuditLogs AdminAuditLog[] @relation("AuditTargetTenant")
+  statementPayments StatementPayment[]
+  notifications  NotificationDelivery[]
+  whatsappMessages WhatsAppMessage[]
+
+  @@index([planId])
+}
+
+model Plan {
+  id                String      @id @default(cuid())
+  name              String
+  slug              String      @unique
+  tier              TenantPlan  @default(free)
+  description       String?
+  maxAccounts       Int?
+  maxCards          Int?
+  whatsappAssistant Boolean     @default(false)
+  automation        Boolean     @default(false)
+  pdfExport         Boolean     @default(false)
+  trialDays         Int         @default(0)
+  isDefault         Boolean     @default(false)
+  isActive          Boolean     @default(true)
+  sortOrder         Int         @default(0)
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  tenants           Tenant[]
+
+  @@index([tier, isActive])
+}
+
+model User {
+  id                String          @id @default(cuid())
+  tenantId          String
+  email             String          @unique
+  name              String
+  passwordHash      String
+  role              UserRole        @default(member)
+  isPlatformAdmin   Boolean         @default(false)
+  whatsappNumber    String?         @unique
+  isActive          Boolean         @default(true)
+  lastLogin         DateTime?
+  loginCount        Int             @default(0)
+  resetToken        String?
+  resetTokenExpires DateTime?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  tenant            Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  preferences       UserPreference?
+  sessions          Session[]
+  authAccounts      Account[]
+  transactions      Transaction[]
+  goals             Goal[]
+  subscriptions     Subscription[]
+  ownedAccounts     FinancialAccount[] @relation("FinancialAccountOwner")
+  ownedCards        Card[]             @relation("CardOwner")
+  invitationsSent   Invitation[]    @relation("InvitationSender")
+  notifications     NotificationDelivery[]
+  whatsappMessages  WhatsAppMessage[]
+  adminAuditLogs    AdminAuditLog[] @relation("AuditActorUser")
+  auditTargets      AdminAuditLog[] @relation("AuditTargetUser")
+
+  @@index([tenantId])
+  @@index([resetToken])
+}
+
+model UserPreference {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  currency           String   @default("BRL")
+  dateFormat         String   @default("DD/MM/YYYY")
+  emailNotifications Boolean  @default(true)
+  monthlyReports     Boolean  @default(true)
+  budgetAlerts       Boolean  @default(true)
+  dueReminders       Boolean  @default(true)
+  autoTithe          Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Category {
+  id           String        @id @default(cuid())
+  tenantId     String
+  parentId     String?
+  systemKey    String?
+  name         String
+  icon         String        @default("tag")
+  color        String        @default("#6B7280")
+  type         CategoryType  @default(expense)
+  keywords     String[]
+  monthlyLimit Decimal?      @db.Decimal(10, 2)
+  isDefault    Boolean       @default(false)
+  createdAt    DateTime      @default(now())
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  parent       Category?     @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children     Category[]    @relation("CategoryTree")
+  rules        CategoryRule[]
+  transactions Transaction[] @relation("TransactionCategory")
+  titheUsages  Transaction[] @relation("TransactionTitheCategory")
+  subscriptions Subscription[]
+
+  @@index([tenantId, type])
+  @@index([tenantId, type, systemKey])
+  @@index([parentId])
+  @@unique([tenantId, type, name])
+}
+
+model CategoryRule {
+  id                       String                 @id @default(cuid())
+  tenantId                 String
+  categoryId               String
+  type                     CategoryType
+  normalizedKeyword        String
+  matchMode                CategoryRuleMatchMode  @default(exact_phrase)
+  source                   CategoryRuleSource
+  priority                 Int                    @default(100)
+  confidence               Decimal?               @db.Decimal(3, 2)
+  createdFromTransactionId String?
+  hitCount                 Int                    @default(0)
+  lastMatchedAt            DateTime?
+  isActive                 Boolean                @default(true)
+  createdAt                DateTime               @default(now())
+  updatedAt                DateTime               @updatedAt
+  tenant                   Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  category                 Category               @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, type, normalizedKeyword, source, matchMode])
+  @@index([tenantId, type, isActive, priority])
+  @@index([categoryId, isActive])
+}
+
+model FinancialAccount {
+  id           String        @id @default(cuid())
+  tenantId     String
+  ownerUserId  String
+  name         String
+  type         AccountType   @default(checking)
+  openingBalance Decimal       @default(0) @map("balance") @db.Decimal(15, 2)
+  currency     String        @default("BRL")
+  color        String        @default("#10B981")
+  institution  String?
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  ownerUser    User          @relation("FinancialAccountOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  transactions Transaction[] @relation("TransactionSourceAccount")
+  transferIns  Transaction[] @relation("TransactionDestinationAccount")
+  goals        Goal[]
+  subscriptions Subscription[]
+  statementPayments StatementPayment[]
+
+  @@index([tenantId])
+  @@index([ownerUserId])
+  @@unique([tenantId, name])
+}
+
+model Card {
+  id           String        @id @default(cuid())
+  tenantId     String
+  ownerUserId  String
+  name         String
+  last4        String?
+  brand        String        @default("Visa")
+  limitAmount  Decimal       @default(0) @db.Decimal(15, 2)
+  dueDay       Int           @default(10)
+  closeDay     Int           @default(3)
+  statementMonthAnchor StatementMonthAnchor @default(close_month)
+  color        String        @default("#374151")
+  institution  String?
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  ownerUser    User          @relation("CardOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+  subscriptions Subscription[]
+  statementPayments StatementPayment[]
+
+  @@index([tenantId])
+  @@index([ownerUserId])
+  @@unique([tenantId, name])
+}
+
+model Transaction {
+  id                String            @id @default(cuid())
+  tenantId          String
+  userId            String?
+  subscriptionId    String?
+  categoryId        String?
+  accountId         String?
+  destinationAccountId String?
+  cardId            String?
+  date              DateTime
+  competence        String            @default("")
+  amount            Decimal           @db.Decimal(15, 2)
+  description       String
+  notes             String?
+  type              TransactionType
+  source            TransactionSource @default(manual)
+  paymentMethod     PaymentMethod     @default(money)
+  settledAt         DateTime?
+  installmentsTotal Int               @default(1)
+  installmentNumber Int               @default(1)
+  parentId          String?
+  classificationSource ClassificationSource @default(unknown)
+  classificationKeyword String?
+  classificationReason  String?
+  classificationVersion Int               @default(2)
+  aiClassified      Boolean           @default(false)
+  aiConfidence      Decimal?          @db.Decimal(3, 2)
+  statementCloseDate DateTime?
+  statementDueDate   DateTime?
+  titheAmount       Decimal?          @db.Decimal(15, 2)
+  titheCategoryId   String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  tenant            Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user              User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subscription      Subscription?     @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  category          Category?         @relation("TransactionCategory", fields: [categoryId], references: [id], onDelete: Cascade)
+  titheCategory     Category?         @relation("TransactionTitheCategory", fields: [titheCategoryId], references: [id], onDelete: SetNull)
+  financialAccount  FinancialAccount? @relation("TransactionSourceAccount", fields: [accountId], references: [id], onDelete: Cascade)
+  destinationAccount FinancialAccount? @relation("TransactionDestinationAccount", fields: [destinationAccountId], references: [id], onDelete: Cascade)
+  card              Card?             @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  parent            Transaction?      @relation("TransactionInstallments", fields: [parentId], references: [id], onDelete: Cascade)
+  installments      Transaction[]     @relation("TransactionInstallments")
+  statementPayments StatementPayment[]
+
+  @@index([tenantId, date])
+  @@index([tenantId, type])
+  @@index([tenantId, cardId, competence])
+  @@index([tenantId, statementDueDate])
+  @@index([userId])
+  @@index([subscriptionId])
+  @@index([parentId])
+  @@index([destinationAccountId])
+}
+
+model Goal {
+  id               String             @id @default(cuid())
+  tenantId         String
+  userId           String?
+  accountId        String?
+  name             String
+  targetAmount     Decimal            @db.Decimal(15, 2)
+  currentAmount    Decimal            @default(0) @db.Decimal(15, 2)
+  deadline         DateTime?
+  color            String             @default("#3B82F6")
+  icon             String?
+  notifyOnComplete Boolean            @default(true)
+  milestone25      GoalMilestoneMode  @default(disabled)
+  milestone50      GoalMilestoneMode  @default(disabled)
+  milestone75      GoalMilestoneMode  @default(disabled)
+  notifyOnDeadline Boolean            @default(true)
+  lastNotifiedAt   DateTime?
+  isCompleted      Boolean            @default(false)
+  completedAt      DateTime?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  tenant           Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  account          FinancialAccount?  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  user             User?              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notifications    NotificationDelivery[]
+
+  @@index([tenantId])
+  @@index([userId])
+}
+
+model Subscription {
+  id              String           @id @default(cuid())
+  tenantId        String
+  userId          String?
+  categoryId      String?
+  accountId       String?
+  cardId          String?
+  name            String
+  type            SubscriptionType @default(expense)
+  amount          Decimal          @db.Decimal(15, 2)
+  billingDay      Int              @default(1)
+  isActive        Boolean          @default(true)
+  autoTithe       Boolean          @default(false)
+  nextBillingDate DateTime
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user            User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category        Category?        @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  account         FinancialAccount? @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  card            Card?            @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  transactions    Transaction[]
+
+  @@index([tenantId])
+  @@index([userId])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model StatementPayment {
+  id            String           @id @default(cuid())
+  tenantId      String
+  cardId        String
+  accountId     String
+  month         String
+  amount        Decimal          @db.Decimal(15, 2)
+  paidAt        DateTime         @default(now())
+  transactionId String?          @unique
+  createdAt     DateTime         @default(now())
+  tenant        Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  card          Card             @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  account       FinancialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  transaction   Transaction?     @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, cardId, month])
+  @@index([accountId])
+}
+
+model Invitation {
+  id              String    @id @default(cuid())
+  tenantId        String
+  invitedByUserId String?
+  email           String
+  name            String
+  role            UserRole  @default(member)
+  kind            InvitationKind @default(admin_isolated)
+  token           String    @unique
+  expiresAt       DateTime
+  acceptedAt      DateTime?
+  revokedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invitedBy       User?     @relation("InvitationSender", fields: [invitedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, email])
+  @@index([tenantId, expiresAt])
+  @@index([tenantId, kind])
+}
+
+model NotificationDelivery {
+  id           String              @id @default(cuid())
+  tenantId     String
+  userId       String?
+  goalId       String?
+  channel      NotificationChannel
+  status       NotificationStatus  @default(pending)
+  target       String
+  subject      String
+  message      String
+  responseCode Int?
+  errorMessage String?
+  attemptedAt  DateTime?
+  deliveredAt  DateTime?
+  createdAt    DateTime            @default(now())
+  tenant       Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user         User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
+  goal         Goal?               @relation(fields: [goalId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt])
+  @@index([userId, createdAt])
+  @@index([goalId, createdAt])
+}
+
+model WhatsAppMessage {
+  id          String                    @id @default(cuid())
+  tenantId    String
+  userId      String
+  phoneNumber String
+  direction   WhatsAppMessageDirection
+  messageId   String?
+  body        String
+  intent      String?
+  status      String?
+  response    String?
+  createdAt   DateTime                  @default(now())
+  tenant      Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user        User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@index([userId, createdAt])
+  @@index([phoneNumber, createdAt])
+}
+
+model WebhookEvent {
+  id        String   @id @default(cuid())
+  provider  String   @default("WHATSAPP")
+  eventId   String   @unique
+  status    String
+  payload   Json?
+  error     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AdminAuditLog {
+  id             String   @id @default(cuid())
+  actorUserId     String
+  actorTenantId   String
+  targetUserId    String?
+  targetTenantId  String?
+  action          String
+  entityType      String
+  entityId        String?
+  summary         String
+  metadata        Json?
+  createdAt       DateTime @default(now())
+  actorUser       User     @relation("AuditActorUser", fields: [actorUserId], references: [id], onDelete: Cascade)
+  actorTenant     Tenant   @relation("AuditActorTenant", fields: [actorTenantId], references: [id], onDelete: Cascade)
+  targetUser      User?    @relation("AuditTargetUser", fields: [targetUserId], references: [id], onDelete: SetNull)
+  targetTenant    Tenant?  @relation("AuditTargetTenant", fields: [targetTenantId], references: [id], onDelete: SetNull)
+
+  @@index([actorUserId, createdAt])
+  @@index([actorTenantId, createdAt])
+  @@index([targetTenantId, createdAt])
+  @@index([entityType, entityId])
+}

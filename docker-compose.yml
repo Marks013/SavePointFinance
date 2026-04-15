@@ -1,0 +1,208 @@
+services:
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN}
+        SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT}
+    container_name: savepoint_web
+    restart: unless-stopped
+    # Puxa TODAS as variáveis do .env automaticamente
+    env_file:
+      - .env
+    environment:
+      # Mantemos apenas o que é exclusivo do Docker ou montado dinamicamente
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      # Destrava a memória do Node.js para usar até 4GB da sua RAM (evita travamentos no app)
+      NODE_OPTIONS: "--max_old_space_size=4096"
+    # Limita os logs para não devorar seus 100GB de disco com o tempo
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    networks:
+      - savepoint
+
+  migrate:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+      target: tools
+    profiles: ["ops"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    command: ["npx", "prisma", "migrate", "deploy", "--schema", "prisma/schema.prisma"]
+    networks:
+      - savepoint
+
+  bootstrap-admin:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+      target: tools
+    profiles: ["ops"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    command: ["node", "scripts/bootstrap-admin.mjs"]
+    networks:
+      - savepoint
+
+  audit-invitations:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+      target: tools
+    profiles: ["ops"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      web:
+        condition: service_started
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      AUDIT_BASE_URL: ${AUDIT_BASE_URL:-http://web:3000}
+    command: ["npm", "run", "audit:invitations"]
+    networks:
+      - savepoint
+
+  backup:
+    build:
+      context: ./ops/backup
+      dockerfile: Dockerfile
+    container_name: savepoint_backup
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "/usr/local/bin/backup-healthcheck.sh"]
+      interval: 30m
+      timeout: 10s
+      retries: 1
+      start_period: 10m
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      BACKUP_DB_HOST: postgres
+      BACKUP_DB_PORT: 5432
+    volumes:
+      - ./:/workspace:ro
+      - savepoint_backups:/backups
+    networks:
+      - savepoint
+
+  backup-once:
+    build:
+      context: ./ops/backup
+      dockerfile: Dockerfile
+    profiles: ["ops"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      BACKUP_DB_HOST: postgres
+      BACKUP_DB_PORT: 5432
+    command: ["/usr/local/bin/run-backup.sh"]
+    volumes:
+      - ./:/workspace:ro
+      - savepoint_backups:/backups
+    networks:
+      - savepoint
+
+  restore-backup-test:
+    build:
+      context: ./ops/backup
+      dockerfile: Dockerfile
+    profiles: ["ops"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      BACKUP_DB_HOST: postgres
+      BACKUP_DB_PORT: 5432
+      RESTORE_MODE: test
+    command: ["/usr/local/bin/restore-backup.sh"]
+    volumes:
+      - savepoint_backups:/backups
+    networks:
+      - savepoint
+
+  restore-backup-prod:
+    build:
+      context: ./ops/backup
+      dockerfile: Dockerfile
+    profiles: ["ops"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      BACKUP_DB_HOST: postgres
+      BACKUP_DB_PORT: 5432
+      RESTORE_MODE: prod
+    command: ["/usr/local/bin/restore-backup.sh"]
+    volumes:
+      - savepoint_backups:/backups
+    networks:
+      - savepoint
+
+  postgres:
+    image: postgres:17-alpine
+    container_name: savepoint_db
+    restart: unless-stopped
+    env_file:
+      - .env
+    # Limita os logs do banco de dados
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # Otimização de Memória para sair dos 10% de ociosidade da Oracle Cloud
+    command: >
+      postgres -c 'shared_buffers=2GB' 
+               -c 'effective_cache_size=6GB'
+               -c 'work_mem=64MB'
+               -c 'maintenance_work_mem=512MB'
+    volumes:
+      - savepoint_postgres:/var/lib/postgresql/data
+    networks:
+      - savepoint
+
+networks:
+  savepoint:
+    driver: bridge
+
+volumes:
+  savepoint_postgres:
+  savepoint_backups:

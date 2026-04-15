@@ -1,0 +1,266 @@
+[
+  {
+    "name": "Salário",
+    "icon": "briefcase-business",
+    "color": "#0F8A5F",
+    "type": "income",
+    "isDefault": true,
+    "keywords": ["salario", "salário", "holerite", "folha de pagamento", "proventos", "pagamento empresa", "ordenado", "remuneracao", "remuneração", "contra cheque", "contracheque"]
+  },
+  {
+    "name": "Freelance e serviços",
+    "icon": "laptop-minimal",
+    "color": "#1D4ED8",
+    "type": "income",
+    "isDefault": true,
+    "keywords": ["freelance", "freela", "servico", "serviço", "prestacao", "prestação", "consultoria", "projeto", "job", "cliente", "honorarios", "honorários"]
+  },
+  {
+    "name": "Rendimentos",
+    "icon": "chart-column",
+    "color": "#0F766E",
+    "type": "income",
+    "isDefault": true,
+    "keywords": ["rendimento", "investimento", "cdb", "cdi", "selic", "tesouro", "dividendo", "dividendos", "juros", "rentabilidade", "aplicacao", "aplicação", "resgate investimento"]
+  },
+  {
+    "name": "Reembolso",
+    "icon": "receipt-text",
+    "color": "#B9851B",
+    "type": "income",
+    "isDefault": true,
+    "keywords": ["reembolso", "estorno", "cashback", "devolucao", "devolução", "ressarcimento", "retorno compra", "cancelamento compra"]
+  },
+  {
+    "name": "Vendas",
+    "icon": "shopping-bag",
+    "color": "#7C3AED",
+    "type": "income",
+    "isDefault": true,
+    "keywords": ["venda", "revenda", "mercado livre", "marketplace", "lojinha", "pix cliente", "recebimento venda", "faturamento", "comissao", "comissão"]
+  },
+  {
+    "name": "Transferências recebidas",
+    "icon": "arrow-down-left",
+    "color": "#2563EB",
+    "type": "income",
+    "isDefault": true,
+    "keywords": ["pix recebido", "transferencia recebida", "transferência recebida", "ted recebida", "doc recebido", "depósito", "deposito", "recebido de", "repasse"]
+  },
+  {
+    "name": "Outras receitas",
+    "icon": "wallet-cards",
+    "color": "#6B7280",
+    "type": "income",
+    "isDefault": true,
+    "keywords": ["credito avulso", "crédito avulso", "entrada", "receita diversa", "outras receitas", "ajuste positivo"]
+  },
+  {
+    "name": "Supermercado",
+    "icon": "shopping-cart",
+    "color": "#0F8A5F",
+    "type": "expense",
+    "isDefault": true,
+    "keywords": ["supermercado", "mercado", "mercadinho", "hipermercado", "atacadao", "atacadão", "assai", "assaí", "carrefour", "extra", "pao de acucar", "pão de açúcar", "sonda", "dia", "oba", "savegnago", "coop", "big", "sam s club", "sams club", "mateus", "guanabara", "st marche", "st marche", "super nosso", "verdemar", "arroz", "feijao", "feijão", "macarrao", "macarrão", "leite", "queijo", "presunto", "manteiga", "carne", "frango", "ovo", "biscoito", "bolacha", "detergente", "sabao", "sabão", "papel higienico", "papel higiênico", "compra do mes", "compra do mês", "rancho"]
+  },
+  {
+    "name": "Feira e hortifruti",
+    "icon": "apple",
+    "color": "#4D7C0F",
+    "type": "expense",
+    "isDefault": true,
+    "keywords": ["feira", "hortifruti", "frutaria", "sacolao", "sacolão", "legumes", "verduras", "quitanda", "horti", "ceasa", "banana", "maça", "maca", "laranja", "verdura", "fruta", "frutas", "legume", "tomate", "alface", "batata", "cebola", "alho", "mamao", "mamão", "melancia", "uva"]
+  },
+  {
+    "name": "Restaurantes",
+    "icon": "utensils-crossed",
+    "color": "#B45309",
+    "type": "expense",
+    "isDefault": true,
+    "keywords": ["restaurante", "almoco", "almoço", "jantar", "lanchonete", "self service", "self-service", "churrascaria", "burger", "hamburgueria", "pizzaria", "sushi", "bar", "boteco", "outback", "madero", "habibs", "giraffas", "coco bambu", "coco bambu", "subway", "mcdonalds", "mcdonald s", "burger king", "bk", "lanche", "marmita", "marmitex", "prato feito", "pf", "pastel", "esfiha", "yakisoba"]
+  },
+  {
+    "name": "Delivery",
+    "icon": "bike",
+    "color": "#DB6B4D",
+    "type": "expense",
+    "isDefault": true,
+    "keywords": ["ifood", "i food", "rappi", "ubereats", "uber eats", "delivery", "entrega", "aiqfome", "delivery much", "ze delivery", "zé delivery", "food to save", "app entrega"]
+  },
+  {
+    "name": "Café e padaria",
+    "icon": "coffee",
+    "color": "#92400E",
+    "type": "expense",
+    "isDefault": true,
+    "keywords": ["padaria", "cafe", "café", "cafeteria", "pao", "pão", "confeitaria", "doceria", "croissant", "espresso", "bakery", "bolo", "salgado", "sonho", "misto quente", "cafe da manha", "café da manhã", "cappuccino", "starbucks", "casa bauducco", "pao frances", "pão francês", "paozinho", "padoca", "pingado", "coxinha", "enroladinho", "torta", "rosca"]
+  },
+  {
+    "name": "Combustível",
+    "icon": "fuel",
+    "color": "#DC2626",
+    "type": "expense",
+    "isDefault": true,
+    "keywords": ["posto", "combustivel", "combustível", "gasolina", "etanol", "alcool", "álcool", "diesel", "shell", "ipiranga", "petrobras", "br mania", "ale combustiveis", "ale combustíveis", "raizen", "raízen", "texaco"]
+  },
+  {
+    "name": "Transporte",
+    "icon": "bus",
+    "color": "#2563EB",
+    "type": "expense",
+    "isDefault": true,
+    "keywords": ["onibus", "ônibus", "metrô", "metro", "trem", "bilhete unico", "bilhete único", "passagem", "rodoviaria", "rodoviária", "estacionamento", "pedagio", "pedágio", "zona azul"]
+  },
+  {
+    "name": "Apps de mobilidade",
+    "icon": "car-taxi-front",
+    "color": "#0F766E",
+    "type": "expense",
+    "isDefault": true,
+    "keywords": ["uber", "99", "99app", "cabify", "indrive", "in drive", "taxi", "táxi", "corrida"]
+  },
+  {
+    "name": "Moradia",
+    "icon": "house",
+    "color": "#7C2D12",
+    "type": "expense",
+    "isDefault": true,
+    "keywords": ["aluguel", "imovel", "imóvel", "moradia", "financiamento habitacional", "prestacao casa", "prestação casa"]
+  },
+  {
+    "name": "Condomínio",
+    "icon": "building-2",
+    "color": "#92400E",
+    "type": "expense",
+    "isDefault": true,
+    "keywords": ["condominio", "condomínio", "tx cond", "taxa condominial", "cota condominial"]
+  },
+  {
+    "name": "Energia elétrica",
+    "icon": "zap",
+    "color": "#CA8A04",
+    "type": "expense",
+    "isDefault": true,
+    "keywords": ["energia", "luz", "enel", "cpfl", "cemig", "neoenergia", "eletropaulo", "equatorial", "celpe", "ceee", "conta de luz", "fatura energia", "energia eletrica", "energia elétrica"]
+  },
+  {
+    "name": "Água e saneamento",
+    "icon": "droplets",
+    "color": "#0284C7",
+    "type": "expense",
+    "isDefault": true,
+    "keywords": ["agua", "água", "saneamento", "sabesp", "copasa", "sanepar", "caesb", "embasa", "corsan", "casan", "conta de agua", "conta de água", "esgoto"]
+  },
+  {
+    "name": "Internet e telefonia",
+    "icon": "wifi",
+    "color": "#1D4ED8",
+    "type": "expense",
+    "isDefault": true,
+    "keywords": ["internet", "telefone", "telefonia", "celular", "tim", "vivo", "claro", "oi", "fibra", "banda larga", "plano movel", "plano móvel", "recarga", "wifi", "wi-fi", "pos pago", "pós pago", "controle", "telefone fixo"]
+  },
+  {
+    "name": "Saúde",
+    "icon": "heart-pulse",
+    "color": "#BE123C",
+    "type": "expense",
+    "isDefault": true,
+    "keywords": ["medico", "médico", "consulta", "exame", "clinica", "clínica", "hospital", "laboratorio", "laboratório", "plano de saude", "plano de saúde", "unimed", "hapvida", "amil", "bradesco saude", "bradesco saúde", "sulamerica", "sulamérica", "fleury", "hermes pardini", "delboni", "lavoisier", "dr consulta", "dr. consulta", "dentista", "psicologo", "psicólogo", "fisioterapia", "terapia", "ultrassom", "raio x", "raio-x"]
+  },
+  {
+    "name": "Farmácia",
+    "icon": "pill",
+    "color": "#DC2626",
+    "type": "expense",
+    "isDefault": true,
+    "keywords": ["farmacia", "farmácia", "drogaria", "droga raia", "drogasil", "pague menos", "paguemenos", "panvel", "nissei", "ultrafarma", "remedio", "remédio", "medicamento", "farmadelivery", "farmadelivery", "drogaria sao paulo", "drogaria são paulo", "pacheco", "droga claro", "dipirona", "paracetamol", "ibuprofeno", "vitamina", "fralda", "pomada", "curativo", "termometro", "termômetro"]
+  },
+  {
+    "name": "Educação",
+    "icon": "graduation-cap",
+    "color": "#4338CA",
+    "type": "expense",
+    "isDefault": true,
+    "keywords": ["escola", "faculdade", "curso", "mensalidade", "colegio", "colégio", "universidade", "udemy", "alura", "cna", "wizard", "yazigi", "material escolar", "senac", "senai", "descomplica", "curso online", "kumon", "livro", "apostila", "caderno", "mochila", "caneta", "formatura"]
+  },
+  {
+    "name": "Streaming e assinaturas",
+    "icon": "play-circle",
+    "color": "#7C3AED",
+    "type": "expense",
+    "isDefault": true,
+    "keywords": ["netflix", "spotify", "prime video", "amazon prime", "disney", "disney plus", "disney+", "hbo", "hbo max", "max", "youtube premium", "youtube", "deezer", "globoplay", "paramount", "paramount plus", "paramount+", "apple tv", "apple tv+", "telecine", "premiere", "star plus", "star+", "crunchyroll", "mubi", "assinatura", "mensalidade app", "recorrencia", "recorrência", "google one", "icloud", "office 365", "microsoft 365", "canva", "chatgpt", "openai"]
+  },
+  {
+    "name": "Lazer",
+    "icon": "party-popper",
+    "color": "#C026D3",
+    "type": "expense",
+    "isDefault": true,
+    "keywords": ["cinema", "teatro", "show", "ingresso", "parque", "diversao", "diversão", "lazer", "barzinho", "evento", "balada", "festa"]
+  },
+  {
+    "name": "Pets",
+    "icon": "paw-print",
+    "color": "#7C3AED",
+    "type": "expense",
+    "isDefault": true,
+    "keywords": ["pet", "petshop", "pet shop", "veterinario", "veterinário", "ração", "racao", "banho e tosa", "cachorro", "gato", "animale", "cobasi", "petz", "whiskas", "golden", "premier pet", "areia gato", "consulta pet", "vacina pet", "petlove"]
+  },
+  {
+    "name": "Impostos e taxas",
+    "icon": "badge-percent",
+    "color": "#7F1D1D",
+    "type": "expense",
+    "isDefault": true,
+    "keywords": ["imposto", "iptu", "ipva", "taxa", "darf", "simples nacional", "mei", "tributo", "multa", "licenciamento", "inss", "irrf"]
+  },
+  {
+    "name": "Tarifas bancárias",
+    "icon": "banknote",
+    "color": "#6B7280",
+    "type": "expense",
+    "isDefault": true,
+    "keywords": ["tarifa", "taxa bancaria", "taxa bancária", "anuidade", "juros rotativo", "encargo", "iof", "mora", "multa cartao", "multa cartão", "pacote bancario", "pacote bancário"]
+  },
+  {
+    "name": "Dízimo",
+    "icon": "hand-coins",
+    "color": "#111111",
+    "type": "expense",
+    "isDefault": true,
+    "keywords": ["dizimo", "dízimo", "contribuicao", "contribuição", "igreja", "oferta", "congregacao", "congregação"]
+  },
+  {
+    "name": "Compras online",
+    "icon": "shopping-bag",
+    "color": "#0F766E",
+    "type": "expense",
+    "isDefault": true,
+    "keywords": ["mercado livre", "amazon", "shopee", "magalu", "magazine luiza", "americanas", "submarino", "aliexpress", "shein", "casas bahia", "pontofrio", "compra online", "ecommerce", "e-commerce", "kabum", "netshoes", "dafiti", "madeiramadeira", "shoptime"]
+  },
+  {
+    "name": "Vestuário",
+    "icon": "shirt",
+    "color": "#BE185D",
+    "type": "expense",
+    "isDefault": true,
+    "keywords": ["roupa", "calcado", "calçado", "vestuario", "vestuário", "renner", "riachuelo", "cea", "c&a", "zara", "nike", "adidas", "loja de roupa", "hering", "youcom", "shoulder", "animale", "centauro", "camisa", "calca", "calça", "bermuda", "tenis", "tênis", "sandalia", "sandália"]
+  },
+  {
+    "name": "Viagem",
+    "icon": "plane",
+    "color": "#0369A1",
+    "type": "expense",
+    "isDefault": true,
+    "keywords": ["viagem", "hotel", "hospedagem", "booking", "airbnb", "latam", "gol", "azul", "passagem aerea", "passagem aérea", "reserva hotel", "turismo", "rodoviaria", "rodoviária", "passagem", "trip", "hostel"]
+  },
+  {
+    "name": "Outras despesas",
+    "icon": "circle-help",
+    "color": "#6B7280",
+    "type": "expense",
+    "isDefault": true,
+    "keywords": ["ajuste", "despesa diversa", "outras despesas", "gasto avulso", "saída avulsa"]
+  }
+]
