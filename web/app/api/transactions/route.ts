@@ -1,9 +1,9 @@
 import { Prisma, Transaction, TransactionSource } from "@prisma/client";
 import { NextResponse } from "next/server";
 
+import { format } from "date-fns";
 import { syncDueSubscriptionTransactions } from "@/lib/automation/subscriptions";
 import { requireSessionUser } from "@/lib/auth/session";
-import { getCardExpenseCompetenceDate, getCardExpenseDueDate } from "@/lib/cards/statement";
 import { resolveTransactionClassification } from "@/lib/finance/transaction-classification";
 import { assertTenantTransactionReferences, TenantReferenceError } from "@/lib/finance/tenant-reference-guard";
 import { ensureTitheCategory, syncTitheForTransactionDates } from "@/lib/finance/tithe";
@@ -22,41 +22,27 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const filters = transactionFiltersSchema.parse({
       limit: searchParams.get("limit") ?? 20,
-      from: searchParams.get("from"),
-      to: searchParams.get("to"),
+      month: searchParams.get("month"), // Use month filter
       type: searchParams.get("type"),
       categoryId: searchParams.get("categoryId"),
       accountId: searchParams.get("accountId"),
       cardId: searchParams.get("cardId")
     });
+
+    if (!filters.month) {
+      return NextResponse.json({ error: "Parâmetro 'month' é obrigatório." }, { status: 400 });
+    }
+
     const where: Prisma.TransactionWhereInput = {
       tenantId: user.tenantId,
+      competence: filters.month, // Filter by competence
       ...(filters.type ? { type: filters.type } : {}),
       ...(filters.categoryId ? { categoryId: filters.categoryId } : {}),
       ...(filters.cardId ? { cardId: filters.cardId } : {})
     };
-    const isCardSearch = Boolean(filters.cardId || (!filters.accountId && !filters.categoryId));
-    const hasDateFilter = Boolean(filters.from || filters.to);
 
     if (filters.accountId) {
       where.OR = [{ accountId: filters.accountId }, { destinationAccountId: filters.accountId }];
-    }
-
-    if (hasDateFilter) {
-      where.date = {};
-
-      if (filters.from) {
-        const fromDate = new Date(`${filters.from}T00:00:00`);
-        // We only need the previous month buffer if searching for cards
-        if (isCardSearch) {
-          fromDate.setMonth(fromDate.getMonth() - 1);
-        }
-        where.date.gte = fromDate;
-      }
-
-      if (filters.to) {
-        where.date.lte = new Date(`${filters.to}T23:59:59`);
-      }
     }
 
     const transactions = await prisma.transaction.findMany({
@@ -68,34 +54,14 @@ export async function GET(request: Request) {
         card: true
       },
       orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-      // If we don't have cards involved, we can trust the DB limit 100%
-      take: isCardSearch && hasDateFilter ? Math.max(filters.limit * 8, 500) : filters.limit
+      take: filters.limit // Direct limit, no complex card search logic
     });
 
-    const filteredTransactions = isCardSearch && hasDateFilter
-      ? transactions
-          .filter((transaction) => {
-            const competenceDate = transaction.card
-              ? getCardExpenseCompetenceDate(transaction.card, transaction.date)
-              : transaction.date;
-
-            if (filters.from && competenceDate < new Date(`${filters.from}T00:00:00`)) {
-              return false;
-            }
-
-            if (filters.to && competenceDate > new Date(`${filters.to}T23:59:59`)) {
-              return false;
-            }
-
-            return true;
-          })
-          .slice(0, filters.limit)
-      : transactions;
-
     return NextResponse.json({
-      items: filteredTransactions.map((transaction) => ({
+      items: transactions.map((transaction) => ({
         id: transaction.id,
         date: transaction.date.toISOString(),
+        competence: transaction.competence, // Include competence in response
         amount: Number(transaction.amount),
         description: transaction.description,
         type: transaction.type,
@@ -127,8 +93,8 @@ export async function GET(request: Request) {
               name: transaction.card.name
             }
           : null,
-        competenceDate: transaction.card ? getCardExpenseCompetenceDate(transaction.card, transaction.date).toISOString() : null,
-        payableDate: transaction.card ? getCardExpenseDueDate(transaction.card, transaction.date).toISOString() : null,
+        // competenceDate: transaction.card ? getCardExpenseCompetenceDate(transaction.card, transaction.date).toISOString() : null,
+        // payableDate: transaction.card ? getCardExpenseDueDate(transaction.card, transaction.date).toISOString() : null,
         notes: transaction.notes,
         titheAmount: transaction.titheAmount ? Number(transaction.titheAmount) : null,
         applyTithe: Number(transaction.titheAmount ?? 0) > 0,
@@ -158,99 +124,105 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const user = await requireSessionUser();
-    const body = transactionFormSchema.parse(await request.json());
-    const parsedDate = new Date(`${body.date}T12:00:00`);
+    const body = await request.json();
+    const parsedData = transactionFormSchema.parse(body);
     const accountId = body.accountId || null;
-    const destinationAccountId = body.destinationAccountId || null;
-    const cardId = body.cardId || null;
-    const notes = body.notes?.trim() || null;
-    const installmentAmounts = splitAmountIntoInstallments(body.amount, body.installments);
+	const competenceKey = parsedData.competence || format(new Date(parsedData.date), "yyyy-MM");
+	const baseCompetenceDate = new Date(`${competenceKey}-15T12:00:00`);
+	const destinationAccountId = body.destinationAccountId || null;
+	const cardId = body.cardId || null;
+	const notes = body.notes?.trim() || null;
+	const installmentAmounts = splitAmountIntoInstallments(body.amount, body.installments);
 
-    await assertTenantTransactionReferences({
-      tenantId: user.tenantId,
-      accountId,
-      destinationAccountId,
-      cardId,
-      categoryId: body.categoryId
-    });
+	await assertTenantTransactionReferences({
+	  tenantId: user.tenantId,
+	  accountId,
+	  destinationAccountId,
+	  cardId,
+	  categoryId: body.categoryId
+	});
 
-    const selectedCard =
-      body.paymentMethod === "credit_card" && cardId
-        ? await prisma.card.findFirst({
-            where: {
-              id: cardId,
-              tenantId: user.tenantId,
-              isActive: true
-            },
-            select: {
-              id: true,
-              closeDay: true,
-              dueDay: true
-            }
-          })
-        : null;
+	const selectedCard =
+	  body.paymentMethod === "credit_card" && cardId
+	    ? await prisma.card.findFirst({
+	        where: {
+	          id: cardId,
+	          tenantId: user.tenantId,
+	          isActive: true
+	        },
+	        select: {
+	          id: true,
+	          closeDay: true,
+	          dueDay: true
+	        }
+	      })
+	    : null;
 
-    if (body.paymentMethod === "credit_card" && cardId && !selectedCard) {
-      return NextResponse.json({ message: "Cartão selecionado não foi encontrado" }, { status: 404 });
-    }
-    const classification = await resolveTransactionClassification({
-      tenantId: user.tenantId,
-      type: body.type,
-      description: body.description,
-      notes,
-      paymentMethod: body.paymentMethod,
-      categoryId: body.categoryId || null
-    });
-    const categoryId = classification.categoryId;
-    const applyTithe = body.type === "income" && body.applyTithe;
-    const titheCategoryId = applyTithe ? await ensureTitheCategory(user.tenantId) : null;
-    const affectedDates: Date[] = [];
+	if (body.paymentMethod === "credit_card" && cardId && !selectedCard) {
+	  return NextResponse.json({ message: "Cartão selecionado não foi encontrado" }, { status: 404 });
+	}
+	const classification = await resolveTransactionClassification({
+	  tenantId: user.tenantId,
+	  type: body.type,
+	  description: body.description,
+	  notes,
+	  paymentMethod: body.paymentMethod,
+	  categoryId: body.categoryId || null
+	});
+	const categoryId = classification.categoryId;
+	const applyTithe = body.type === "income" && body.applyTithe;
+	const titheCategoryId = applyTithe ? await ensureTitheCategory(user.tenantId) : null;
+	const affectedDates: Date[] = [];
 
-    let parentId: string | null = null;
-    let firstTransactionId: string | null = null;
+	let parentId: string | null = null;
+	let firstTransactionId: string | null = null;
 
-    for (let index = 0; index < body.installments; index += 1) {
-      const transactionDate = addMonthsClamped(parsedDate, index);
-      affectedDates.push(transactionDate);
-      const created: Transaction = await prisma.transaction.create({
-        data: {
-          tenantId: user.tenantId,
-          userId: user.id,
-          date: transactionDate,
-          amount: new Prisma.Decimal(installmentAmounts[index].toFixed(2)),
-          description:
-            body.installments > 1
-              ? `${body.description} (${index + 1}/${body.installments})`
-              : body.description,
-          notes,
-          type: body.type,
-          source: TransactionSource.manual,
-          paymentMethod: body.paymentMethod,
-          categoryId,
-          accountId,
-          destinationAccountId,
-          cardId,
-          installmentsTotal: body.installments,
-          installmentNumber: index + 1,
-          parentId,
-          titheAmount: applyTithe ? new Prisma.Decimal((installmentAmounts[index] * 0.1).toFixed(2)) : null,
-          titheCategoryId,
-          classificationSource: classification.classificationSource,
-          classificationKeyword: classification.classificationKeyword,
-          classificationReason: classification.reason,
-          classificationVersion: 2,
-          aiClassified: classification.aiClassified,
-          aiConfidence:
-            classification.confidence !== null ? new Prisma.Decimal(classification.confidence.toFixed(2)) : null
-        }
-      });
+	for (let index = 0; index < body.installments; index += 1) {
+	  const transactionDate = addMonthsClamped(new Date(parsedData.date), index);
+	  const competenceDate = addMonthsClamped(baseCompetenceDate, index);
+	  const competenceForInstallment = format(competenceDate, "yyyy-MM");
 
-      if (index === 0) {
-        parentId = created.id;
-        firstTransactionId = created.id;
-      }
-    }
+	  const created: Transaction = await prisma.transaction.create({
+	    data: {
+	      tenantId: user.tenantId,
+	      userId: user.id,
+	      date: transactionDate,
+	      competence: competenceForInstallment, // Use competence for this installment
+	      amount: new Prisma.Decimal(installmentAmounts[index].toFixed(2)),
+	      description:
+	        body.installments > 1
+	          ? `${body.description} (${index + 1}/${body.installments})`
+	          : body.description,
+	      notes,
+	      type: body.type,
+	      source: TransactionSource.manual,
+	      paymentMethod: body.paymentMethod,
+	      categoryId,
+	      accountId,
+	      destinationAccountId,
+	      cardId,
+	      installmentsTotal: body.installments,
+	      installmentNumber: index + 1,
+	      parentId,
+	      titheAmount: applyTithe ? new Prisma.Decimal((installmentAmounts[index] * 0.1).toFixed(2)) : null,
+	      titheCategoryId,
+	      classificationSource: classification.classificationSource,
+	      classificationKeyword: classification.classificationKeyword,
+	      classificationReason: classification.reason,
+	      classificationVersion: 2,
+	      aiClassified: classification.aiClassified,
+	      aiConfidence:
+	        classification.confidence !== null ? new Prisma.Decimal(classification.confidence.toFixed(2)) : null
+	    }
+	  });
 
+	  affectedDates.push(transactionDate); // Keep this to track affected dates
+
+	  if (index === 0) {
+	    parentId = created.id;
+	    firstTransactionId = created.id;
+	  }
+	}
     if (!firstTransactionId) {
       return NextResponse.json({ message: "Failed to create transaction" }, { status: 500 });
     }

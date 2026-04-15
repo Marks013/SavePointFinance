@@ -319,6 +319,7 @@ model Transaction {
   destinationAccountId String?
   cardId            String?
   date              DateTime
+  competence        String            @default("")
   amount            Decimal           @db.Decimal(15, 2)
   description       String
   notes             String?

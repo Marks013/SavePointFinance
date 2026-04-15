@@ -4,8 +4,7 @@ import { getAccountsWithComputedBalance } from "@/lib/finance/accounts";
 import { formatMonthKeyLabel, getCurrentMonthKey, getMonthRange } from "@/lib/month";
 import {
   calculateStatementTotal,
-  getCardExpenseCompetenceDate,
-  getCardExpenseDueDate,
+  getCardExpenseDueDate, // Keep this, used in upcoming calculations
   getStatementPaymentDate,
   getStatementRange
 } from "@/lib/cards/statement";
@@ -13,8 +12,7 @@ import { prisma } from "@/lib/prisma/client";
 import { advanceSubscriptionBillingDate } from "@/lib/subscriptions/recurrence";
 
 export type FinanceReportFilters = {
-  from?: string | null;
-  to?: string | null;
+  month?: string | null; // New field for YYYY-MM competence month
   baseMonth?: string | null;
   type?: string | null;
   accountId?: string | null;
@@ -228,13 +226,13 @@ function pickQuarterHighlight(quarters: QuarterSnapshot[], direction: "max" | "m
 }
 
 function getFilterRange(filters: FinanceReportFilters) {
-  if (filters.from && filters.to) {
-    return {
-      start: new Date(`${filters.from}T00:00:00`),
-      end: new Date(`${filters.to}T23:59:59`)
-    };
+  if (filters.month) {
+    // If month is provided, get the start and end of that month
+    const { start, end } = getMonthRange(filters.month);
+    return { start, end };
   }
 
+  // Fallback to current month if no specific month filter is provided
   const month = getCurrentMonthKey();
   const { start, end } = getMonthRange(month);
   return { start, end };
@@ -266,19 +264,11 @@ function buildTransactionWhere(
       : {})
   };
 
-  if (filters.from || filters.to) {
-    where.date = {};
-
-    if (filters.from) {
-      const fromDate = new Date(`${filters.from}T00:00:00`);
-      fromDate.setMonth(fromDate.getMonth() - 1);
-      where.date.gte = fromDate;
-    }
-
-    if (filters.to) {
-      where.date.lte = new Date(`${filters.to}T23:59:59`);
-    }
+  if (filters.month) {
+    where.competence = filters.month; // Filter by competence month
   }
+  // The date range logic based on 'from' and 'to' is removed.
+  // The competence filtering covers the primary use case.
 
   if (filters.accountId) {
     where.OR = [{ accountId: filters.accountId }, { destinationAccountId: filters.accountId }];
@@ -305,6 +295,7 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
         id: true,
         amount: true,
         date: true,
+        competence: true, // Include competence in the select
         description: true,
         type: true,
         categoryId: true,
@@ -473,20 +464,11 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
   };
   let classifiedAutomatically = 0;
   let uncategorizedTransactions = 0;
-  let transactionsInRange = 0;
-  const filteredTransactions = transactions.filter((transaction) => {
-    const competenceDate = transaction.card
-      ? getCardExpenseCompetenceDate(transaction.card, transaction.date)
-      : transaction.date;
-
-    return competenceDate >= projectionStart && competenceDate <= projectionEnd;
-  });
-
-  for (const transaction of filteredTransactions) {
-    const competenceDate = transaction.card
-      ? getCardExpenseCompetenceDate(transaction.card, transaction.date)
-      : transaction.date;
-    const monthKey = getMonthBucketKey(competenceDate);
+  // let transactionsInRange = 0; // No longer needed as all 'transactions' are in range by competence
+  // The transactions are already filtered by competence in the Prisma query.
+  // We will iterate directly over 'transactions' and use 'transaction.competence' for monthly aggregation.
+  for (const transaction of transactions) { // Iterate directly over 'transactions'
+    const monthKey = transaction.competence; // Use transaction.competence directly
     const amount = Number(transaction.amount);
     const monthly = monthlyMap.get(monthKey) ?? {
       income: 0,
@@ -495,7 +477,7 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
       transactions: 0,
       uncategorizedExpense: 0
     };
-    transactionsInRange += 1;
+    // transactionsInRange += 1; // No longer needed
     monthly.transactions += 1;
 
     if (transaction.type === TransactionType.income) {
@@ -612,23 +594,12 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
     monthlyMap.set(monthKey, monthly);
   }
 
-  summary.transactions = transactionsInRange;
+  summary.transactions = transactions.length; // Summary transactions count all fetched transactions
   summary.balance = summary.income - summary.expense;
-  const filterStart =
-    filters.from
-      ? new Date(`${filters.from}T00:00:00`)
-      : (filteredTransactions[0]?.card
-          ? getCardExpenseCompetenceDate(filteredTransactions[0].card, filteredTransactions[0].date)
-          : filteredTransactions[0]?.date) ?? projectionStart;
-  const lastFilteredTransaction = filteredTransactions.at(-1);
-  const filterEnd =
-    filters.to
-      ? new Date(`${filters.to}T23:59:59`)
-      : (lastFilteredTransaction
-          ? lastFilteredTransaction.card
-            ? getCardExpenseCompetenceDate(lastFilteredTransaction.card, lastFilteredTransaction.date)
-            : lastFilteredTransaction.date
-          : projectionEnd);
+  // The filterStart and filterEnd should be derived from the competence month range directly.
+  const filterStart = projectionStart;
+  const filterEnd = projectionEnd;
+
   const totalDays = Math.max(
     1,
     Math.ceil((filterEnd.getTime() - filterStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
@@ -1051,8 +1022,8 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
       autoClassified: classifiedAutomatically,
       uncategorized: uncategorizedTransactions,
       coverage:
-        filteredTransactions.length > 0
-          ? (filteredTransactions.length - uncategorizedTransactions) / filteredTransactions.length
+        transactions.length > 0
+          ? (transactions.length - uncategorizedTransactions) / transactions.length
           : 0
     },
     spendingInsights: {
@@ -1133,7 +1104,7 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
     byAccount,
     byCard,
     upcoming: upcoming.slice(0, 12),
-    recent: filteredTransactions
+    recent: transactions
       .slice(-12)
       .reverse()
       .map((transaction) => ({

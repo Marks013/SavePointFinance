@@ -53,14 +53,14 @@ function getStatementReferenceDate(month: string) {
 }
 
 async function getDashboardData(tenantId: string, month: string) {
-  const { start, end, from, to } = getMonthRange(month);
+  const { start, end } = getMonthRange(month);
   const statementReferenceDate = getStatementReferenceDate(month);
 
   try {
     const [accounts, monthlyReport, goals, recentTransactions, upcomingSubscriptions, upcomingGoals, activeCards] =
       await Promise.all([
         getAccountsWithComputedBalance(tenantId),
-        getFinanceReport(tenantId, { from, to }),
+        getFinanceReport(tenantId, { month }),
         prisma.goal.aggregate({
           where: {
             tenantId,

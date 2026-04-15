@@ -18,9 +18,8 @@ export async function GET(request: Request) {
     const resolvedMonth = month ? normalizeMonthKey(month) : null;
     const monthRange = resolvedMonth ? getMonthRange(resolvedMonth) : null;
     const report = await getFinanceReport(user.tenantId, {
-      from: searchParams.get("from") ?? monthRange?.from ?? null,
-      to: searchParams.get("to") ?? monthRange?.to ?? null,
-      baseMonth: resolvedMonth,
+      month: resolvedMonth, // Pass resolvedMonth to the new 'month' filter
+      baseMonth: resolvedMonth, // Keep baseMonth for other internal logic if needed
       type: searchParams.get("type"),
       accountId: searchParams.get("accountId"),
       cardId: searchParams.get("cardId"),

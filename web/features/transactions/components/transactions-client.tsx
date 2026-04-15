@@ -102,8 +102,7 @@ async function getTransactionsWithFilters(filters: TransactionFiltersValues) {
     limit: String(filters.limit ?? 30)
   });
 
-  if (filters.from) searchParams.set("from", filters.from);
-  if (filters.to) searchParams.set("to", filters.to);
+  if (filters.month) searchParams.set("month", filters.month);
   if (filters.type) searchParams.set("type", filters.type);
   if (filters.categoryId) searchParams.set("categoryId", filters.categoryId);
   if (filters.accountId) searchParams.set("accountId", filters.accountId);
@@ -198,9 +197,9 @@ function getMonthKeyFromDate(value: string) {
   return formatDateKey(new Date(value)).slice(0, 7);
 }
 
-function buildEmptyTransactionValues(): TransactionFormValues {
+function buildEmptyTransactionValues(monthKey: string): TransactionFormValues {
   return {
-    date: formatDateKey(new Date()),
+    date: new Date(formatDateKey(new Date()) + "T12:00:00"),
     amount: 0,
     description: "",
     type: "expense",
@@ -211,6 +210,7 @@ function buildEmptyTransactionValues(): TransactionFormValues {
     cardId: "",
     notes: "",
     installments: 1,
+    competence: monthKey, // Add competence here
     applyTithe: false
   };
 }
@@ -238,8 +238,7 @@ export function TransactionsClient() {
   const [reviewSelections, setReviewSelections] = useState<ReviewSelectionState>({});
   const [filters, setFilters] = useState<TransactionFiltersValues>({
     limit: 30,
-    from: monthRange.from,
-    to: monthRange.to,
+    month: month,
     type: undefined,
     categoryId: "",
     accountId: "",
@@ -297,7 +296,7 @@ export function TransactionsClient() {
 
   const form = useForm<z.input<typeof transactionFormSchema>, unknown, TransactionFormValues>({
     resolver: zodResolver(transactionFormSchema),
-    defaultValues: buildEmptyTransactionValues()
+    defaultValues: buildEmptyTransactionValues(month) // Pass the 'month' variable
   });
 
   const saveMutation = useMutation({
@@ -326,7 +325,7 @@ export function TransactionsClient() {
       }
       setEditingScope("single");
       setEditingInstallmentsTotal(1);
-      form.reset(buildEmptyTransactionValues());
+      form.reset(buildEmptyTransactionValues(month)); // Pass the 'month' variable
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["transactions"] }),
         queryClient.invalidateQueries({ queryKey: ["accounts"] }),
@@ -354,7 +353,7 @@ export function TransactionsClient() {
       if (editingId) {
         setEditingId(null);
         setIsEditorOpen(false);
-        form.reset(buildEmptyTransactionValues());
+        form.reset(buildEmptyTransactionValues(month));
       }
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["transactions"] }),
@@ -423,7 +422,7 @@ export function TransactionsClient() {
     setIsEditorOpen(false);
     setEditingScope("single");
     setEditingInstallmentsTotal(1);
-    form.reset(buildEmptyTransactionValues());
+    form.reset(buildEmptyTransactionValues(month)); // Pass the 'month' variable
   };
 
   const openCreateForm = () => {
@@ -431,7 +430,7 @@ export function TransactionsClient() {
     setIsEditorOpen(true);
     setEditingScope("single");
     setEditingInstallmentsTotal(1);
-    form.reset(buildEmptyTransactionValues());
+    form.reset(buildEmptyTransactionValues(month)); // Pass the 'month' variable
   };
 
   const selectedType = form.watch("type") ?? "expense";
@@ -932,26 +931,7 @@ export function TransactionsClient() {
         </div>
 
         <div className="mt-6 grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
-          <div className="space-y-2">
-            <Label htmlFor="transactions-filter-from">De</Label>
-            <DatePickerInput
-              disabled
-              id="transactions-filter-from"
-              readOnly
-              type="date"
-              value={filters.from ?? ""}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="transactions-filter-to">Até</Label>
-            <DatePickerInput
-              disabled
-              id="transactions-filter-to"
-              readOnly
-              type="date"
-              value={filters.to ?? ""}
-            />
-          </div>
+
           <div className="space-y-2">
             <Label htmlFor="transactions-filter-type">Tipo</Label>
             <Select
@@ -1046,8 +1026,7 @@ export function TransactionsClient() {
             onClick={() =>
               setFilters({
                 limit: 30,
-                from: monthRange.from,
-                to: monthRange.to,
+                month: month,
                 type: undefined,
                 categoryId: "",
                 accountId: "",

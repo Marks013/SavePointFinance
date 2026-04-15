@@ -11,6 +11,7 @@ import { resolveTransactionClassification } from "@/lib/finance/transaction-clas
 import { ensureTitheCategory, getMonthKey, syncMonthlyTitheTransaction } from "@/lib/finance/tithe";
 import { prisma } from "@/lib/prisma/client";
 import { advanceSubscriptionBillingDate } from "@/lib/subscriptions/recurrence";
+import { format } from "date-fns";
 import { formatDateDisplay, formatDateKey } from "@/lib/date";
 import { formatCurrency } from "@/lib/utils";
 
@@ -212,10 +213,10 @@ export async function generateSubscriptionTransaction(subscriptionId: string, te
       userId: subscription.userId ?? userId,
       subscriptionId: subscription.id,
       date: nextBillingDate,
+      competence: format(nextBillingDate, "yyyy-MM"), // Add competence here
       amount: subscription.amount,
       description: `Assinatura: ${subscription.name}`,
-      type: subscription.type === "income" ? TransactionType.income : TransactionType.expense,
-      paymentMethod: subscription.cardId ? PaymentMethod.credit_card : PaymentMethod.money,
+      type: subscription.type === "income" ? TransactionType.income : TransactionType.expense,      paymentMethod: subscription.cardId ? PaymentMethod.credit_card : PaymentMethod.money,
       categoryId: classification.categoryId,
       accountId: subscription.accountId,
       cardId: subscription.cardId,
@@ -702,8 +703,7 @@ export async function runRecurringAutomation(tenantId: string, userId: string) {
     const report = await getFinanceReport(
       tenantId,
       {
-        from: `${monthToken}-01`,
-        to: formatDateKey(new Date(reportDate.getFullYear(), reportDate.getMonth() + 1, 0))
+        month: monthToken
       }
     );
     const message =

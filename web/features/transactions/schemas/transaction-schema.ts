@@ -1,14 +1,14 @@
 import { z } from "zod";
 
-import { dateKeySchema, optionalDateKeySchema } from "@/lib/date";
+import { dateKeySchema } from "@/lib/date";
 
 export const transactionTypeValues = ["income", "expense", "transfer"] as const;
 export const paymentMethodValues = ["pix", "money", "credit_card", "debit_card", "transfer"] as const;
 export const transactionEditScopeValues = ["single", "group"] as const;
 
-export const transactionFormSchema = z
-  .object({
-    date: dateKeySchema,
+export const transactionFormSchema =
+  z.object({
+    date: z.coerce.date(),
     amount: z.coerce.number().positive("Informe um valor maior que zero"),
     description: z.string().trim().min(3, "Informe uma descricao"),
     type: z.enum(transactionTypeValues),
@@ -19,9 +19,9 @@ export const transactionFormSchema = z
     cardId: z.string().optional().nullable(),
     notes: z.string().optional().nullable(),
     installments: z.coerce.number().int().min(1).max(120).default(1),
+	competence: z.string().regex(/^\d{4}-\d{2}$/, "Formato inválido. Use YYYY-MM").optional(),
     applyTithe: z.boolean().default(false)
-  })
-  .superRefine((value, ctx) => {
+  }).superRefine((value, ctx) => {
     if (value.type !== "income" && value.applyTithe) {
       ctx.addIssue({
         code: "custom",
@@ -118,8 +118,7 @@ export const transactionFormSchema = z
 
 export const transactionFiltersSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
-  from: optionalDateKeySchema,
-  to: optionalDateKeySchema,
+  month: z.string().regex(/^\d{4}-\d{2}$/, "Formato inválido. Use YYYY-MM").optional().nullable(),
   type: z.enum(transactionTypeValues).optional().nullable(),
   categoryId: z.string().optional().nullable(),
   accountId: z.string().optional().nullable(),

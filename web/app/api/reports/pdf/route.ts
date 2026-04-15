@@ -18,22 +18,22 @@ type ExecutiveSummary = {
   bullets?: string[];
 };
 
-function formatScopeLabel(scope: "month" | "year" | "custom", from?: string | null, to?: string | null) {
-  if (scope === "year" && from) {
-    return `Exercicio ${from.slice(0, 4)}`;
+function formatScopeLabel(scope: "month" | "year" | "custom", month?: string | null) {
+  if (scope === "year" && month) {
+    return `Exercicio ${month.slice(0, 4)}`;
   }
 
-  if (scope === "month" && from) {
-    const [year, month] = from.split("-").map(Number);
+  if (scope === "month" && month) {
+    const [year, m] = month.split("-").map(Number);
 
     return new Intl.DateTimeFormat("pt-BR", {
       month: "long",
       year: "numeric"
-    }).format(new Date(year ?? 0, (month ?? 1) - 1, 1));
+    }).format(new Date(year ?? 0, (m ?? 1) - 1, 1));
   }
 
-  if (from && to) {
-    return `${from} a ${to}`;
+  if (month) {
+    return `Competencia ${month}`;
   }
 
   return "Consolidado geral";
@@ -104,18 +104,16 @@ export async function GET(request: Request) {
     const resolvedMonth = month ? normalizeMonthKey(month) : null;
     const monthRange = resolvedMonth ? getMonthRange(resolvedMonth) : null;
     const report = (await getFinanceReport(user.tenantId, {
-      from: searchParams.get("from") ?? monthRange?.from ?? null,
-      to: searchParams.get("to") ?? monthRange?.to ?? null,
+      month: resolvedMonth,
       baseMonth: resolvedMonth,
       type: searchParams.get("type"),
       accountId: searchParams.get("accountId"),
       cardId: searchParams.get("cardId"),
       categoryId: searchParams.get("categoryId")
     })) as ExtendedReport;
-    const scopeLabel = formatScopeLabel(report.period.scope, report.filters.from, report.filters.to);
+    const scopeLabel = formatScopeLabel(report.period.scope, report.filters.month);
     const periodParts = [
-      report.filters.from ? `Inicio ${report.filters.from}` : null,
-      report.filters.to ? `Fim ${report.filters.to}` : null,
+      report.filters.month ? `Competencia ${report.filters.month}` : null,
       report.filters.type ? `Tipo ${report.filters.type}` : null
     ].filter(Boolean);
     const documentTitle =
@@ -126,7 +124,7 @@ export async function GET(request: Request) {
           : "Relatorio gerencial financeiro";
     const filename =
       report.period.scope === "year"
-        ? `savepoint-relatorio-anual-${report.filters.from?.slice(0, 4) ?? "geral"}.pdf`
+        ? `savepoint-relatorio-anual-${report.filters.month?.slice(0, 4) ?? "geral"}.pdf`
         : report.period.scope === "month"
           ? `savepoint-relatorio-mensal-${resolvedMonth ?? "geral"}.pdf`
           : "savepoint-relatorio-gerencial.pdf";

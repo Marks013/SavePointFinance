@@ -598,8 +598,7 @@ async function main() {
     const report = await getFinanceReport(
       tenant.id,
       {
-        from: "2026-01-01",
-        to: "2026-02-28"
+        month: "2026-01"
       }
     );
     assertCondition(Math.abs(report.summary.income - 1500) < 0.0001, `Receitas do relatório incoerentes: ${report.summary.income}`);

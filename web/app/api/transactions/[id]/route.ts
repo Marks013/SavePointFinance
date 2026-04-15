@@ -8,6 +8,7 @@ import { ensureTitheCategory, syncTitheForTransactionDates } from "@/lib/finance
 import { captureRequestError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
 import { addMonthsClamped } from "@/lib/utils";
+import { format } from "date-fns";
 import { transactionUpdateSchema } from "@/features/transactions/schemas/transaction-schema";
 
 type Params = {
@@ -89,6 +90,8 @@ export async function PATCH(request: Request, context: Params) {
       return NextResponse.json({ message: "Cartão selecionado não foi encontrado" }, { status: 404 });
     }
 
+    const competenceForSingleUpdate = body.competence || format(updatedDate, "yyyy-MM");
+    const baseCompetenceDate = new Date(`${competenceForSingleUpdate}-15T12:00:00`);
     const groupRootId = existingTransaction.parentId ?? (existingTransaction.installmentsTotal > 1 ? existingTransaction.id : null);
     const updateWholeGroup = body.editScope === "group" && Boolean(groupRootId);
 
@@ -113,6 +116,7 @@ export async function PATCH(request: Request, context: Params) {
         installments.map((installment) => {
           const monthOffset = installment.installmentNumber - existingTransaction.installmentNumber;
           const nextDate = addMonthsClamped(updatedDate, monthOffset);
+          const nextCompetenceDate = addMonthsClamped(baseCompetenceDate, monthOffset);
 
           return prisma.transaction.update({
             where: {
@@ -120,6 +124,7 @@ export async function PATCH(request: Request, context: Params) {
             },
             data: {
               date: nextDate,
+              competence: format(nextCompetenceDate, "yyyy-MM"),
               amount: new Prisma.Decimal(body.amount.toFixed(2)),
               description: buildInstallmentDescription(body.description, installment.installmentNumber, installment.installmentsTotal),
               type: body.type,
@@ -168,6 +173,7 @@ export async function PATCH(request: Request, context: Params) {
       },
       data: {
         date: updatedDate,
+        competence: competenceForSingleUpdate,
         amount: new Prisma.Decimal(body.amount.toFixed(2)),
         description: buildInstallmentDescription(body.description, existingTransaction.installmentNumber, existingTransaction.installmentsTotal),
         type: body.type,
