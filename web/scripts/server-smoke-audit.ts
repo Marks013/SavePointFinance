@@ -354,7 +354,7 @@ async function run() {
 	"Cartões em operação"
     ],
     minimumMatches: 3
-  ]);
+  });
   results.push("Dashboard principal carregou com conteudo esperado");
 
   await expectPage(dataJar, "/dashboard/accounts", {
@@ -373,7 +373,7 @@ async function run() {
 	  "Movimentações recentes"
     ],
 	minimumMatches: 4
-  ]);
+  });
   results.push("Tela de transacoes carregou com conteudo esperado");
 
   await expectPage(dataJar, "/dashboard/subscriptions", {
@@ -397,7 +397,7 @@ async function run() {
 	  "Movimentações recentes"
     ],
     minimumMatches: 4
-  ]);
+  });
   results.push("Tela de relatorios carregou com conteudo esperado");
 
   await expectPage(dataJar, "/dashboard/settings", {
@@ -409,7 +409,7 @@ async function run() {
 	  "Entregas recentes"
     ],
     minimumMatches: 4
-  ]);
+  });
   results.push("Tela de configuracoes carregou com conteudo esperado");
 
   await expectPage(dataJar, "/dashboard/goals", [
