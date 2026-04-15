@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { accountFormSchema } from "@/features/accounts/schemas/account-schema";
 import { requireSessionUser } from "@/lib/auth/session";
+import { revalidateFinanceReports } from "@/lib/cache/finance-read-models";
 import { getAccountsWithComputedBalance } from "@/lib/finance/accounts";
 import { canCreateAccount } from "@/lib/licensing/server";
 import { getMonthRange, normalizeMonthKey } from "@/lib/month";
@@ -106,6 +107,7 @@ export async function POST(request: Request) {
         institution: body.institution?.trim() || null
       }
     });
+    revalidateFinanceReports(user.tenantId);
 
     return NextResponse.json(
       {

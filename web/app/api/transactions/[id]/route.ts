@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 import { requireSessionUser } from "@/lib/auth/session";
+import { revalidateFinanceReports } from "@/lib/cache/finance-read-models";
 import { buildCardBillingSnapshot } from "@/lib/cards/statement";
 import { resolveTransactionClassification } from "@/lib/finance/transaction-classification";
 import { assertTenantTransactionReferences, TenantReferenceError } from "@/lib/finance/tenant-reference-guard";
@@ -191,6 +192,7 @@ export async function PATCH(request: Request, context: Params) {
           ]
         });
       }
+      revalidateFinanceReports(user.tenantId);
 
       return NextResponse.json({
         id,
@@ -237,6 +239,7 @@ export async function PATCH(request: Request, context: Params) {
         dates: [existingTransaction.date, updatedDate]
       });
     }
+    revalidateFinanceReports(user.tenantId);
 
     return NextResponse.json({
       id: updated.id,
@@ -290,6 +293,7 @@ export async function DELETE(request: Request, context: Params) {
         dates: [existingTransaction.date]
       });
     }
+    revalidateFinanceReports(user.tenantId);
 
     return NextResponse.json({ success: true });
   } catch (error) {

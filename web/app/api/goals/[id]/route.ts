@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { goalFormSchema } from "@/features/goals/schemas/goal-schema";
 import { requireSessionUser } from "@/lib/auth/session";
+import { revalidateFinanceReports } from "@/lib/cache/finance-read-models";
 import { assertTenantAccountReference, TenantReferenceError } from "@/lib/finance/tenant-reference-guard";
 import { captureRequestError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
@@ -37,6 +38,7 @@ export async function PATCH(request: Request, context: Params) {
         completedAt: body.currentAmount >= body.targetAmount ? new Date() : null
       }
     });
+    revalidateFinanceReports(user.tenantId);
 
     return NextResponse.json(updated);
   } catch (error) {
@@ -64,6 +66,7 @@ export async function DELETE(request: Request, context: Params) {
         tenantId: user.tenantId
       }
     });
+    revalidateFinanceReports(user.tenantId);
 
     return NextResponse.json({ success: true });
   } catch (error) {

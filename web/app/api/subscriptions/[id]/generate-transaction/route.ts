@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { generateSubscriptionTransaction } from "@/lib/automation/subscriptions";
 import { requireSessionUser } from "@/lib/auth/session";
+import { revalidateFinanceReports } from "@/lib/cache/finance-read-models";
 import { captureRequestError } from "@/lib/observability/sentry";
 
 type Params = {
@@ -13,6 +14,7 @@ export async function POST(request: Request, context: Params) {
     const user = await requireSessionUser();
     const { id } = await context.params;
     const result = await generateSubscriptionTransaction(id, user.tenantId, user.id);
+    revalidateFinanceReports(user.tenantId);
 
     return NextResponse.json({
       transactionId: result.transactionId,

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { categoryFormSchema } from "@/features/categories/schemas/category-schema";
 import { requireSessionUser } from "@/lib/auth/session";
+import { revalidateFinanceReports } from "@/lib/cache/finance-read-models";
 import { invalidateTenantClassificationCache } from "@/lib/finance/classification-cache";
 import {
   buildCategoryKeywords,
@@ -92,6 +93,7 @@ export async function POST(request: Request) {
     });
 
     invalidateTenantClassificationCache(user.tenantId);
+    revalidateFinanceReports(user.tenantId);
 
     return NextResponse.json(
       {

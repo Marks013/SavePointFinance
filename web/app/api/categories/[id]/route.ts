@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { categoryFormSchema } from "@/features/categories/schemas/category-schema";
 import { requireSessionUser } from "@/lib/auth/session";
+import { revalidateFinanceReports } from "@/lib/cache/finance-read-models";
 import { invalidateTenantClassificationCache } from "@/lib/finance/classification-cache";
 import { buildCategoryKeywords, getDefaultCategorySystemKey, normalizeCategoryName } from "@/lib/finance/default-categories";
 import { captureRequestError } from "@/lib/observability/sentry";
@@ -64,6 +65,7 @@ export async function PATCH(request: Request, context: Params) {
     });
 
     invalidateTenantClassificationCache(user.tenantId);
+    revalidateFinanceReports(user.tenantId);
 
     return NextResponse.json(updated);
   } catch (error) {
@@ -113,6 +115,7 @@ export async function DELETE(request: Request, context: Params) {
     });
 
     invalidateTenantClassificationCache(user.tenantId);
+    revalidateFinanceReports(user.tenantId);
 
     return NextResponse.json({ success: true });
   } catch (error) {

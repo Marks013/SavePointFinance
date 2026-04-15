@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { requireSessionUser } from "@/lib/auth/session";
+import { revalidateFinanceReports } from "@/lib/cache/finance-read-models";
 import { invalidateTenantClassificationCache } from "@/lib/finance/classification-cache";
 import { ensureTenantDefaultCategories } from "@/lib/finance/default-categories";
 import { captureRequestError } from "@/lib/observability/sentry";
@@ -17,6 +18,7 @@ export async function POST(request: Request) {
 
     await ensureTenantDefaultCategories(user.tenantId);
     invalidateTenantClassificationCache(user.tenantId);
+    revalidateFinanceReports(user.tenantId);
 
     const after = await prisma.category.count({
       where: {

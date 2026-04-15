@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { format } from "date-fns";
 import { syncDueSubscriptionTransactions } from "@/lib/automation/subscriptions";
 import { requireSessionUser } from "@/lib/auth/session";
+import { revalidateFinanceReports } from "@/lib/cache/finance-read-models";
 import { buildCardBillingSnapshot } from "@/lib/cards/statement";
 import { ensureTenantCardStatementSnapshots } from "@/lib/cards/snapshot-sync";
 import { resolveTransactionClassification } from "@/lib/finance/transaction-classification";
@@ -288,6 +289,7 @@ export async function POST(request: Request) {
         card: true
       }
     });
+    revalidateFinanceReports(user.tenantId);
 
     return NextResponse.json(
       {

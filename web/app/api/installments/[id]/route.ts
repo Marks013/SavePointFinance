@@ -5,6 +5,7 @@ import {
   installmentReconcileSchema
 } from "@/features/installments/schemas/installment-schema";
 import { requireSessionUser } from "@/lib/auth/session";
+import { revalidateFinanceReports } from "@/lib/cache/finance-read-models";
 import { assertTenantCategoryReference, TenantReferenceError } from "@/lib/finance/tenant-reference-guard";
 import { captureRequestError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
@@ -24,6 +25,7 @@ export async function DELETE(request: Request, context: Params) {
         OR: [{ id }, { parentId: id }]
       }
     });
+    revalidateFinanceReports(user.tenantId);
 
     return NextResponse.json({ success: true });
   } catch (error) {
@@ -112,6 +114,7 @@ export async function PATCH(request: Request, context: Params) {
         })
       )
     );
+    revalidateFinanceReports(user.tenantId);
 
     return NextResponse.json({ success: true });
   } catch (error) {

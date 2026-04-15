@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { cardFormSchema } from "@/features/cards/schemas/card-schema";
 import { requireSessionUser } from "@/lib/auth/session";
+import { revalidateFinanceReports } from "@/lib/cache/finance-read-models";
 import { getCardStatementSnapshot, getNextPayableStatementSnapshot, statementMonthSchema } from "@/lib/cards/statement";
 import { ensureTenantCardStatementSnapshots } from "@/lib/cards/snapshot-sync";
 import { canCreateCard } from "@/lib/licensing/server";
@@ -140,6 +141,7 @@ export async function POST(request: Request) {
         institution: body.institution?.trim() || null
       }
     });
+    revalidateFinanceReports(user.tenantId);
 
     return NextResponse.json(
       {

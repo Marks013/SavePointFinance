@@ -7,6 +7,7 @@ import {
   getCurrentPayableStatementMonth,
   getStatementPaymentDate
 } from "@/lib/cards/statement";
+import { revalidateFinanceReports } from "@/lib/cache/finance-read-models";
 import { getFinanceReport } from "@/lib/finance/reports";
 import { resolveTransactionClassification } from "@/lib/finance/transaction-classification";
 import { ensureTitheCategory, getMonthKey, syncMonthlyTitheTransaction } from "@/lib/finance/tithe";
@@ -199,6 +200,7 @@ export async function generateSubscriptionTransaction(subscriptionId: string, te
         nextBillingDate: followingBillingDate
       }
     });
+    revalidateFinanceReports(tenantId);
 
     return {
       transactionId: existing.id,
@@ -263,6 +265,7 @@ export async function generateSubscriptionTransaction(subscriptionId: string, te
       monthKey: getMonthKey(nextBillingDate)
     });
   }
+  revalidateFinanceReports(tenantId);
 
   return {
     transactionId: transaction.id,

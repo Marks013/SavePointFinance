@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireSessionUser } from "@/lib/auth/session";
+import { revalidateFinanceReports } from "@/lib/cache/finance-read-models";
 import { deriveRuleKeyword } from "@/lib/finance/category-rules";
 import { invalidateTenantClassificationCache } from "@/lib/finance/classification-cache";
 import { captureRequestError } from "@/lib/observability/sentry";
@@ -175,6 +176,7 @@ export async function PATCH(request: Request, context: Params) {
     });
 
     invalidateTenantClassificationCache(user.tenantId);
+    revalidateFinanceReports(user.tenantId);
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -3,6 +3,7 @@ import { after, NextResponse } from "next/server";
 import { subscriptionFormSchema } from "@/features/subscriptions/schemas/subscription-schema";
 import { syncDueSubscriptionTransactions } from "@/lib/automation/subscriptions";
 import { requireSessionUser } from "@/lib/auth/session";
+import { revalidateFinanceReports } from "@/lib/cache/finance-read-models";
 import { resolveTransactionClassification } from "@/lib/finance/transaction-classification";
 import { assertTenantTransactionReferences, TenantReferenceError } from "@/lib/finance/tenant-reference-guard";
 import { captureRequestError, captureUnexpectedError } from "@/lib/observability/sentry";
@@ -48,6 +49,7 @@ export async function PATCH(request: Request, context: Params) {
         autoTithe: body.autoTithe && body.type === "income"
       }
     });
+    revalidateFinanceReports(user.tenantId);
 
     after(async () => {
       await syncDueSubscriptionTransactions({
@@ -90,6 +92,7 @@ export async function DELETE(request: Request, context: Params) {
     await prisma.subscription.delete({
       where: { id, tenantId: user.tenantId }
     });
+    revalidateFinanceReports(user.tenantId);
 
     return NextResponse.json({ success: true });
   } catch (error) {

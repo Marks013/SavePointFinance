@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { syncDueSubscriptionTransactions } from "@/lib/automation/subscriptions";
 import { requireSessionUser } from "@/lib/auth/session";
-import { getFinanceReport } from "@/lib/finance/reports";
+import { getCachedFinanceReport } from "@/lib/cache/finance-read-models";
 import { normalizeMonthKey } from "@/lib/month";
 import { captureRequestError } from "@/lib/observability/sentry";
 
@@ -16,7 +16,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const month = searchParams.get("month");
     const resolvedMonth = month ? normalizeMonthKey(month) : null;
-    const report = await getFinanceReport(user.tenantId, {
+    const report = await getCachedFinanceReport(user.tenantId, {
       month: resolvedMonth,
       baseMonth: resolvedMonth,
       from: searchParams.get("from"),

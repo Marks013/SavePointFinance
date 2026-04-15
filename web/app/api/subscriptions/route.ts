@@ -3,6 +3,7 @@ import { after, NextResponse } from "next/server";
 import { subscriptionFormSchema } from "@/features/subscriptions/schemas/subscription-schema";
 import { syncDueSubscriptionTransactions } from "@/lib/automation/subscriptions";
 import { requireSessionUser } from "@/lib/auth/session";
+import { revalidateFinanceReports } from "@/lib/cache/finance-read-models";
 import { resolveTransactionClassification } from "@/lib/finance/transaction-classification";
 import { assertTenantTransactionReferences, TenantReferenceError } from "@/lib/finance/tenant-reference-guard";
 import { getMonthRange, normalizeMonthKey } from "@/lib/month";
@@ -147,6 +148,7 @@ export async function POST(request: Request) {
         autoTithe: body.autoTithe && body.type === "income"
       }
     });
+    revalidateFinanceReports(user.tenantId);
 
     after(async () => {
       await syncDueSubscriptionTransactions({

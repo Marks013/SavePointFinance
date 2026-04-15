@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { cardFormSchema } from "@/features/cards/schemas/card-schema";
 import { requireSessionUser } from "@/lib/auth/session";
+import { revalidateFinanceReports } from "@/lib/cache/finance-read-models";
 import { freezeCardStatementSnapshotsBeforeCardUpdate } from "@/lib/cards/snapshot-sync";
 import { captureRequestError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
@@ -57,6 +58,7 @@ export async function PATCH(request: Request, context: Params) {
         institution: body.institution?.trim() || null
       }
     });
+    revalidateFinanceReports(user.tenantId);
 
     return NextResponse.json(updated);
   } catch (error) {
@@ -89,6 +91,7 @@ export async function DELETE(request: Request, context: Params) {
         tenantId: user.tenantId
       }
     });
+    revalidateFinanceReports(user.tenantId);
 
     return NextResponse.json({ success: true });
   } catch (error) {

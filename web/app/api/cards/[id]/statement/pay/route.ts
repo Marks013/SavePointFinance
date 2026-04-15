@@ -4,6 +4,7 @@ import { format } from "date-fns";
 import { z } from "zod";
 
 import { requireSessionUser } from "@/lib/auth/session";
+import { revalidateFinanceReports } from "@/lib/cache/finance-read-models";
 import { getCardStatementSnapshot, getStatementPaymentDate, statementMonthSchema } from "@/lib/cards/statement";
 import { ensureTenantCardStatementSnapshots } from "@/lib/cards/snapshot-sync";
 import { captureRequestError } from "@/lib/observability/sentry";
@@ -109,6 +110,7 @@ export async function POST(request: Request, context: Params) {
         }
       });
     });
+    revalidateFinanceReports(user.tenantId);
 
     return NextResponse.json(
       {
