@@ -414,7 +414,7 @@ export const categoryColorPresets: PresetOption[] = [
   {
     value: "#B45309",
     label: "Âmbar",
-    shortLabel: "Â",
+    shortLabel: "A",
     color: "#B45309",
     background: "rgba(180,83,9,0.14)"
   },

@@ -33,7 +33,7 @@ const brand = {
 
 function escapeHtml(value: string) {
   return value
-    .replaceAll("&", "&amp;")
+    .replaceAll("&", "&")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")

@@ -127,14 +127,14 @@ export function GoalsClient() {
       ]);
     },
     onError: () => {
-      toast.error(editingId ? "NÃƒÂ£o foi possÃƒÂ­vel atualizar a meta" : "NÃƒÂ£o foi possÃƒÂ­vel criar a meta");
+      toast.error(editingId ? "Não foi possível atualizar a meta" : "Não foi possível criar a meta");
     }
   });
 
   const deleteMutation = useMutation({
     mutationFn: deleteGoal,
     onSuccess: async () => {
-      toast.success("Meta excluÃƒÂ­da");
+      toast.success("Meta excluída");
       if (editingId) {
         setEditingId(null);
         setIsEditorOpen(false);
@@ -145,7 +145,7 @@ export function GoalsClient() {
       ]);
     },
     onError: () => {
-      toast.error("NÃƒÂ£o foi possÃƒÂ­vel excluir a meta");
+      toast.error("Não foi possível excluir a meta");
     }
   });
 
@@ -196,7 +196,7 @@ export function GoalsClient() {
           ) : null}
         </div>
         <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--color-muted-foreground)]">
-          Acompanhe objetivos financeiros com valor atual, valor alvo, prazo e vÃƒÂ­nculo opcional com a conta que sustenta
+          Acompanhe objetivos financeiros com valor atual, valor alvo, prazo e vínculo opcional com a conta que sustenta
           essa reserva.
         </p>
 
@@ -245,7 +245,7 @@ export function GoalsClient() {
                 </div>
               </div>
               <div className="space-y-2 md:col-span-3">
-                <Label htmlFor="goal-icon">ÃƒÂcone</Label>
+                <Label htmlFor="goal-icon">Ícone</Label>
                 <Input id="goal-icon" {...form.register("icon")} />
               </div>
             </div>
@@ -270,7 +270,7 @@ export function GoalsClient() {
                 swatchOnly
               />
               <p className="text-sm text-[var(--color-muted-foreground)]">
-                A cor escolhida serÃƒÂ¡ usada no progresso da meta e na identificaÃƒÂ§ÃƒÂ£o visual da reserva.
+                A cor escolhida será usada no progresso da meta e na identificação visual da reserva.
               </p>
             </div>
             <Button className="w-full" disabled={saveMutation.isPending} type="submit">
@@ -278,13 +278,13 @@ export function GoalsClient() {
             </Button>
             {isEditing ? (
               <Button className="w-full" onClick={cancelEditing} type="button" variant="ghost">
-                Cancelar ediÃƒÂ§ÃƒÂ£o
+                Cancelar edição
               </Button>
             ) : null}
           </form>
         ) : (
           <div className="muted-panel mt-8 flex flex-col gap-4 px-4 py-5 text-sm text-[var(--color-muted-foreground)]">
-            <p>O editor foi fechado apÃƒÂ³s a ÃƒÂºltima ediÃƒÂ§ÃƒÂ£o concluÃƒÂ­da.</p>
+            <p>O editor foi fechado após a última edição concluída.</p>
             <Button className="w-full sm:w-auto" onClick={openCreateForm} type="button" variant="secondary">
               Nova meta
             </Button>
@@ -297,7 +297,7 @@ export function GoalsClient() {
           <div>
             <h2 className="text-2xl font-semibold tracking-[-0.03em]">Metas ativas</h2>
             <p className="mt-2 text-sm leading-7 text-[var(--color-muted-foreground)]">
-              Visualize o avanÃƒÂ§o acumulado, o volume jÃƒÂ¡ reservado e o que ainda falta atingir.
+              Visualize o avanço acumulado, o volume já reservado e o que ainda falta atingir.
             </p>
           </div>
           <div className="metric-grid-compact">
@@ -310,7 +310,7 @@ export function GoalsClient() {
               <p className="metric-value amount-nowrap">{formatCurrency(targetAmount)}</p>
             </article>
             <article className="metric-card">
-              <p className="metric-label">ConcluÃƒÂ­das</p>
+              <p className="metric-label">Concluídas</p>
               <p className="metric-value">{completedGoals}</p>
             </article>
           </div>

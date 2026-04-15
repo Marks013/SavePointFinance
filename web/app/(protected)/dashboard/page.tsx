@@ -166,6 +166,7 @@ async function getDashboardData(tenantId: string, month: string) {
 
     return {
       periodBalances: monthlyReport.periodBalances,
+      periodResult: monthlyReport.summary.balance,
       income: monthlyReport.summary.income,
       expenses: monthlyReport.summary.expense,
       averageDailyExpense: monthlyReport.summary.averageDailyExpense,
@@ -196,6 +197,7 @@ async function getDashboardData(tenantId: string, month: string) {
         closing: 0,
         net: 0
       },
+      periodResult: 0,
       income: 0,
       expenses: 0,
       averageDailyExpense: 0,
@@ -277,10 +279,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                 <p className="metric-label">Resultado do período</p>
                 <p
                   className={`subtle-metric-value amount-nowrap mt-3 ${
-                    data.periodBalances.net >= 0 ? "text-[var(--color-emerald-600)]" : "amount-negative"
+                    data.periodResult >= 0 ? "text-[var(--color-emerald-600)]" : "amount-negative"
                   }`}
                 >
-                  {formatCurrency(data.periodBalances.net)}
+                  {formatCurrency(data.periodResult)}
                 </p>
                 <p className="mt-2 text-sm leading-6 text-[var(--color-ink-700)]">
                   Diferença entre receitas e despesas pela competência financeira.

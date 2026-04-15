@@ -97,14 +97,14 @@ async function getAccounts() {
 async function getCards() {
   const response = await fetch("/api/cards", { cache: "no-store" });
   await ensureApiResponse(response, { fallbackMessage: "Falha ao carregar cartoes", method: "GET", path: "/api/cards" });
-  if (!response.ok) throw new Error("Falha ao carregar cartÃƒÂµes");
+  if (!response.ok) throw new Error("Falha ao carregar cartões");
   return (await response.json()) as { items: RefItem[] };
 }
 
 async function getProfilePreferences() {
   const response = await fetch("/api/profile", { cache: "no-store" });
   await ensureApiResponse(response, { fallbackMessage: "Falha ao carregar preferencias", method: "GET", path: "/api/profile" });
-  if (!response.ok) throw new Error("Falha ao carregar preferÃƒÂªncias");
+  if (!response.ok) throw new Error("Falha ao carregar preferências");
   return (await response.json()) as ProfilePreferencesPayload;
 }
 
@@ -221,11 +221,11 @@ export function SubscriptionsClient() {
         method: "POST",
         path: `/api/subscriptions/${id}/generate-transaction`
       });
-      if (!response.ok) throw new Error("Falha ao gerar transaÃƒÂ§ÃƒÂ£o");
+      if (!response.ok) throw new Error("Falha ao gerar transação");
       return response.json();
     },
     onSuccess: async () => {
-      toast.success("TransaÃƒÂ§ÃƒÂ£o gerada");
+      toast.success("Transação gerada");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["subscriptions"] }),
         queryClient.invalidateQueries({ queryKey: ["transactions"] }),
@@ -242,7 +242,7 @@ export function SubscriptionsClient() {
       await ensureApiResponse(response, { fallbackMessage: "Falha ao excluir assinatura", method: "DELETE", path: `/api/subscriptions/${id}` });
     },
     onSuccess: async () => {
-      toast.success("Assinatura excluÃƒÂ­da");
+      toast.success("Assinatura excluída");
       if (editingId) {
         setEditingId(null);
         setIsEditorOpen(false);
@@ -362,26 +362,26 @@ export function SubscriptionsClient() {
           <div>
             <div className="eyebrow">Assinaturas</div>
             <h1 className="mt-3 text-3xl font-semibold tracking-[-0.03em]">
-              {isEditing ? "Editar recorrÃƒÂªncia" : "Nova recorrÃƒÂªncia"}
+              {isEditing ? "Editar recorrência" : "Nova recorrência"}
             </h1>
           </div>
           {!showEditor ? (
             <Button onClick={openCreateForm} type="button" variant="secondary">
-              Nova recorrÃƒÂªncia
+              Nova recorrência
             </Button>
           ) : null}
         </div>
         <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--color-muted-foreground)]">
-          Use recorrÃƒÂªncias para registrar despesas e receitas que se repetem todo mÃƒÂªs e manter o dashboard coerente com
+          Use recorrências para registrar despesas e receitas que se repetem todo mês e manter o dashboard coerente com
           a rotina financeira.
         </p>
         <p className="mt-3 text-sm font-medium text-[var(--color-primary)]">
-          CompetÃƒÂªncia ativa: {formatMonthKeyLabel(month)}
+          Competência ativa: {formatMonthKeyLabel(month)}
         </p>
         {showEditor ? (
           <>
             <div className="mt-6 space-y-3">
-              <Label>ServiÃƒÂ§os populares</Label>
+              <Label>Serviços populares</Label>
               <div className="grid gap-3 sm:grid-cols-2">
                 {subscriptionServicePresets.map((preset) => (
                   <SubscriptionServiceCard
@@ -411,7 +411,7 @@ export function SubscriptionsClient() {
               <Input id="sub-day" type="number" {...form.register("billingDay")} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="sub-next">{selectedType === "income" ? "PrÃƒÂ³ximo recebimento" : "PrÃƒÂ³xima cobranÃƒÂ§a"}</Label>
+              <Label htmlFor="sub-next">{selectedType === "income" ? "Próximo recebimento" : "Próxima cobrança"}</Label>
               <Input id="sub-next" type="date" {...form.register("nextBillingDate")} />
               {form.formState.errors.nextBillingDate ? (
                 <p className="text-sm text-[var(--color-destructive)]">{form.formState.errors.nextBillingDate.message}</p>
@@ -450,9 +450,9 @@ export function SubscriptionsClient() {
               ) : null}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="sub-card">CartÃƒÂ£o</Label>
+              <Label htmlFor="sub-card">Cartão</Label>
               <Select id="sub-card" {...form.register("cardId")}>
-                <option value="">Sem cartÃƒÂ£o</option>
+                <option value="">Sem cartão</option>
                 {(cardsQuery.data?.items ?? []).map((item) => (
                   <option key={item.id} value={item.id}>{item.name}</option>
                 ))}
@@ -465,11 +465,11 @@ export function SubscriptionsClient() {
           {selectedType === "income" ? (
             <label className="muted-panel flex items-center gap-3 text-sm">
               <input className="app-checkbox" type="checkbox" {...form.register("autoTithe")} />
-              Considerar dÃƒÂ­zimo nesta receita recorrente
+              Considerar dízimo nesta receita recorrente
             </label>
           ) : null}
           <p className="text-sm text-[var(--color-muted-foreground)]">
-            Vincule a recorrÃƒÂªncia ÃƒÂ  conta ou ao cartÃƒÂ£o correto para que relatÃƒÂ³rios, fatura e painel reflitam o impacto
+            Vincule a recorrência à conta ou ao cartão correto para que relatórios, fatura e painel reflitam o impacto
             financeiro no lugar certo.
           </p>
           <Button className="w-full" disabled={saveMutation.isPending} type="submit">
@@ -477,16 +477,16 @@ export function SubscriptionsClient() {
           </Button>
           {isEditing ? (
             <Button className="w-full" onClick={cancelEditing} type="button" variant="ghost">
-              Cancelar ediÃƒÂ§ÃƒÂ£o
+              Cancelar edição
             </Button>
           ) : null}
             </form>
           </>
         ) : (
           <div className="muted-panel mt-8 flex flex-col gap-4 px-4 py-5 text-sm text-[var(--color-muted-foreground)]">
-            <p>O editor foi fechado apÃƒÂ³s a ÃƒÂºltima ediÃƒÂ§ÃƒÂ£o concluÃƒÂ­da.</p>
+            <p>O editor foi fechado após a última edição concluída.</p>
             <Button className="w-full sm:w-auto" onClick={openCreateForm} type="button" variant="secondary">
-              Nova recorrÃƒÂªncia
+              Nova recorrência
             </Button>
           </div>
         )}
@@ -497,12 +497,12 @@ export function SubscriptionsClient() {
           <div>
             <h2 className="text-2xl font-semibold tracking-[-0.03em]">Assinaturas ativas</h2>
             <p className="mt-2 text-sm leading-7 text-[var(--color-muted-foreground)]">
-              Controle o custo fixo mensal e o prÃƒÂ³ximo lanÃƒÂ§amento previsto de cada recorrÃƒÂªncia no mÃƒÂªs selecionado.
+              Controle o custo fixo mensal e o próximo lançamento previsto de cada recorrência no mês selecionado.
             </p>
           </div>
           <div className="metric-grid-compact">
             <article className="metric-card">
-              <p className="metric-label">SaÃƒÂ­das mensais</p>
+              <p className="metric-label">Saídas mensais</p>
               <p className="metric-value amount-nowrap amount-negative">{formatCurrency(monthlyExpenses)}</p>
             </article>
             <article className="metric-card">
@@ -538,24 +538,24 @@ export function SubscriptionsClient() {
                       <p className="break-words font-semibold">{item.name}</p>
                     )}
                       <p className="break-words text-sm text-[var(--color-muted-foreground)]">
-                      {item.category?.name ?? "Sem categoria"} Ã¢â‚¬Â¢ {item.type === "income" ? "ocorrÃƒÂªncia no mÃƒÂªs ativo em " : "cobranÃƒÂ§a no mÃƒÂªs ativo em "}
+                      {item.category?.name ?? "Sem categoria"} • {item.type === "income" ? "ocorrência no mês ativo em " : "cobrança no mês ativo em "}
                       {formatDateDisplay(item.activeMonthDateResolved)}
                     </p>
                     <p className="break-words text-sm text-[var(--color-muted-foreground)]">
-                      {item.card?.name ?? item.account?.name ?? "Sem origem financeira"} Ã¢â‚¬Â¢{" "}
+                      {item.card?.name ?? item.account?.name ?? "Sem origem financeira"} •{" "}
                       {item.type === "expense" ? "Despesa recorrente" : "Receita recorrente"}
                     </p>
                     <p className="break-words text-xs text-[var(--color-muted-foreground)]">
-                      CompetÃƒÂªncia {formatMonthKeyLabel(month)} Ã¢â‚¬Â¢ prÃƒÂ³xima cobranÃƒÂ§a real em {formatDateDisplay(item.nextBillingDate)}
+                      Competência {formatMonthKeyLabel(month)} • próxima cobrança real em {formatDateDisplay(item.nextBillingDate)}
                     </p>
                     <p className="break-words text-xs text-[var(--color-muted-foreground)]">
                       {item.activeMonthGenerated
-                        ? `LanÃƒÂ§amento jÃƒÂ¡ gerado em ${formatDateDisplay(item.activeMonthTransactionDate ?? item.activeMonthDateResolved)}`
-                        : `LanÃƒÂ§amento ainda nÃƒÂ£o gerado nesta competÃƒÂªncia`}
+                        ? `Lançamento já gerado em ${formatDateDisplay(item.activeMonthTransactionDate ?? item.activeMonthDateResolved)}`
+                        : `Lançamento ainda não gerado nesta competência`}
                     </p>
                     {item.autoTithe ? (
                       <p className="break-words text-xs text-[var(--color-muted-foreground)]">
-                        DÃƒÂ­zimo automÃƒÂ¡tico incluÃƒÂ­do nesta recorrÃƒÂªncia
+                        Dízimo automático incluído nesta recorrência
                       </p>
                     ) : null}
                   </div>
@@ -573,7 +573,7 @@ export function SubscriptionsClient() {
                     type="button"
                     variant="secondary"
                   >
-                    {item.activeMonthGenerated ? "JÃƒÂ¡ lanÃƒÂ§ada" : "Gerar transaÃƒÂ§ÃƒÂ£o"}
+                    {item.activeMonthGenerated ? "Já lançada" : "Gerar transação"}
                   </Button>
                   <Button
                     disabled={deleteMutation.isPending}
@@ -589,8 +589,8 @@ export function SubscriptionsClient() {
           })}
           {!subscriptionsQuery.isLoading && subscriptions.length === 0 ? (
             <div className="muted-panel border border-dashed px-4 py-6 text-sm text-[var(--color-muted-foreground)]">
-              Nenhuma recorrÃƒÂªncia foi cadastrada ainda. Use assinaturas para automatizar cobranÃƒÂ§as fixas e manter o
-              resultado mensal mais previsÃƒÂ­vel.
+              Nenhuma recorrência foi cadastrada ainda. Use assinaturas para automatizar cobranças fixas e manter o
+              resultado mensal mais previsível.
             </div>
           ) : null}
         </div>

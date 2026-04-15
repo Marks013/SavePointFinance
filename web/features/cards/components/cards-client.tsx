@@ -105,7 +105,7 @@ const invalidFieldClassName =
 async function getCards(month: string) {
   const response = await fetch(`/api/cards?month=${month}`, { cache: "no-store" });
   await ensureApiResponse(response, { fallbackMessage: "Falha ao carregar cartoes", method: "GET", path: "/api/cards" });
-  if (!response.ok) throw new Error("Falha ao carregar cartÃƒÂµes");
+  if (!response.ok) throw new Error("Falha ao carregar cartões");
   return (await response.json()) as { items: CardItem[] };
 }
 
@@ -126,7 +126,7 @@ async function createCard(values: CardFormValues) {
   });
   await ensureApiResponse(response, { fallbackMessage: "Falha ao criar cartao", method: "POST", path: "/api/cards" });
 
-  if (!response.ok) throw new Error("Falha ao criar cartÃƒÂ£o");
+  if (!response.ok) throw new Error("Falha ao criar cartão");
   return response.json();
 }
 
@@ -140,7 +140,7 @@ async function updateCard(id: string, values: CardFormValues) {
   });
   await ensureApiResponse(response, { fallbackMessage: "Falha ao atualizar cartao", method: "PATCH", path: `/api/cards/${id}` });
 
-  if (!response.ok) throw new Error("Falha ao atualizar cartÃƒÂ£o");
+  if (!response.ok) throw new Error("Falha ao atualizar cartão");
   return response.json();
 }
 
@@ -152,7 +152,7 @@ async function deleteCard(id: string) {
 
   if (!response.ok) {
     const payload = (await response.json()) as { message?: string };
-    throw new Error(payload.message ?? "Falha ao excluir cartÃƒÂ£o");
+    throw new Error(payload.message ?? "Falha ao excluir cartão");
   }
 }
 
@@ -252,7 +252,7 @@ export function CardsClient() {
       ]);
     },
     onError: (error) => {
-      toast.error("NÃƒÂ£o foi possÃƒÂ­vel pagar a fatura", {
+      toast.error("Não foi possível pagar a fatura", {
         description: error.message
       });
     }
@@ -282,7 +282,7 @@ export function CardsClient() {
     },
     onSuccess: async () => {
       const wasEditing = Boolean(editingId);
-      toast.success(editingId ? "CartÃƒÂ£o atualizado" : "CartÃƒÂ£o criado");
+      toast.success(editingId ? "Cartão atualizado" : "Cartão criado");
       setEditingId(null);
       if (wasEditing) {
         setIsEditorOpen(false);
@@ -294,14 +294,14 @@ export function CardsClient() {
       ]);
     },
     onError: () => {
-      toast.error(editingId ? "NÃƒÂ£o foi possÃƒÂ­vel atualizar o cartÃƒÂ£o" : "NÃƒÂ£o foi possÃƒÂ­vel criar o cartÃƒÂ£o");
+      toast.error(editingId ? "Não foi possível atualizar o cartão" : "Não foi possível criar o cartão");
     }
   });
 
   const deleteMutation = useMutation({
     mutationFn: deleteCard,
     onSuccess: async () => {
-      toast.success("CartÃƒÂ£o excluÃƒÂ­do");
+      toast.success("Cartão excluído");
       if (editingId) {
         setEditingId(null);
         setIsEditorOpen(false);
@@ -313,7 +313,7 @@ export function CardsClient() {
       ]);
     },
     onError: (error) => {
-      toast.error("NÃƒÂ£o foi possÃƒÂ­vel excluir o cartÃƒÂ£o", {
+      toast.error("Não foi possível excluir o cartão", {
         description: error.message
       });
     }
@@ -423,23 +423,23 @@ export function CardsClient() {
       <section className="surface content-section" ref={formSectionRef}>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <div className="eyebrow">CartÃƒÂµes</div>
+            <div className="eyebrow">Cartões</div>
             <h1 className="mt-3 text-3xl font-semibold tracking-[-0.03em]">
-              {isEditing ? "Editar cartÃƒÂ£o" : "Novo cartÃƒÂ£o"}
+              {isEditing ? "Editar cartão" : "Novo cartão"}
             </h1>
           </div>
           {!showEditor ? (
             <Button onClick={openCreateForm} type="button" variant="secondary">
-              Novo cartÃƒÂ£o
+              Novo cartão
             </Button>
           ) : null}
         </div>
         <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--color-muted-foreground)]">
-          Cadastre cartÃƒÂµes usados no crÃƒÂ©dito para controlar limite, competÃƒÂªncia, pagamento de fatura e impacto nos
-          relatÃƒÂ³rios.
+          Cadastre cartões usados no crédito para controlar limite, competência, pagamento de fatura e impacto nos
+          relatórios.
         </p>
         <p className="mt-3 text-sm font-medium text-[var(--color-primary)]">
-          CompetÃƒÂªncia global ativa: {formatMonthKeyLabel(month)}
+          Competência global ativa: {formatMonthKeyLabel(month)}
         </p>
 
         {showEditor ? (
@@ -449,7 +449,7 @@ export function CardsClient() {
               (values) => saveMutation.mutate(values),
               (errors) => {
                 const firstError = Object.values(errors).find((error) => error?.message)?.message;
-                toast.error(firstError ?? "Revise os campos obrigatÃƒÂ³rios antes de continuar");
+                toast.error(firstError ?? "Revise os campos obrigatórios antes de continuar");
               }
             )}
           >
@@ -513,24 +513,24 @@ export function CardsClient() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="card-anchor">Regra da competÃƒÂªncia</Label>
+              <Label htmlFor="card-anchor">Regra da competência</Label>
               <Select
                 className={form.formState.errors.statementMonthAnchor ? invalidFieldClassName : undefined}
                 id="card-anchor"
                 {...form.register("statementMonthAnchor")}
               >
-                <option value="close_month">MÃƒÂªs do fechamento</option>
-                <option value="previous_month">MÃƒÂªs anterior ao fechamento</option>
+                <option value="close_month">Mês do fechamento</option>
+                <option value="previous_month">Mês anterior ao fechamento</option>
               </Select>
             </div>
           </div>
           <p className="text-xs leading-6 text-[var(--color-muted-foreground)]">
-            Use <strong>mÃƒÂªs do fechamento</strong> quando a fatura de abril fecha em abril. Use{" "}
-            <strong>mÃƒÂªs anterior ao fechamento</strong> quando a fatura de abril fecha em maio.
+            Use <strong>mês do fechamento</strong> quando a fatura de abril fecha em abril. Use{" "}
+            <strong>mês anterior ao fechamento</strong> quando a fatura de abril fecha em maio.
           </p>
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="card-institution">InstituiÃƒÂ§ÃƒÂ£o</Label>
+              <Label htmlFor="card-institution">Instituição</Label>
               <Select
                 className={form.formState.errors.institution ? invalidFieldClassName : undefined}
                 id="card-institution"
@@ -544,7 +544,7 @@ export function CardsClient() {
               </Select>
             </div>
             <div className="space-y-3">
-              <Label>Paleta do cartÃƒÂ£o</Label>
+              <Label>Paleta do cartão</Label>
               <div className="flex flex-wrap gap-3">
                 {cardColorPresets.map((preset) => (
                   <button
@@ -572,7 +572,7 @@ export function CardsClient() {
               active
               background={findPreset(cardColorPresets, selectedColor)?.background ?? "rgba(17,17,17,0.16)"}
               color={findPreset(cardColorPresets, selectedColor)?.color ?? selectedColor}
-              label="Cor do cartÃƒÂ£o"
+              label="Cor do cartão"
               shortLabel=""
               swatchOnly
             />
@@ -588,13 +588,13 @@ export function CardsClient() {
               background={findPreset(brazilianInstitutions, selectedInstitution)?.background ?? "rgba(122,28,172,0.14)"}
               color={findPreset(brazilianInstitutions, selectedInstitution)?.color ?? "#7A1CAC"}
               description={findPreset(brazilianInstitutions, selectedInstitution)?.description}
-              label={selectedInstitution || "InstituiÃƒÂ§ÃƒÂ£o"}
+              label={selectedInstitution || "Instituição"}
               shortLabel={findPreset(brazilianInstitutions, selectedInstitution)?.shortLabel ?? "BK"}
             />
           </div>
           <p className="text-sm text-[var(--color-muted-foreground)]">
-            O limite e os dias de fechamento e vencimento sÃƒÂ£o usados para acompanhar a fatura mensal e o limite
-            disponÃƒÂ­vel em tempo real.
+            O limite e os dias de fechamento e vencimento são usados para acompanhar a fatura mensal e o limite
+            disponível em tempo real.
           </p>
           {form.formState.errors.name ? (
             <p className="text-sm text-[var(--color-destructive)]">{form.formState.errors.name.message}</p>
@@ -615,19 +615,19 @@ export function CardsClient() {
             <p className="text-sm text-[var(--color-destructive)]">{form.formState.errors.closeDay.message}</p>
           ) : null}
           <Button className="w-full" disabled={saveMutation.isPending} type="submit">
-            {saveMutation.isPending ? "Salvando..." : isEditing ? "Salvar cartÃƒÂ£o" : "Criar cartÃƒÂ£o"}
+            {saveMutation.isPending ? "Salvando..." : isEditing ? "Salvar cartão" : "Criar cartão"}
           </Button>
           {isEditing ? (
             <Button className="w-full" onClick={cancelEditing} type="button" variant="ghost">
-              Cancelar ediÃƒÂ§ÃƒÂ£o
+              Cancelar edição
             </Button>
           ) : null}
           </form>
         ) : (
           <div className="muted-panel mt-8 flex flex-col gap-4 px-4 py-5 text-sm text-[var(--color-muted-foreground)]">
-            <p>O editor foi fechado apÃƒÂ³s a ÃƒÂºltima ediÃƒÂ§ÃƒÂ£o concluÃƒÂ­da.</p>
+            <p>O editor foi fechado após a última edição concluída.</p>
             <Button className="w-full sm:w-auto" onClick={openCreateForm} type="button" variant="secondary">
-              Novo cartÃƒÂ£o
+              Novo cartão
             </Button>
           </div>
         )}
@@ -636,9 +636,9 @@ export function CardsClient() {
       <section className="surface content-section">
         <div className="space-y-4">
           <div>
-            <h2 className="text-2xl font-semibold tracking-[-0.03em]">CartÃƒÂµes ativos</h2>
+            <h2 className="text-2xl font-semibold tracking-[-0.03em]">Cartões ativos</h2>
             <p className="mt-2 text-sm leading-7 text-[var(--color-muted-foreground)]">
-              Acompanhe o limite total, a soma das faturas abertas e a utilizaÃƒÂ§ÃƒÂ£o consolidada.
+              Acompanhe o limite total, a soma das faturas abertas e a utilização consolidada.
             </p>
           </div>
           <div className="metric-grid-compact">
@@ -679,7 +679,7 @@ export function CardsClient() {
                   <div className="min-w-0">
                     <p className="break-words text-base font-semibold text-[var(--color-foreground)]">{card.name}</p>
                     <p className="mt-1 text-xs tracking-[0.04em] text-[var(--color-muted-foreground)]">
-                      {card.brand} {card.last4 ? `Ã¢â‚¬Â¢ ${card.last4}` : ""}
+                      {card.brand} {card.last4 ? `• ${card.last4}` : ""}
                     </p>
                   </div>
                 </div>
@@ -701,12 +701,12 @@ export function CardsClient() {
                     {formatCurrency(card.statementAmount)}
                   </p>
                   <p className="mt-2 text-xs text-[var(--color-muted-foreground)]">
-                    CompetÃƒÂªncia {formatMonthKeyLabel(card.statementMonth)}
+                    Competência {formatMonthKeyLabel(card.statementMonth)}
                   </p>
                 </div>
                 <div className="rounded-[1.15rem] border border-[var(--color-border)]/60 bg-[var(--color-muted)]/18 px-4 py-4">
                   <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted-foreground)]">
-                    DisponÃƒÂ­vel
+                    Disponível
                   </p>
                   <p
                     className={`amount-nowrap mt-2 text-lg font-semibold ${card.availableLimit < 0 ? "amount-negative" : "text-[var(--color-foreground)]"}`}
@@ -731,7 +731,7 @@ export function CardsClient() {
               </div>
               <div className="mt-3 rounded-[1.15rem] border border-[var(--color-border)]/60 bg-[var(--color-muted)]/18 px-4 py-4">
                 <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted-foreground)]">
-                  Ciclo do cartÃƒÂ£o
+                  Ciclo do cartão
                 </p>
                 <div className="detail-grid mt-3">
                   <div className="rounded-[1rem] border border-[var(--color-border)]/70 bg-[var(--color-card)] px-3 py-3">
@@ -756,12 +756,12 @@ export function CardsClient() {
                           {new Date(card.payableDueDate).toLocaleDateString("pt-BR")}
                         </p>
                         <p className="mt-1 break-words text-xs text-[var(--color-muted-foreground)]">
-                          {formatCurrency(card.payableStatementAmount)} Ã¢â‚¬Â¢ {formatMonthKeyLabel(card.payableStatementMonth)}
+                          {formatCurrency(card.payableStatementAmount)} • {formatMonthKeyLabel(card.payableStatementMonth)}
                         </p>
                       </>
                     ) : (
                       <p className="mt-1 break-words text-sm font-semibold leading-5 text-[var(--color-muted-foreground)]">
-                        Sem cobranÃƒÂ§a pendente
+                        Sem cobrança pendente
                       </p>
                     )}
                   </div>
@@ -769,7 +769,7 @@ export function CardsClient() {
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-[var(--color-muted-foreground)]">
                 {card.institution ? <span>{card.institution}</span> : null}
-                <span>CompetÃƒÂªncia {formatMonthKeyLabel(card.statementMonth)}</span>
+                <span>Competência {formatMonthKeyLabel(card.statementMonth)}</span>
               </div>
               <div className="mt-3 h-2 overflow-hidden rounded-full bg-[rgba(214,199,172,0.6)]">
                 <div
@@ -802,8 +802,8 @@ export function CardsClient() {
           ))}
           {!cardsQuery.isLoading && cards.length === 0 ? (
             <div className="muted-panel border border-dashed px-4 py-6 text-sm text-[var(--color-muted-foreground)] md:col-span-2">
-              Nenhum cartÃƒÂ£o foi cadastrado ainda. Cadastre cartÃƒÂµes de crÃƒÂ©dito para controlar limite e fatura com
-              precisÃƒÂ£o.
+              Nenhum cartão foi cadastrado ainda. Cadastre cartões de crédito para controlar limite e fatura com
+              precisão.
             </div>
           ) : null}
         </div>
@@ -853,7 +853,7 @@ export function CardsClient() {
                         {selectedStatementCard?.name ?? statementQuery.data.card.name}
                       </h3>
                       <p className="mt-2 break-words text-sm text-white/72">
-                        {formatMonthKeyLabel(statementQuery.data.month)} Ã¢â‚¬Â¢ vence em{" "}
+                        {formatMonthKeyLabel(statementQuery.data.month)} • vence em{" "}
                         {new Date(statementQuery.data.summary.dueDate).toLocaleDateString("pt-BR")}
                       </p>
                     </div>
@@ -945,7 +945,7 @@ export function CardsClient() {
 
         <div className="mt-6 flex flex-wrap items-start gap-4">
           <div className="min-w-0 flex-1 space-y-2">
-            <Label htmlFor="statement-card">CartÃƒÂ£o</Label>
+            <Label htmlFor="statement-card">Cartão</Label>
             <Select
               id="statement-card"
               value={selectedStatementCardId}
@@ -962,16 +962,16 @@ export function CardsClient() {
                 }
               }}
             >
-              <option value="">Selecione um cartÃƒÂ£o</option>
+              <option value="">Selecione um cartão</option>
               {cards.map((card) => (
                 <option key={card.id} value={card.id}>
-                  {card.name} {card.last4 ? `Ã¢â‚¬Â¢ ${card.last4}` : ""}
+                  {card.name} {card.last4 ? `• ${card.last4}` : ""}
                 </option>
               ))}
             </Select>
           </div>
           <div className="min-w-0 flex-1 space-y-2">
-            <Label htmlFor="statement-month">CompetÃƒÂªncia</Label>
+            <Label htmlFor="statement-month">Competência</Label>
             <DatePickerInput
               id="statement-month"
               onChange={(event) => setStatementMonth(event.target.value)}
@@ -983,10 +983,10 @@ export function CardsClient() {
         <div className="muted-panel mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-[var(--color-muted-foreground)]">
           <p>
             {selectedStatementCardId
-              ? `CartÃƒÂ£o selecionado: ${cards.find((item) => item.id === selectedStatementCardId)?.name ?? "CartÃƒÂ£o"}.`
-              : "Nenhum cartÃƒÂ£o selecionado."}
+              ? `Cartão selecionado: ${cards.find((item) => item.id === selectedStatementCardId)?.name ?? "Cartão"}.`
+              : "Nenhum cartão selecionado."}
           </p>
-          <p>{`CompetÃƒÂªncia em anÃƒÂ¡lise: ${new Date(`${statementMonth}-01T12:00:00`).toLocaleDateString("pt-BR", {
+          <p>{`Competência em análise: ${new Date(`${statementMonth}-01T12:00:00`).toLocaleDateString("pt-BR", {
             month: "long",
             year: "numeric"
           })}.`}</p>
@@ -1002,13 +1002,13 @@ export function CardsClient() {
             type="button"
             variant="ghost"
           >
-            Limpar seleÃƒÂ§ÃƒÂ£o
+            Limpar seleção
           </Button>
         </div>
 
         {false ? (
           <div className="muted-panel mt-6 border border-dashed px-4 py-6 text-sm text-[var(--color-muted-foreground)]">
-            Selecione um cartÃƒÂ£o para acompanhar a competÃƒÂªncia, conferir a fatura e registrar o pagamento.
+            Selecione um cartão para acompanhar a competência, conferir a fatura e registrar o pagamento.
           </div>
         ) : null}
 
@@ -1029,13 +1029,13 @@ export function CardsClient() {
           <div className="mt-6 space-y-6">
             {statementQuery.isFetching ? (
               <p className="text-sm text-[var(--color-muted-foreground)]">
-                Atualizando valores e lanÃƒÂ§amentos da fatura...
+                Atualizando valores e lançamentos da fatura...
               </p>
             ) : null}
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="text-sm text-[var(--color-muted-foreground)]">
-                {statementQuery.data.summary.transactions} lanÃƒÂ§amento
-                {statementQuery.data.summary.transactions === 1 ? "" : "s"} nesta competÃƒÂªncia.
+                {statementQuery.data.summary.transactions} lançamento
+                {statementQuery.data.summary.transactions === 1 ? "" : "s"} nesta competência.
               </p>
               <div className="flex items-center gap-3">
                 <Label htmlFor="statement-items-limit">Exibir</Label>
@@ -1064,11 +1064,11 @@ export function CardsClient() {
                 <p className="metric-value amount-nowrap">{formatCurrency(statementQuery.data.summary.outstandingAmount)}</p>
               </article>
               <article className="metric-card">
-                <p className="text-sm text-[var(--color-muted-foreground)]">Limite disponÃƒÂ­vel</p>
+                <p className="text-sm text-[var(--color-muted-foreground)]">Limite disponível</p>
                 <p className={`metric-value amount-nowrap ${statementQuery.data.summary.availableLimit < 0 ? "amount-negative" : ""}`}>{formatCurrency(statementQuery.data.summary.availableLimit)}</p>
               </article>
               <article className="metric-card">
-                <p className="text-sm text-[var(--color-muted-foreground)]">LanÃƒÂ§amentos</p>
+                <p className="text-sm text-[var(--color-muted-foreground)]">Lançamentos</p>
                 <p className="metric-value">{statementQuery.data.summary.transactions}</p>
               </article>
               <article className="metric-card">
@@ -1079,7 +1079,7 @@ export function CardsClient() {
 
             <div className="muted-panel text-sm text-[var(--color-muted-foreground)]">
               <p>
-                Ciclo da fatura: {new Date(statementQuery.data.summary.cycleStart).toLocaleDateString("pt-BR")} atÃƒÂ©{" "}
+                Ciclo da fatura: {new Date(statementQuery.data.summary.cycleStart).toLocaleDateString("pt-BR")} até{" "}
                 {new Date(statementQuery.data.summary.cycleEnd).toLocaleDateString("pt-BR")}.
               </p>
               <p className="mt-2">
@@ -1105,7 +1105,7 @@ export function CardsClient() {
                     <>
                       <p className="mt-2 text-lg font-semibold">Fatura em aberto</p>
                       <p className="mt-1 text-sm text-[var(--color-muted-foreground)]">
-                        Escolha uma conta para registrar a baixa da competÃƒÂªncia.
+                        Escolha uma conta para registrar a baixa da competência.
                       </p>
                     </>
                   )}
@@ -1139,7 +1139,7 @@ export function CardsClient() {
             <div className="space-y-3">
               {statementQuery.data.itemsMeta.hasMore ? (
                 <p className="text-sm text-[var(--color-muted-foreground)]">
-                  Mostrando {statementQuery.data.itemsMeta.returned} de {statementQuery.data.summary.transactions} itens da competÃƒÂªncia.
+                  Mostrando {statementQuery.data.itemsMeta.returned} de {statementQuery.data.summary.transactions} itens da competência.
                 </p>
               ) : null}
               {statementQuery.data.items.map((item) => (
@@ -1148,8 +1148,8 @@ export function CardsClient() {
                     <div className="min-w-0 flex-1">
                       <p className="break-words font-semibold">{item.description}</p>
                       <p className="break-words text-sm text-[var(--color-muted-foreground)]">
-                        {item.category} Ã¢â‚¬Â¢ {new Date(item.date).toLocaleDateString("pt-BR")}
-                        {item.installmentLabel ? ` Ã¢â‚¬Â¢ ${item.installmentLabel}` : ""}
+                        {item.category} • {new Date(item.date).toLocaleDateString("pt-BR")}
+                        {item.installmentLabel ? ` • ${item.installmentLabel}` : ""}
                       </p>
                     </div>
                     <p className="amount-nowrap w-full text-left font-semibold sm:w-auto sm:text-right">
@@ -1159,7 +1159,7 @@ export function CardsClient() {
                 </article>
               ))}
               {statementQuery.data.items.length === 0 ? (
-                <p className="text-sm text-[var(--color-muted-foreground)]">Nenhum lanÃƒÂ§amento nesta competÃƒÂªncia.</p>
+                <p className="text-sm text-[var(--color-muted-foreground)]">Nenhum lançamento nesta competência.</p>
               ) : null}
             </div>
           </div>

@@ -80,7 +80,7 @@ async function restoreDefaultCategories() {
 
   if (!response.ok) {
     const payload = (await response.json()) as { message?: string };
-    throw new Error(payload.message ?? "Falha ao restaurar categorias padrÃƒÂ£o");
+    throw new Error(payload.message ?? "Falha ao restaurar categorias padrão");
   }
 
   return (await response.json()) as { restored: number; total: number };
@@ -130,7 +130,7 @@ export function CategoriesClient() {
       ]);
     },
     onError: (error) => {
-      toast.error(editingId ? "NÃƒÂ£o foi possÃƒÂ­vel atualizar a categoria" : "NÃƒÂ£o foi possÃƒÂ­vel criar a categoria", {
+      toast.error(editingId ? "Não foi possível atualizar a categoria" : "Não foi possível criar a categoria", {
         description: error.message
       });
     }
@@ -139,7 +139,7 @@ export function CategoriesClient() {
   const deleteMutation = useMutation({
     mutationFn: deleteCategory,
     onSuccess: async () => {
-      toast.success("Categoria excluÃƒÂ­da");
+      toast.success("Categoria excluída");
       if (editingId) {
         setEditingId(null);
         setIsEditorOpen(false);
@@ -152,7 +152,7 @@ export function CategoriesClient() {
       ]);
     },
     onError: (error) => {
-      toast.error("NÃƒÂ£o foi possÃƒÂ­vel excluir a categoria", {
+      toast.error("Não foi possível excluir a categoria", {
         description: error.message
       });
     }
@@ -161,11 +161,11 @@ export function CategoriesClient() {
   const restoreDefaultsMutation = useMutation({
     mutationFn: restoreDefaultCategories,
     onSuccess: async (payload) => {
-      toast.success("Categorias padrÃƒÂ£o restauradas", {
+      toast.success("Categorias padrão restauradas", {
         description:
           payload.restored > 0
             ? `${payload.restored} categoria(s) adicionada(s) sem duplicar as existentes.`
-            : "Nenhuma categoria nova foi adicionada porque a base jÃƒÂ¡ estava completa."
+            : "Nenhuma categoria nova foi adicionada porque a base já estava completa."
       });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["categories"] }),
@@ -174,7 +174,7 @@ export function CategoriesClient() {
       ]);
     },
     onError: (error) => {
-      toast.error("NÃƒÂ£o foi possÃƒÂ­vel restaurar as categorias padrÃƒÂ£o", {
+      toast.error("Não foi possível restaurar as categorias padrão", {
         description: error.message
       });
     }
@@ -246,7 +246,7 @@ export function CategoriesClient() {
           ) : null}
         </div>
         <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--color-muted-foreground)]">
-          Cadastre categorias claras para organizar lanÃƒÂ§amentos e melhorar os relatÃƒÂ³rios.
+          Cadastre categorias claras para organizar lançamentos e melhorar os relatórios.
         </p>
 
         {showEditor ? (
@@ -289,7 +289,7 @@ export function CategoriesClient() {
             </div>
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="category-icon">ÃƒÂcone</Label>
+                <Label htmlFor="category-icon">Ícone</Label>
                 <Input id="category-icon" {...form.register("icon")} />
               </div>
               <div className="space-y-2">
@@ -306,7 +306,7 @@ export function CategoriesClient() {
             <div className="grid gap-4 md:grid-cols-1">
               <div className="space-y-2">
                 <Label htmlFor="category-keywords">Palavras-chave</Label>
-                <Input id="category-keywords" placeholder="mercado, casa, salÃƒÂ¡rio" {...form.register("keywords")} />
+                <Input id="category-keywords" placeholder="mercado, casa, salário" {...form.register("keywords")} />
               </div>
             </div>
             <div className="muted-panel flex flex-wrap items-center gap-3">
@@ -319,22 +319,22 @@ export function CategoriesClient() {
                 swatchOnly
               />
               <p className="text-sm text-[var(--color-muted-foreground)]">
-                A cor serÃƒÂ¡ usada na interface e nos grÃƒÂ¡ficos.
+                A cor será usada na interface e nos gráficos.
               </p>
             </div>
-            <p className="text-sm text-[var(--color-muted-foreground)]">Use palavras-chave para ajudar a classificaÃƒÂ§ÃƒÂ£o automÃƒÂ¡tica.</p>
+            <p className="text-sm text-[var(--color-muted-foreground)]">Use palavras-chave para ajudar a classificação automática.</p>
             <Button className="w-full" disabled={saveMutation.isPending} type="submit">
               {saveMutation.isPending ? "Salvando..." : isEditing ? "Salvar categoria" : "Criar categoria"}
             </Button>
             {isEditing ? (
               <Button className="w-full" onClick={cancelEditing} type="button" variant="ghost">
-                Cancelar ediÃƒÂ§ÃƒÂ£o
+                Cancelar edição
               </Button>
             ) : null}
           </form>
         ) : (
           <div className="muted-panel mt-8 flex flex-col gap-4 px-4 py-5 text-sm text-[var(--color-muted-foreground)]">
-            <p>O editor foi fechado apÃƒÂ³s a ÃƒÂºltima ediÃƒÂ§ÃƒÂ£o concluÃƒÂ­da.</p>
+            <p>O editor foi fechado após a última edição concluída.</p>
             <Button className="w-full sm:w-auto" onClick={openCreateForm} type="button" variant="secondary">
               Nova categoria
             </Button>
@@ -347,7 +347,7 @@ export function CategoriesClient() {
           <div className="min-w-0 flex-1">
             <h2 className="text-2xl font-semibold tracking-[-0.03em]">Categorias ativas</h2>
             <p className="mt-2 text-sm leading-7 text-[var(--color-muted-foreground)]">
-              Revise, edite ou restaure a base padrÃƒÂ£o sem duplicar itens existentes.
+              Revise, edite ou restaure a base padrão sem duplicar itens existentes.
             </p>
           </div>
           <div className="flex w-full flex-col gap-3 sm:w-auto sm:items-end">
@@ -358,7 +358,7 @@ export function CategoriesClient() {
               type="button"
               variant="secondary"
             >
-              {restoreDefaultsMutation.isPending ? "Restaurando..." : "Restaurar categorias padrÃƒÂ£o"}
+              {restoreDefaultsMutation.isPending ? "Restaurando..." : "Restaurar categorias padrão"}
             </Button>
             <div className="grid w-full gap-3 sm:grid-cols-2">
               <article className="metric-card w-full">
@@ -394,7 +394,7 @@ export function CategoriesClient() {
                       {category.type === "income" ? "Receita" : "Despesa"}
                     </span>
                     <span className="rounded-full border border-[var(--color-border)] px-2.5 py-1 text-xs text-[var(--color-muted-foreground)]">
-                      {category.isDefault ? "PadrÃƒÂ£o" : "Personalizada"}
+                      {category.isDefault ? "Padrão" : "Personalizada"}
                     </span>
                   </div>
                 </div>
@@ -427,8 +427,8 @@ export function CategoriesClient() {
           ))}
           {!categoriesQuery.isLoading && categories.length === 0 ? (
             <div className="muted-panel border border-dashed px-4 py-6 text-sm text-[var(--color-muted-foreground)] md:col-span-2">
-              Nenhuma categoria foi cadastrada ainda. Crie categorias para melhorar o agrupamento dos lanÃƒÂ§amentos e a
-              leitura dos relatÃƒÂ³rios.
+              Nenhuma categoria foi cadastrada ainda. Crie categorias para melhorar o agrupamento dos lançamentos e a
+              leitura dos relatórios.
             </div>
           ) : null}
         </div>

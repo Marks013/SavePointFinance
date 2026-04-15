@@ -187,7 +187,7 @@ async function reviewClassification(id: string, categoryId: string, applyToInsta
   });
 
   if (!response.ok) {
-    throw new Error("Falha ao revisar classificaÃƒÂ§ÃƒÂ£o");
+    throw new Error("Falha ao revisar classificação");
   }
 
   return response.json();
@@ -200,7 +200,7 @@ function formatTransactionTypeLabel(type: TransactionItem["type"]) {
     case "expense":
       return "Despesa";
     case "transfer":
-      return "TransferÃƒÂªncia";
+      return "Transferência";
     default:
       return type;
   }
@@ -231,7 +231,7 @@ function buildEmptyTransactionValues(monthKey: string): TransactionFormValues {
 async function getProfilePreferences() {
   const response = await fetch("/api/profile", { cache: "no-store" });
   await ensureApiResponse(response, { fallbackMessage: "Falha ao carregar preferencias", method: "GET", path: "/api/profile" });
-  if (!response.ok) throw new Error("Falha ao carregar preferÃƒÂªncias");
+  if (!response.ok) throw new Error("Falha ao carregar preferências");
   return (await response.json()) as ProfilePreferencesPayload;
 }
 
@@ -324,8 +324,8 @@ export function TransactionsClient() {
         editingId
           ? payload?.scope === "group"
             ? "Grupo de parcelas atualizado"
-            : "TransaÃƒÂ§ÃƒÂ£o atualizada"
-          : "TransaÃƒÂ§ÃƒÂ£o criada"
+            : "Transação atualizada"
+          : "Transação criada"
       );
       setEditingId(null);
       setIsCreditEditLocked(false);
@@ -349,8 +349,8 @@ export function TransactionsClient() {
         error instanceof Error
           ? error.message
           : editingId
-            ? "NÃƒÂ£o foi possÃƒÂ­vel atualizar a transaÃƒÂ§ÃƒÂ£o"
-            : "NÃƒÂ£o foi possÃƒÂ­vel criar a transaÃƒÂ§ÃƒÂ£o"
+            ? "Não foi possível atualizar a transação"
+            : "Não foi possível criar a transação"
       );
     }
   });
@@ -358,7 +358,7 @@ export function TransactionsClient() {
   const deleteMutation = useMutation({
     mutationFn: deleteTransaction,
     onSuccess: async () => {
-      toast.success("TransaÃƒÂ§ÃƒÂ£o excluÃƒÂ­da");
+      toast.success("Transação excluída");
       if (editingId) {
         setEditingId(null);
         setIsCreditEditLocked(false);
@@ -375,7 +375,7 @@ export function TransactionsClient() {
       ]);
     },
     onError: () => {
-      toast.error("NÃƒÂ£o foi possÃƒÂ­vel excluir a transaÃƒÂ§ÃƒÂ£o");
+      toast.error("Não foi possível excluir a transação");
     }
   });
 
@@ -390,7 +390,7 @@ export function TransactionsClient() {
       applyToInstallments?: boolean;
     }) => reviewClassification(id, categoryId, applyToInstallments),
     onSuccess: async (_, variables) => {
-      toast.success("ClassificaÃƒÂ§ÃƒÂ£o revisada");
+      toast.success("Classificação revisada");
       setReviewSelections((current) => {
         const next = { ...current };
         delete next[variables.id];
@@ -402,7 +402,7 @@ export function TransactionsClient() {
       ]);
     },
     onError: () => {
-      toast.error("NÃƒÂ£o foi possÃƒÂ­vel revisar a classificaÃƒÂ§ÃƒÂ£o");
+      toast.error("Não foi possível revisar a classificação");
     }
   });
 
@@ -468,12 +468,12 @@ export function TransactionsClient() {
         ? "Receitas"
         : filters.type === "expense"
           ? "Despesas"
-          : "TransferÃƒÂªncias"
+          : "Transferências"
       : null,
     selectedFilterCategory ? `Categoria: ${selectedFilterCategory.name}` : null,
     selectedFilterAccount ? `Conta: ${selectedFilterAccount.name}` : null,
     selectedFilterCard
-      ? `CartÃƒÂ£o: ${selectedFilterCard.name}${selectedFilterCard.last4 ? ` Ã¢â‚¬Â¢ ${selectedFilterCard.last4}` : ""}`
+      ? `Cartão: ${selectedFilterCard.name}${selectedFilterCard.last4 ? ` • ${selectedFilterCard.last4}` : ""}`
       : null
   ].filter(Boolean) as string[], [filters.type, selectedFilterAccount, selectedFilterCard, selectedFilterCategory]);
   const isEditing = editingId !== null;
@@ -529,25 +529,25 @@ export function TransactionsClient() {
         <div className="page-intro">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <div className="eyebrow">{isEditing ? "Editar transaÃƒÂ§ÃƒÂ£o" : "Nova transaÃƒÂ§ÃƒÂ£o"}</div>
-              <h1 className="text-3xl font-semibold tracking-[-0.04em]">OperaÃƒÂ§ÃƒÂ£o financeira</h1>
+              <div className="eyebrow">{isEditing ? "Editar transação" : "Nova transação"}</div>
+              <h1 className="text-3xl font-semibold tracking-[-0.04em]">Operação financeira</h1>
             </div>
             {!showEditor ? (
               <Button onClick={openCreateForm} type="button" variant="secondary">
-                Nova transaÃƒÂ§ÃƒÂ£o
+                Nova transação
               </Button>
             ) : null}
           </div>
           <p className="text-sm leading-7 text-[var(--color-muted-foreground)]">
-            Registre lanÃƒÂ§amentos, vincule contas ou cartÃƒÂµes e mantenha o histÃƒÂ³rico financeiro conectado ao painel,
-            ÃƒÂ  fatura e aos relatÃƒÂ³rios.
+            Registre lançamentos, vincule contas ou cartões e mantenha o histórico financeiro conectado ao painel,
+            à fatura e aos relatórios.
           </p>
           <p className="text-sm font-medium text-[var(--color-primary)]">
-            CompetÃƒÂªncia ativa: {formatMonthKeyLabel(month)}
+            Competência ativa: {formatMonthKeyLabel(month)}
           </p>
           <p className="mt-3 text-sm leading-7 text-[var(--color-muted-foreground)]">
-            Se a categoria nÃƒÂ£o for informada, o sistema tenta classificar automaticamente com base no contexto do
-            lanÃƒÂ§amento e em padrÃƒÂµes brasileiros de consumo.
+            Se a categoria não for informada, o sistema tenta classificar automaticamente com base no contexto do
+            lançamento e em padrões brasileiros de consumo.
           </p>
         </div>
 
@@ -558,7 +558,7 @@ export function TransactionsClient() {
               (values) => saveMutation.mutate(values),
               (errors) => {
                 const firstError = Object.values(errors).find((error) => error?.message)?.message;
-                toast.error(firstError ?? "Revise os campos obrigatÃƒÂ³rios antes de continuar");
+                toast.error(firstError ?? "Revise os campos obrigatórios antes de continuar");
               }
             )}
           >
@@ -580,7 +580,7 @@ export function TransactionsClient() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="description">DescriÃƒÂ§ÃƒÂ£o</Label>
+            <Label htmlFor="description">Descrição</Label>
             <Input
               className={form.formState.errors.description ? invalidFieldClassName : undefined}
               id="description"
@@ -600,7 +600,7 @@ export function TransactionsClient() {
               >
                 <option value="expense">Despesa</option>
                 <option value="income">Receita</option>
-                <option value="transfer">TransferÃƒÂªncia</option>
+                <option value="transfer">Transferência</option>
               </Select>
             </div>
             <div className="space-y-2">
@@ -613,9 +613,9 @@ export function TransactionsClient() {
               >
                 <option value="pix">PIX</option>
                 <option value="money">Dinheiro</option>
-                <option value="debit_card">CartÃƒÂ£o de dÃƒÂ©bito</option>
-                <option value="credit_card">CartÃƒÂ£o de crÃƒÂ©dito</option>
-                <option value="transfer">TransferÃƒÂªncia</option>
+                <option value="debit_card">Cartão de débito</option>
+                <option value="credit_card">Cartão de crédito</option>
+                <option value="transfer">Transferência</option>
               </Select>
             </div>
           </div>
@@ -630,7 +630,7 @@ export function TransactionsClient() {
               >
                 <option value="">
                   {selectedType === "transfer"
-                    ? "TransferÃƒÂªncias nÃƒÂ£o usam categoria"
+                    ? "Transferências não usam categoria"
                     : "Classificar automaticamente"}
                 </option>
                 {filteredCategories.map((category) => (
@@ -642,7 +642,7 @@ export function TransactionsClient() {
             </div>
             <div className="space-y-2">
               <Label htmlFor={isCreditCard ? "cardId" : "accountId"}>
-                {isCreditCard ? "CartÃƒÂ£o vinculado" : selectedType === "transfer" ? "Conta de origem" : "Conta vinculada"}
+                {isCreditCard ? "Cartão vinculado" : selectedType === "transfer" ? "Conta de origem" : "Conta vinculada"}
               </Label>
               {isCreditCard ? (
                 <Select
@@ -651,10 +651,10 @@ export function TransactionsClient() {
                   id="cardId"
                   {...form.register("cardId")}
                 >
-                  <option value="">Selecione o cartÃƒÂ£o</option>
+                  <option value="">Selecione o cartão</option>
                   {cards.map((card) => (
                     <option key={card.id} value={card.id}>
-                      {card.name} {card.last4 ? `Ã¢â‚¬Â¢ ${card.last4}` : ""}
+                      {card.name} {card.last4 ? `• ${card.last4}` : ""}
                     </option>
                   ))}
                 </Select>
@@ -696,7 +696,7 @@ export function TransactionsClient() {
 
           <div className="grid gap-4 lg:grid-cols-[1fr_120px]">
             <div className="space-y-2">
-              <Label htmlFor="notes">ObservaÃƒÂ§ÃƒÂµes</Label>
+              <Label htmlFor="notes">Observações</Label>
               <Input id="notes" placeholder="Opcional" {...form.register("notes")} />
             </div>
             <div className="space-y-2">
@@ -715,37 +715,37 @@ export function TransactionsClient() {
           {selectedType === "income" ? (
             <label className="muted-panel flex items-center gap-3 text-sm">
               <input className="app-checkbox" type="checkbox" {...form.register("applyTithe")} />
-              Considerar dÃƒÂ­zimo nesta receita
+              Considerar dízimo nesta receita
             </label>
           ) : null}
 
           <div className="attention-panel text-sm leading-7 text-[var(--color-foreground)]">
             {isCreditCard
-              ? "Compras no crÃƒÂ©dito ficam vinculadas ao cartÃƒÂ£o e entram no controle de fatura e limite."
+              ? "Compras no crédito ficam vinculadas ao cartão e entram no controle de fatura e limite."
               : selectedType === "transfer"
-                ? "TransferÃƒÂªncias usam a conta de origem e nÃƒÂ£o entram como despesa de cartÃƒÂ£o."
+                ? "Transferências usam a conta de origem e não entram como despesa de cartão."
               : selectedType === "income" && selectedApplyTithe
-                ? "Esta receita entrarÃƒÂ¡ no consolidado mensal de dÃƒÂ­zimo, gerando uma ÃƒÂºnica despesa somada no perÃƒÂ­odo."
-                : "Despesas e receitas devem ficar vinculadas ÃƒÂ  conta correta para melhorar relatÃƒÂ³rios e conciliaÃƒÂ§ÃƒÂ£o."}
+                ? "Esta receita entrará no consolidado mensal de dízimo, gerando uma única despesa somada no período."
+                : "Despesas e receitas devem ficar vinculadas à conta correta para melhorar relatórios e conciliação."}
           </div>
 
           {isEditing && isCreditEditLocked ? (
             <div className="warning-copy text-sm">
-              Para alterar data, conta ou cartÃƒÂ£o neste lanÃƒÂ§amento de crÃƒÂ©dito, recrie o lanÃƒÂ§amento.
+              Para alterar data, conta ou cartão neste lançamento de crédito, recrie o lançamento.
             </div>
           ) : null}
 
           {isEditing ? (
             <p className="warning-copy text-sm">
               {editingInstallmentsTotal > 1
-                ? "Escolha se a alteraÃƒÂ§ÃƒÂ£o deve afetar apenas esta parcela ou todo o grupo parcelado."
-                : "VocÃƒÂª estÃƒÂ¡ editando uma transaÃƒÂ§ÃƒÂ£o jÃƒÂ¡ registrada."}
+                ? "Escolha se a alteração deve afetar apenas esta parcela ou todo o grupo parcelado."
+                : "Você está editando uma transação já registrada."}
             </p>
           ) : null}
 
           {isEditing && editingInstallmentsTotal > 1 ? (
             <div className="space-y-2">
-              <Label htmlFor="edit-scope">Aplicar ediÃƒÂ§ÃƒÂ£o</Label>
+              <Label htmlFor="edit-scope">Aplicar edição</Label>
               <Select id="edit-scope" value={editingScope} onChange={(event) => setEditingScope(event.target.value as "single" | "group")}>
                 <option value="single">Somente esta parcela</option>
                 <option value="group">Todo o parcelamento</option>
@@ -788,19 +788,19 @@ export function TransactionsClient() {
           ) : null}
 
           <Button className="w-full" disabled={saveMutation.isPending} type="submit">
-            {saveMutation.isPending ? "Salvando..." : isEditing ? "Salvar transaÃƒÂ§ÃƒÂ£o" : "Registrar transaÃƒÂ§ÃƒÂ£o"}
+            {saveMutation.isPending ? "Salvando..." : isEditing ? "Salvar transação" : "Registrar transação"}
           </Button>
           {isEditing ? (
             <Button className="w-full" onClick={cancelEditing} type="button" variant="ghost">
-              Cancelar ediÃƒÂ§ÃƒÂ£o
+              Cancelar edição
             </Button>
           ) : null}
           </form>
         ) : (
           <div className="muted-panel mt-8 flex flex-col gap-4 px-4 py-5 text-sm text-[var(--color-muted-foreground)]">
-            <p>O editor foi fechado apÃƒÂ³s a ÃƒÂºltima ediÃƒÂ§ÃƒÂ£o concluÃƒÂ­da.</p>
+            <p>O editor foi fechado após a última edição concluída.</p>
             <Button className="w-full sm:w-auto" onClick={openCreateForm} type="button" variant="secondary">
-              Nova transaÃƒÂ§ÃƒÂ£o
+              Nova transação
             </Button>
           </div>
         )}
@@ -809,8 +809,8 @@ export function TransactionsClient() {
       <section className="surface content-section">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <div className="eyebrow">ÃƒÅ¡ltimas transaÃƒÂ§ÃƒÂµes</div>
-            <h2 className="mt-4 text-2xl font-semibold tracking-[-0.03em]">MovimentaÃƒÂ§ÃƒÂµes recentes</h2>
+            <div className="eyebrow">Últimas transações</div>
+            <h2 className="mt-4 text-2xl font-semibold tracking-[-0.03em]">Movimentações recentes</h2>
           </div>
           <Button disabled={transactionsQuery.isFetching} onClick={() => transactionsQuery.refetch()} type="button" variant="secondary">
             {transactionsQuery.isFetching ? "Atualizando..." : "Atualizar"}
@@ -827,7 +827,7 @@ export function TransactionsClient() {
             <p className="metric-value amount-nowrap amount-negative">{formatCurrency(expenseTotal)}</p>
           </article>
           <article className="metric-card">
-            <p className="metric-label">TransferÃƒÂªncias filtradas</p>
+            <p className="metric-label">Transferências filtradas</p>
             <p className="metric-value amount-nowrap">{formatCurrency(transferTotal)}</p>
           </article>
         </div>
@@ -835,13 +835,13 @@ export function TransactionsClient() {
         <div className="mt-6">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <p className="metric-label">SugestÃƒÂµes para revisar</p>
+              <p className="metric-label">Sugestões para revisar</p>
               <p className="mt-1 text-sm text-[var(--color-muted-foreground)]">
-                ClassificaÃƒÂ§ÃƒÂµes automÃƒÂ¡ticas recentes, priorizando as de menor confianÃƒÂ§a.
+                Classificações automáticas recentes, priorizando as de menor confiança.
               </p>
             </div>
             <p className="shrink-0 text-sm font-medium text-[var(--color-muted-foreground)]">
-              {automaticSuggestions.length} em anÃƒÂ¡lise
+              {automaticSuggestions.length} em análise
             </p>
           </div>
 
@@ -857,12 +857,12 @@ export function TransactionsClient() {
                       <div className="min-w-0 flex-1">
                         <p className="break-words text-sm font-semibold">{transaction.description}</p>
                         <p className="mt-1 break-words text-xs text-[var(--color-muted-foreground)]">
-                          {formatDateDisplay(transaction.date)} Ã¢â‚¬Â¢ {formatCurrency(transaction.amount)} Ã¢â‚¬Â¢{" "}
+                          {formatDateDisplay(transaction.date)} • {formatCurrency(transaction.amount)} •{" "}
                           {transaction.account?.name ?? transaction.card?.name ?? "Sem origem"}
                         </p>
                         <p className="mt-2 break-words text-xs text-[var(--color-muted-foreground)]">
                           Sugerido: {transaction.category?.name ?? "Sem categoria"}{" "}
-                          {transaction.classification?.ai ? "por IA" : "por regras"} Ã¢â‚¬Â¢ confianÃƒÂ§a{" "}
+                          {transaction.classification?.ai ? "por IA" : "por regras"} • confiança{" "}
                           {Math.round((transaction.classification?.confidence ?? 0) * 100)}%
                         </p>
                       </div>
@@ -897,7 +897,7 @@ export function TransactionsClient() {
                             type="button"
                             variant="secondary"
                           >
-                            Confirmar sugestÃƒÂ£o
+                            Confirmar sugestão
                           </Button>
                           <Button
                             disabled={!selectedCategoryId || reviewMutation.isPending}
@@ -936,7 +936,7 @@ export function TransactionsClient() {
               })
             ) : (
               <div className="muted-panel border border-dashed px-4 py-6 text-sm text-[var(--color-muted-foreground)]">
-                Nenhuma classificaÃƒÂ§ÃƒÂ£o automÃƒÂ¡tica pendente de revisÃƒÂ£o nesta amostra recente.
+                Nenhuma classificação automática pendente de revisão nesta amostra recente.
               </div>
             )}
           </div>
@@ -959,7 +959,7 @@ export function TransactionsClient() {
               <option value="">Todos</option>
               <option value="expense">Despesa</option>
               <option value="income">Receita</option>
-              <option value="transfer">TransferÃƒÂªncia</option>
+              <option value="transfer">Transferência</option>
             </Select>
           </div>
           <div className="space-y-2">
@@ -993,16 +993,16 @@ export function TransactionsClient() {
             </Select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="transactions-filter-card">CartÃƒÂ£o</Label>
+            <Label htmlFor="transactions-filter-card">Cartão</Label>
             <Select
               id="transactions-filter-card"
               value={filters.cardId ?? ""}
               onChange={(event) => setFilters((current) => ({ ...current, cardId: event.target.value }))}
             >
-              <option value="">Todos os cartÃƒÂµes</option>
+              <option value="">Todos os cartões</option>
               {cards.map((card) => (
                 <option key={card.id} value={card.id}>
-                  {card.name} {card.last4 ? `Ã¢â‚¬Â¢ ${card.last4}` : ""}
+                  {card.name} {card.last4 ? `• ${card.last4}` : ""}
                 </option>
               ))}
             </Select>
@@ -1010,9 +1010,9 @@ export function TransactionsClient() {
         </div>
 
         <div className="muted-panel mt-4 flex flex-wrap items-start justify-between gap-3 text-sm text-[var(--color-muted-foreground)]">
-          <p className="shrink-0">{`MÃƒÂªs ativo: ${formatMonthKeyLabel(month)}.`}</p>
+          <p className="shrink-0">{`Mês ativo: ${formatMonthKeyLabel(month)}.`}</p>
           <p className="min-w-0 flex-1 break-words text-left sm:text-right">
-            {activeRefinements.length > 0 ? activeRefinements.join(" Ã¢â‚¬Â¢ ") : "Sem refinamentos adicionais."}
+            {activeRefinements.length > 0 ? activeRefinements.join(" • ") : "Sem refinamentos adicionais."}
           </p>
         </div>
 
@@ -1059,7 +1059,7 @@ export function TransactionsClient() {
                   key={`transactions-loading-${index}`}
                   className="muted-panel border border-dashed px-4 py-5 text-sm text-[var(--color-muted-foreground)]"
                 >
-                  Carregando movimentaÃƒÆ’Ã‚Â§ÃƒÆ’Ã‚Âµes do mÃƒÆ’Ã‚Âªs ativo...
+                  Carregando movimentações do mês ativo...
                 </div>
               ))}
             </div>
@@ -1069,7 +1069,7 @@ export function TransactionsClient() {
           ) : null}
           {!transactionsQuery.isLoading && visibleTransactions.length > 0 ? (
             <p className="text-sm text-[var(--color-muted-foreground)]">
-              Mostrando {visibleTransactions.length} movimentaÃƒÂ§ÃƒÂµes de {transactionSummary?.totalCount ?? visibleTransactions.length} no mÃƒÂªs filtrado.
+              Mostrando {visibleTransactions.length} movimentações de {transactionSummary?.totalCount ?? visibleTransactions.length} no mês filtrado.
             </p>
           ) : null}
           {visibleTransactions.map((transaction) => (
@@ -1099,12 +1099,12 @@ export function TransactionsClient() {
                   <p className="mt-3 break-words text-base font-semibold">{transaction.description}</p>
                   <p className="mt-1 break-words text-sm text-[var(--color-muted-foreground)]">
                     {transaction.type === "transfer"
-                      ? `${transaction.account?.name ?? "Sem origem"} Ã¢â€ â€™ ${transaction.destinationAccount?.name ?? "Sem destino"}`
-                      : `${transaction.category?.name ?? "Sem categoria"} Ã¢â‚¬Â¢ ${transaction.account?.name ?? transaction.card?.name ?? "Sem origem"}`}
+                      ? `${transaction.account?.name ?? "Sem origem"} → ${transaction.destinationAccount?.name ?? "Sem destino"}`
+                      : `${transaction.category?.name ?? "Sem categoria"} • ${transaction.account?.name ?? transaction.card?.name ?? "Sem origem"}`}
                   </p>
                   {transaction.card && transaction.competenceDate && transaction.payableDate ? (
                     <p className="mt-2 break-words text-xs text-[var(--color-muted-foreground)]">
-                      CompetÃƒÂªncia {formatMonthKeyLabel(getMonthKeyFromDate(transaction.competenceDate))} Ã¢â‚¬Â¢ vence{" "}
+                      Competência {formatMonthKeyLabel(getMonthKeyFromDate(transaction.competenceDate))} • vence{" "}
                       {formatDateDisplay(transaction.payableDate)}
                     </p>
                   ) : null}
@@ -1116,13 +1116,13 @@ export function TransactionsClient() {
                           : "Categoria sugerida por regra"
                         : null}
                       {transaction.classification?.auto && typeof transaction.classification.confidence === "number"
-                        ? ` Ã¢â‚¬Â¢ confianÃƒÂ§a ${Math.round(transaction.classification.confidence * 100)}%`
+                        ? ` • confiança ${Math.round(transaction.classification.confidence * 100)}%`
                         : ""}
                     </p>
                   ) : null}
                   {transaction.titheAmount ? (
                     <p className="mt-2 break-words text-xs text-[var(--color-muted-foreground)]">
-                      DÃƒÂ­zimo {formatCurrency(transaction.titheAmount)}
+                      Dízimo {formatCurrency(transaction.titheAmount)}
                     </p>
                   ) : null}
                 </div>
@@ -1164,7 +1164,7 @@ export function TransactionsClient() {
 
           {!transactionsQuery.isLoading && visibleTransactions.length === 0 ? (
             <div className="muted-panel border border-dashed px-4 py-6 text-sm text-[var(--color-muted-foreground)]">
-              Nenhuma transaÃƒÂ§ÃƒÂ£o foi encontrada para os filtros selecionados.
+              Nenhuma transação foi encontrada para os filtros selecionados.
             </div>
           ) : null}
         </div>

@@ -138,7 +138,7 @@ export async function GET(request: Request) {
             ? "Consolidado executivo com foco em desempenho, concentracao e leitura gerencial do ano."
             : "Consolidado executivo com foco em fluxo, despesas e desempenho operacional do periodo.",
         periodLabel: `Periodo analisado: ${scopeLabel}`,
-        filtersLabel: periodParts.length > 0 ? periodParts.join(" Ã¢â‚¬Â¢ ") : "Sem refinamentos adicionais",
+        filtersLabel: periodParts.length > 0 ? periodParts.join(" • ") : "Sem refinamentos adicionais",
         periodScope: report.period.scope,
         periodMonths: report.period.months,
         executiveSummary: buildExecutiveSummary(report),

@@ -159,14 +159,14 @@ function formatPeriodTitle(scope: PeriodScope, baseMonthKey: string, start: Date
 
 function formatPeriodSubtitle(scope: PeriodScope, baseMonthKey: string, start: Date, end: Date) {
   if (scope === "year") {
-    return "Consolidado anual com comparativos internos, ritmo mensal e sinais de concentraÃƒÂ§ÃƒÂ£o de gastos.";
+    return "Consolidado anual com comparativos internos, ritmo mensal e sinais de concentração de gastos.";
   }
 
   if (scope === "month") {
-    return `Resumo operacional de ${formatMonthKeyLabel(baseMonthKey)} com caixa, categorias e prÃƒÂ³ximos compromissos.`;
+    return `Resumo operacional de ${formatMonthKeyLabel(baseMonthKey)} com caixa, categorias e próximos compromissos.`;
   }
 
-  return `Recorte personalizado entre ${formatShortDate(start)} e ${formatShortDate(end)} com visÃƒÂ£o consolidada do perÃƒÂ­odo.`;
+  return `Recorte personalizado entre ${formatShortDate(start)} e ${formatShortDate(end)} com visão consolidada do período.`;
 }
 
 function getScopeLabel(scope: PeriodScope) {
@@ -178,7 +178,7 @@ function getScopeLabel(scope: PeriodScope) {
     return "Leitura mensal";
   }
 
-  return "PerÃƒÂ­odo personalizado";
+  return "Período personalizado";
 }
 
 function pickMonthlyHighlight(
@@ -419,13 +419,11 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
       where: {
         tenantId,
         ...(userId ? { userId } : {}),
-        date: {
-          lte: projectionEnd
-        },
         OR: [{ accountId: { not: null } }, { destinationAccountId: { not: null } }]
       },
       select: {
         date: true,
+        competence: true,
         accountId: true,
         destinationAccountId: true,
         amount: true,
@@ -810,6 +808,9 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
       cardPayments: 0
     }
   );
+  const periodMonthKeys = listMonthKeysBetween(projectionStart, projectionEnd);
+  const openingCutoffMonth = periodMonthKeys[0] ?? getCurrentMonthKey(projectionStart);
+  const closingCutoffMonth = periodMonthKeys.at(periodMonthKeys.length - 1) ?? openingCutoffMonth;
 
   const byCategory = Array.from(categoryMap.values())
     .sort((a, b) => b.total - a.total)
@@ -836,6 +837,9 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
 
   for (const transaction of balanceTransactions) {
     const amount = Number(transaction.amount);
+    const competenceMonth = transaction.competence ?? getCurrentMonthKey(transaction.date);
+    const affectsOpening = competenceMonth < openingCutoffMonth;
+    const affectsClosing = competenceMonth <= closingCutoffMonth;
 
     if (transaction.accountId) {
       const account = activeAccountBalances.get(transaction.accountId);
@@ -849,11 +853,13 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
               : 0;
 
         if (effect !== 0) {
-          if (transaction.date < projectionStart) {
+          if (affectsOpening) {
             account.opening += effect;
           }
 
-          account.closing += effect;
+          if (affectsClosing) {
+            account.closing += effect;
+          }
         }
       }
     }
@@ -862,11 +868,13 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
       const account = activeAccountBalances.get(transaction.destinationAccountId);
 
       if (account) {
-        if (transaction.date < projectionStart) {
+        if (affectsOpening) {
           account.opening += amount;
         }
 
-        account.closing += amount;
+        if (affectsClosing) {
+          account.closing += amount;
+        }
       }
     }
   }
@@ -881,7 +889,6 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
       closing: 0
     }
   );
-  const periodMonthKeys = listMonthKeysBetween(projectionStart, projectionEnd);
   const periodScope = detectPeriodScope(projectionStart, projectionEnd);
   const periodMonths = periodMonthKeys.length;
   const baseMonthKey = filters.baseMonth ?? periodMonthKeys.at(periodMonthKeys.length - 1) ?? getCurrentMonthKey(projectionEnd);
@@ -971,39 +978,39 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
           : "attention";
   const narrativeHeadline =
     summary.transactions === 0
-      ? "Ainda nÃƒÂ£o hÃƒÂ¡ movimentaÃƒÂ§ÃƒÂ£o suficiente para uma leitura anual consistente"
+      ? "Ainda não há movimentação suficiente para uma leitura anual consistente"
       : narrativeTone === "warning"
         ? periodScope === "year"
-          ? "O ano fechou sob pressÃƒÂ£o e pede correÃƒÂ§ÃƒÂ£o de rota"
-          : "O perÃƒÂ­odo fechou pressionado e exige ajuste operacional"
+          ? "O ano fechou sob pressão e pede correção de rota"
+          : "O período fechou pressionado e exige ajuste operacional"
         : narrativeTone === "positive"
           ? periodScope === "year"
-            ? "O ano fechou com resultado saudÃƒÂ¡vel e margem de manobra"
-            : "O perÃƒÂ­odo terminou com folga operacional"
+            ? "O ano fechou com resultado saudável e margem de manobra"
+            : "O período terminou com folga operacional"
           : periodScope === "year"
-            ? "O ano ficou positivo, mas com sinais de atenÃƒÂ§ÃƒÂ£o"
-            : "O perÃƒÂ­odo ficou positivo, mas ainda sem folga confortÃƒÂ¡vel";
+            ? "O ano ficou positivo, mas com sinais de atenção"
+            : "O período ficou positivo, mas ainda sem folga confortável";
   const narrativeSummary =
     summary.transactions === 0
-      ? "O recorte atual ainda nÃƒÂ£o tem volume de transaÃƒÂ§ÃƒÂµes para sustentar uma leitura executiva confiÃƒÂ¡vel."
+      ? "O recorte atual ainda não tem volume de transações para sustentar uma leitura executiva confiável."
       : periodScope === "year"
         ? `${positiveMonths} meses positivos, ${negativeMonths} meses negativos e resultado acumulado de ${summary.balance.toLocaleString(
             "pt-BR",
             { style: "currency", currency: "BRL" }
           )}.`
-        : `${summary.transactions} lanÃƒÂ§amentos analisados com resultado de ${summary.balance.toLocaleString("pt-BR", {
+        : `${summary.transactions} lançamentos analisados com resultado de ${summary.balance.toLocaleString("pt-BR", {
             style: "currency",
             currency: "BRL"
-          })} no perÃƒÂ­odo.`;
+          })} no período.`;
   const narrativeFocus =
     topCategoriesShare >= 0.5
-      ? `As trÃƒÂªs maiores categorias concentram ${Math.round(topCategoriesShare * 100)}% das despesas.`
+      ? `As três maiores categorias concentram ${Math.round(topCategoriesShare * 100)}% das despesas.`
       : worstMonth
         ? `O ponto mais pressionado foi ${worstMonth.label}, com saldo de ${worstMonth.balance.toLocaleString(
             "pt-BR",
             { style: "currency", currency: "BRL" }
           )}.`
-        : "A distribuiÃƒÂ§ÃƒÂ£o de despesas segue relativamente equilibrada no recorte atual.";
+        : "A distribuição de despesas segue relativamente equilibrada no recorte atual.";
   const alerts = [
     summary.balance < 0
       ? {
@@ -1016,20 +1023,20 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
       ? {
           tone: "attention" as const,
           title: "Despesa sem categoria relevante",
-          detail: `${Math.round(uncategorizedExpenseShare * 100)}% das despesas ainda estÃƒÂ£o sem categorizaÃƒÂ§ÃƒÂ£o.`
+          detail: `${Math.round(uncategorizedExpenseShare * 100)}% das despesas ainda estão sem categorização.`
         }
       : null,
     topCategoriesShare >= 0.55
       ? {
           tone: "attention" as const,
-          title: "Alta concentraÃƒÂ§ÃƒÂ£o de gastos",
-          detail: `As trÃƒÂªs maiores categorias representam ${Math.round(topCategoriesShare * 100)}% da despesa total.`
+          title: "Alta concentração de gastos",
+          detail: `As três maiores categorias representam ${Math.round(topCategoriesShare * 100)}% da despesa total.`
         }
       : null,
     positiveMonths >= Math.max(1, Math.ceil(periodMonths * 0.7)) && summary.balance > 0
       ? {
           tone: "positive" as const,
-          title: "CadÃƒÂªncia financeira estÃƒÂ¡vel",
+          title: "Cadência financeira estável",
           detail: `${positiveMonths} de ${periodMonths} meses fecharam positivos.`
         }
       : null
@@ -1061,14 +1068,14 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
       topCategory,
       essentialExpenses: categoryInsights
         .filter((item) =>
-          ["Moradia", "CondomÃƒÂ­nio", "Energia elÃƒÂ©trica", "ÃƒÂgua e saneamento", "Internet e telefonia", "SaÃƒÂºde"].includes(
+          ["Moradia", "Condomínio", "Energia elétrica", "Água e saneamento", "Internet e telefonia", "Saúde"].includes(
             item.name
           )
         )
         .reduce((sum, item) => sum + item.total, 0),
       lifestyleExpenses: categoryInsights
         .filter((item) =>
-          ["Restaurantes", "Delivery", "Lazer", "Streaming e assinaturas", "Viagem", "CafÃƒÂ© e padaria"].includes(
+          ["Restaurantes", "Delivery", "Lazer", "Streaming e assinaturas", "Viagem", "Café e padaria"].includes(
             item.name
           )
         )
