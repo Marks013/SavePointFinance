@@ -16,6 +16,14 @@ class CookieJar {
     const setCookies =
       typeof response.headers.getSetCookie === "function" ? response.headers.getSetCookie() : [];
 
+    if (setCookies.length === 0) {
+      const fallbackCookie = response.headers.get("set-cookie");
+
+      if (fallbackCookie) {
+        setCookies.push(fallbackCookie);
+      }
+    }
+
     for (const entry of setCookies) {
       const [pair] = entry.split(";", 1);
       const separatorIndex = pair.indexOf("=");
