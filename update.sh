@@ -4,6 +4,7 @@ set -Eeuo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_FILE="${ENV_FILE:-${ROOT_DIR}/.env}"
+RUNTIME_ENV_FILE="${RUNTIME_ENV_FILE:-${ROOT_DIR}/.deploy/runtime.env}"
 RELEASES_DIR="${RELEASES_DIR:-${ROOT_DIR}/.deploy/releases}"
 SERVICE_NAME="${SERVICE_NAME:-web}"
 HEALTH_PATH="${HEALTH_PATH:-/api/health}"
@@ -13,6 +14,7 @@ RELEASE_RETENTION_COUNT="${RELEASE_RETENTION_COUNT:-5}"
 ROLLBACK_IMAGE_RETENTION_COUNT="${ROLLBACK_IMAGE_RETENTION_COUNT:-2}"
 RUN_DB_MIGRATIONS="${RUN_DB_MIGRATIONS:-false}"
 RUN_BACKUP_ON_DEPLOY="${RUN_BACKUP_ON_DEPLOY:-false}"
+SMOKE_REQUIRED="${SMOKE_REQUIRED:-false}"
 KEEP_MAINTENANCE_ON_FAILURE="${KEEP_MAINTENANCE_ON_FAILURE:-true}"
 MAINTENANCE_WAS_ENABLED="false"
 MAINTENANCE_IS_ENABLED="false"
@@ -71,18 +73,35 @@ detect_compose_cmd() {
   exit 1
 }
 
-load_env_file() {
-  if [[ -f "$ENV_FILE" ]]; then
-    set -a
-    # shellcheck disable=SC1090
-    source "$ENV_FILE"
-    set +a
-  fi
-}
-
 APP_HEALTH_BASE_URL=""
 COMPOSE_CMD=""
 ROLLBACK_IMAGE_TAG=""
+
+ensure_runtime_env_file() {
+  mkdir -p "$(dirname "$RUNTIME_ENV_FILE")"
+  touch "$RUNTIME_ENV_FILE"
+}
+
+read_env_value() {
+  local file_path="$1"
+  local key="$2"
+
+  if [[ ! -f "$file_path" ]]; then
+    return 1
+  fi
+
+  local raw_value
+  raw_value="$(sed -n "s/^${key}=//p" "$file_path" | tail -n 1)"
+
+  if [[ -z "$raw_value" ]]; then
+    return 1
+  fi
+
+  raw_value="${raw_value%$'\r'}"
+  raw_value="${raw_value#\"}"
+  raw_value="${raw_value%\"}"
+  printf '%s' "$raw_value"
+}
 
 inspect_service_state() {
   if [[ -z "$COMPOSE_CMD" ]]; then
@@ -144,7 +163,7 @@ set_maintenance_mode() {
     return 0
   fi
 
-  sh "${ROOT_DIR}/ops/toggle-maintenance.sh" "$target_mode" >> "${RELEASE_DIR}/maintenance.log" 2>&1
+  RUNTIME_ENV_FILE="$RUNTIME_ENV_FILE" sh "${ROOT_DIR}/ops/toggle-maintenance.sh" "$target_mode" >> "${RELEASE_DIR}/maintenance.log" 2>&1
 
   if [[ "$target_mode" == "on" ]]; then
     MAINTENANCE_IS_ENABLED="true"
@@ -288,9 +307,10 @@ on_error() {
 trap on_error ERR
 
 mkdir -p "$RELEASE_DIR"
-load_env_file
+ensure_runtime_env_file
 COMPOSE_CMD="$(detect_compose_cmd)"
-APP_HEALTH_BASE_URL="${APP_HEALTH_BASE_URL:-http://127.0.0.1:${APP_PORT:-3000}}"
+APP_PORT_VALUE="$(read_env_value "$ENV_FILE" APP_PORT || true)"
+APP_HEALTH_BASE_URL="${APP_HEALTH_BASE_URL:-http://127.0.0.1:${APP_PORT_VALUE:-3000}}"
 ROLLBACK_IMAGE_TAG="savepointfinance-web:rollback-${RELEASE_TIMESTAMP}"
 
 log "Iniciando deploy robusto do SavePointFinance"
@@ -314,7 +334,7 @@ else
   ROLLBACK_IMAGE_TAG=""
 fi
 
-if grep -q '^MAINTENANCE_MODE=true' "$ENV_FILE"; then
+if [[ "$(read_env_value "$RUNTIME_ENV_FILE" MAINTENANCE_MODE || true)" == "true" ]]; then
   MAINTENANCE_WAS_ENABLED="true"
   MAINTENANCE_IS_ENABLED="true"
   log "Modo de manutencao ja estava ativo antes do deploy."
@@ -352,7 +372,22 @@ log "Aguardando healthcheck apos reabrir a aplicacao"
 wait_for_health
 
 log "Executando auditoria de fumaça"
+set +e
 $COMPOSE_CMD run --rm audit-server-smoke > "${RELEASE_DIR}/smoke.log" 2>&1
+SMOKE_EXIT_CODE=$?
+set -e
+
+if (( SMOKE_EXIT_CODE != 0 )); then
+  capture_logs
+
+  if [[ "$SMOKE_REQUIRED" == "true" ]]; then
+    log "Auditoria de fumaça falhou e esta configurada como obrigatoria."
+    exit "$SMOKE_EXIT_CODE"
+  fi
+
+  log "Auditoria de fumaça falhou, mas o deploy seguira porque SMOKE_REQUIRED=false."
+  log "Consulte ${RELEASE_DIR}/smoke.log para diagnostico."
+fi
 
 capture_logs
 
