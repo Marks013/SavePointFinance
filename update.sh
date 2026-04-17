@@ -9,10 +9,13 @@ SERVICE_NAME="${SERVICE_NAME:-web}"
 HEALTH_PATH="${HEALTH_PATH:-/api/health}"
 HEALTH_TIMEOUT_SECONDS="${HEALTH_TIMEOUT_SECONDS:-90}"
 HEALTH_INTERVAL_SECONDS="${HEALTH_INTERVAL_SECONDS:-3}"
+RELEASE_RETENTION_COUNT="${RELEASE_RETENTION_COUNT:-5}"
+ROLLBACK_IMAGE_RETENTION_COUNT="${ROLLBACK_IMAGE_RETENTION_COUNT:-2}"
 RUN_DB_MIGRATIONS="${RUN_DB_MIGRATIONS:-false}"
 RUN_BACKUP_ON_DEPLOY="${RUN_BACKUP_ON_DEPLOY:-false}"
 KEEP_MAINTENANCE_ON_FAILURE="${KEEP_MAINTENANCE_ON_FAILURE:-true}"
 MAINTENANCE_WAS_ENABLED="false"
+MAINTENANCE_IS_ENABLED="false"
 DEPLOY_SUCCEEDED="false"
 AUTO_ROLLBACK_ATTEMPTED="false"
 DEPLOY_STARTED_AT_EPOCH="$(date +%s)"
@@ -130,6 +133,27 @@ emit_runtime_hint() {
   fi
 }
 
+set_maintenance_mode() {
+  local target_mode="$1"
+
+  if [[ "$target_mode" == "on" && "$MAINTENANCE_IS_ENABLED" == "true" ]]; then
+    return 0
+  fi
+
+  if [[ "$target_mode" == "off" && "$MAINTENANCE_IS_ENABLED" == "false" ]]; then
+    return 0
+  fi
+
+  sh "${ROOT_DIR}/ops/toggle-maintenance.sh" "$target_mode" >> "${RELEASE_DIR}/maintenance.log" 2>&1
+
+  if [[ "$target_mode" == "on" ]]; then
+    MAINTENANCE_IS_ENABLED="true"
+    return 0
+  fi
+
+  MAINTENANCE_IS_ENABLED="false"
+}
+
 wait_for_health() {
   local deadline=$((SECONDS + HEALTH_TIMEOUT_SECONDS))
   local attempt=1
@@ -197,6 +221,46 @@ rollback_release() {
   bash "${ROOT_DIR}/ops/rollback-release.sh" "$RELEASE_MANIFEST" >> "${RELEASE_DIR}/rollback.log" 2>&1 || true
 }
 
+cleanup_success_artifacts() {
+  if [[ -n "$ROLLBACK_IMAGE_TAG" ]] && docker image inspect "$ROLLBACK_IMAGE_TAG" >/dev/null 2>&1; then
+    log "Removendo snapshot local de rollback deste ciclo"
+    docker image rm -f "$ROLLBACK_IMAGE_TAG" >> "${RELEASE_DIR}/cleanup.log" 2>&1 || true
+  fi
+
+  if [[ -d "$RELEASES_DIR" ]] && [[ "$RELEASE_RETENTION_COUNT" =~ ^[0-9]+$ ]] && (( RELEASE_RETENTION_COUNT >= 1 )); then
+    local old_release_dirs
+    old_release_dirs="$(
+      find "$RELEASES_DIR" -mindepth 1 -maxdepth 1 -type d | sort | head -n -"${RELEASE_RETENTION_COUNT}" 2>/dev/null || true
+    )"
+
+    if [[ -n "$old_release_dirs" ]]; then
+      log "Removendo evidencias antigas e mantendo os ultimos ${RELEASE_RETENTION_COUNT} releases"
+      while IFS= read -r old_release_dir; do
+        [[ -n "$old_release_dir" ]] || continue
+        rm -rf -- "$old_release_dir"
+      done <<< "$old_release_dirs"
+    fi
+  fi
+
+  if [[ "$ROLLBACK_IMAGE_RETENTION_COUNT" =~ ^[0-9]+$ ]] && (( ROLLBACK_IMAGE_RETENTION_COUNT >= 0 )); then
+    local rollback_tags
+    rollback_tags="$(
+      docker image ls --format '{{.Repository}}:{{.Tag}}' |
+        grep '^savepointfinance-web:rollback-' |
+        sort |
+        head -n -"${ROLLBACK_IMAGE_RETENTION_COUNT}" 2>/dev/null || true
+    )"
+
+    if [[ -n "$rollback_tags" ]]; then
+      log "Removendo snapshots antigos de rollback e mantendo os ultimos ${ROLLBACK_IMAGE_RETENTION_COUNT}"
+      while IFS= read -r rollback_tag; do
+        [[ -n "$rollback_tag" ]] || continue
+        docker image rm -f "$rollback_tag" >> "${RELEASE_DIR}/cleanup.log" 2>&1 || true
+      done <<< "$rollback_tags"
+    fi
+  fi
+}
+
 on_error() {
   local exit_code=$?
   local elapsed_seconds=$(( $(date +%s) - DEPLOY_STARTED_AT_EPOCH ))
@@ -206,9 +270,13 @@ on_error() {
     rollback_release
 
     if [[ "$KEEP_MAINTENANCE_ON_FAILURE" == "true" ]]; then
+      if [[ "$MAINTENANCE_IS_ENABLED" != "true" ]]; then
+        log "Religando modo de manutencao apos falha"
+        set_maintenance_mode on || true
+      fi
       log "Falha detectada. O sistema sera mantido em manutencao para triagem."
     else
-      sh "${ROOT_DIR}/ops/toggle-maintenance.sh" off >> "${RELEASE_DIR}/maintenance.log" 2>&1 || true
+      set_maintenance_mode off || true
     fi
   fi
 
@@ -248,10 +316,11 @@ fi
 
 if grep -q '^MAINTENANCE_MODE=true' "$ENV_FILE"; then
   MAINTENANCE_WAS_ENABLED="true"
+  MAINTENANCE_IS_ENABLED="true"
   log "Modo de manutencao ja estava ativo antes do deploy."
 else
   log "Ativando modo de manutencao"
-  sh "${ROOT_DIR}/ops/toggle-maintenance.sh" on >> "${RELEASE_DIR}/maintenance.log" 2>&1
+  set_maintenance_mode on
 fi
 
 if [[ "$RUN_BACKUP_ON_DEPLOY" == "true" ]]; then
@@ -276,19 +345,26 @@ $COMPOSE_CMD up -d --no-deps --force-recreate "$SERVICE_NAME" > "${RELEASE_DIR}/
 log "Aguardando healthcheck publico ${APP_HEALTH_BASE_URL}${HEALTH_PATH}"
 wait_for_health
 
-log "Executando auditoria de fumaça ainda sob manutencao"
+log "Abrindo a aplicacao para executar a auditoria de fumaca"
+set_maintenance_mode off
+
+log "Executando auditoria de fumaça"
 $COMPOSE_CMD run --rm audit-server-smoke > "${RELEASE_DIR}/smoke.log" 2>&1
 
 capture_logs
 
-if [[ "$MAINTENANCE_WAS_ENABLED" != "true" ]]; then
+if [[ "$MAINTENANCE_WAS_ENABLED" == "true" ]]; then
+  log "Restaurando o modo de manutencao que ja estava ativo antes do deploy"
+  set_maintenance_mode on
+elif [[ "$MAINTENANCE_IS_ENABLED" == "true" ]]; then
   log "Desativando modo de manutencao"
-  sh "${ROOT_DIR}/ops/toggle-maintenance.sh" off >> "${RELEASE_DIR}/maintenance.log" 2>&1
+  set_maintenance_mode off
 fi
 
 DEPLOY_SUCCEEDED="true"
 DEPLOY_FINISHED_AT_EPOCH="$(date +%s)"
 DEPLOY_ELAPSED_SECONDS=$((DEPLOY_FINISHED_AT_EPOCH - DEPLOY_STARTED_AT_EPOCH))
+cleanup_success_artifacts
 log "Deploy concluido com sucesso"
 log "Tempo total do deploy: $(format_duration "$DEPLOY_ELAPSED_SECONDS")"
 log "Manifesto: ${RELEASE_MANIFEST}"
