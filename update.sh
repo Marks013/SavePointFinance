@@ -177,7 +177,7 @@ rollback_release() {
 
   AUTO_ROLLBACK_ATTEMPTED="true"
   log "Acionando rollback automatico para ${ROLLBACK_IMAGE_TAG}"
-  "${ROOT_DIR}/ops/rollback-release.sh" "$RELEASE_MANIFEST" >> "${RELEASE_DIR}/rollback.log" 2>&1 || true
+  bash "${ROOT_DIR}/ops/rollback-release.sh" "$RELEASE_MANIFEST" >> "${RELEASE_DIR}/rollback.log" 2>&1 || true
 }
 
 on_error() {
@@ -191,7 +191,7 @@ on_error() {
     if [[ "$KEEP_MAINTENANCE_ON_FAILURE" == "true" ]]; then
       log "Falha detectada. O sistema sera mantido em manutencao para triagem."
     else
-      "${ROOT_DIR}/ops/toggle-maintenance.sh" off >> "${RELEASE_DIR}/maintenance.log" 2>&1 || true
+      sh "${ROOT_DIR}/ops/toggle-maintenance.sh" off >> "${RELEASE_DIR}/maintenance.log" 2>&1 || true
     fi
   fi
 
@@ -234,7 +234,7 @@ if grep -q '^MAINTENANCE_MODE=true' "$ENV_FILE"; then
   log "Modo de manutencao ja estava ativo antes do deploy."
 else
   log "Ativando modo de manutencao"
-  "${ROOT_DIR}/ops/toggle-maintenance.sh" on >> "${RELEASE_DIR}/maintenance.log" 2>&1
+  sh "${ROOT_DIR}/ops/toggle-maintenance.sh" on >> "${RELEASE_DIR}/maintenance.log" 2>&1
 fi
 
 if [[ "$RUN_BACKUP_ON_DEPLOY" == "true" ]]; then
@@ -266,7 +266,7 @@ capture_logs
 
 if [[ "$MAINTENANCE_WAS_ENABLED" != "true" ]]; then
   log "Desativando modo de manutencao"
-  "${ROOT_DIR}/ops/toggle-maintenance.sh" off >> "${RELEASE_DIR}/maintenance.log" 2>&1
+  sh "${ROOT_DIR}/ops/toggle-maintenance.sh" off >> "${RELEASE_DIR}/maintenance.log" 2>&1
 fi
 
 DEPLOY_SUCCEEDED="true"
