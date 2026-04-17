@@ -372,10 +372,11 @@ log "Aguardando healthcheck apos reabrir a aplicacao"
 wait_for_health
 
 log "Executando auditoria de fumaça"
-set +e
-$COMPOSE_CMD run --rm audit-server-smoke > "${RELEASE_DIR}/smoke.log" 2>&1
-SMOKE_EXIT_CODE=$?
-set -e
+if $COMPOSE_CMD run --rm audit-server-smoke > "${RELEASE_DIR}/smoke.log" 2>&1; then
+  SMOKE_EXIT_CODE=0
+else
+  SMOKE_EXIT_CODE=$?
+fi
 
 if (( SMOKE_EXIT_CODE != 0 )); then
   capture_logs
