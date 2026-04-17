@@ -11,10 +11,8 @@ if [ -z "$MODE" ]; then
   exit 1
 fi
 
-if [ ! -f "$ENV_FILE" ]; then
-  echo "Arquivo de ambiente não encontrado: $ENV_FILE"
-  exit 1
-fi
+mkdir -p "$(dirname "$ENV_FILE")"
+[ -f "$ENV_FILE" ] || : > "$ENV_FILE"
 
 case "$MODE" in
   on)

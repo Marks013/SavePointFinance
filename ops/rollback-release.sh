@@ -3,7 +3,6 @@
 set -Eeuo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-ENV_FILE="${ENV_FILE:-${ROOT_DIR}/.env}"
 SERVICE_NAME="${SERVICE_NAME:-web}"
 HEALTH_PATH="${HEALTH_PATH:-/api/health}"
 HEALTH_TIMEOUT_SECONDS="${HEALTH_TIMEOUT_SECONDS:-90}"
@@ -46,15 +45,6 @@ detect_compose_cmd() {
 require_file() {
   local file_path="$1"
   [[ -f "$file_path" ]] || fail "Arquivo nao encontrado: ${file_path}"
-}
-
-load_env_file() {
-  if [[ -f "$ENV_FILE" ]]; then
-    set -a
-    # shellcheck disable=SC1090
-    source "$ENV_FILE"
-    set +a
-  fi
 }
 
 inspect_service_state() {
@@ -127,14 +117,11 @@ wait_for_health() {
 }
 
 main() {
-  require_file "$ENV_FILE"
-
   if [[ -z "$RELEASE_MANIFEST_PATH" ]]; then
     fail "Uso: ./ops/rollback-release.sh <caminho-do-manifest>"
   fi
 
   require_file "$RELEASE_MANIFEST_PATH"
-  load_env_file
 
   set -a
   # shellcheck disable=SC1090

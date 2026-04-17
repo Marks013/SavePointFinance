@@ -163,7 +163,7 @@ set_maintenance_mode() {
     return 0
   fi
 
-  RUNTIME_ENV_FILE="$RUNTIME_ENV_FILE" sh "${ROOT_DIR}/ops/toggle-maintenance.sh" "$target_mode" >> "${RELEASE_DIR}/maintenance.log" 2>&1
+  ENV_FILE="$RUNTIME_ENV_FILE" sh "${ROOT_DIR}/ops/toggle-maintenance.sh" "$target_mode" >> "${RELEASE_DIR}/maintenance.log" 2>&1
 
   if [[ "$target_mode" == "on" ]]; then
     MAINTENANCE_IS_ENABLED="true"
