@@ -348,6 +348,9 @@ wait_for_health
 log "Abrindo a aplicacao para executar a auditoria de fumaca"
 set_maintenance_mode off
 
+log "Aguardando healthcheck apos reabrir a aplicacao"
+wait_for_health
+
 log "Executando auditoria de fumaça"
 $COMPOSE_CMD run --rm audit-server-smoke > "${RELEASE_DIR}/smoke.log" 2>&1
 
