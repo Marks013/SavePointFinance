@@ -509,7 +509,7 @@ async function run() {
   results.push("Dashboard autenticado responde para o admin");
 
   await expectPage(adminJar, "/dashboard/admin", {
-    markers: ["Painel administrativo", "Auditoria administrativa", "Pessoas"],
+    markers: ["Painel administrativo", "Auditoria administrativa", "Colaboradores"],
     minimumMatches: 2
   });
   results.push("Painel admin responde para perfil administrativo");
