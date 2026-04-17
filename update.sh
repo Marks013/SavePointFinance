@@ -87,14 +87,31 @@ inspect_service_state() {
   fi
 
   local ps_output
-  ps_output="$($COMPOSE_CMD ps "$SERVICE_NAME" 2>/dev/null | tail -n +3 | head -n 1 || true)"
+  ps_output="$($COMPOSE_CMD ps --format json "$SERVICE_NAME" 2>/dev/null | head -n 1 || true)"
 
   if [[ -z "$ps_output" ]]; then
-    printf 'servico-sem-status'
+    ps_output="$($COMPOSE_CMD ps "$SERVICE_NAME" 2>/dev/null | tail -n +3 | head -n 1 || true)"
+
+    if [[ -z "$ps_output" ]]; then
+      printf 'servico-sem-status'
+      return 0
+    fi
+
+    printf '%s' "$ps_output" | awk '{print $(NF-1) " " $NF}'
     return 0
   fi
 
-  printf '%s' "$ps_output" | awk '{print $(NF-1) " " $NF}'
+  local state
+  state="$(printf '%s' "$ps_output" | sed -n 's/.*"State":"\([^"]*\)".*/\1/p')"
+  local health
+  health="$(printf '%s' "$ps_output" | sed -n 's/.*"Health":"\([^"]*\)".*/\1/p')"
+
+  if [[ -n "$health" ]]; then
+    printf '%s (%s)' "${state:-estado-desconhecido}" "$health"
+    return 0
+  fi
+
+  printf '%s' "${state:-estado-desconhecido}"
 }
 
 emit_runtime_hint() {

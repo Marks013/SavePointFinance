@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 const MAINTENANCE_PATH = "/manutencao";
-const ALLOWED_API_PREFIXES = ["/api/integrations"];
+const ALLOWED_API_PREFIXES = ["/api/health", "/api/integrations"];
 
 function isAllowedDuringMaintenance(pathname: string) {
   if (pathname === MAINTENANCE_PATH) {
