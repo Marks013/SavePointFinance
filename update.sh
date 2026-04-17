@@ -15,12 +15,42 @@ KEEP_MAINTENANCE_ON_FAILURE="${KEEP_MAINTENANCE_ON_FAILURE:-true}"
 MAINTENANCE_WAS_ENABLED="false"
 DEPLOY_SUCCEEDED="false"
 AUTO_ROLLBACK_ATTEMPTED="false"
+DEPLOY_STARTED_AT_EPOCH="$(date +%s)"
 RELEASE_TIMESTAMP="$(date '+%Y%m%d-%H%M%S')"
 RELEASE_DIR="${RELEASES_DIR}/${RELEASE_TIMESTAMP}"
 RELEASE_MANIFEST="${RELEASE_DIR}/release.env"
 
 log() {
   printf '[deploy] %s\n' "$*"
+}
+
+format_duration() {
+  local total_seconds="$1"
+  local hours=$((total_seconds / 3600))
+  local minutes=$(((total_seconds % 3600) / 60))
+  local seconds=$((total_seconds % 60))
+
+  if (( hours > 0 )); then
+    printf '%dh %02dm %02ds' "$hours" "$minutes" "$seconds"
+    return
+  fi
+
+  if (( minutes > 0 )); then
+    printf '%dm %02ds' "$minutes" "$seconds"
+    return
+  fi
+
+  printf '%ds' "$seconds"
+}
+
+print_prefixed_block() {
+  local prefix="$1"
+  local content="$2"
+
+  while IFS= read -r line; do
+    [[ -n "$line" ]] || continue
+    printf '%s %s\n' "$prefix" "$line"
+  done <<< "$content"
 }
 
 detect_compose_cmd() {
@@ -51,12 +81,64 @@ APP_HEALTH_BASE_URL=""
 COMPOSE_CMD=""
 ROLLBACK_IMAGE_TAG=""
 
+inspect_service_state() {
+  if [[ -z "$COMPOSE_CMD" ]]; then
+    return 0
+  fi
+
+  local ps_output
+  ps_output="$($COMPOSE_CMD ps "$SERVICE_NAME" 2>/dev/null | tail -n +3 | head -n 1 || true)"
+
+  if [[ -z "$ps_output" ]]; then
+    printf 'servico-sem-status'
+    return 0
+  fi
+
+  printf '%s' "$ps_output" | awk '{print $(NF-1) " " $NF}'
+}
+
+emit_runtime_hint() {
+  local attempt="$1"
+
+  if [[ -z "$COMPOSE_CMD" ]]; then
+    return 0
+  fi
+
+  local service_logs
+  service_logs="$($COMPOSE_CMD logs --tail=12 "$SERVICE_NAME" 2>&1 || true)"
+
+  if [[ -n "$service_logs" ]]; then
+    log "Tentativa ${attempt}: ultimos eventos do servico ${SERVICE_NAME}"
+    print_prefixed_block "[deploy][web]" "$service_logs"
+  fi
+}
+
 wait_for_health() {
   local deadline=$((SECONDS + HEALTH_TIMEOUT_SECONDS))
+  local attempt=1
 
   while (( SECONDS < deadline )); do
-    local response
-    response="$(curl --silent --show-error --max-time 5 "${APP_HEALTH_BASE_URL}${HEALTH_PATH}" || true)"
+    local response=""
+    local curl_output=""
+    local curl_status=0
+    local service_state=""
+    local elapsed=0
+    local remaining=0
+
+    curl_output="$(curl --silent --show-error --max-time 5 "${APP_HEALTH_BASE_URL}${HEALTH_PATH}" 2>&1)" || curl_status=$?
+    elapsed=$((HEALTH_TIMEOUT_SECONDS - (deadline - SECONDS)))
+    remaining=$((deadline - SECONDS))
+    (( remaining < 0 )) && remaining=0
+    service_state="$(inspect_service_state)"
+
+    if (( curl_status == 0 )); then
+      response="$curl_output"
+      log "Tentativa ${attempt}: healthcheck respondeu (container: ${service_state}, ${elapsed}s decorridos, ${remaining}s restantes)"
+    else
+      response="curl_exit=${curl_status} ${curl_output:-healthcheck sem resposta}"
+      log "Tentativa ${attempt}: aguardando app (container: ${service_state}, ${elapsed}s decorridos, ${remaining}s restantes) -> ${response}"
+    fi
+
     printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "${response:-healthcheck sem resposta}" >> "${RELEASE_DIR}/health.log"
 
     if [[ "$response" == *'"status":"ok"'* ]]; then
@@ -64,7 +146,12 @@ wait_for_health() {
       return 0
     fi
 
+    if (( attempt == 1 || attempt % 3 == 0 )); then
+      emit_runtime_hint "$attempt"
+    fi
+
     sleep "$HEALTH_INTERVAL_SECONDS"
+    ((attempt++))
   done
 
   log "Healthcheck nao respondeu com status ok dentro do tempo limite."
@@ -95,6 +182,7 @@ rollback_release() {
 
 on_error() {
   local exit_code=$?
+  local elapsed_seconds=$(( $(date +%s) - DEPLOY_STARTED_AT_EPOCH ))
   capture_logs
 
   if [[ "$DEPLOY_SUCCEEDED" != "true" ]]; then
@@ -107,6 +195,7 @@ on_error() {
     fi
   fi
 
+  log "Tempo total ate a falha: $(format_duration "$elapsed_seconds")"
   log "Deploy falhou. Consulte ${RELEASE_DIR}"
   exit "$exit_code"
 }
@@ -181,5 +270,8 @@ if [[ "$MAINTENANCE_WAS_ENABLED" != "true" ]]; then
 fi
 
 DEPLOY_SUCCEEDED="true"
+DEPLOY_FINISHED_AT_EPOCH="$(date +%s)"
+DEPLOY_ELAPSED_SECONDS=$((DEPLOY_FINISHED_AT_EPOCH - DEPLOY_STARTED_AT_EPOCH))
 log "Deploy concluido com sucesso"
+log "Tempo total do deploy: $(format_duration "$DEPLOY_ELAPSED_SECONDS")"
 log "Manifesto: ${RELEASE_MANIFEST}"

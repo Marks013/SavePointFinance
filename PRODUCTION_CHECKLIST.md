@@ -4,6 +4,9 @@
 
 Use este fluxo para publicar uma nova versao da aplicacao com validacao basica:
 
+chmod +x ./update.sh
+chmod +x ./ops/toggle-maintenance.sh
+
 ```bash
 ./ops/toggle-maintenance.sh on
 git pull
