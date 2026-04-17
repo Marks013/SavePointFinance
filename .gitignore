@@ -13,3 +13,4 @@ pnpm-debug.log*
 terminal.txt
 .deploy/releases/*
 !.deploy/releases/.gitkeep
+.deploy/runtime.env
