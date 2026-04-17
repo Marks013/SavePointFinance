@@ -113,20 +113,31 @@ type PageExpectation = {
   minimumMatches?: number;
 };
 
+function extractSetCookieHeaders(response: Response) {
+  const setCookies =
+    typeof response.headers.getSetCookie === "function" ? response.headers.getSetCookie() : [];
+
+  if (setCookies.length > 0) {
+    return setCookies;
+  }
+
+  const fallbackCookie = response.headers.get("set-cookie");
+
+  if (!fallbackCookie) {
+    return [];
+  }
+
+  return fallbackCookie
+    .split(/,(?=\s*[^;,\s]+=)/g)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
 class CookieJar {
   private readonly store = new Map<string, string>();
 
   private updateFromResponse(response: Response) {
-    const setCookies =
-      typeof response.headers.getSetCookie === "function" ? response.headers.getSetCookie() : [];
-
-    if (setCookies.length === 0) {
-      const fallbackCookie = response.headers.get("set-cookie");
-
-      if (fallbackCookie) {
-        setCookies.push(fallbackCookie);
-      }
-    }
+    const setCookies = extractSetCookieHeaders(response);
 
     for (const entry of setCookies) {
       const [pair] = entry.split(";", 1);
@@ -290,7 +301,7 @@ async function signIn(email: string, password: string) {
   const session = await getSession(jar);
   assertCondition(
     session?.user?.email?.toLowerCase() === email.toLowerCase(),
-    "Sessao nao foi estabelecida apos login"
+    `Sessao nao foi estabelecida apos login para ${email}`
   );
 
   return jar;

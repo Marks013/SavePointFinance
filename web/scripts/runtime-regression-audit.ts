@@ -14,15 +14,13 @@ class CookieJar {
 
   private updateFromResponse(response: Response) {
     const setCookies =
-      typeof response.headers.getSetCookie === "function" ? response.headers.getSetCookie() : [];
-
-    if (setCookies.length === 0) {
-      const fallbackCookie = response.headers.get("set-cookie");
-
-      if (fallbackCookie) {
-        setCookies.push(fallbackCookie);
-      }
-    }
+      typeof response.headers.getSetCookie === "function"
+        ? response.headers.getSetCookie()
+        : (response.headers
+            .get("set-cookie")
+            ?.split(/,(?=\s*[^;,\s]+=)/g)
+            .map((entry) => entry.trim())
+            .filter(Boolean) ?? []);
 
     for (const entry of setCookies) {
       const [pair] = entry.split(";", 1);
