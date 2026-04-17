@@ -28,7 +28,7 @@ export default async function AcceptInvitationPage({ searchParams }: AcceptInvit
             <div className="eyebrow">Acesso por convite</div>
             <h2 className="section-title">Aceitar convite</h2>
             <p className="section-copy">
-              Confirme os dados e finalize o acesso ao painel.
+              Confirme os dados, defina sua senha e aceite os Termos de Uso e a Política de Privacidade para finalizar o acesso.
             </p>
           </div>
           <div className="mt-8">

@@ -427,6 +427,9 @@ export function CardsClient() {
             <h1 className="mt-3 text-3xl font-semibold tracking-[-0.03em]">
               {isEditing ? "Editar cartão" : "Novo cartão"}
             </h1>
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--color-muted-foreground)]">
+              Vale Alimentação é gerenciado na área dedicada, fora do fluxo de cartões.
+            </p>
           </div>
           {!showEditor ? (
             <Button onClick={openCreateForm} type="button" variant="secondary">
@@ -435,11 +438,11 @@ export function CardsClient() {
           ) : null}
         </div>
         <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--color-muted-foreground)]">
-          Cadastre cartões usados no crédito para controlar limite, competência, pagamento de fatura e impacto nos
+          Cadastre cartões usados no crédito para acompanhar limite, ciclo de compras, vencimento e impacto nos
           relatórios.
         </p>
         <p className="mt-3 text-sm font-medium text-[var(--color-primary)]">
-          Competência global ativa: {formatMonthKeyLabel(month)}
+          Mês de análise: {formatMonthKeyLabel(month)}
         </p>
 
         {showEditor ? (
@@ -695,13 +698,13 @@ export function CardsClient() {
               <div className="metric-grid-compact mt-4">
                 <div className="rounded-[1.15rem] border border-[var(--color-border)]/60 bg-[var(--color-muted)]/18 px-4 py-4">
                   <p className="text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted-foreground)]">
-                    Competencia aberta
+                    Fatura do ciclo
                   </p>
                   <p className="amount-nowrap mt-2 text-lg font-semibold text-[var(--color-foreground)]">
                     {formatCurrency(card.statementAmount)}
                   </p>
                   <p className="mt-2 text-xs text-[var(--color-muted-foreground)]">
-                    Competência {formatMonthKeyLabel(card.statementMonth)}
+                    Ciclo de {formatMonthKeyLabel(card.statementMonth)}
                   </p>
                 </div>
                 <div className="rounded-[1.15rem] border border-[var(--color-border)]/60 bg-[var(--color-muted)]/18 px-4 py-4">
@@ -813,9 +816,9 @@ export function CardsClient() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="max-w-3xl">
             <div className="eyebrow">Central de fatura</div>
-            <h2 className="mt-3 text-3xl font-semibold tracking-[-0.03em]">Acompanhe e pague a competencia certa</h2>
+            <h2 className="mt-3 text-3xl font-semibold tracking-[-0.03em]">Acompanhe e pague a fatura certa</h2>
             <p className="mt-4 text-sm leading-7 text-[var(--color-muted-foreground)]">
-              O pagamento da fatura fica concentrado aqui. Selecione o cartao, confira a competencia e registre a
+              O pagamento da fatura fica concentrado aqui. Selecione o cartão, confira o ciclo e registre a
               baixa sem depender dos filtros da listagem.
             </p>
           </div>
@@ -832,15 +835,15 @@ export function CardsClient() {
               <p className="metric-label text-white/72">Acao principal</p>
               {!selectedStatementCardId ? (
                 <>
-                  <h3 className="mt-3 text-2xl font-semibold text-white">Selecione um cartao para abrir a fatura</h3>
+                  <h3 className="mt-3 text-2xl font-semibold text-white">Selecione um cartão para abrir a fatura</h3>
                   <p className="mt-3 max-w-xl text-sm leading-7 text-white/80">
-                    Assim que um cartao for escolhido, a competencia, o saldo pendente e a acao de pagamento aparecem
+                    Assim que um cartão for escolhido, o ciclo, o saldo pendente e a ação de pagamento aparecem
                     aqui no topo.
                   </p>
                 </>
               ) : statementQuery.isLoading && !statementQuery.data ? (
                 <>
-                  <h3 className="mt-3 text-2xl font-semibold text-white">Carregando a competencia selecionada</h3>
+                  <h3 className="mt-3 text-2xl font-semibold text-white">Carregando o ciclo selecionado</h3>
                   <p className="mt-3 max-w-xl text-sm leading-7 text-white/80">
                     Buscando os lancamentos, o saldo pendente e os dados de pagamento da fatura.
                   </p>
@@ -863,13 +866,13 @@ export function CardsClient() {
                         : canPayStatement
                           ? "Saldo pendente"
                           : statementQuery.data.summary.totalAmount > 0
-                            ? "Competencia conciliada"
+                            ? "Ciclo conciliado"
                             : "Sem lancamentos"}
                     </div>
                   </div>
 
                   <p className="mt-6 text-xs font-semibold uppercase tracking-[0.14em] text-white/62">
-                    {statementIsPaid ? "Valor baixado" : canPayStatement ? "Valor a pagar agora" : "Resumo da competencia"}
+                    {statementIsPaid ? "Valor baixado" : canPayStatement ? "Valor a pagar agora" : "Resumo do ciclo"}
                   </p>
                   <p className="hero-amount amount-nowrap mt-3 text-white">
                     {formatCurrency(
@@ -884,10 +887,10 @@ export function CardsClient() {
                     {statementIsPaid
                       ? `Baixada em ${new Date(statementQuery.data.payment!.paidAt).toLocaleDateString("pt-BR")} pela conta ${statementQuery.data.payment!.account.name}.`
                       : canPayStatement
-                        ? "Escolha a conta pagadora abaixo para registrar a baixa da competencia pendente."
+                        ? "Escolha a conta pagadora abaixo para registrar a baixa da fatura pendente."
                         : statementQuery.data.summary.totalAmount > 0
-                          ? "Essa competencia nao tem saldo pendente neste momento, mas continua disponivel para conferencia."
-                          : "Ainda nao existem compras vinculadas a esta competencia."}
+                          ? "Esse ciclo nao tem saldo pendente neste momento, mas continua disponivel para conferencia."
+                          : "Ainda nao existem compras vinculadas a este ciclo."}
                   </p>
                 </>
               ) : null}
@@ -895,7 +898,7 @@ export function CardsClient() {
 
             <div className="rounded-[24px] border border-white/12 bg-white/8 p-4">
               {!selectedStatementCardId ? (
-                <p className="text-sm leading-7 text-white/76">Escolha um cartao abaixo para destravar a central de fatura.</p>
+                <p className="text-sm leading-7 text-white/76">Escolha um cartão abaixo para destravar a central de fatura.</p>
               ) : statementQuery.isLoading && !statementQuery.data ? (
                 <p className="text-sm leading-7 text-white/76">Preparando o painel de pagamento da fatura...</p>
               ) : statementQuery.data && canPayStatement ? (
@@ -971,7 +974,7 @@ export function CardsClient() {
             </Select>
           </div>
           <div className="min-w-0 flex-1 space-y-2">
-            <Label htmlFor="statement-month">Competência</Label>
+            <Label htmlFor="statement-month">Ciclo</Label>
             <DatePickerInput
               id="statement-month"
               onChange={(event) => setStatementMonth(event.target.value)}

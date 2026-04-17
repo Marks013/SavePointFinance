@@ -24,6 +24,7 @@ type AccountItem = {
   id: string;
   name: string;
   type: string;
+  usage: "standard" | "benefit_food";
   balance: number;
   openingBalance: number;
   currency: string;
@@ -86,7 +87,7 @@ export function AccountsClient() {
   const [isEditorOpen, setIsEditorOpen] = useState(true);
   const formSectionRef = useRef<HTMLElement | null>(null);
   const accountsQuery = useQuery({ queryKey: ["accounts", month], queryFn: () => getAccounts(month) });
-  const accounts = accountsQuery.data?.items ?? [];
+  const accounts = (accountsQuery.data?.items ?? []).filter((account) => account.usage === "standard");
   const activeBalance = accounts.reduce((sum, account) => sum + account.balance, 0);
   const openingBalance = accounts.reduce((sum, account) => sum + account.openingBalance, 0);
   const periodNet = accounts.reduce((sum, account) => sum + account.periodNet, 0);
@@ -96,20 +97,25 @@ export function AccountsClient() {
     defaultValues: {
       name: "",
       type: "checking",
+      usage: "standard",
       balance: 0,
       currency: "BRL",
       color: accountColorPresets[0].value,
       institution: brazilianInstitutions[0].value
     }
   });
-
   const saveMutation = useMutation({
     mutationFn: async (values: AccountFormValues) => {
+      const payload: AccountFormValues = {
+        ...values,
+        usage: "standard"
+      };
+
       if (editingId) {
-        return updateAccount(editingId, values);
+        return updateAccount(editingId, payload);
       }
 
-      return createAccount(values);
+      return createAccount(payload);
     },
     onSuccess: async () => {
       const wasEditing = Boolean(editingId);
@@ -124,8 +130,10 @@ export function AccountsClient() {
         queryClient.invalidateQueries({ queryKey: ["reports-summary"] })
       ]);
     },
-    onError: () => {
-      toast.error(editingId ? "Não foi possível atualizar a conta" : "Não foi possível criar a conta");
+    onError: (error) => {
+      toast.error(editingId ? "Não foi possível atualizar a conta" : "Não foi possível criar a conta", {
+        description: error.message
+      });
     }
   });
 
@@ -156,6 +164,7 @@ export function AccountsClient() {
     form.reset({
       name: account.name,
       type: account.type as AccountFormValues["type"],
+      usage: "standard",
       balance: account.openingBalance,
       currency: account.currency,
       color: account.color,
@@ -227,7 +236,7 @@ export function AccountsClient() {
               <Label htmlFor="account-name">Nome</Label>
               <Input id="account-name" {...form.register("name")} />
             </div>
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
               <div className="space-y-2">
                 <Label htmlFor="account-type">Tipo</Label>
                 <Select id="account-type" {...form.register("type")}>
@@ -236,7 +245,12 @@ export function AccountsClient() {
                   <option value="investment">Investimento</option>
                   <option value="wallet">Carteira</option>
                 </Select>
+                {form.formState.errors.type ? (
+                  <p className="text-sm text-[var(--color-destructive)]">{form.formState.errors.type.message}</p>
+                ) : null}
               </div>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="account-balance">Saldo de referência</Label>
                 <CurrencyInput control={form.control} id="account-balance" name="balance" />
@@ -370,7 +384,9 @@ export function AccountsClient() {
                   />
                   <div className="min-w-0">
                     <p className="break-words text-sm font-medium text-[var(--color-foreground)]">{account.name}</p>
-                    <p className="text-xs tracking-[0.02em] text-[var(--color-muted-foreground)]">{account.type}</p>
+                    <p className="text-xs tracking-[0.02em] text-[var(--color-muted-foreground)]">
+                      {account.type}
+                    </p>
                   </div>
                 </div>
                 <div className="w-full sm:w-auto sm:text-right">

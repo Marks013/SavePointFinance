@@ -1,6 +1,7 @@
 "use client";
 
-import { useDeferredValue, useMemo, useState } from "react";
+import type { ReactNode } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, CalendarRange, Sparkles, TrendingDown, TrendingUp } from "lucide-react";
@@ -28,6 +29,7 @@ type CategoryItem = {
 type AccountItem = {
   id: string;
   name: string;
+  usage?: "standard" | "benefit_food";
   income: number;
   expense: number;
   net: number;
@@ -89,11 +91,19 @@ type ReportResponse = {
     months: number;
   };
   summary?: {
+    income: number;
+    expense: number;
     balance: number;
     savingsRate: number;
     transactions: number;
     averageDailyExpense: number;
     uncategorizedExpense: number;
+  };
+  benefits?: {
+    foodWallets?: number;
+    foodBalance?: number;
+    foodIncome?: number;
+    foodExpense?: number;
   };
   periodBalances?: {
     opening: number;
@@ -156,6 +166,14 @@ function pct(value: number, digits = 0) {
   return `${(value * 100).toFixed(digits)}%`;
 }
 
+function formatSavingsRate(rate: number, income: number) {
+  if (income <= 0) {
+    return "N/A";
+  }
+
+  return pct(rate);
+}
+
 function amountClass(value: number) {
   if (value < 0) return "amount-negative";
   if (value > 0) return "amount-positive";
@@ -205,6 +223,38 @@ function ChartTooltipContent({
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function DeferredResponsiveChart({
+  children,
+  height = 320
+}: {
+  children: ReactNode;
+  height?: number;
+}) {
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      setIsMounted(true);
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+    };
+  }, []);
+
+  return (
+    <div className="mt-6 min-w-0" style={{ height }}>
+      {isMounted ? (
+        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={height}>
+          {children}
+        </ResponsiveContainer>
+      ) : (
+        <div className="muted-panel h-full w-full animate-pulse rounded-[1.5rem] border border-dashed" />
+      )}
     </div>
   );
 }
@@ -269,6 +319,7 @@ export function ReportsClient() {
   const upcomingItems = data?.upcoming ?? [];
   const recentItems = data?.recent ?? [];
   const categoryBreakdown = data?.spendingInsights?.categoryBreakdown ?? [];
+  const benefitSummary = data?.benefits;
   const selectedAccount = (accountsQuery.data ?? []).find((item) => item.id === filters.accountId);
   const selectedCard = (cardsQuery.data ?? []).find((item) => item.id === filters.cardId);
   const selectedCategory = (categoriesQuery.data ?? []).find((item) => item.id === filters.categoryId);
@@ -325,12 +376,18 @@ export function ReportsClient() {
             </article>
           </div>
         </div>
-        <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+        <div className="filter-shell mt-8">
+          <p className="filter-kicker">Leitura</p>
+          <p className="filter-copy">
+            Ajuste a janela e os recortes para interpretar o período com mais clareza, sem perder a base de comparação.
+          </p>
+        </div>
+        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           <div className="space-y-2">
-            <Label htmlFor="reports-period-mode">Escopo</Label>
+            <Label htmlFor="reports-period-mode">Escopo de leitura</Label>
             <Select id="reports-period-mode" value={periodMode} onChange={(event) => setPeriodMode(event.target.value as "month" | "year")}>
-              <option value="month">Mês ativo</option>
-              <option value="year">Ano do mês ativo</option>
+              <option value="month">Mês em foco</option>
+              <option value="year">Ano do mês em foco</option>
             </Select>
           </div>
           <div className="space-y-2"><Label htmlFor="reports-filter-from">De</Label><DatePickerInput id="reports-filter-from" type="date" disabled readOnly value={activeRange.from} /></div>
@@ -338,13 +395,13 @@ export function ReportsClient() {
           <div className="space-y-2">
             <Label htmlFor="reports-filter-type">Tipo</Label>
             <Select id="reports-filter-type" value={filters.type} onChange={(event) => setFilters((current) => ({ ...current, type: event.target.value }))}>
-              <option value="">Todos</option><option value="income">Receita</option><option value="expense">Despesa</option><option value="transfer">Transferência</option>
+              <option value="">Todos os tipos</option><option value="income">Receita</option><option value="expense">Despesa</option><option value="transfer">Transferência</option>
             </Select>
           </div>
           <div className="space-y-2">
             <Label htmlFor="reports-filter-account">Conta</Label>
             <Select id="reports-filter-account" value={filters.accountId} onChange={(event) => setFilters((current) => ({ ...current, accountId: event.target.value }))}>
-              <option value="">Todas</option>{(accountsQuery.data ?? []).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+              <option value="">Todas as contas</option>{(accountsQuery.data ?? []).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
             </Select>
           </div>
           <div className="space-y-2">
@@ -356,26 +413,47 @@ export function ReportsClient() {
           <div className="space-y-2">
             <Label htmlFor="reports-filter-category">Categoria</Label>
             <Select id="reports-filter-category" value={filters.categoryId} onChange={(event) => setFilters((current) => ({ ...current, categoryId: event.target.value }))}>
-              <option value="">Todas</option>{(categoriesQuery.data ?? []).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+              <option value="">Todas as categorias</option>{(categoriesQuery.data ?? []).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
             </Select>
           </div>
           <div className="flex flex-wrap items-end gap-3 md:col-span-2 xl:col-span-3 2xl:col-span-4">
-            <Button onClick={() => setFilters({ type: "", accountId: "", cardId: "", categoryId: "" })} type="button" variant="ghost">Limpar refinamentos</Button>
+            <Button onClick={() => setFilters({ type: "", accountId: "", cardId: "", categoryId: "" })} type="button" variant="ghost">Limpar leitura</Button>
             {data?.license?.features?.pdfExport ? <Button asChild><a href={pdfHref} target="_blank">Abrir PDF do resumo</a></Button> : <Button disabled type="button" variant="secondary">PDF disponível no Premium</Button>}
           </div>
         </div>
-        <div className="muted-panel mt-4 flex flex-wrap items-start justify-between gap-3 text-sm text-[var(--color-muted-foreground)]">
-          <p className="shrink-0">{`Base de navegação: ${monthLabel} • Escopo em análise: ${periodLabel}.`}</p>
-          <p className="min-w-0 flex-1 break-words text-left sm:text-right">{refinements.length > 0 ? refinements.join(" • ") : "Sem refinamentos adicionais."}</p>
+        <div className="muted-panel mt-4 flex flex-wrap items-start justify-between gap-3 text-sm">
+          <p className="filter-summary-meta shrink-0">{`Base de leitura: ${monthLabel} • Janela ativa: ${periodLabel}.`}</p>
+          <p className="filter-summary-copy min-w-0 flex-1 break-words text-left sm:text-right">{refinements.length > 0 ? refinements.join(" • ") : "Sem recortes adicionais no momento."}</p>
         </div>
       </section>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <article className="metric-card"><p className="metric-label">Resultado do período</p><p className={`metric-value amount-nowrap ${amountClass(data?.summary?.balance ?? 0)}`}>{formatCurrency(data?.summary?.balance ?? 0)}</p><p className="metric-footnote">{`Taxa de economia: ${pct(data?.summary?.savingsRate ?? 0)}`}</p></article>
+        <article className="metric-card"><p className="metric-label">Resultado do período</p><p className={`metric-value amount-nowrap ${amountClass(data?.summary?.balance ?? 0)}`}>{formatCurrency(data?.summary?.balance ?? 0)}</p><p className="metric-footnote">{`Taxa de economia: ${formatSavingsRate(data?.summary?.savingsRate ?? 0, data?.summary?.income ?? 0)}`}</p></article>
         <article className="metric-card"><p className="metric-label">Saldo inicial</p><p className={`metric-value amount-nowrap ${amountClass(data?.periodBalances?.opening ?? 0)}`}>{formatCurrency(data?.periodBalances?.opening ?? 0)}</p><p className="metric-footnote">Caixa consolidado no início do recorte.</p></article>
         <article className="metric-card"><p className="metric-label">Saldo final</p><p className={`metric-value amount-nowrap ${amountClass(data?.periodBalances?.closing ?? 0)}`}>{formatCurrency(data?.periodBalances?.closing ?? 0)}</p><p className="metric-footnote">Caixa consolidado no fim do período.</p></article>
         <article className="metric-card"><p className="metric-label">{isYearScope ? "Média mensal de resultado" : "Despesa média diária"}</p><p className={`metric-value amount-nowrap ${amountClass(isYearScope ? data?.annualInsights?.cadence?.averageMonthlyBalance ?? 0 : -(data?.summary?.averageDailyExpense ?? 0))}`}>{formatCurrency(isYearScope ? data?.annualInsights?.cadence?.averageMonthlyBalance ?? 0 : data?.summary?.averageDailyExpense ?? 0)}</p><p className="metric-footnote">{isYearScope ? `${data?.annualInsights?.cadence?.positiveMonths ?? 0} meses positivos de ${data?.period?.months ?? 0}.` : "Saída média por dia no período."}</p></article>
       </div>
+
+      {(benefitSummary?.foodWallets ?? 0) > 0 ? (
+        <section className="surface content-section">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-semibold">Vale Alimentação</h2>
+              <p className="mt-1 text-sm text-[var(--color-muted-foreground)]">
+                Saldo atual das carteiras de benefício e o fluxo registrado no período.
+              </p>
+            </div>
+            <p className="text-sm font-medium text-[var(--color-primary)]">
+              {benefitSummary?.foodWallets ?? 0} carteiras ativas
+            </p>
+          </div>
+          <div className="mt-6 grid gap-4 md:grid-cols-3">
+            <article className="data-card p-4"><p className="metric-label">Saldo disponível</p><p className={`subtle-metric-value amount-nowrap mt-3 ${amountClass(benefitSummary?.foodBalance ?? 0)}`}>{formatCurrency(benefitSummary?.foodBalance ?? 0)}</p><p className="mt-2 text-sm text-[var(--color-muted-foreground)]">Saldo somado das carteiras de Vale Alimentação.</p></article>
+            <article className="data-card p-4"><p className="metric-label">Créditos no período</p><p className="subtle-metric-value amount-nowrap mt-3 amount-positive">{formatCurrency(benefitSummary?.foodIncome ?? 0)}</p><p className="mt-2 text-sm text-[var(--color-muted-foreground)]">Entradas lançadas na carteira de benefício.</p></article>
+            <article className="data-card p-4"><p className="metric-label">Consumo no período</p><p className="subtle-metric-value amount-nowrap mt-3 amount-negative">{formatCurrency(benefitSummary?.foodExpense ?? 0)}</p><p className="mt-2 text-sm text-[var(--color-muted-foreground)]">Despesas elegíveis de alimentação consumidas no recorte.</p></article>
+          </div>
+        </section>
+      ) : null}
 
       {isYearScope ? (
         <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
@@ -405,12 +483,31 @@ export function ReportsClient() {
 
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <section className="surface content-section">
-          <h2 className="text-xl font-semibold">{isYearScope ? "Receitas, despesas e saldo mensal" : "Receitas, despesas e competência"}</h2>
-          <div className="mt-6 h-[320px]"><ResponsiveContainer width="100%" height="100%"><BarChart data={monthlySeries}><CartesianGrid stroke="rgba(69,82,70,0.08)" vertical={false} /><XAxis axisLine={false} dataKey="label" tick={{ fill: "var(--color-muted-foreground)", fontSize: 12 }} tickLine={false} tickMargin={12} /><YAxis axisLine={false} tick={{ fill: "var(--color-muted-foreground)", fontSize: 12 }} tickFormatter={(value: number) => formatCurrency(value).replace("R$ ", "R$")} tickLine={false} width={94} /><Tooltip content={<ChartTooltipContent />} cursor={{ fill: "rgba(19,111,79,0.08)" }} /><Bar dataKey="income" name="Receitas" fill="#1F8F62" radius={[8, 8, 0, 0]} /><Bar dataKey="expense" name="Despesas" fill="#DB6B4D" radius={[8, 8, 0, 0]} /><Bar dataKey={isYearScope ? "balance" : "transfer"} name={isYearScope ? "Saldo" : "Transferências"} fill={isYearScope ? "#3B82F6" : "#B9851B"} radius={[8, 8, 0, 0]} /></BarChart></ResponsiveContainer></div>
+          <h2 className="text-xl font-semibold">{isYearScope ? "Receitas, despesas e saldo mensal" : "Receitas, despesas e transferências"}</h2>
+          <DeferredResponsiveChart>
+            <BarChart data={monthlySeries}>
+              <CartesianGrid stroke="rgba(69,82,70,0.08)" vertical={false} />
+              <XAxis axisLine={false} dataKey="label" tick={{ fill: "var(--color-muted-foreground)", fontSize: 12 }} tickLine={false} tickMargin={12} />
+              <YAxis axisLine={false} tick={{ fill: "var(--color-muted-foreground)", fontSize: 12 }} tickFormatter={(value: number) => formatCurrency(value).replace("R$ ", "R$")} tickLine={false} width={94} />
+              <Tooltip content={<ChartTooltipContent />} cursor={{ fill: "rgba(19,111,79,0.08)" }} />
+              <Bar dataKey="income" name="Receitas" fill="#1F8F62" radius={[8, 8, 0, 0]} />
+              <Bar dataKey="expense" name="Despesas" fill="#DB6B4D" radius={[8, 8, 0, 0]} />
+              <Bar dataKey={isYearScope ? "balance" : "transfer"} name={isYearScope ? "Saldo" : "Transferências"} fill={isYearScope ? "#3B82F6" : "#B9851B"} radius={[8, 8, 0, 0]} />
+            </BarChart>
+          </DeferredResponsiveChart>
         </section>
         <section className="surface content-section">
           <h2 className="text-xl font-semibold">Despesas por categoria</h2>
-          <div className="mt-6 h-[320px]"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={categoryData} dataKey="total" nameKey="name" innerRadius={64} outerRadius={110}>{categoryData.map((entry, index: number) => <Cell key={entry.name} fill={palette[index % palette.length]} />)}</Pie><Tooltip content={<ChartTooltipContent />} /></PieChart></ResponsiveContainer></div>
+          <DeferredResponsiveChart>
+            <PieChart>
+              <Pie data={categoryData} dataKey="total" nameKey="name" innerRadius={64} outerRadius={110}>
+                {categoryData.map((entry, index: number) => (
+                  <Cell key={entry.name} fill={palette[index % palette.length]} />
+                ))}
+              </Pie>
+              <Tooltip content={<ChartTooltipContent />} />
+            </PieChart>
+          </DeferredResponsiveChart>
         </section>
       </div>
 
@@ -426,7 +523,7 @@ export function ReportsClient() {
         </section>
         <section className="surface content-section">
           <h2 className="text-xl font-semibold">Movimentação por conta</h2>
-          <div className="mt-6 space-y-3">{byAccounts.length ? byAccounts.slice(0, 8).map((item) => <article key={item.id} className="data-card p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0 flex-1"><p className="break-words font-semibold">{item.name}</p><p className="break-words text-sm text-[var(--color-muted-foreground)]">{`Entradas ${formatCurrency(item.income)} • Saídas ${formatCurrency(item.expense)}`}</p></div><p className={`amount-nowrap w-full text-left font-semibold sm:w-auto sm:text-right ${amountClass(item.net)}`}>{formatCurrency(item.net)}</p></div></article>) : <div className="muted-panel border border-dashed px-4 py-6 text-sm text-[var(--color-muted-foreground)]">Nenhuma conta com impacto financeiro foi encontrada neste filtro.</div>}</div>
+          <div className="mt-6 space-y-3">{byAccounts.length ? byAccounts.slice(0, 8).map((item) => <article key={item.id} className="data-card p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0 flex-1"><p className="break-words font-semibold">{item.usage === "benefit_food" ? `${item.name} • vale alimentação` : item.name}</p><p className="break-words text-sm text-[var(--color-muted-foreground)]">{`Entradas ${formatCurrency(item.income)} • Saídas ${formatCurrency(item.expense)}`}</p></div><p className={`amount-nowrap w-full text-left font-semibold sm:w-auto sm:text-right ${amountClass(item.net)}`}>{formatCurrency(item.net)}</p></div></article>) : <div className="muted-panel border border-dashed px-4 py-6 text-sm text-[var(--color-muted-foreground)]">Nenhuma conta com impacto financeiro foi encontrada neste filtro.</div>}</div>
         </section>
       </div>
 
@@ -459,7 +556,7 @@ export function ReportsClient() {
         </section>
 
         <section className="surface content-section">
-          <h2 className="text-xl font-semibold">{isYearScope ? "Próximos compromissos e projeções" : "Vencimentos e estimativas do período"}</h2>
+          <h2 className="text-xl font-semibold">{isYearScope ? "Próximos compromissos e projeções" : "Compromissos do período"}</h2>
           <div className="mt-6 space-y-3">
             {upcomingItems.length ? (
               upcomingItems.map((item) => (
@@ -493,7 +590,7 @@ export function ReportsClient() {
 
       <section className="surface content-section">
         <h2 className="text-xl font-semibold">Movimentações recentes</h2>
-        <div className="mt-6 space-y-3">{recentItems.map((item) => <article key={item.id} className="data-card p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0 flex-1"><p className="break-words font-semibold">{item.description}</p><p className="break-words text-sm text-[var(--color-muted-foreground)]">{item.category} • {formatDateDisplay(item.date)}</p><p className="break-words text-sm text-[var(--color-muted-foreground)]">{item.card ?? item.account ?? "Sem origem"}{item.destinationAccount ? ` → ${item.destinationAccount}` : ""}</p></div><p className={`amount-nowrap w-full text-left font-semibold sm:w-auto sm:text-right ${item.type === "expense" ? "amount-negative" : item.type === "income" ? "amount-positive" : "text-[var(--color-foreground)]"}`}>{formatCurrency(item.amount)}</p></div></article>)}</div>
+        <div className="mt-6 space-y-3">{recentItems.map((item) => <article key={item.id} className="data-card p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0 flex-1"><p className="break-words font-semibold">{item.description}</p><p className="break-words text-sm text-[var(--color-muted-foreground)]">{item.type === "transfer" ? "Transferência entre contas" : item.category} • {formatDateDisplay(item.date)}</p><p className="break-words text-sm text-[var(--color-muted-foreground)]">{item.card ?? item.account ?? "Sem origem"}{item.destinationAccount ? ` → ${item.destinationAccount}` : ""}</p></div><p className={`amount-nowrap w-full text-left font-semibold sm:w-auto sm:text-right ${item.type === "expense" ? "amount-negative" : item.type === "income" ? "amount-positive" : "text-[var(--color-foreground)]"}`}>{formatCurrency(item.amount)}</p></div></article>)}</div>
       </section>
 
       <section className="surface content-section">

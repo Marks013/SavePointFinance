@@ -249,7 +249,13 @@ export function InstallmentsClient() {
         <p className="mt-3 text-sm font-medium text-[var(--color-primary)]">
           Competência ativa: {formatMonthKeyLabel(month)}
         </p>
-        <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="filter-shell mt-6">
+          <p className="filter-kicker">Leitura</p>
+          <p className="filter-copy">
+            Ajuste o recorte para acompanhar parcelamentos com mais contexto e manter a referência do período em foco.
+          </p>
+        </div>
+        <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <div className="space-y-2">
             <Label htmlFor="installments-filter-from">De</Label>
             <DatePickerInput
@@ -286,13 +292,13 @@ export function InstallmentsClient() {
             </Select>
           </div>
         </div>
-        <div className="muted-panel mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-[var(--color-muted-foreground)]">
-          <p>{`Mês ativo: ${formatMonthKeyLabel(month)}.`}</p>
-          <p>{selectedFilterCard ? `Refinando por cartão: ${selectedFilterCard.name}.` : "Mostrando todos os cartões."}</p>
+        <div className="muted-panel mt-4 flex flex-wrap items-center justify-between gap-3 text-sm">
+          <p className="filter-summary-meta">{`Base de leitura: ${formatMonthKeyLabel(month)}.`}</p>
+          <p className="filter-summary-copy">{selectedFilterCard ? `Recorte por cartão: ${selectedFilterCard.name}.` : "Sem recorte por cartão."}</p>
         </div>
         <div className="mt-4">
           <Button onClick={() => setCardId("")} type="button" variant="ghost">
-            Limpar refinamentos
+            Limpar leitura
           </Button>
         </div>
       </section>

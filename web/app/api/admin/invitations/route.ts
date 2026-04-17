@@ -86,7 +86,7 @@ export async function GET(request: Request) {
         id: invitation.id,
         email: invitation.email,
         name: invitation.name,
-        role: invitation.role,
+        role: invitation.kind === InvitationKind.shared_wallet ? "member" : "admin",
         kind: invitation.kind,
         inviteUrl: `/accept-invitation?token=${invitation.token}`,
         expiresAt: invitation.expiresAt.toISOString(),
@@ -194,7 +194,7 @@ export async function POST(request: Request) {
         invitedByUserId: admin.id,
         email: normalizedEmail,
         name: body.name,
-        role: body.role,
+        role: "admin",
         kind: InvitationKind.admin_isolated,
         token,
         expiresAt

@@ -5,11 +5,13 @@
 Use este fluxo para publicar uma nova versao da aplicacao com validacao basica:
 
 ```bash
+./ops/toggle-maintenance.sh on
 git pull
 docker compose build web audit-server-smoke
 docker compose up -d --force-recreate web
 docker compose logs --tail=100 web
 docker compose run --rm audit-server-smoke
+./ops/toggle-maintenance.sh off
 ```
 
 ## Deploy com migration
@@ -31,6 +33,10 @@ docker compose run --rm audit-server-smoke
 - `savepoint_web` recriado sem erro
 - logs do `web` sem falha de boot
 - `audit-server-smoke` com `Server smoke audit OK`
+- em `Configuracoes > Automacoes`, validar se e-mail e WhatsApp aparecem como prontos para envio quando esperados
+- em `Configuracoes > Automacoes`, conferir se a pre-visualizacao de avisos mostra assinaturas, faturas e metas coerentes para os proximos 7 dias
+- em `Configuracoes > Entregas recentes`, confirmar se os avisos manuais registram status `Entregue` ou mostram a causa real da falha
+- ao testar uma transacao de dizimo gerada automaticamente, confirmar que editar/excluir mostra mensagem explicando o vinculo com a receita original
 
 ## Servicos que ficam ativos
 

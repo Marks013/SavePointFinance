@@ -6,6 +6,7 @@ import { getEmailChannelHealth, getWhatsAppChannelHealth } from "@/lib/notificat
 import { captureRequestError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
 import { getSharingAuthority } from "@/lib/sharing/access";
+import { getAccountPermissionFlags } from "@/lib/users/account-permissions";
 import { deleteUserWithAllData } from "@/lib/users/delete-user";
 import { formatWhatsAppDisplayPhone, formatWhatsAppPhone } from "@/lib/whatsapp/phone";
 
@@ -26,6 +27,11 @@ export async function GET(request: Request) {
     }
 
     const sharingAuthority = await getSharingAuthority(user);
+    const permissions = getAccountPermissionFlags({
+      role: user.role,
+      isPlatformAdmin: user.isPlatformAdmin,
+      canManageSharing: sharingAuthority.canManage
+    });
     const emailHealth = getEmailChannelHealth();
     const whatsappHealth = getWhatsAppChannelHealth();
 
@@ -42,6 +48,7 @@ export async function GET(request: Request) {
       sharing: {
         canManage: sharingAuthority.canManage
       },
+      permissions,
       whatsappNumber: formatWhatsAppDisplayPhone(profile.whatsappNumber),
       license: {
         plan: user.license.plan,
@@ -86,6 +93,25 @@ export async function GET(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const user = await requireSessionUser();
+    const profile = await prisma.user.findUnique({
+      where: {
+        id: user.id
+      },
+      include: {
+        preferences: true
+      }
+    });
+
+    if (!profile) {
+      return NextResponse.json({ message: "User not found" }, { status: 404 });
+    }
+
+    const sharingAuthority = await getSharingAuthority(user);
+    const permissions = getAccountPermissionFlags({
+      role: user.role,
+      isPlatformAdmin: user.isPlatformAdmin,
+      canManageSharing: sharingAuthority.canManage
+    });
     const body = (await request.json()) as {
       name: string;
       whatsappNumber?: string | null;
@@ -100,6 +126,32 @@ export async function PATCH(request: Request) {
       };
     };
 
+    const currentPreferences = {
+      currency: profile.preferences?.currency ?? "BRL",
+      dateFormat: profile.preferences?.dateFormat ?? "DD/MM/YYYY",
+      emailNotifications: profile.preferences?.emailNotifications ?? true,
+      monthlyReports: profile.preferences?.monthlyReports ?? true,
+      budgetAlerts: profile.preferences?.budgetAlerts ?? true,
+      dueReminders: profile.preferences?.dueReminders ?? true,
+      autoTithe: profile.preferences?.autoTithe ?? false
+    };
+
+    const nextPreferences = {
+      currency: permissions.canEditCurrency
+        ? body.preferences.currency.trim().toUpperCase()
+        : currentPreferences.currency,
+      dateFormat: permissions.canEditDateFormat ? body.preferences.dateFormat.trim() : currentPreferences.dateFormat,
+      emailNotifications: permissions.canEditEmailNotifications
+        ? body.preferences.emailNotifications
+        : currentPreferences.emailNotifications,
+      monthlyReports: permissions.canEditMonthlyReports
+        ? body.preferences.monthlyReports
+        : currentPreferences.monthlyReports,
+      budgetAlerts: permissions.canEditBudgetAlerts ? body.preferences.budgetAlerts : currentPreferences.budgetAlerts,
+      dueReminders: permissions.canEditDueReminders ? body.preferences.dueReminders : currentPreferences.dueReminders,
+      autoTithe: permissions.canEditAutoTithe ? body.preferences.autoTithe : currentPreferences.autoTithe
+    };
+
     await prisma.user.update({
       where: {
         id: user.id
@@ -109,24 +161,8 @@ export async function PATCH(request: Request) {
         whatsappNumber: formatWhatsAppPhone(body.whatsappNumber) || null,
         preferences: {
           upsert: {
-            create: {
-              currency: body.preferences.currency.trim().toUpperCase(),
-              dateFormat: body.preferences.dateFormat.trim(),
-              emailNotifications: body.preferences.emailNotifications,
-              monthlyReports: body.preferences.monthlyReports,
-              budgetAlerts: body.preferences.budgetAlerts,
-              dueReminders: body.preferences.dueReminders,
-              autoTithe: body.preferences.autoTithe
-            },
-            update: {
-              currency: body.preferences.currency.trim().toUpperCase(),
-              dateFormat: body.preferences.dateFormat.trim(),
-              emailNotifications: body.preferences.emailNotifications,
-              monthlyReports: body.preferences.monthlyReports,
-              budgetAlerts: body.preferences.budgetAlerts,
-              dueReminders: body.preferences.dueReminders,
-              autoTithe: body.preferences.autoTithe
-            }
+            create: nextPreferences,
+            update: nextPreferences
           }
         }
       }

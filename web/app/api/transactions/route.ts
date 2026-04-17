@@ -6,14 +6,20 @@ import { syncDueSubscriptionTransactions } from "@/lib/automation/subscriptions"
 import { requireSessionUser } from "@/lib/auth/session";
 import { revalidateFinanceReports } from "@/lib/cache/finance-read-models";
 import { buildCardBillingSnapshot } from "@/lib/cards/statement";
+import { BenefitWalletRuleError, validateBenefitWalletTransaction } from "@/lib/finance/benefit-wallet";
+import { FOOD_BENEFIT_CATEGORY_SYSTEM_KEYS } from "@/lib/finance/benefit-wallet-rules";
 import { ensureTenantCardStatementSnapshots } from "@/lib/cards/snapshot-sync";
 import { resolveTransactionClassification } from "@/lib/finance/transaction-classification";
 import { assertTenantTransactionReferences, TenantReferenceError } from "@/lib/finance/tenant-reference-guard";
-import { ensureTitheCategory, syncTitheForTransactionDates } from "@/lib/finance/tithe";
+import { ensureTitheCategory, syncTitheForMonthKeys } from "@/lib/finance/tithe";
 import { captureRequestError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
 import { addMonthsClamped, splitAmountIntoInstallments } from "@/lib/utils";
 import { transactionFiltersSchema, transactionFormSchema } from "@/features/transactions/schemas/transaction-schema";
+
+function readAccountUsage(account: unknown) {
+  return (account as { usage?: "standard" | "benefit_food" }).usage ?? "standard";
+}
 
 export async function GET(request: Request) {
   try {
@@ -112,13 +118,15 @@ export async function GET(request: Request) {
         account: transaction.financialAccount
           ? {
               id: transaction.financialAccount.id,
-              name: transaction.financialAccount.name
+              name: transaction.financialAccount.name,
+              usage: readAccountUsage(transaction.financialAccount)
             }
           : null,
         destinationAccount: transaction.destinationAccount
           ? {
               id: transaction.destinationAccount.id,
-              name: transaction.destinationAccount.name
+              name: transaction.destinationAccount.name,
+              usage: readAccountUsage(transaction.destinationAccount)
             }
           : null,
         card: transaction.card
@@ -180,6 +188,18 @@ export async function POST(request: Request) {
       cardId,
       categoryId: body.categoryId
     });
+    const selectedAccount =
+      accountId !== null
+        ? await prisma.financialAccount.findFirst({
+            where: {
+              id: accountId,
+              tenantId: user.tenantId
+            },
+            select: {
+              usage: true
+            }
+          })
+        : null;
 
     const selectedCard =
       body.paymentMethod === "credit_card" && cardId
@@ -207,12 +227,25 @@ export async function POST(request: Request) {
       description: body.description,
       notes,
       paymentMethod: body.paymentMethod,
-      categoryId: body.categoryId || null
+      categoryId: body.categoryId || null,
+      allowedCategorySystemKeys:
+        selectedAccount?.usage === "benefit_food" && body.type === "expense"
+          ? FOOD_BENEFIT_CATEGORY_SYSTEM_KEYS
+          : undefined
     });
-    const categoryId = classification.categoryId;
+    const categoryId = body.categoryId || classification.categoryId;
+    await validateBenefitWalletTransaction({
+      tenantId: user.tenantId,
+      type: body.type,
+      paymentMethod: body.paymentMethod,
+      accountId,
+      destinationAccountId,
+      categoryId: categoryId || null,
+      cardId
+    });
     const applyTithe = body.type === "income" && body.applyTithe;
     const titheCategoryId = applyTithe ? await ensureTitheCategory(user.tenantId) : null;
-    const affectedDates: Date[] = [];
+    const affectedCompetences: string[] = [];
 
     let parentId: string | null = null;
     let firstTransactionId: string | null = null;
@@ -259,7 +292,7 @@ export async function POST(request: Request) {
         }
       });
 
-      affectedDates.push(transactionDate);
+      affectedCompetences.push(competenceForInstallment);
 
       if (index === 0) {
         parentId = created.id;
@@ -271,10 +304,10 @@ export async function POST(request: Request) {
     }
 
     if (applyTithe) {
-      await syncTitheForTransactionDates({
+      await syncTitheForMonthKeys({
         tenantId: user.tenantId,
         userId: user.id,
-        dates: affectedDates
+        monthKeys: affectedCompetences
       });
     }
 
@@ -326,6 +359,10 @@ export async function POST(request: Request) {
 
     if (error instanceof TenantReferenceError) {
       return NextResponse.json({ message: error.message }, { status: 404 });
+    }
+
+    if (error instanceof BenefitWalletRuleError) {
+      return NextResponse.json({ message: error.message }, { status: 400 });
     }
 
     captureRequestError(error, { request, feature: "transactions" });

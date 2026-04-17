@@ -1,7 +1,4 @@
 • Melhorar de forma incremental, não estrutural. O próximo lote saudável é:
       - ampliar o piloto de cache para mais 1 superfície, se o resumo se provar estável
-      - adicionar observabilidade de produção melhor
-      - endurecer o processo de deploy e rollback
-      - criar mais smoke/audits de negócio
 
 • Adiar upgrades oportunistas. React 19.2, cache mais agressivo e mudanças maiores só depois de você ter dados de uso real.

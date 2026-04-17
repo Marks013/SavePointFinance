@@ -12,24 +12,28 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { acceptInvitationSchema, type AcceptInvitationValues } from "@/features/password/schemas/password-schema";
+import {
+  PRIVACY_POLICY_PATH,
+  PRIVACY_POLICY_VERSION,
+  TERMS_OF_USE_PATH,
+  TERMS_OF_USE_VERSION
+} from "@/lib/legal/documents";
 import { ensureApiResponse } from "@/lib/observability/http";
 import { captureUnexpectedError } from "@/lib/observability/sentry";
+import { formatRoleLabel } from "@/lib/users/role-label";
 
 type InvitationPayload = {
   email: string;
   name: string;
   role: "admin" | "member";
   tenantName: string;
+  accountAdminName?: string | null;
   expiresAt: string;
 };
 
 type AcceptInvitationFormProps = {
   initialToken?: string;
 };
-
-function formatRoleLabel(role: "admin" | "member") {
-  return role === "admin" ? "Administrador" : "Membro";
-}
 
 function sanitizeToken(value: string) {
   const normalized = value.trim();
@@ -53,7 +57,9 @@ export function AcceptInvitationForm({ initialToken = "" }: AcceptInvitationForm
       token: normalizedToken,
       name: "",
       password: "",
-      confirmPassword: ""
+      confirmPassword: "",
+      acceptTermsOfUse: false,
+      acceptPrivacyPolicy: false
     }
   });
 
@@ -130,7 +136,12 @@ export function AcceptInvitationForm({ initialToken = "" }: AcceptInvitationForm
           }
         },
         (errors) => {
-          const firstError = errors.confirmPassword?.message || errors.password?.message || errors.name?.message;
+          const firstError =
+            errors.confirmPassword?.message ||
+            errors.password?.message ||
+            errors.name?.message ||
+            errors.acceptTermsOfUse?.message ||
+            errors.acceptPrivacyPolicy?.message;
           toast.error(firstError ?? "Revise os dados do convite antes de continuar");
         }
       )}
@@ -141,7 +152,10 @@ export function AcceptInvitationForm({ initialToken = "" }: AcceptInvitationForm
         <div className="muted-panel text-sm text-[var(--color-muted-foreground)]">
           <p><strong className="text-[var(--color-foreground)]">Conta:</strong> {invitation.tenantName}</p>
           <p><strong className="text-[var(--color-foreground)]">E-mail:</strong> {invitation.email}</p>
-          <p><strong className="text-[var(--color-foreground)]">Perfil:</strong> {formatRoleLabel(invitation.role)}</p>
+          <p>
+            <strong className="text-[var(--color-foreground)]">Perfil:</strong>{" "}
+            {formatRoleLabel({ role: invitation.role, accountAdminName: invitation.accountAdminName })}
+          </p>
         </div>
       ) : null}
 
@@ -174,6 +188,52 @@ export function AcceptInvitationForm({ initialToken = "" }: AcceptInvitationForm
           <p className="text-sm text-[var(--color-destructive)]">
             {form.formState.errors.confirmPassword.message}
           </p>
+        ) : null}
+      </div>
+
+      <div className="space-y-3 rounded-[22px] border border-[var(--color-border)] bg-[var(--color-card)]/80 p-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--color-muted-foreground)]">
+          Aceites obrigatorios
+        </p>
+
+        <label className="flex items-start gap-3 text-sm leading-6 text-[var(--color-ink-700)]" htmlFor="accept-terms-of-use">
+          <input
+            className="mt-1 size-4 rounded border border-[var(--color-border)] accent-[var(--color-primary)]"
+            disabled={isLoading}
+            id="accept-terms-of-use"
+            type="checkbox"
+            {...form.register("acceptTermsOfUse")}
+          />
+          <span>
+            Li e aceito os{" "}
+            <Link className="font-semibold text-[var(--color-primary)] underline-offset-4 hover:underline" href={TERMS_OF_USE_PATH} target="_blank">
+              Termos de Uso
+            </Link>{" "}
+            vigentes ({TERMS_OF_USE_VERSION}).
+          </span>
+        </label>
+        {form.formState.errors.acceptTermsOfUse ? (
+          <p className="text-sm text-[var(--color-destructive)]">{form.formState.errors.acceptTermsOfUse.message}</p>
+        ) : null}
+
+        <label className="flex items-start gap-3 text-sm leading-6 text-[var(--color-ink-700)]" htmlFor="accept-privacy-policy">
+          <input
+            className="mt-1 size-4 rounded border border-[var(--color-border)] accent-[var(--color-primary)]"
+            disabled={isLoading}
+            id="accept-privacy-policy"
+            type="checkbox"
+            {...form.register("acceptPrivacyPolicy")}
+          />
+          <span>
+            Li e aceito a{" "}
+            <Link className="font-semibold text-[var(--color-primary)] underline-offset-4 hover:underline" href={PRIVACY_POLICY_PATH} target="_blank">
+              Politica de Privacidade
+            </Link>{" "}
+            vigente ({PRIVACY_POLICY_VERSION}).
+          </span>
+        </label>
+        {form.formState.errors.acceptPrivacyPolicy ? (
+          <p className="text-sm text-[var(--color-destructive)]">{form.formState.errors.acceptPrivacyPolicy.message}</p>
         ) : null}
       </div>
 

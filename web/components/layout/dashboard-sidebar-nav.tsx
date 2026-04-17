@@ -18,6 +18,7 @@ import {
   ShieldCheck,
   Split,
   Target,
+  Wallet,
   UsersRound
 } from "lucide-react";
 
@@ -30,6 +31,7 @@ const navigation = [
   { href: "/dashboard" as Route, label: "Painel", icon: LayoutDashboard },
   { href: "/dashboard/transactions" as Route, label: "Transações", icon: ReceiptText },
   { href: "/dashboard/categories" as Route, label: "Categorias", icon: FolderTree },
+  { href: "/dashboard/benefits" as Route, label: "Vale Alimentação", icon: Wallet },
   { href: "/dashboard/accounts" as Route, label: "Contas", icon: Landmark },
   { href: "/dashboard/cards" as Route, label: "Cartões", icon: CreditCard },
   { href: "/dashboard/subscriptions" as Route, label: "Assinaturas", icon: RefreshCcw },
@@ -53,7 +55,7 @@ export function DashboardSidebarNav({ canManageSharing, isPlatformAdmin }: Dashb
   const [isPending, startTransition] = useTransition();
   const items = [
     ...navigation,
-    ...(canManageSharing ? [{ href: "/dashboard/sharing" as Route, label: "Convidar parentes", icon: UsersRound }] : []),
+    ...(canManageSharing ? [{ href: "/dashboard/sharing" as Route, label: "Compartilhar carteira", icon: UsersRound }] : []),
     ...(isPlatformAdmin ? [{ href: "/dashboard/admin" as Route, label: "Admin", icon: ShieldCheck }] : [])
   ];
 
@@ -101,14 +103,14 @@ export function DashboardSidebarNav({ canManageSharing, isPlatformAdmin }: Dashb
     <>
       <section className="mb-5 rounded-[22px] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-muted)_48%,var(--color-card))] p-3.5">
         <p className="text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-[var(--color-muted-foreground)]">
-          Competência global
+          Mês de análise
         </p>
         <p aria-live="polite" className="mt-1 text-sm font-semibold leading-5 text-[var(--color-foreground)]">
           {formatMonthKeyLabel(month)}
         </p>
 
         <p className="mt-2 text-xs leading-5 text-[var(--color-muted-foreground)]">
-          Aplica o mês ativo ao painel, transações, assinaturas, parcelas e relatórios.
+          Usa o mesmo mês em painel, transações, assinaturas, parcelas e relatórios.
         </p>
 
         <div className="mt-3 grid gap-2">
@@ -167,9 +169,9 @@ export function DashboardSidebarNav({ canManageSharing, isPlatformAdmin }: Dashb
 
       <div className="mb-3 flex items-center justify-between gap-3 px-1">
         <p className="text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">
-          Módulos
+          Navegação
         </p>
-        <p className="text-xs text-[var(--color-muted-foreground)]">{items.length} áreas</p>
+        <p className="text-xs text-[var(--color-muted-foreground)]">Rotina financeira</p>
       </div>
 
       <nav className="space-y-2">

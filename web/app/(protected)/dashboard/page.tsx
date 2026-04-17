@@ -5,7 +5,7 @@ import { ArrowRight, BellRing, CreditCard, Landmark, Target } from "lucide-react
 
 import { SummaryCards } from "@/features/dashboard/components/summary-cards";
 import { syncDueSubscriptionTransactions } from "@/lib/automation/subscriptions";
-import { requireSessionUser } from "@/lib/auth/session";
+import { requireProtectedPageUser } from "@/lib/auth/session";
 import {
   getNextPayableStatementSnapshot,
   getCardStatementSnapshots
@@ -183,6 +183,7 @@ async function getDashboardData(tenantId: string, month: string) {
       averageDailyExpense: monthlyReport.summary.averageDailyExpense,
       classification: monthlyReport.classification,
       spendingInsights: monthlyReport.spendingInsights,
+      benefits: monthlyReport.benefits,
       monthlyCardPayments,
       periodExpenseForecast,
       upcomingProjection: upcomingProjection.slice(0, 5),
@@ -217,6 +218,12 @@ async function getDashboardData(tenantId: string, month: string) {
         uncategorized: 0,
         coverage: 0
       },
+      benefits: {
+        foodWallets: 0,
+        foodBalance: 0,
+        foodIncome: 0,
+        foodExpense: 0
+      },
       spendingInsights: {
         topCategory: null,
         essentialExpenses: 0,
@@ -243,7 +250,7 @@ type DashboardPageProps = {
 };
 
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
-  const user = await requireSessionUser();
+  const user = await requireProtectedPageUser();
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const month = normalizeMonthKey(resolvedSearchParams?.month);
   await syncDueSubscriptionTransactions({
@@ -255,21 +262,21 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   const monthPerspective = getMonthPerspective(month);
   const commitmentCardNote =
     monthPerspective === "current"
-      ? "Recorrências e faturas ainda previstas para este mês."
+      ? "Compromissos que ainda podem pressionar o restante deste mês."
       : monthPerspective === "future"
         ? "Recorrências e faturas previstas para o mês selecionado."
-        : "Recorrências e faturas mapeadas para a competência selecionada.";
+        : "Compromissos que fizeram parte da competência selecionada.";
   const dueSectionTitle =
-    monthPerspective === "current" ? "Próximos vencimentos" : monthPerspective === "future" ? "Vencimentos previstos" : "Vencimentos do período";
+    monthPerspective === "current" ? "Avisos para os próximos dias" : monthPerspective === "future" ? "Compromissos previstos" : "Compromissos do período";
   const dueSectionEmpty =
     monthPerspective === "current"
-      ? "Nenhuma cobrança futura encontrada."
+      ? "Nenhum compromisso futuro encontrado para os próximos dias deste mês."
       : monthPerspective === "future"
-        ? "Nenhum vencimento previsto para o período."
-        : "Nenhum vencimento encontrado no período.";
+        ? "Nenhum compromisso previsto para o período."
+        : "Nenhum compromisso encontrado no período.";
   const goalSectionTitle = monthPerspective === "current" ? "Metas com prazo próximo" : "Metas com prazo no período";
   const movementSectionCopy =
-    "Lançamentos contabilizados dentro da competência selecionada, mesmo quando a compra original aconteceu em outra data.";
+    "Aqui entram os lançamentos da competência selecionada. Em compras no cartão, a data real e o vencimento aparecem separados.";
 
   return (
     <div className="space-y-6 py-4">
@@ -480,7 +487,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                     <p className="break-words text-sm font-medium">{transaction.description}</p>
                     <p className="break-words text-xs text-[var(--color-muted-foreground)]">
                       {transaction.card ? `Compra em ${formatDate(transaction.date)}` : formatDate(transaction.date)} •{" "}
-                      {transaction.category?.name ?? "Sem categoria"} •{" "}
+                      {transaction.type === "transfer"
+                        ? "Transferência entre contas"
+                        : transaction.category?.name ?? "Sem categoria"}{" "}
+                      •{" "}
                       {transaction.card?.name ??
                         (transaction.destinationAccount
                           ? `${transaction.financialAccount?.name ?? "Sem origem"} → ${transaction.destinationAccount.name}`
@@ -488,8 +498,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                     </p>
                     {transaction.card && transaction.competenceDate && transaction.payableDate ? (
                       <p className="mt-1 break-words text-xs text-[var(--color-muted-foreground)]">
-                        Competência {formatMonthKeyLabel(transaction.competence)} • vence{" "}
-                        {formatDate(transaction.payableDate)}
+                        Entra em {formatMonthKeyLabel(transaction.competence)} • vence em {formatDate(transaction.payableDate)}
                       </p>
                     ) : null}
                   </div>
@@ -623,6 +632,21 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                 {data.activeAccounts[0]?.name ?? "Sem conta de referência"}
               </p>
             </div>
+            {data.benefits.foodWallets > 0 ? (
+              <div className="data-card px-4 py-4">
+                <p className="metric-label">Vale alimentação</p>
+                <p
+                  className={`amount-nowrap mt-3 max-w-full text-[clamp(1.25rem,4vw,2rem)] font-semibold tracking-[-0.05em] ${
+                    data.benefits.foodBalance < 0 ? "amount-negative" : "text-[var(--color-foreground)]"
+                  }`}
+                >
+                  {formatCurrency(data.benefits.foodBalance)}
+                </p>
+                <p className="mt-2 text-sm text-[var(--color-muted-foreground)]">
+                  {data.benefits.foodWallets} carteira(s) ativa(s) • créditos {formatCurrency(data.benefits.foodIncome)}
+                </p>
+              </div>
+            ) : null}
           </div>
 
         </article>
@@ -686,13 +710,13 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                     <div className="detail-grid">
                       <div className="rounded-[1.1rem] border border-[var(--color-border)]/70 bg-[var(--color-muted)]/25 px-3 py-3">
                         <p className="text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-[var(--color-muted-foreground)]">
-                          Competencia aberta
+                          Fatura do ciclo
                         </p>
                         <p className="amount-nowrap mt-2 text-sm font-medium text-[var(--color-foreground)]">
                           {formatCurrency(Number(card.statementAmount))}
                         </p>
                         <p className="mt-1 text-xs text-[var(--color-muted-foreground)]">
-                          Competência {formatMonthKeyLabel(card.statementMonth)}
+                          Ciclo de {formatMonthKeyLabel(card.statementMonth)}
                         </p>
                       </div>
                       <div className="rounded-[1.1rem] border border-[var(--color-border)]/70 bg-[var(--color-muted)]/25 px-3 py-3">
@@ -703,7 +727,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                           {formatDate(card.payableDueDate)}
                         </p>
                         <p className="mt-1 text-xs text-[var(--color-muted-foreground)]">
-                          Referente a {formatMonthKeyLabel(card.payableStatementMonth)}
+                          Refere-se a {formatMonthKeyLabel(card.payableStatementMonth)}
                         </p>
                       </div>
                       <div className="rounded-[1.1rem] border border-[var(--color-border)]/70 bg-[var(--color-muted)]/25 px-3 py-3">

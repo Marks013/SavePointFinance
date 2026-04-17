@@ -4,9 +4,11 @@ import { NextResponse } from "next/server";
 import { requireSessionUser } from "@/lib/auth/session";
 import { revalidateFinanceReports } from "@/lib/cache/finance-read-models";
 import { buildCardBillingSnapshot } from "@/lib/cards/statement";
+import { BenefitWalletRuleError, validateBenefitWalletTransaction } from "@/lib/finance/benefit-wallet";
+import { FOOD_BENEFIT_CATEGORY_SYSTEM_KEYS } from "@/lib/finance/benefit-wallet-rules";
 import { resolveTransactionClassification } from "@/lib/finance/transaction-classification";
 import { assertTenantTransactionReferences, TenantReferenceError } from "@/lib/finance/tenant-reference-guard";
-import { ensureTitheCategory, syncTitheForTransactionDates } from "@/lib/finance/tithe";
+import { ensureTitheCategory, syncTitheForMonthKeys } from "@/lib/finance/tithe";
 import { captureRequestError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
 import { addMonthsClamped } from "@/lib/utils";
@@ -36,6 +38,7 @@ export async function PATCH(request: Request, context: Params) {
       select: {
         id: true,
         date: true,
+        competence: true,
         paymentMethod: true,
         accountId: true,
         destinationAccountId: true,
@@ -50,7 +53,13 @@ export async function PATCH(request: Request, context: Params) {
     });
 
     if (existingTransaction.notes?.startsWith("[AUTO_TITHE:")) {
-      return NextResponse.json({ message: "O dízimo consolidado é gerado automaticamente" }, { status: 400 });
+      return NextResponse.json(
+        {
+          message:
+            "Esta transação de dízimo não pode ser editada manualmente porque foi gerada automaticamente a partir da receita vinculada. Edite a receita original para recalcular o dízimo."
+        },
+        { status: 400 }
+      );
     }
 
     const notes = body.notes?.trim() || null;
@@ -68,6 +77,18 @@ export async function PATCH(request: Request, context: Params) {
       cardId: nextCardId,
       categoryId: body.categoryId
     });
+    const nextAccount =
+      nextAccountId !== null
+        ? await prisma.financialAccount.findFirst({
+            where: {
+              id: nextAccountId,
+              tenantId: user.tenantId
+            },
+            select: {
+              usage: true
+            }
+          })
+        : null;
 
     if (
       isLockedCreditTransaction &&
@@ -93,9 +114,22 @@ export async function PATCH(request: Request, context: Params) {
       notes,
       paymentMethod: body.paymentMethod,
       categoryId: body.categoryId || null,
-      excludeTransactionId: id
+      excludeTransactionId: id,
+      allowedCategorySystemKeys:
+        nextAccount?.usage === "benefit_food" && body.type === "expense"
+          ? FOOD_BENEFIT_CATEGORY_SYSTEM_KEYS
+          : undefined
     });
-    const categoryId = classification.categoryId;
+    const categoryId = body.categoryId || classification.categoryId;
+    await validateBenefitWalletTransaction({
+      tenantId: user.tenantId,
+      type: body.type,
+      paymentMethod: body.paymentMethod,
+      accountId: nextAccountId,
+      destinationAccountId: nextDestinationAccountId,
+      categoryId: categoryId || null,
+      cardId: nextCardId
+    });
     const applyTithe = body.type === "income" && body.applyTithe;
     const titheCategoryId = applyTithe ? await ensureTitheCategory(user.tenantId) : null;
     const selectedCard =
@@ -139,7 +173,7 @@ export async function PATCH(request: Request, context: Params) {
         return NextResponse.json({ message: "Grupo de parcelas não encontrado" }, { status: 404 });
       }
 
-      const affectedDatesBefore = installments.map((installment) => installment.date);
+      const affectedCompetencesBefore = installments.map((installment) => installment.competence);
 
       await prisma.$transaction(
         installments.map((installment) => {
@@ -181,14 +215,18 @@ export async function PATCH(request: Request, context: Params) {
       );
 
       if (applyTithe || installments.some((installment) => Number(installment.titheAmount ?? 0) > 0)) {
-        await syncTitheForTransactionDates({
+        await syncTitheForMonthKeys({
           tenantId: user.tenantId,
           userId: existingTransaction.userId ?? user.id,
-          dates: [
-            ...affectedDatesBefore,
-            ...installments.map((installment) =>
-              addMonthsClamped(updatedDate, installment.installmentNumber - existingTransaction.installmentNumber)
-            )
+          monthKeys: [
+            ...affectedCompetencesBefore,
+            ...installments.map((installment) => {
+              const monthOffset = installment.installmentNumber - existingTransaction.installmentNumber;
+              const nextDate = addMonthsClamped(updatedDate, monthOffset);
+              const nextCompetenceDate = addMonthsClamped(baseCompetenceDate, monthOffset);
+              const cardSnapshot = selectedCard ? buildCardBillingSnapshot(selectedCard, nextDate) : null;
+              return cardSnapshot?.competence ?? format(nextCompetenceDate, "yyyy-MM");
+            })
           ]
         });
       }
@@ -233,10 +271,10 @@ export async function PATCH(request: Request, context: Params) {
     });
 
     if (applyTithe || Number(existingTransaction.titheAmount ?? 0) > 0) {
-      await syncTitheForTransactionDates({
+      await syncTitheForMonthKeys({
         tenantId: user.tenantId,
         userId: existingTransaction.userId ?? user.id,
-        dates: [existingTransaction.date, updatedDate]
+        monthKeys: [existingTransaction.competence, updated.competence]
       });
     }
     revalidateFinanceReports(user.tenantId);
@@ -254,6 +292,10 @@ export async function PATCH(request: Request, context: Params) {
       return NextResponse.json({ message: error.message }, { status: 404 });
     }
 
+    if (error instanceof BenefitWalletRuleError) {
+      return NextResponse.json({ message: error.message }, { status: 400 });
+    }
+
     captureRequestError(error, { request, feature: "transactions" });
     return NextResponse.json({ message: error instanceof Error ? error.message : "Failed to update transaction" }, { status: 400 });
   }
@@ -269,6 +311,7 @@ export async function DELETE(request: Request, context: Params) {
         tenantId: user.tenantId
       },
       select: {
+        competence: true,
         date: true,
         titheAmount: true,
         notes: true,
@@ -277,7 +320,13 @@ export async function DELETE(request: Request, context: Params) {
     });
 
     if (existingTransaction.notes?.startsWith("[AUTO_TITHE:")) {
-      return NextResponse.json({ message: "O dízimo consolidado é gerado automaticamente" }, { status: 400 });
+      return NextResponse.json(
+        {
+          message:
+            "Esta transação de dízimo não pode ser excluída manualmente porque foi gerada automaticamente a partir da receita vinculada. Exclua ou ajuste a receita original para atualizar o dízimo."
+        },
+        { status: 400 }
+      );
     }
 
     await prisma.transaction.delete({
@@ -287,10 +336,10 @@ export async function DELETE(request: Request, context: Params) {
     });
 
     if (Number(existingTransaction.titheAmount ?? 0) > 0) {
-      await syncTitheForTransactionDates({
+      await syncTitheForMonthKeys({
         tenantId: user.tenantId,
         userId: existingTransaction.userId ?? user.id,
-        dates: [existingTransaction.date]
+        monthKeys: [existingTransaction.competence]
       });
     }
     revalidateFinanceReports(user.tenantId);

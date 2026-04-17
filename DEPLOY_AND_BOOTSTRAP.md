@@ -84,6 +84,7 @@ Modelos disponiveis:
 - servidor: [`.env.server.example`](/C:/Users/samue/Desktop/SavePoint/SavePoint/.env.server.example)
 - docker local: [`.env.local-docker.example`](/C:/Users/samue/Desktop/SavePoint/SavePoint/.env.local-docker.example)
 - o arquivo ativo usado pelo `docker compose` continua sendo `.env`
+- o modo de manutencao usa `MAINTENANCE_MODE=true|false` no mesmo `.env`
 
 Geracao rapida:
 
@@ -233,8 +234,18 @@ Variaveis importantes para o smoke:
 - `ADMIN_PASSWORD`
 - `SMOKE_USER_EMAIL`
 - `SMOKE_USER_PASSWORD`
+- `FAMILY_USER_EMAIL`
+- `FAMILY_USER_PASSWORD`
 - `SMOKE_MONTH`
 - `AUDIT_BASE_URL`
+
+O smoke atualizado agora cobre tambem:
+
+- `GET /api/health`
+- acesso administrativo do `Admin de Conta`
+- restricoes do `Familiar`
+- bloqueio de acesso do Familiar em `/dashboard/admin`, `/dashboard/sharing` e `/api/admin/users`
+- validacao server-side das preferencias que o Familiar nao pode alterar
 
 ### Ativar backup automatico
 
@@ -515,4 +526,78 @@ docker compose up -d web
 Depois, para voltar ao perfil de servidor:
 
 1. copie `.env.server.example` para `.env`
+
+## Modo de manutencao operacional
+
+Para bloquear temporariamente o acesso web sem rebuildar imagem:
+
+```bash
+./ops/toggle-maintenance.sh on
+```
+
+Para liberar novamente:
+
+```bash
+./ops/toggle-maintenance.sh off
+```
+
+O script altera `MAINTENANCE_MODE` no `.env` e recria apenas o servico `web`. Isso recarrega as variaveis em runtime sem derrubar o banco. Nao use `docker compose restart web` para esse caso, porque `restart` nao recarrega o `env_file`.
+
+## Deploy robusto com rollback
+
+O `update.sh` agora faz um fluxo mais seguro:
+
+1. ativa manutencao
+2. salva a imagem atual como snapshot local de rollback
+3. registra evidencias em `.deploy/releases/<timestamp>`
+4. executa `git pull --ff-only`
+5. opcionalmente roda backup preventivo com `RUN_BACKUP_ON_DEPLOY=true`
+6. opcionalmente roda migrations com `RUN_DB_MIGRATIONS=true`
+7. recria `web`
+8. espera `GET /api/health`
+9. executa `audit-server-smoke` ainda com manutencao ativa
+10. so libera o trafego se tudo passar
+
+Uso padrao:
+
+```bash
+./update.sh
+```
+
+Com migrations:
+
+```bash
+RUN_DB_MIGRATIONS=true ./update.sh
+```
+
+Com backup preventivo:
+
+```bash
+RUN_BACKUP_ON_DEPLOY=true ./update.sh
+```
+
+### Evidencias operacionais
+
+Cada deploy salva artefatos em `.deploy/releases/<timestamp>`:
+
+- `release.env`
+- `git-pull.log`
+- `build.log`
+- `up.log`
+- `health.log`
+- `smoke.log`
+- `web.log`
+- `compose-ps.log`
+- `maintenance.log`
+- `rollback.log` quando houver falha e rollback automatico
+
+### Rollback manual
+
+Se precisar restaurar explicitamente a release anterior:
+
+```bash
+./ops/rollback-release.sh .deploy/releases/<timestamp>/release.env
+```
+
+O rollback reutiliza a imagem snapshot salva no deploy, recria apenas `web` e espera o `/api/health` voltar com status `ok`.
 2. ajuste seus valores reais

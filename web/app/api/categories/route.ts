@@ -29,6 +29,7 @@ export async function GET(request: Request) {
       items: categories.map((category) => ({
         id: category.id,
         name: category.name,
+        systemKey: category.systemKey,
         icon: category.icon,
         color: category.color,
         type: category.type,
@@ -99,6 +100,7 @@ export async function POST(request: Request) {
       {
         id: category.id,
         name: category.name,
+        systemKey: category.systemKey,
         icon: category.icon,
         color: category.color,
         type: category.type,

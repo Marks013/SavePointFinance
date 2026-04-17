@@ -15,6 +15,12 @@ export async function GET(request: Request) {
       token
     },
     include: {
+      invitedBy: {
+        select: {
+          name: true,
+          isPlatformAdmin: true
+        }
+      },
       tenant: {
         select: {
           name: true
@@ -27,11 +33,18 @@ export async function GET(request: Request) {
     return NextResponse.json({ message: "Convite invalido ou expirado" }, { status: 404 });
   }
 
+  const invitationRole = invitation.kind === "shared_wallet" ? "member" : "admin";
+  const accountAdminName =
+    invitation.kind === "shared_wallet" && invitation.invitedBy && !invitation.invitedBy.isPlatformAdmin
+      ? invitation.invitedBy.name
+      : null;
+
   return NextResponse.json({
     email: invitation.email,
     name: invitation.name,
-    role: invitation.role,
+    role: invitationRole,
     tenantName: invitation.tenant.name,
+    accountAdminName,
     expiresAt: invitation.expiresAt.toISOString()
   });
 }

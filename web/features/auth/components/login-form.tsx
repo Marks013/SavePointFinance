@@ -72,6 +72,10 @@ export function LoginForm() {
         {isPending ? "Entrando..." : "Entrar no painel"}
       </Button>
 
+      <p className="text-center text-sm leading-6 text-[var(--color-muted-foreground)]">
+        🔒 Seus dados são criptografados de ponta a ponta e armazenados com segurança.
+      </p>
+
       {authError ? (
         <p className="text-sm text-[var(--color-destructive)]" role="alert">
           {authError}

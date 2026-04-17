@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { formatDateTimeDisplay } from "@/lib/date";
 import { ensureApiResponse } from "@/lib/observability/http";
+import { formatCurrency } from "@/lib/utils";
 
 type ProfilePayload = {
   id: string;
@@ -26,6 +27,20 @@ type ProfilePayload = {
   };
   sharing: {
     canManage: boolean;
+  };
+  permissions: {
+    canAccessAdminPage: boolean;
+    canAccessSharingPage: boolean;
+    canManageFamilyInvites: boolean;
+    canEditName: boolean;
+    canEditWhatsAppNumber: boolean;
+    canEditEmailNotifications: boolean;
+    canEditMonthlyReports: boolean;
+    canEditCurrency: boolean;
+    canEditDateFormat: boolean;
+    canEditBudgetAlerts: boolean;
+    canEditDueReminders: boolean;
+    canEditAutoTithe: boolean;
   };
   whatsappNumber: string;
   license: {
@@ -49,6 +64,11 @@ type ProfilePayload = {
     whatsappConfigured: boolean;
     whatsappWebhookPath: string;
     smartClassificationEnabled: boolean;
+    emailProvider: "webhook" | "resend" | "brevo";
+    emailConfigured: boolean;
+    emailFrom: string | null;
+    emailIssue: string | null;
+    whatsappIssue: string | null;
   };
   preferences: {
     currency: string;
@@ -64,6 +84,25 @@ type ProfilePayload = {
 type AutomationSummary = {
   dueSubscriptions: number;
   upcomingGoals: number;
+  upcomingCardStatements: number;
+  warningPreview: Array<{
+    type: "subscription" | "card_statement" | "goal_deadline";
+    label: string;
+    date: string;
+    amount: number;
+  }>;
+  delivery: {
+    email: {
+      provider: "webhook" | "resend" | "brevo";
+      configured: boolean;
+      from: string | null;
+      issue: string | null;
+    };
+    whatsapp: {
+      configured: boolean;
+      issue: string | null;
+    };
+  };
 };
 
 type AutomationRunResult = {
@@ -124,6 +163,19 @@ function formatChannel(channel: string) {
       return "WhatsApp";
     default:
       return channel;
+  }
+}
+
+function formatWarningType(type: AutomationSummary["warningPreview"][number]["type"]) {
+  switch (type) {
+    case "subscription":
+      return "Recorrência";
+    case "card_statement":
+      return "Fatura do cartão";
+    case "goal_deadline":
+      return "Prazo de meta";
+    default:
+      return type;
   }
 }
 
@@ -188,7 +240,16 @@ export function SettingsClient() {
   const notifications = notificationsQuery.data?.items ?? [];
   const deliveredNotifications = notifications.filter((item) => item.status === "sent").length;
   const failedNotifications = notifications.filter((item) => item.status === "failed").length;
-  const canManageSharing = Boolean(profileQuery.data?.sharing.canManage);
+  const canManageSharing = Boolean(profileQuery.data?.permissions.canAccessSharingPage);
+  const settingsPermissions = profileQuery.data?.permissions;
+  const hasSharedAccountRestrictions = Boolean(
+    settingsPermissions &&
+      (!settingsPermissions.canEditCurrency ||
+        !settingsPermissions.canEditDateFormat ||
+        !settingsPermissions.canEditBudgetAlerts ||
+        !settingsPermissions.canEditDueReminders ||
+        !settingsPermissions.canEditAutoTithe)
+  );
   const form = useForm<SettingsFormValues>({
     defaultValues: {
       name: "",
@@ -307,7 +368,7 @@ export function SettingsClient() {
         <section className="surface content-section">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0 flex-1">
-              <div className="eyebrow">Convidar parentes</div>
+              <div className="eyebrow">Compartilhamento</div>
               <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em]">Compartilhamento familiar</h2>
               <p className="mt-2 max-w-3xl text-sm leading-7 text-[var(--color-muted-foreground)]">
                 Convide cônjuge, familiar ou alguém de confiança para usar a mesma carteira financeira da conta{" "}
@@ -343,7 +404,7 @@ export function SettingsClient() {
           <form className="mt-6 space-y-4" onSubmit={form.handleSubmit((values) => profileMutation.mutate(values))}>
             <div className="space-y-2">
               <Label htmlFor="settings-name">Nome</Label>
-              <Input id="settings-name" {...form.register("name")} />
+              <Input disabled={settingsPermissions ? !settingsPermissions.canEditName : false} id="settings-name" {...form.register("name")} />
             </div>
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
@@ -353,6 +414,7 @@ export function SettingsClient() {
               <div className="space-y-2">
                 <Label htmlFor="settings-whatsapp">WhatsApp</Label>
                 <Input
+                  disabled={settingsPermissions ? !settingsPermissions.canEditWhatsAppNumber : false}
                   id="settings-whatsapp"
                   inputMode="numeric"
                   placeholder="(DD) 9 0000-0000"
@@ -372,7 +434,11 @@ export function SettingsClient() {
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="settings-currency">Moeda</Label>
-                <Select id="settings-currency" {...form.register("currency")}>
+                <Select
+                  disabled={settingsPermissions ? !settingsPermissions.canEditCurrency : false}
+                  id="settings-currency"
+                  {...form.register("currency")}
+                >
                   <option value="BRL">BRL</option>
                   <option value="USD">USD</option>
                   <option value="EUR">EUR</option>
@@ -380,19 +446,29 @@ export function SettingsClient() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="settings-date-format">Formato de data</Label>
-                <Select id="settings-date-format" {...form.register("dateFormat")}>
+                <Select
+                  disabled={settingsPermissions ? !settingsPermissions.canEditDateFormat : false}
+                  id="settings-date-format"
+                  {...form.register("dateFormat")}
+                >
                   <option value="DD/MM/YYYY">DD/MM/YYYY</option>
                   <option value="MM/DD/YYYY">MM/DD/YYYY</option>
                   <option value="YYYY-MM-DD">YYYY-MM-DD</option>
                 </Select>
               </div>
             </div>
+            {hasSharedAccountRestrictions ? (
+              <div className="muted-panel text-sm text-[var(--color-muted-foreground)]">
+                Como <strong>Familiar</strong>, você mantém suas preferências pessoais e seu WhatsApp, mas moeda, formato
+                de data, alertas, lembretes e dízimo ficam sob controle do <strong>Admin de Conta</strong>.
+              </div>
+            ) : null}
             <div className="grid gap-3 md:grid-cols-2">
-              <label className="muted-panel flex items-center gap-3 text-sm"><input className="app-checkbox" type="checkbox" {...form.register("emailNotifications")} /> Notificações por e-mail</label>
-              <label className="muted-panel flex items-center gap-3 text-sm"><input className="app-checkbox" type="checkbox" {...form.register("monthlyReports")} /> Relatórios mensais</label>
-              <label className="muted-panel flex items-center gap-3 text-sm"><input className="app-checkbox" type="checkbox" {...form.register("budgetAlerts")} /> Alertas de orçamento</label>
-              <label className="muted-panel flex items-center gap-3 text-sm"><input className="app-checkbox" type="checkbox" {...form.register("dueReminders")} /> Lembretes de vencimento</label>
-              <label className="muted-panel flex items-center gap-3 text-sm"><input className="app-checkbox" type="checkbox" {...form.register("autoTithe")} /> Marcar dízimo por padrão em novas receitas</label>
+              <label className="muted-panel flex items-center gap-3 text-sm"><input className="app-checkbox" disabled={settingsPermissions ? !settingsPermissions.canEditEmailNotifications : false} type="checkbox" {...form.register("emailNotifications")} /> Notificações por e-mail</label>
+              <label className="muted-panel flex items-center gap-3 text-sm"><input className="app-checkbox" disabled={settingsPermissions ? !settingsPermissions.canEditMonthlyReports : false} type="checkbox" {...form.register("monthlyReports")} /> Relatórios mensais</label>
+              <label className="muted-panel flex items-center gap-3 text-sm"><input className="app-checkbox" disabled={settingsPermissions ? !settingsPermissions.canEditBudgetAlerts : false} type="checkbox" {...form.register("budgetAlerts")} /> Alertas de orçamento</label>
+              <label className="muted-panel flex items-center gap-3 text-sm"><input className="app-checkbox" disabled={settingsPermissions ? !settingsPermissions.canEditDueReminders : false} type="checkbox" {...form.register("dueReminders")} /> Lembretes de vencimento</label>
+              <label className="muted-panel flex items-center gap-3 text-sm"><input className="app-checkbox" disabled={settingsPermissions ? !settingsPermissions.canEditAutoTithe : false} type="checkbox" {...form.register("autoTithe")} /> Marcar dízimo por padrão em novas receitas</label>
             </div>
             <Button className="w-full" disabled={profileMutation.isPending} type="submit">
               {profileMutation.isPending ? "Salvando..." : "Salvar configurações"}
@@ -413,10 +489,67 @@ export function SettingsClient() {
                   <p className="text-sm text-[var(--color-muted-foreground)]">Metas com prazo próximo</p>
                   <p className="mt-2 text-2xl font-semibold">{automationQuery.data?.upcomingGoals ?? 0}</p>
                 </article>
+                <article className="metric-card">
+                  <p className="text-sm text-[var(--color-muted-foreground)]">Faturas perto do vencimento</p>
+                  <p className="mt-2 text-2xl font-semibold">{automationQuery.data?.upcomingCardStatements ?? 0}</p>
+                </article>
+                <article className="metric-card">
+                  <p className="text-sm text-[var(--color-muted-foreground)]">Avisos na janela curta</p>
+                  <p className="mt-2 text-2xl font-semibold">{automationQuery.data?.warningPreview.length ?? 0}</p>
+                </article>
+              </div>
+              <div className="mt-6 grid gap-4 md:grid-cols-2">
+                <article className="data-card p-4">
+                  <p className="text-sm font-semibold">Entrega por e-mail</p>
+                  <p className="mt-2 text-sm text-[var(--color-muted-foreground)]">
+                    {automationQuery.data?.delivery.email.configured
+                      ? `Pronta via ${automationQuery.data.delivery.email.provider}.`
+                      : "Ainda não pronta para envio."}
+                  </p>
+                  <p className="mt-2 break-words text-xs text-[var(--color-muted-foreground)]">
+                    {automationQuery.data?.delivery.email.configured
+                      ? profileQuery.data?.integrations.emailFrom
+                        ? `Remetente: ${profileQuery.data.integrations.emailFrom}`
+                        : "Sem remetente exposto na interface."
+                      : automationQuery.data?.delivery.email.issue ?? profileQuery.data?.integrations.emailIssue ?? "Revise as variáveis do provedor."}
+                  </p>
+                </article>
+                <article className="data-card p-4">
+                  <p className="text-sm font-semibold">Entrega por WhatsApp</p>
+                  <p className="mt-2 text-sm text-[var(--color-muted-foreground)]">
+                    {automationQuery.data?.delivery.whatsapp.configured ? "Pronta para envio." : "Ainda não pronta para envio."}
+                  </p>
+                  <p className="mt-2 break-words text-xs text-[var(--color-muted-foreground)]">
+                    {automationQuery.data?.delivery.whatsapp.configured
+                      ? "Os lembretes podem sair pelo número vinculado no perfil."
+                      : automationQuery.data?.delivery.whatsapp.issue ?? profileQuery.data?.integrations.whatsappIssue ?? "Revise a configuração do WhatsApp Cloud API."}
+                  </p>
+                </article>
+              </div>
+              <div className="muted-panel mt-6 text-sm text-[var(--color-muted-foreground)]">
+                Os avisos só disparam quando a rotina automática roda por cron ou quando você executa a ação manual abaixo.
               </div>
               <Button className="mt-6 w-full" disabled={automationMutation.isPending} onClick={() => automationMutation.mutate()} type="button">
                 {automationMutation.isPending ? "Executando..." : "Executar automações agora"}
               </Button>
+
+              {automationQuery.data?.warningPreview.length ? (
+                <div className="mt-6 space-y-3">
+                  {automationQuery.data.warningPreview.map((item) => (
+                    <article key={`${item.type}-${item.label}-${item.date}`} className="data-card p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="break-words font-semibold">{item.label}</p>
+                          <p className="break-words text-sm text-[var(--color-muted-foreground)]">
+                            {formatWarningType(item.type)} • {formatDateTimeDisplay(item.date)}
+                          </p>
+                        </div>
+                        <p className="amount-nowrap w-full text-left font-semibold sm:w-auto sm:text-right">{formatCurrency(item.amount)}</p>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : null}
 
               {automationResult ? (
                 <div className="muted-panel mt-6 text-sm">
@@ -538,6 +671,12 @@ export function SettingsClient() {
         <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--color-muted-foreground)]">
           Os lembretes gerados pelas automações ficam registrados aqui com status de entrega por canal.
         </p>
+        {!profileQuery.data?.integrations.emailConfigured && profileQuery.data?.preferences.emailNotifications ? (
+          <div className="warning-panel mt-6 text-sm">
+            O envio por e-mail está habilitado nas suas preferências, mas o ambiente ainda não está pronto para entregar mensagens.
+            {profileQuery.data.integrations.emailIssue ? ` ${profileQuery.data.integrations.emailIssue}` : ""}
+          </div>
+        ) : null}
         <div className="mt-6 grid gap-4 md:grid-cols-3">
           <article className="metric-card">
             <p className="metric-label">Registradas</p>

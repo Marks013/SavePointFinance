@@ -1,10 +1,13 @@
-import { hash } from "bcryptjs";
 import { InvitationKind } from "@prisma/client";
+import { hash } from "bcryptjs";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { acceptInvitationSchema } from "@/features/password/schemas/password-schema";
+import { logAdminAudit } from "@/lib/admin/audit";
 import { normalizeEmail } from "@/lib/auth/normalize-email";
+import { revalidateAdminUsers } from "@/lib/cache/admin-read-models";
+import { PRIVACY_POLICY_VERSION, TERMS_OF_USE_VERSION } from "@/lib/legal/documents";
 import { getTenantSeatSummary } from "@/lib/licensing/server";
 import { captureRequestError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
@@ -52,6 +55,7 @@ export async function POST(request: Request) {
 
     const normalizedEmail = normalizeEmail(invitation.email);
     const passwordHash = await hash(body.password, 10);
+    const invitationRole = invitation.kind === InvitationKind.shared_wallet ? "member" : "admin";
 
     const existingUser = await prisma.user.findFirst({
       where: {
@@ -82,7 +86,7 @@ export async function POST(request: Request) {
           tenantId: invitation.tenantId,
           name: body.name,
           passwordHash,
-          role: invitation.role,
+          role: invitationRole,
           isActive: true
         }
       });
@@ -93,9 +97,30 @@ export async function POST(request: Request) {
         },
         data: {
           acceptedAt: new Date(),
-          name: body.name
+          name: body.name,
+          role: invitationRole
         }
       });
+
+      await logAdminAudit({
+        actorUserId: updatedUser.id,
+        actorTenantId: updatedUser.tenantId,
+        targetUserId: updatedUser.id,
+        targetTenantId: updatedUser.tenantId,
+        action: "auth.invitation_accepted",
+        entityType: "invitation",
+        entityId: invitation.id,
+        summary: `Convite aceito por ${updatedUser.email}`,
+        metadata: {
+          invitationKind: invitation.kind,
+          acceptedTermsOfUseVersion: TERMS_OF_USE_VERSION,
+          acceptedPrivacyPolicyVersion: PRIVACY_POLICY_VERSION,
+          acceptedAt: new Date().toISOString()
+        }
+      });
+
+      revalidateAdminUsers(invitation.tenantId);
+      revalidateAdminUsers(existingUser.tenantId);
 
       return NextResponse.json({
         success: true,
@@ -113,7 +138,7 @@ export async function POST(request: Request) {
         email: normalizedEmail,
         name: body.name,
         passwordHash,
-        role: invitation.role,
+        role: invitationRole,
         isActive: true,
         preferences: {
           create: {
@@ -127,11 +152,31 @@ export async function POST(request: Request) {
       where: {
         id: invitation.id
       },
-      data: {
-        acceptedAt: new Date(),
-        name: body.name
+        data: {
+          acceptedAt: new Date(),
+          name: body.name,
+          role: invitationRole
+        }
+      });
+
+    await logAdminAudit({
+      actorUserId: user.id,
+      actorTenantId: user.tenantId,
+      targetUserId: user.id,
+      targetTenantId: user.tenantId,
+      action: "auth.invitation_accepted",
+      entityType: "invitation",
+      entityId: invitation.id,
+      summary: `Convite aceito por ${user.email}`,
+      metadata: {
+        invitationKind: invitation.kind,
+        acceptedTermsOfUseVersion: TERMS_OF_USE_VERSION,
+        acceptedPrivacyPolicyVersion: PRIVACY_POLICY_VERSION,
+        acceptedAt: new Date().toISOString()
       }
     });
+
+    revalidateAdminUsers(invitation.tenantId);
 
     return NextResponse.json({
       success: true,

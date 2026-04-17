@@ -20,6 +20,7 @@ import { ensureFallbackCategory } from "@/lib/finance/default-categories";
 import { matchGlobalKeywordContext } from "@/lib/finance/global-keywords";
 import { captureUnexpectedError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
+import { isAllowedBenefitFoodCategory } from "@/lib/finance/benefit-wallet-rules";
 
 type ClassificationInput = {
   tenantId: string;
@@ -29,6 +30,7 @@ type ClassificationInput = {
   paymentMethod: PaymentMethod;
   categoryId?: string | null;
   excludeTransactionId?: string;
+  allowedCategorySystemKeys?: readonly string[];
 };
 
 type ClassificationOutput = {
@@ -67,7 +69,29 @@ export async function resolveTransactionClassification(
     };
   }
 
-  const { categories, rules: categoryRules } = await getTenantClassificationContext(input.tenantId);
+  const { categories: tenantCategories, rules: tenantCategoryRules } = await getTenantClassificationContext(input.tenantId);
+  const allowedCategorySystemKeys = new Set(input.allowedCategorySystemKeys ?? []);
+  const restrictCategories = allowedCategorySystemKeys.size > 0;
+  const categories = tenantCategories.filter((category) => {
+    if (category.type !== input.type) {
+      return false;
+    }
+
+    if (!restrictCategories) {
+      return true;
+    }
+
+    const systemKey = category.systemKey;
+    if (!systemKey) {
+      return false;
+    }
+
+    return isAllowedBenefitFoodCategory(systemKey) && allowedCategorySystemKeys.has(systemKey);
+  });
+  const allowedCategoryIds = new Set(categories.map((category) => category.id));
+  const categoryRules = restrictCategories
+    ? tenantCategoryRules.filter((rule) => allowedCategoryIds.has(rule.categoryId))
+    : tenantCategoryRules;
 
   const manualRuleMatch = matchTenantCategoryRules(
     categoryRules.filter((rule) => rule.source === "manual"),
@@ -176,6 +200,7 @@ export async function resolveTransactionClassification(
     orderBy: [{ date: "desc" }, { createdAt: "desc" }],
     take: 120
   });
+  const filteredHistory = history.filter((item) => !restrictCategories || allowedCategoryIds.has(item.categoryId ?? ""));
 
   const classification = await classifyTransactionCategory({
     type: input.type,
@@ -183,7 +208,7 @@ export async function resolveTransactionClassification(
     notes: input.notes ?? null,
     paymentMethod: input.paymentMethod,
     categories,
-    history: history
+    history: filteredHistory
       .filter(
         (item): item is typeof item & { categoryId: string } =>
           Boolean(item.categoryId) &&
@@ -242,6 +267,8 @@ export async function resolveTransactionClassification(
   return {
     ...classification,
     classificationKeyword,
-    categoryId: classification.categoryId ?? (await ensureFallbackCategory(input.tenantId, input.type))
+    categoryId:
+      classification.categoryId ??
+      (restrictCategories ? null : await ensureFallbackCategory(input.tenantId, input.type))
   };
 }

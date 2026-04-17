@@ -4,6 +4,7 @@ import Credentials from "next-auth/providers/credentials";
 import { compare } from "bcryptjs";
 
 import { loginSchema } from "@/features/auth/schemas/login-schema";
+import { logAdminAudit } from "@/lib/admin/audit";
 import { baseAuthConfig } from "@/lib/auth/base-config";
 import { normalizeEmail } from "@/lib/auth/normalize-email";
 import { resolveTenantLicenseState } from "@/lib/licensing/policy";
@@ -76,15 +77,33 @@ export const authConfig = {
           return null;
         }
 
+        const now = new Date();
+
         await prisma.user.update({
           where: {
             id: user.id
           },
           data: {
-            lastLogin: new Date(),
+            lastLogin: now,
             loginCount: {
               increment: 1
             }
+          }
+        });
+
+        await logAdminAudit({
+          actorUserId: user.id,
+          actorTenantId: user.tenantId,
+          targetUserId: user.id,
+          targetTenantId: user.tenantId,
+          action: "auth.login",
+          entityType: "session",
+          entityId: user.id,
+          summary: `Acesso autenticado de ${user.email}`,
+          metadata: {
+            accessAt: now.toISOString(),
+            role: user.role,
+            isPlatformAdmin: user.isPlatformAdmin
           }
         });
 

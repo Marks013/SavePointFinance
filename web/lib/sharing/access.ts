@@ -59,6 +59,7 @@ async function findCurrentUserAsAccountOwner(user: SharingSessionUser) {
         equals: currentUser.email,
         mode: "insensitive"
       },
+      kind: InvitationKind.shared_wallet,
       acceptedAt: {
         not: null
       }
@@ -71,17 +72,29 @@ async function findCurrentUserAsAccountOwner(user: SharingSessionUser) {
       kind: true,
       invitedBy: {
         select: {
-          isPlatformAdmin: true
+          id: true,
+          name: true,
+          email: true,
+          isPlatformAdmin: true,
+          isActive: true
         }
       }
     }
   });
 
-  if (acceptedInvitation?.kind === InvitationKind.shared_wallet && !acceptedInvitation.invitedBy?.isPlatformAdmin) {
+  if (!acceptedInvitation) {
     return null;
   }
 
-  return toSharingOwner(currentUser);
+  if (
+    acceptedInvitation.invitedBy &&
+    !acceptedInvitation.invitedBy.isPlatformAdmin &&
+    acceptedInvitation.invitedBy.isActive
+  ) {
+    return toSharingOwner(acceptedInvitation.invitedBy);
+  }
+
+  return null;
 }
 
 async function findPlatformInvitedOwner(user: SharingSessionUser) {

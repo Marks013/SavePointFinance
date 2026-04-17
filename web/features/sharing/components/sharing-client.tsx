@@ -272,7 +272,7 @@ export function SharingClient() {
               />
             </div>
             <div className="muted-panel text-sm text-[var(--color-muted-foreground)]">
-              A pessoa convidada entra sempre como membro da carteira compartilhada e não pode gerenciar convites.
+              A pessoa convidada entra sempre como familiar da carteira compartilhada e não pode gerenciar convites.
             </div>
             <Button
               className="w-full"

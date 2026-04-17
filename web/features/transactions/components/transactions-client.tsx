@@ -13,6 +13,7 @@ import { CurrencyInput } from "@/components/ui/currency-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { FOOD_BENEFIT_CATEGORY_SYSTEM_KEYS, isAllowedBenefitFoodCategory } from "@/lib/finance/benefit-wallet-rules";
 import { formatDateDisplay, formatDateKey, normalizeCalendarDate } from "@/lib/date";
 import { formatMonthKeyLabel, normalizeMonthKey } from "@/lib/month";
 import { ensureApiResponse } from "@/lib/observability/http";
@@ -27,6 +28,7 @@ import {
 type CategoryItem = {
   id: string;
   name: string;
+  systemKey?: string | null;
   type: "income" | "expense";
   color: string;
 };
@@ -35,6 +37,7 @@ type AccountItem = {
   id: string;
   name: string;
   type: string;
+  usage?: "standard" | "benefit_food";
   balance: number;
   currency: string;
   color: string;
@@ -60,8 +63,8 @@ type TransactionItem = {
   installmentsTotal: number;
   installmentNumber: number;
   category: { id: string; name: string; color: string } | null;
-  account: { id: string; name: string } | null;
-  destinationAccount: { id: string; name: string } | null;
+  account: { id: string; name: string; usage?: "standard" | "benefit_food" } | null;
+  destinationAccount: { id: string; name: string; usage?: "standard" | "benefit_food" } | null;
   card: { id: string; name: string } | null;
   notes?: string | null;
   titheAmount: number | null;
@@ -208,6 +211,10 @@ function formatTransactionTypeLabel(type: TransactionItem["type"]) {
 
 function getMonthKeyFromDate(value: string) {
   return formatDateKey(new Date(value)).slice(0, 7);
+}
+
+function formatAccountOptionLabel(account: AccountItem) {
+  return account.usage === "benefit_food" ? `${account.name} • vale alimentação` : account.name;
 }
 
 function buildEmptyTransactionValues(monthKey: string): TransactionFormValues {
@@ -450,6 +457,7 @@ export function TransactionsClient() {
   const selectedType = useWatch({ control: form.control, name: "type" }) ?? "expense";
   const selectedPaymentMethod = useWatch({ control: form.control, name: "paymentMethod" }) ?? "pix";
   const selectedApplyTithe = useWatch({ control: form.control, name: "applyTithe" }) ?? false;
+  const selectedAccountId = useWatch({ control: form.control, name: "accountId" }) ?? "";
   const selectedFilterCard = useMemo(
     () => cards.find((card) => card.id === (filters.cardId ?? "")),
     [cards, filters.cardId]
@@ -478,13 +486,91 @@ export function TransactionsClient() {
   ].filter(Boolean) as string[], [filters.type, selectedFilterAccount, selectedFilterCard, selectedFilterCategory]);
   const isEditing = editingId !== null;
   const showEditor = isEditorOpen || isEditing || transactions.length === 0;
-  const filteredCategories = useMemo(() => categories.filter((category) => {
-    if (selectedType === "transfer") {
-      return true;
-    }
-    return category.type === selectedType;
-  }), [categories, selectedType]);
+  const selectedAccount = useMemo(
+    () => accounts.find((account) => account.id === selectedAccountId) ?? null,
+    [accounts, selectedAccountId]
+  );
+  const isBenefitWalletSelected = selectedAccount?.usage === "benefit_food";
+  const filteredCategories = useMemo(
+    () =>
+      categories.filter((category) => {
+        if (selectedType === "transfer") {
+          return true;
+        }
+
+        if (category.type !== selectedType) {
+          return false;
+        }
+
+        if (isBenefitWalletSelected && selectedType === "expense") {
+          return isAllowedBenefitFoodCategory(category.systemKey);
+        }
+
+        return true;
+      }),
+    [categories, isBenefitWalletSelected, selectedType]
+  );
+  const showTransferTypeOption = !isBenefitWalletSelected;
+  const showCreditCardPaymentOption = !isBenefitWalletSelected;
+  const showTransferPaymentOption = !isBenefitWalletSelected;
+  const showDebitCardPaymentOption = !(isBenefitWalletSelected && selectedType === "income");
+  const isBenefitWalletIncome = isBenefitWalletSelected && selectedType === "income";
+  const typeFieldLabel = isBenefitWalletSelected ? "Movimentação" : "Tipo";
+  const paymentFieldLabel = isBenefitWalletIncome
+    ? "Origem da recarga"
+    : isBenefitWalletSelected
+      ? "Forma de uso"
+      : "Pagamento";
+  const categoryFieldLabel = isBenefitWalletIncome
+    ? "Classificação da recarga"
+    : isBenefitWalletSelected
+      ? "Categoria de consumo"
+      : "Categoria";
   const isCreditCard = selectedPaymentMethod === "credit_card";
+  const accountFieldLabel = isCreditCard
+    ? "Cartão vinculado"
+    : isBenefitWalletIncome
+      ? "Carteira do benefício"
+      : selectedType === "transfer"
+        ? "Conta de origem"
+        : isBenefitWalletSelected
+          ? "Carteira do benefício"
+          : "Conta vinculada";
+
+  useEffect(() => {
+    if (isBenefitWalletSelected) {
+      if (selectedType === "transfer") {
+        form.setValue("type", "expense");
+      }
+
+      if (
+        selectedPaymentMethod === "credit_card" ||
+        (selectedType === "income" && (selectedPaymentMethod === "transfer" || selectedPaymentMethod === "debit_card"))
+      ) {
+        form.setValue("paymentMethod", "pix");
+      }
+
+      form.setValue("destinationAccountId", "");
+      form.setValue("cardId", "");
+      form.setValue("installments", 1);
+    }
+  }, [form, isBenefitWalletSelected, selectedPaymentMethod, selectedType]);
+
+  useEffect(() => {
+    if (!isBenefitWalletSelected || selectedType !== "expense") {
+      return;
+    }
+
+    const currentCategoryId = form.getValues("categoryId");
+    if (!currentCategoryId) {
+      return;
+    }
+
+    const currentCategory = categories.find((category) => category.id === currentCategoryId);
+    if (currentCategory && !isAllowedBenefitFoodCategory(currentCategory.systemKey)) {
+      form.setValue("categoryId", "");
+    }
+  }, [categories, form, isBenefitWalletSelected, selectedType]);
 
   useEffect(() => {
     if (selectedType === "transfer") {
@@ -543,7 +629,7 @@ export function TransactionsClient() {
             à fatura e aos relatórios.
           </p>
           <p className="text-sm font-medium text-[var(--color-primary)]">
-            Competência ativa: {formatMonthKeyLabel(month)}
+            Mês de análise: {formatMonthKeyLabel(month)}
           </p>
           <p className="mt-3 text-sm leading-7 text-[var(--color-muted-foreground)]">
             Se a categoria não for informada, o sistema tenta classificar automaticamente com base no contexto do
@@ -591,46 +677,56 @@ export function TransactionsClient() {
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="type">Tipo</Label>
+              <Label htmlFor="type">{typeFieldLabel}</Label>
               <Select
                 className={form.formState.errors.type ? invalidFieldClassName : undefined}
                 disabled={isEditing && isCreditEditLocked}
                 id="type"
                 {...form.register("type")}
               >
-                <option value="expense">Despesa</option>
-                <option value="income">Receita</option>
-                <option value="transfer">Transferência</option>
+                <option value="expense">{isBenefitWalletSelected ? "Consumo" : "Despesa"}</option>
+                <option value="income">{isBenefitWalletSelected ? "Recarga de saldo" : "Receita"}</option>
+                {showTransferTypeOption ? <option value="transfer">Transferência</option> : null}
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="paymentMethod">Pagamento</Label>
+              <Label htmlFor="paymentMethod">{paymentFieldLabel}</Label>
               <Select
                 className={form.formState.errors.paymentMethod ? invalidFieldClassName : undefined}
                 disabled={isEditing && isCreditEditLocked}
                 id="paymentMethod"
                 {...form.register("paymentMethod")}
               >
-                <option value="pix">PIX</option>
-                <option value="money">Dinheiro</option>
-                <option value="debit_card">Cartão de débito</option>
-                <option value="credit_card">Cartão de crédito</option>
-                <option value="transfer">Transferência</option>
+                <option value="pix">{isBenefitWalletIncome ? "PIX / repasse" : "PIX"}</option>
+                <option value="money">{isBenefitWalletIncome ? "Lançamento manual" : "Dinheiro"}</option>
+                {showDebitCardPaymentOption ? <option value="debit_card">Cartão de débito</option> : null}
+                {showCreditCardPaymentOption ? <option value="credit_card">Cartão de crédito</option> : null}
+                {showTransferPaymentOption ? <option value="transfer">Transferência</option> : null}
               </Select>
+              {isBenefitWalletIncome ? (
+                <p className="text-xs text-[var(--color-muted-foreground)]">
+                  Para recarga do benefício, use Receita com PIX ou Dinheiro.
+                </p>
+              ) : null}
             </div>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="categoryId">Categoria</Label>
+              <Label htmlFor="categoryId">{categoryFieldLabel}</Label>
               <Select
                 className={form.formState.errors.categoryId ? invalidFieldClassName : undefined}
+                disabled={isBenefitWalletIncome}
                 id="categoryId"
                 {...form.register("categoryId")}
               >
                 <option value="">
                   {selectedType === "transfer"
                     ? "Transferências não usam categoria"
+                    : isBenefitWalletIncome
+                      ? "Recargas de benefício não usam categoria"
+                    : isBenefitWalletSelected && selectedType === "expense"
+                      ? "Selecione uma categoria elegível de alimentação"
                     : "Classificar automaticamente"}
                 </option>
                 {filteredCategories.map((category) => (
@@ -641,9 +737,7 @@ export function TransactionsClient() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor={isCreditCard ? "cardId" : "accountId"}>
-                {isCreditCard ? "Cartão vinculado" : selectedType === "transfer" ? "Conta de origem" : "Conta vinculada"}
-              </Label>
+              <Label htmlFor={isCreditCard ? "cardId" : "accountId"}>{accountFieldLabel}</Label>
               {isCreditCard ? (
                 <Select
                   className={form.formState.errors.cardId ? invalidFieldClassName : undefined}
@@ -668,7 +762,7 @@ export function TransactionsClient() {
                   <option value="">Selecione a conta</option>
                   {accounts.map((account) => (
                     <option key={account.id} value={account.id}>
-                      {account.name}
+                      {formatAccountOptionLabel(account)}
                     </option>
                   ))}
                 </Select>
@@ -676,7 +770,7 @@ export function TransactionsClient() {
             </div>
           </div>
 
-          {selectedType === "transfer" ? (
+          {selectedType === "transfer" && !isBenefitWalletSelected ? (
             <div className="space-y-2">
               <Label htmlFor="destinationAccountId">Conta de destino</Label>
               <Select
@@ -687,7 +781,7 @@ export function TransactionsClient() {
                 <option value="">Selecione a conta de destino</option>
                 {accounts.map((account) => (
                   <option key={account.id} value={account.id}>
-                    {account.name}
+                    {formatAccountOptionLabel(account)}
                   </option>
                 ))}
               </Select>
@@ -722,6 +816,10 @@ export function TransactionsClient() {
           <div className="attention-panel text-sm leading-7 text-[var(--color-foreground)]">
             {isCreditCard
               ? "Compras no crédito ficam vinculadas ao cartão e entram no controle de fatura e limite."
+              : isBenefitWalletIncome
+                ? "Para lançar saldo no Vale Alimentação, use Receita com PIX ou Dinheiro. Categoria não é necessária, e o dízimo é opcional."
+              : isBenefitWalletSelected
+                ? `Vale Alimentação aceita créditos com dízimo opcional e consumos apenas em ${FOOD_BENEFIT_CATEGORY_SYSTEM_KEYS.length} grupos alimentares elegíveis.`
               : selectedType === "transfer"
                 ? "Transferências usam a conta de origem e não entram como despesa de cartão."
               : selectedType === "income" && selectedApplyTithe
@@ -849,7 +947,17 @@ export function TransactionsClient() {
             {automaticSuggestions.length ? (
               automaticSuggestions.map((transaction) => {
                 const selectedCategoryId = reviewSelections[transaction.id] ?? transaction.category?.id ?? "";
-                const reviewCategories = categories.filter((item) => item.type === transaction.type);
+                const reviewCategories = categories.filter((item) => {
+                  if (item.type !== transaction.type) {
+                    return false;
+                  }
+
+                  if (transaction.account?.usage === "benefit_food" && transaction.type === "expense") {
+                    return isAllowedBenefitFoodCategory(item.systemKey);
+                  }
+
+                  return true;
+                });
 
                 return (
                   <article key={`review-${transaction.id}`} className="data-card p-4">
@@ -861,7 +969,7 @@ export function TransactionsClient() {
                           {transaction.account?.name ?? transaction.card?.name ?? "Sem origem"}
                         </p>
                         <p className="mt-2 break-words text-xs text-[var(--color-muted-foreground)]">
-                          Sugerido: {transaction.category?.name ?? "Sem categoria"}{" "}
+                          Sugerido: {transaction.category?.name ?? "Sem classificação"}{" "}
                           {transaction.classification?.ai ? "por IA" : "por regras"} • confiança{" "}
                           {Math.round((transaction.classification?.confidence ?? 0) * 100)}%
                         </p>
@@ -942,8 +1050,14 @@ export function TransactionsClient() {
           </div>
         </div>
 
-        <div className="mt-6 grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
+        <div className="filter-shell mt-6">
+          <p className="filter-kicker">Leitura</p>
+          <p className="filter-copy">
+            Refine o recorte para revisar movimentações com mais contexto, sem perder a referência do mês em foco.
+          </p>
+        </div>
 
+        <div className="mt-4 grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
           <div className="space-y-2">
             <Label htmlFor="transactions-filter-type">Tipo</Label>
             <Select
@@ -956,7 +1070,7 @@ export function TransactionsClient() {
                 }))
               }
             >
-              <option value="">Todos</option>
+              <option value="">Todos os tipos</option>
               <option value="expense">Despesa</option>
               <option value="income">Receita</option>
               <option value="transfer">Transferência</option>
@@ -969,7 +1083,7 @@ export function TransactionsClient() {
               value={filters.categoryId ?? ""}
               onChange={(event) => setFilters((current) => ({ ...current, categoryId: event.target.value }))}
             >
-              <option value="">Todas</option>
+              <option value="">Todas as categorias</option>
               {categories.map((category) => (
                 <option key={category.id} value={category.id}>
                   {category.name}
@@ -984,7 +1098,7 @@ export function TransactionsClient() {
               value={filters.accountId ?? ""}
               onChange={(event) => setFilters((current) => ({ ...current, accountId: event.target.value }))}
             >
-              <option value="">Todas</option>
+              <option value="">Todas as contas</option>
               {accounts.map((account) => (
                 <option key={account.id} value={account.id}>
                   {account.name}
@@ -1009,16 +1123,16 @@ export function TransactionsClient() {
           </div>
         </div>
 
-        <div className="muted-panel mt-4 flex flex-wrap items-start justify-between gap-3 text-sm text-[var(--color-muted-foreground)]">
-          <p className="shrink-0">{`Mês ativo: ${formatMonthKeyLabel(month)}.`}</p>
-          <p className="min-w-0 flex-1 break-words text-left sm:text-right">
-            {activeRefinements.length > 0 ? activeRefinements.join(" • ") : "Sem refinamentos adicionais."}
+        <div className="muted-panel mt-4 flex flex-wrap items-start justify-between gap-3 text-sm">
+          <p className="filter-summary-meta shrink-0">{`Base de leitura: ${formatMonthKeyLabel(month)}.`}</p>
+          <p className="filter-summary-copy min-w-0 flex-1 break-words text-left sm:text-right">
+            {activeRefinements.length > 0 ? activeRefinements.join(" • ") : "Sem recortes adicionais no momento."}
           </p>
         </div>
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <Label htmlFor="transactions-filter-limit">Exibir</Label>
+            <Label htmlFor="transactions-filter-limit">Volume em tela</Label>
             <Select
               id="transactions-filter-limit"
               value={String(filters.limit ?? 30)}
@@ -1029,9 +1143,9 @@ export function TransactionsClient() {
                 }))
               }
             >
-              <option value="30">30 itens</option>
-              <option value="60">60 itens</option>
-              <option value="100">100 itens</option>
+              <option value="30">30 lançamentos</option>
+              <option value="60">60 lançamentos</option>
+              <option value="100">100 lançamentos</option>
             </Select>
           </div>
           <Button
@@ -1047,7 +1161,7 @@ export function TransactionsClient() {
             type="button"
             variant="ghost"
           >
-            Limpar filtros
+            Limpar leitura
           </Button>
         </div>
 
@@ -1100,7 +1214,11 @@ export function TransactionsClient() {
                   <p className="mt-1 break-words text-sm text-[var(--color-muted-foreground)]">
                     {transaction.type === "transfer"
                       ? `${transaction.account?.name ?? "Sem origem"} → ${transaction.destinationAccount?.name ?? "Sem destino"}`
-                      : `${transaction.category?.name ?? "Sem categoria"} • ${transaction.account?.name ?? transaction.card?.name ?? "Sem origem"}`}
+                      : `${transaction.category?.name ?? "Sem categoria"} • ${
+                          transaction.account?.usage === "benefit_food"
+                            ? `${transaction.account?.name ?? "Sem origem"} • vale alimentação`
+                            : transaction.account?.name ?? transaction.card?.name ?? "Sem origem"
+                        }`}
                   </p>
                   {transaction.card && transaction.competenceDate && transaction.payableDate ? (
                     <p className="mt-2 break-words text-xs text-[var(--color-muted-foreground)]">

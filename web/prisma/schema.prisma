@@ -50,6 +50,11 @@ enum AccountType {
   wallet
 }
 
+enum FinancialAccountUsage {
+  standard
+  benefit_food
+}
+
 enum TransactionType {
   income
   expense
@@ -268,6 +273,7 @@ model FinancialAccount {
   ownerUserId  String
   name         String
   type         AccountType   @default(checking)
+  usage        FinancialAccountUsage @default(standard)
   openingBalance Decimal       @default(0) @map("balance") @db.Decimal(15, 2)
   currency     String        @default("BRL")
   color        String        @default("#10B981")

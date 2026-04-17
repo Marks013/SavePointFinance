@@ -10,10 +10,56 @@ const adminEmail = process.env.ADMIN_EMAIL?.trim();
 const adminPassword = process.env.ADMIN_PASSWORD?.trim();
 const smokeUserEmail = process.env.SMOKE_USER_EMAIL?.trim() || adminEmail;
 const smokeUserPassword = process.env.SMOKE_USER_PASSWORD?.trim() || adminPassword;
+const familyUserEmail = process.env.FAMILY_USER_EMAIL?.trim();
+const familyUserPassword = process.env.FAMILY_USER_PASSWORD?.trim();
 const smokeMonth = process.env.SMOKE_MONTH?.trim() || new Date().toISOString().slice(0, 7);
 
+type HealthPayload = {
+  status?: string;
+  checks?: {
+    database?: string;
+    email?: {
+      provider?: string;
+      configured?: boolean;
+    };
+    whatsapp?: {
+      configured?: boolean;
+    };
+  };
+};
+
 type ProfilePayload = {
+  id?: string;
+  name?: string;
   email?: string;
+  role?: "admin" | "member";
+  sharing?: {
+    canManage?: boolean;
+  };
+  permissions?: {
+    canAccessAdminPage?: boolean;
+    canAccessSharingPage?: boolean;
+    canManageFamilyInvites?: boolean;
+    canEditName?: boolean;
+    canEditWhatsAppNumber?: boolean;
+    canEditEmailNotifications?: boolean;
+    canEditMonthlyReports?: boolean;
+    canEditCurrency?: boolean;
+    canEditDateFormat?: boolean;
+    canEditBudgetAlerts?: boolean;
+    canEditDueReminders?: boolean;
+    canEditAutoTithe?: boolean;
+  };
+  whatsappNumber?: string;
+  preferences?: {
+    currency?: string;
+    dateFormat?: string;
+    emailNotifications?: boolean;
+    monthlyReports?: boolean;
+    budgetAlerts?: boolean;
+    dueReminders?: boolean;
+    autoTithe?: boolean;
+  };
 };
 
 type AccountsPayload = {
@@ -178,35 +224,32 @@ async function getHtml(jar: CookieJar, path: string) {
   };
 }
 
-async function getJson<T>(jar: CookieJar, path: string) {
+async function getJson<T>(jar: CookieJar, path: string, init: RequestInit = {}) {
+  const headers = new Headers(init.headers);
+  headers.set("Accept", "application/json");
+
   const response = await jar.fetch(`${baseUrl}${path}`, {
-    headers: {
-      Accept: "application/json"
-    }
+    ...init,
+    headers
   });
 
-  const payload = (await response.json()) as T;
+  const raw = await response.text();
+  const payload = raw ? (JSON.parse(raw) as T) : ({} as T);
   return { response, payload };
 }
 
 async function getSession(jar: CookieJar) {
-  const response = await jar.fetch(`${baseUrl}/api/auth/session`, {
-    headers: {
-      Accept: "application/json"
-    }
-  });
+  const { response, payload } = await getJson<{ user?: { email?: string } } | null>(
+    jar,
+    "/api/auth/session"
+  );
   assertCondition(response.ok, `Falha ao carregar sessao: ${response.status}`);
-  return (await response.json()) as { user?: { email?: string } } | null;
+  return payload;
 }
 
 async function getCsrfToken(jar: CookieJar) {
-  const response = await jar.fetch(`${baseUrl}/api/auth/csrf`, {
-    headers: {
-      Accept: "application/json"
-    }
-  });
+  const { response, payload } = await getJson<{ csrfToken?: string }>(jar, "/api/auth/csrf");
   assertCondition(response.ok, `Falha ao carregar CSRF: ${response.status}`);
-  const payload = (await response.json()) as { csrfToken?: string };
   assertCondition(payload.csrfToken, "CSRF token nao encontrado");
   return payload.csrfToken;
 }
@@ -271,8 +314,7 @@ async function signOut(jar: CookieJar) {
   assertCondition(!session?.user?.email, "Sessao continuou ativa apos logout");
 }
 
-async function expectAnonymousRedirect(path: string, redirectPath = "/login") {
-  const jar = new CookieJar();
+async function expectRedirect(path: string, redirectPath: string, jar = new CookieJar()) {
   const { response } = await getHtml(jar, path);
   const location = formatLocationHeader(response);
 
@@ -296,8 +338,145 @@ async function expectPage(jar: CookieJar, path: string, expectation: PageExpecta
 
   assertCondition(
     matchedMarkers.length >= minimumMatches,
-    `${path} nao atingiu o minimo de marcadores esperados (${matchedMarkers.length}/${minimumMatches}). Ultimo marcador ausente: ${markers.find((marker) => !matchedMarkers.includes(marker)) ?? "desconhecido"}`
+    `${path} nao atingiu o minimo de marcadores esperados (${matchedMarkers.length}/${minimumMatches}). Ultimo marcador ausente: ${
+      markers.find((marker) => !matchedMarkers.includes(marker)) ?? "desconhecido"
+    }`
   );
+}
+
+async function expectHealthcheck() {
+  const { response, payload } = await getJson<HealthPayload>(new CookieJar(), "/api/health");
+  assertCondition(response.ok, `/api/health respondeu ${response.status}`);
+  assertCondition(payload.status === "ok", "Healthcheck nao retornou status ok");
+  assertCondition(payload.checks?.database === "ok", "Healthcheck nao confirmou o banco");
+}
+
+async function patchProfile(jar: CookieJar, payload: Record<string, unknown>) {
+  return getJson<{ success?: boolean }>(jar, "/api/profile", {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+}
+
+async function auditFamilyRestrictions(results: string[]) {
+  if (!familyUserEmail || !familyUserPassword) {
+    results.push("Auditoria de Familiar ignorada porque FAMILY_USER_EMAIL/FAMILY_USER_PASSWORD nao foram definidos");
+    return;
+  }
+
+  const familyJar = await signIn(familyUserEmail, familyUserPassword);
+  results.push("Login do Familiar estabelece sessao valida");
+
+  const familyProfileBefore = await getJson<ProfilePayload>(familyJar, "/api/profile");
+  assertCondition(familyProfileBefore.response.ok, `/api/profile (familiar) respondeu ${familyProfileBefore.response.status}`);
+  assertCondition(familyProfileBefore.payload.role === "member", "Usuario familiar nao veio com role member");
+  assertCondition(
+    familyProfileBefore.payload.permissions?.canAccessAdminPage === false,
+    "Familiar nao deveria acessar painel admin"
+  );
+  assertCondition(
+    familyProfileBefore.payload.permissions?.canAccessSharingPage === false,
+    "Familiar nao deveria acessar compartilhamento"
+  );
+  assertCondition(
+    familyProfileBefore.payload.permissions?.canEditMonthlyReports === true,
+    "Familiar deveria poder editar relatorios mensais"
+  );
+  assertCondition(
+    familyProfileBefore.payload.permissions?.canEditCurrency === false &&
+      familyProfileBefore.payload.permissions?.canEditDateFormat === false &&
+      familyProfileBefore.payload.permissions?.canEditBudgetAlerts === false &&
+      familyProfileBefore.payload.permissions?.canEditDueReminders === false &&
+      familyProfileBefore.payload.permissions?.canEditAutoTithe === false,
+    "Permissoes restritas do Familiar nao foram aplicadas"
+  );
+  results.push("API de perfil do Familiar expõe as permissões esperadas");
+
+  await expectRedirect("/dashboard/admin", "/dashboard", familyJar);
+  results.push("Familiar nao acessa a pagina Admin");
+
+  await expectRedirect("/dashboard/sharing", "/dashboard", familyJar);
+  results.push("Familiar nao acessa a pagina Compartilhar Carteira");
+
+  const adminUsersResponse = await getJson<Record<string, unknown>>(familyJar, "/api/admin/users");
+  assertCondition(
+    adminUsersResponse.response.status === 401 || adminUsersResponse.response.status === 403,
+    `Familiar acessou /api/admin/users com status ${adminUsersResponse.response.status}`
+  );
+  results.push("Familiar nao acessa APIs administrativas");
+
+  const originalName = familyProfileBefore.payload.name ?? "Familiar";
+  const originalWhatsApp = familyProfileBefore.payload.whatsappNumber ?? "";
+  const originalPreferences = {
+    currency: familyProfileBefore.payload.preferences?.currency ?? "BRL",
+    dateFormat: familyProfileBefore.payload.preferences?.dateFormat ?? "DD/MM/YYYY",
+    emailNotifications: familyProfileBefore.payload.preferences?.emailNotifications ?? true,
+    monthlyReports: familyProfileBefore.payload.preferences?.monthlyReports ?? true,
+    budgetAlerts: familyProfileBefore.payload.preferences?.budgetAlerts ?? true,
+    dueReminders: familyProfileBefore.payload.preferences?.dueReminders ?? true,
+    autoTithe: familyProfileBefore.payload.preferences?.autoTithe ?? false
+  };
+
+  const patchedName = `${originalName} Auditado`.slice(0, 60);
+  const requestedMonthlyReports = !originalPreferences.monthlyReports;
+
+  const profilePatch = await patchProfile(familyJar, {
+    name: patchedName,
+    whatsappNumber: originalWhatsApp,
+    preferences: {
+      currency: originalPreferences.currency === "BRL" ? "USD" : "BRL",
+      dateFormat: originalPreferences.dateFormat === "DD/MM/YYYY" ? "YYYY-MM-DD" : "DD/MM/YYYY",
+      emailNotifications: originalPreferences.emailNotifications,
+      monthlyReports: requestedMonthlyReports,
+      budgetAlerts: !originalPreferences.budgetAlerts,
+      dueReminders: !originalPreferences.dueReminders,
+      autoTithe: !originalPreferences.autoTithe
+    }
+  });
+
+  assertCondition(profilePatch.response.ok, `PATCH /api/profile (familiar) respondeu ${profilePatch.response.status}`);
+
+  const familyProfileAfter = await getJson<ProfilePayload>(familyJar, "/api/profile");
+  assertCondition(familyProfileAfter.response.ok, `/api/profile apos PATCH respondeu ${familyProfileAfter.response.status}`);
+  assertCondition(familyProfileAfter.payload.name === patchedName, "Familiar nao conseguiu atualizar o nome");
+  assertCondition(
+    familyProfileAfter.payload.preferences?.monthlyReports === requestedMonthlyReports,
+    "Familiar nao conseguiu atualizar relatorios mensais"
+  );
+  assertCondition(
+    familyProfileAfter.payload.preferences?.currency === originalPreferences.currency,
+    "Familiar nao deveria conseguir alterar moeda"
+  );
+  assertCondition(
+    familyProfileAfter.payload.preferences?.dateFormat === originalPreferences.dateFormat,
+    "Familiar nao deveria conseguir alterar formato de data"
+  );
+  assertCondition(
+    familyProfileAfter.payload.preferences?.budgetAlerts === originalPreferences.budgetAlerts,
+    "Familiar nao deveria conseguir alterar alertas de orçamento"
+  );
+  assertCondition(
+    familyProfileAfter.payload.preferences?.dueReminders === originalPreferences.dueReminders,
+    "Familiar nao deveria conseguir alterar lembretes"
+  );
+  assertCondition(
+    familyProfileAfter.payload.preferences?.autoTithe === originalPreferences.autoTithe,
+    "Familiar nao deveria conseguir alterar dizimo automatico"
+  );
+  results.push("Restricoes de configuracoes do Familiar estao sendo impostas no backend");
+
+  const restoreResponse = await patchProfile(familyJar, {
+    name: originalName,
+    whatsappNumber: originalWhatsApp,
+    preferences: originalPreferences
+  });
+  assertCondition(restoreResponse.response.ok, `Falha ao restaurar o perfil do Familiar: ${restoreResponse.response.status}`);
+
+  await signOut(familyJar);
+  results.push("Logout do Familiar encerra a sessao");
 }
 
 async function run() {
@@ -309,7 +488,10 @@ async function run() {
 
   const results: string[] = [];
 
-  await expectAnonymousRedirect("/dashboard");
+  await expectHealthcheck();
+  results.push("Healthcheck publico responde com banco saudavel");
+
+  await expectRedirect("/dashboard", "/login");
   results.push("Area protegida redireciona para login sem sessao");
 
   const anonymousLogin = await getHtml(new CookieJar(), "/login");
@@ -321,16 +503,26 @@ async function run() {
   results.push("Login por credenciais estabelece sessao valida");
 
   await expectPage(adminJar, "/dashboard", {
-	  markers: ['aria-label="Encerrar', "Encerrar sessão", "Resumo das contas"],
-	  minimumMatches: 2
-	});	
+    markers: ['aria-label="Encerrar', "Encerrar sessão", "Resumo das contas"],
+    minimumMatches: 2
+  });
   results.push("Dashboard autenticado responde para o admin");
+
+  await expectPage(adminJar, "/dashboard/admin", {
+    markers: ["Painel administrativo", "Auditoria administrativa", "Pessoas"],
+    minimumMatches: 2
+  });
+  results.push("Painel admin responde para perfil administrativo");
 
   const adminProfile = await getJson<ProfilePayload>(adminJar, "/api/profile");
   assertCondition(adminProfile.response.ok, `/api/profile respondeu ${adminProfile.response.status}`);
   assertCondition(
     adminProfile.payload.email?.toLowerCase() === adminEmail.toLowerCase(),
     "Perfil autenticado nao corresponde ao admin configurado"
+  );
+  assertCondition(
+    adminProfile.payload.permissions?.canAccessAdminPage === true,
+    "Perfil administrativo nao recebeu acesso ao painel admin"
   );
   results.push("API de perfil autenticada respondeu com o admin esperado");
 
@@ -339,40 +531,27 @@ async function run() {
   if (smokeUserEmail.toLowerCase() !== adminEmail.toLowerCase()) {
     await signOut(adminJar);
     results.push("Logout do admin encerra a sessao");
-    await expectAnonymousRedirect("/dashboard");
+    await expectRedirect("/dashboard", "/login");
     results.push("Area protegida volta a exigir autenticacao apos logout do admin");
     dataJar = await signIn(smokeUserEmail, smokeUserPassword);
     results.push("Login do usuario de dados estabelece sessao valida");
   }
 
   await expectPage(dataJar, "/dashboard", {
-    markers: [
-	'aria-label="Encerrar"',
-    "Visão central da operação",
-    "Movimento recente",
-    "Resumo das contas",
-	"Cartões em operação"
-    ],
+    markers: ['aria-label="Encerrar"', "Visão central da operação", "Movimento recente", "Resumo das contas", "Cartões em operação"],
     minimumMatches: 3
   });
   results.push("Dashboard principal carregou com conteudo esperado");
 
   await expectPage(dataJar, "/dashboard/accounts", {
     markers: ['id="account-name"', 'id="account-type"', "Saldo atual total", "Base cadastrada", "Contas"],
-	minimumMatches: 3
+    minimumMatches: 3
   });
   results.push("Tela de contas carregou com conteudo esperado");
 
   await expectPage(dataJar, "/dashboard/transactions", {
-    markers: [
-	  'id="description"',
-	  'id="transactions-filter-type"',
-	  'id="transactions-filter-limit"',
-	  "Receitas filtradas",
-	  "Despesas filtradas",
-	  "Movimentações recentes"
-    ],
-	minimumMatches: 4
+    markers: ['id="description"', 'id="transactions-filter-type"', 'id="transactions-filter-limit"', "Receitas filtradas", "Despesas filtradas", "Movimentações recentes"],
+    minimumMatches: 4
   });
   results.push("Tela de transacoes carregou com conteudo esperado");
 
@@ -389,37 +568,20 @@ async function run() {
   results.push("Tela de cartoes carregou com conteudo esperado");
 
   await expectPage(dataJar, "/dashboard/reports", {
-    markers: [
-      'id="reports-period-mode"',
-	  'id="reports-filter-type"',
-	  "Despesas por categoria","Mapa de categorias",
-	  "Mapa de categorias",
-	  "Movimentações recentes"
-    ],
+    markers: ['id="reports-period-mode"', 'id="reports-filter-type"', "Despesas por categoria", "Mapa de categorias", "Movimentações recentes"],
     minimumMatches: 4
   });
   results.push("Tela de relatorios carregou com conteudo esperado");
 
   await expectPage(dataJar, "/dashboard/settings", {
-    markers: [
-      'id="settings-name"',
-	  'id="settings-email"',
-	  'id="settings-whatsapp"',
-	  "Automações recorrentes",
-	  "Entregas recentes"
-    ],
+    markers: ['id="settings-name"', 'id="settings-email"', 'id="settings-whatsapp"', "Automações recorrentes", "Entregas recentes"],
     minimumMatches: 4
   });
   results.push("Tela de configuracoes carregou com conteudo esperado");
 
   await expectPage(dataJar, "/dashboard/goals", {
-    markers: [
-	  "Metas",
-	  "Metas ativas",
-	  "Reservado",
-	  "Objetivo total"
-    ],
-	minimumMatches: 1
+    markers: ["Metas", "Metas ativas", "Reservado", "Objetivo total"],
+    minimumMatches: 1
   });
   results.push("Tela de metas carregou com conteudo esperado");
 
@@ -446,10 +608,7 @@ async function run() {
   assertCondition(Array.isArray(subscriptions.payload.items), "API de assinaturas nao retornou lista de itens");
   results.push("API de assinaturas autenticada respondeu com estrutura valida");
 
-  const transactions = await getJson<TransactionsPayload>(
-    dataJar,
-    `/api/transactions?limit=10&month=${smokeMonth}`
-  );
+  const transactions = await getJson<TransactionsPayload>(dataJar, `/api/transactions?limit=10&month=${smokeMonth}`);
   assertCondition(transactions.response.ok, `/api/transactions respondeu ${transactions.response.status}`);
   assertCondition(Array.isArray(transactions.payload.items), "API de transacoes nao retornou lista de itens");
   assertCondition(
@@ -488,13 +647,16 @@ async function run() {
   await signOut(dataJar);
   results.push("Logout encerra a sessao");
 
-  await expectAnonymousRedirect("/dashboard");
+  await expectRedirect("/dashboard", "/login");
   results.push("Area protegida volta a exigir autenticacao apos logout");
+
+  await auditFamilyRestrictions(results);
 
   console.log("Server smoke audit OK");
   console.log(`Base URL: ${baseUrl}`);
   console.log(`Admin usado: ${adminEmail}`);
   console.log(`Usuario de dados: ${smokeUserEmail}`);
+  console.log(`Familiar usado: ${familyUserEmail ?? "nao configurado"}`);
   console.log(`Mes do smoke: ${smokeMonth}`);
   for (const item of results) {
     console.log(`- ${item}`);

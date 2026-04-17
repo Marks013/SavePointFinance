@@ -11,3 +11,5 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 terminal.txt
+.deploy/releases/*
+!.deploy/releases/.gitkeep

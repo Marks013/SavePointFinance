@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { invitationSchema, type InvitationValues } from "@/features/password/schemas/password-schema";
 import { formatDateDisplay, formatDateTimeDisplay, parseBrazilianDateToDateKey } from "@/lib/date";
+import { formatRoleFilterLabel, formatRoleLabel } from "@/lib/users/role-label";
 
 type Stats = {
   totalTenants: number;
@@ -54,6 +55,9 @@ type UserItem = {
     id: string;
     name: string;
     slug: string;
+    accountAdminId: string | null;
+    accountAdminName: string | null;
+    accountAdminEmail: string | null;
     planId: string;
     planName: string;
     planSlug: string;
@@ -143,10 +147,6 @@ type PlanItem = {
     pdfExport: boolean;
   };
 };
-
-function formatRoleLabel(role: "admin" | "member") {
-  return role === "admin" ? "Administrador" : "Membro";
-}
 
 function formatPlanLabel(plan: string) {
   return plan === "pro" ? "Premium" : "Gratuito";
@@ -296,7 +296,7 @@ export function AdminClient() {
     defaultValues: {
       email: "",
       name: "",
-      role: "member"
+      role: "admin"
     }
   });
   const statsQuery = useQuery({ queryKey: ["admin-stats"], queryFn: getStats });
@@ -641,7 +641,10 @@ export function AdminClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ planId, isActive, trialDays, trialExpiresAt, expiresAt })
       });
-      if (!response.ok) throw new Error("Falha ao atualizar tenant");
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => ({}))) as { message?: string };
+        throw new Error(payload.message ?? "Falha ao atualizar conta");
+      }
     },
     onSuccess: async () => {
       await Promise.all([
@@ -649,7 +652,10 @@ export function AdminClient() {
         queryClient.invalidateQueries({ queryKey: ["admin-stats"] }),
         queryClient.invalidateQueries({ queryKey: ["admin-audit"] })
       ]);
-      toast.success("Tenant atualizado");
+      toast.success("Conta atualizada");
+    },
+    onError: (error) => {
+      toast.error(error.message);
     }
   });
 
@@ -690,13 +696,40 @@ export function AdminClient() {
     }
   });
 
+  const deleteTenantMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await fetch(`/api/admin/tenants/${id}`, {
+        method: "DELETE"
+      });
+
+      const payload = (await response.json().catch(() => ({}))) as { message?: string };
+
+      if (!response.ok) {
+        throw new Error(payload.message ?? "Falha ao excluir conta");
+      }
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin-tenants"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-users"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-invitations"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-stats"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-audit"] })
+      ]);
+      toast.success("Conta excluída definitivamente");
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    }
+  });
+
   const createInvitationMutation = useMutation({
     mutationFn: async (values: InvitationValues) => {
       if (isPlatformAdmin && !invitePlanId) {
         throw new Error("Selecione o plano inicial do usuario");
       }
 
-      const payload = isPlatformAdmin ? { ...values, planId: invitePlanId } : values;
+      const payload = isPlatformAdmin ? { ...values, role: "admin", planId: invitePlanId } : { ...values, role: "admin" };
       const response = await fetch("/api/admin/invitations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1026,32 +1059,32 @@ export function AdminClient() {
         </div>
       </section>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-        <article className="metric-card"><p className="metric-label">Contas</p><p className="metric-value">{statsQuery.data?.totalTenants ?? 0}</p></article>
-        <article className="metric-card"><p className="metric-label">Ativos</p><p className="metric-value">{statsQuery.data?.activeTenants ?? 0}</p></article>
-        <article className="metric-card"><p className="metric-label">Em avaliação</p><p className="metric-value">{statsQuery.data?.trialTenants ?? 0}</p></article>
-        <article className="metric-card"><p className="metric-label">Expirados</p><p className="metric-value">{statsQuery.data?.expiredTenants ?? 0}</p></article>
-        <article className="metric-card">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
+        <article className="metric-card min-w-0"><p className="metric-label">Contas</p><p className="metric-value">{statsQuery.data?.totalTenants ?? 0}</p></article>
+        <article className="metric-card min-w-0"><p className="metric-label">Ativos</p><p className="metric-value">{statsQuery.data?.activeTenants ?? 0}</p></article>
+        <article className="metric-card min-w-0"><p className="metric-label">Em avaliação</p><p className="metric-value">{statsQuery.data?.trialTenants ?? 0}</p></article>
+        <article className="metric-card min-w-0"><p className="metric-label">Expirados</p><p className="metric-value">{statsQuery.data?.expiredTenants ?? 0}</p></article>
+        <article className="metric-card min-w-0">
           <p className="metric-label">{isPlatformAdmin ? "Pessoas da plataforma" : "Pessoas da conta"}</p>
           <p className="metric-value">{statsQuery.data?.totalUsers ?? 0}</p>
         </article>
-        <article className="metric-card">
+        <article className="metric-card min-w-0">
           <p className="metric-label">{isPlatformAdmin ? "Pessoas ativas da plataforma" : "Pessoas ativas"}</p>
           <p className="metric-value">{statsQuery.data?.activeUsers ?? 0}</p>
         </article>
         {isPlatformAdmin ? (
           <>
-            <article className="metric-card">
+            <article className="metric-card min-w-0">
               <p className="metric-label">Pessoas nesta conta</p>
               <p className="metric-value">{statsQuery.data?.currentTenantUsers ?? 0}</p>
             </article>
-            <article className="metric-card">
+            <article className="metric-card min-w-0">
               <p className="metric-label">Pessoas ativas nesta conta</p>
               <p className="metric-value">{statsQuery.data?.currentTenantActiveUsers ?? 0}</p>
             </article>
           </>
         ) : null}
-        <article className="metric-card"><p className="metric-label">Transações</p><p className="metric-value">{statsQuery.data?.totalTransactions ?? 0}</p></article>
+        <article className="metric-card min-w-0"><p className="metric-label">Transações</p><p className="metric-value">{statsQuery.data?.totalTransactions ?? 0}</p></article>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
@@ -1064,7 +1097,7 @@ export function AdminClient() {
               </p>
             </div>
             <article className="metric-card w-full sm:w-auto">
-              <p className="metric-label">Listadas</p>
+              <p className="metric-label">No recorte</p>
               <p className="metric-value">{tenants.length}</p>
             </article>
           </div>
@@ -1113,20 +1146,34 @@ export function AdminClient() {
               </div>
             </div>
           ) : null}
-          <div className="mt-6 space-y-3">
-            <div className="grid gap-3 md:grid-cols-3">
+            <div className="mt-6 space-y-3">
+            {isPlatformAdmin ? (
+              <div className="warning-panel">
+                <p className="warning-copy">
+                  O superadmin pode excluir uma conta inteira por card. Essa ação remove pessoas, convites, contas
+                  financeiras, cartões, transações e demais dados vinculados.
+                </p>
+              </div>
+            ) : null}
+            <div className="filter-shell">
+              <p className="filter-kicker">Recorte operacional</p>
+              <p className="filter-copy">
+                Encontre rapidamente a conta certa e ajuste plano, ciclo e status sem poluir a leitura do painel.
+              </p>
+            </div>
+            <div className="grid gap-3 xl:grid-cols-4">
               <Input
                 onChange={(event) => setTenantSearch(event.target.value)}
-                placeholder="Buscar por conta ou identificador"
+                placeholder="Encontre por conta ou identificador"
                 value={tenantSearch}
               />
               <Select onChange={(event) => setTenantPlanFilter(event.target.value)} value={tenantPlanFilter}>
-                <option value="">Todos os planos</option>
+                <option value="">Qualquer plano</option>
                 <option value="free">Gratuito</option>
                 <option value="pro">Premium</option>
               </Select>
               <Select onChange={(event) => setTenantStatusFilter(event.target.value)} value={tenantStatusFilter}>
-                <option value="">Todos os estados</option>
+                <option value="">Qualquer estado</option>
                 <option value="active">Ativos</option>
                 <option value="trial">Em avaliação</option>
                 <option value="expired">Expirados</option>
@@ -1226,6 +1273,43 @@ export function AdminClient() {
                     {tenant.isActive ? "Desativar" : "Ativar"}
                   </Button>
                 </div>
+                {isPlatformAdmin ? (
+                  <div className="danger-panel mt-4">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                      <div className="min-w-0">
+                        <p className="danger-kicker">Ação crítica</p>
+                        <p className="danger-copy">
+                          Exclui a conta <strong>{tenant.slug}</strong> com pessoas, convites, cartões, contas
+                          financeiras, transações e demais registros relacionados.
+                        </p>
+                      </div>
+                      <Button
+                        className="w-full border-[var(--color-destructive)] bg-[color-mix(in_srgb,var(--color-destructive)_8%,transparent)] text-[var(--color-destructive)] hover:bg-[color-mix(in_srgb,var(--color-destructive)_14%,transparent)] lg:w-auto"
+                        disabled={deleteTenantMutation.isPending}
+                        onClick={() => {
+                          const confirmation = window.prompt(
+                            `Digite ${tenant.slug} para excluir definitivamente esta conta e todos os dados vinculados.`
+                          );
+
+                          if (!confirmation) {
+                            return;
+                          }
+
+                          if (confirmation.trim().toLowerCase() !== tenant.slug.trim().toLowerCase()) {
+                            toast.error("O identificador informado não confere");
+                            return;
+                          }
+
+                          deleteTenantMutation.mutate(tenant.id);
+                        }}
+                        type="button"
+                        variant="ghost"
+                      >
+                        Excluir conta e dados
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
               </article>
             ))}
           </div>
@@ -1240,18 +1324,32 @@ export function AdminClient() {
               </p>
             </div>
             <article className="metric-card w-full sm:w-auto">
-              <p className="metric-label">Listados</p>
+              <p className="metric-label">No recorte</p>
               <p className="metric-value">{users.length}</p>
             </article>
           </div>
           <div className="mt-6 space-y-3">
+            {isPlatformAdmin ? (
+              <div className="warning-panel">
+                <p className="warning-copy">
+                  A exclusão definitiva de pessoa fica disponível em cada card e apaga também os dados financeiros
+                  vinculados a ela, respeitando os bloqueios de segurança da conta principal.
+                </p>
+              </div>
+            ) : null}
+            <div className="filter-shell">
+              <p className="filter-kicker">Recorte de acesso</p>
+              <p className="filter-copy">
+                Combine conta, perfil, status e atividade recente para navegar pela base com mais clareza.
+              </p>
+            </div>
             <div className="grid gap-3 md:grid-cols-4">
               <Input
                 onChange={(event) => {
                   setUserSearch(event.target.value);
                   setUserPage(1);
                 }}
-                placeholder="Buscar por nome, e-mail ou conta"
+                placeholder="Encontre por nome, e-mail ou conta"
                 value={userSearch}
               />
               {isPlatformAdmin ? (
@@ -1262,7 +1360,7 @@ export function AdminClient() {
                   }}
                   value={userTenantFilter}
                 >
-                  <option value="">Todas as contas</option>
+                  <option value="">Qualquer conta</option>
                   {tenants.map((tenant) => (
                     <option key={tenant.id} value={tenant.id}>
                       {tenant.name}
@@ -1279,9 +1377,9 @@ export function AdminClient() {
                 }}
                 value={userRoleFilter}
               >
-                <option value="">Todos os perfis</option>
-                <option value="admin">Administradores</option>
-                <option value="member">Membros</option>
+                <option value="">Qualquer perfil</option>
+                <option value="admin">{formatRoleFilterLabel("admin")}</option>
+                <option value="member">{formatRoleFilterLabel("member")}</option>
               </Select>
               <Select
                 onChange={(event) => {
@@ -1290,12 +1388,12 @@ export function AdminClient() {
                 }}
                 value={userStatusFilter}
               >
-                <option value="">Todos os status</option>
+                <option value="">Qualquer status</option>
                 <option value="active">Ativos</option>
                 <option value="inactive">Inativos</option>
               </Select>
             </div>
-            <div className="grid gap-3 md:grid-cols-3">
+            <div className="grid gap-3 xl:grid-cols-3">
               <Select
                 onChange={(event) => {
                   setUserLastLoginFilter(event.target.value);
@@ -1303,7 +1401,7 @@ export function AdminClient() {
                 }}
                 value={userLastLoginFilter}
               >
-                <option value="">Qualquer último login</option>
+                <option value="">Sem recorte de acesso</option>
                 <option value="recent">Login nos últimos 30 dias</option>
                 <option value="never">Nunca acessaram</option>
               </Select>
@@ -1314,167 +1412,202 @@ export function AdminClient() {
                 }}
                 value={userSort}
               >
-                <option value="created_desc">Mais recentes</option>
-                <option value="created_asc">Mais antigos</option>
+                <option value="created_desc">Entrada mais recente</option>
+                <option value="created_asc">Entrada mais antiga</option>
                 <option value="login_desc">Último login mais recente</option>
                 <option value="name_asc">Nome A-Z</option>
               </Select>
-              <div className="flex items-center justify-end text-sm text-[var(--color-muted-foreground)]">
-                {usersMeta ? `${usersMeta.total} pessoas encontradas` : "Carregando pessoas..."}
+              <div className="flex items-center text-sm text-[var(--color-muted-foreground)] xl:justify-end">
+                {usersMeta ? `${usersMeta.total} pessoas no recorte atual` : "Atualizando recorte..."}
               </div>
             </div>
-            {users.map((user) => (
-              <article key={user.id} className="data-card p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="font-semibold">{user.name}</p>
-                    <p className="break-words text-sm text-[var(--color-muted-foreground)]">
-                      {user.email} • {user.tenant.name}
-                      {user.isPlatformAdmin ? " • Superadmin" : ""}
-                    </p>
-                    <p className="break-words text-xs text-[var(--color-muted-foreground)]">
-                      Conta {user.tenant.slug} • {formatUserTenantPlanLabel(user)}
-                    </p>
-                    <p className="break-words text-xs text-[var(--color-muted-foreground)]">
-                      Último login: {user.lastLogin ? formatDateTimeDisplay(user.lastLogin) : "Nunca acessou"}
-                    </p>
-                  </div>
-                  <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
+            <div className="space-y-3">
+                {users.map((user) => (
+                  <article key={user.id} className="data-card p-4">
+                    <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_auto] 2xl:items-start">
+                      <div className="min-w-0 space-y-1">
+                        <p className="truncate font-semibold">{user.name}</p>
+                        <p className="break-all text-sm leading-6 text-[var(--color-muted-foreground)]">
+                          {user.email} • {user.tenant.name}
+                          {user.isPlatformAdmin ? " • Superadmin" : ""}
+                        </p>
+                        <p className="break-words text-xs leading-5 text-[var(--color-muted-foreground)]">
+                          Perfil:{" "}
+                          {formatRoleLabel({
+                            role: user.role,
+                            isPlatformAdmin: user.isPlatformAdmin,
+                            accountAdminName: user.tenant.accountAdminName
+                          })}
+                        </p>
+                        {user.role === "member" ? (
+                          <p className="break-words text-xs leading-5 text-[var(--color-muted-foreground)]">
+                            Vinculado a:{" "}
+                            {user.tenant.accountAdminName ? (
+                              <>
+                                <strong>{user.tenant.accountAdminName}</strong>
+                                {user.tenant.accountAdminEmail ? ` • ${user.tenant.accountAdminEmail}` : ""}
+                              </>
+                            ) : (
+                              "Titular da conta não identificado"
+                            )}
+                          </p>
+                        ) : null}
+                        <p className="break-words text-xs leading-5 text-[var(--color-muted-foreground)]">
+                          Conta {user.tenant.slug} • {formatUserTenantPlanLabel(user)}
+                        </p>
+                        <p className="break-words text-xs leading-5 text-[var(--color-muted-foreground)]">
+                          Último login: {user.lastLogin ? formatDateTimeDisplay(user.lastLogin) : "Nunca acessou"}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2 2xl:justify-end">
+                        {isPlatformAdmin ? (
+                          <Button
+                            onClick={() => toggleRoleMutation.mutate({ id: user.id, role: user.role === "admin" ? "member" : "admin" })}
+                            type="button"
+                            variant="secondary"
+                          >
+                            Tornar {user.role === "admin" ? "familiar" : "admin de conta"}
+                          </Button>
+                        ) : null}
+                        <Button
+                          onClick={() => {
+                            const newPassword = window.prompt(`Nova senha para ${user.name}`);
+                            if (newPassword && newPassword.length >= 8) {
+                              resetPasswordMutation.mutate({ id: user.id, newPassword });
+                            } else if (newPassword) {
+                              toast.error("A senha precisa ter ao menos 8 caracteres");
+                            }
+                          }}
+                          type="button"
+                          variant="secondary"
+                        >
+                          Resetar senha
+                        </Button>
+                        <Button
+                          onClick={() => toggleActiveMutation.mutate({ id: user.id, isActive: !user.isActive })}
+                          type="button"
+                          variant="ghost"
+                        >
+                          {user.isActive ? "Desativar" : "Ativar"}
+                        </Button>
+                      </div>
+                    </div>
+                    {isPlatformAdmin && !user.isPlatformAdmin ? (
+                      <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
+                        <Select
+                          onChange={(event) =>
+                            setUserTenantDrafts((current) => ({
+                              ...current,
+                              [user.id]: event.target.value
+                            }))
+                          }
+                          value={userTenantDrafts[user.id] ?? user.tenant.id}
+                        >
+                          {tenants.map((tenant) => (
+                            <option key={tenant.id} value={tenant.id}>
+                              {getTenantLabel(tenant)}
+                            </option>
+                          ))}
+                        </Select>
+                        <Button
+                          disabled={(userTenantDrafts[user.id] ?? user.tenant.id) === user.tenant.id || moveUserTenantMutation.isPending}
+                          onClick={() =>
+                            moveUserTenantMutation.mutate({
+                              id: user.id,
+                              tenantId: userTenantDrafts[user.id] ?? user.tenant.id
+                            })
+                          }
+                          type="button"
+                          variant="ghost"
+                        >
+                          Alterar conta
+                        </Button>
+                      </div>
+                    ) : null}
+                    {!user.isPlatformAdmin ? (
+                      <div className="danger-panel mt-4">
+                        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                          <div className="min-w-0">
+                            <p className="danger-kicker">Ação crítica</p>
+                            <p className="danger-copy">
+                              Remove <strong>{user.name}</strong> e os dados financeiros vinculados ao perfil. A ação
+                              respeita as travas de segurança para não desmontar a administração principal da conta.
+                            </p>
+                          </div>
+                          <Button
+                            className="w-full border-[var(--color-destructive)] bg-[color-mix(in_srgb,var(--color-destructive)_8%,transparent)] text-[var(--color-destructive)] hover:bg-[color-mix(in_srgb,var(--color-destructive)_14%,transparent)] lg:w-auto"
+                            disabled={deleteUserMutation.isPending}
+                            onClick={() => {
+                              const confirmation = window.prompt(
+                                `Digite ${user.email} para excluir definitivamente esta pessoa e todos os dados vinculados.`
+                              );
+
+                              if (!confirmation) {
+                                return;
+                              }
+
+                              if (confirmation.trim().toLowerCase() !== user.email.trim().toLowerCase()) {
+                                toast.error("O e-mail informado não confere");
+                                return;
+                              }
+
+                              deleteUserMutation.mutate(user.id);
+                            }}
+                            type="button"
+                            variant="ghost"
+                          >
+                            Excluir pessoa e dados
+                          </Button>
+                        </div>
+                      </div>
+                    ) : null}
+                  </article>
+                ))}
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                  <p className="text-sm text-[var(--color-muted-foreground)]">
+                    Página {usersMeta?.page ?? 1} de {usersMeta?.totalPages ?? 1}
+                  </p>
+                  <div className="flex gap-2">
                     <Button
-                      onClick={() => toggleRoleMutation.mutate({ id: user.id, role: user.role === "admin" ? "member" : "admin" })}
-                      type="button"
-                      variant="secondary"
-                    >
-                      Tornar {user.role === "admin" ? "membro" : "administrador"}
-                    </Button>
-                    <Button
-                      onClick={() => {
-                        const newPassword = window.prompt(`Nova senha para ${user.name}`);
-                        if (newPassword && newPassword.length >= 8) {
-                          resetPasswordMutation.mutate({ id: user.id, newPassword });
-                        } else if (newPassword) {
-                          toast.error("A senha precisa ter ao menos 8 caracteres");
-                        }
-                      }}
-                      type="button"
-                      variant="secondary"
-                    >
-                      Resetar senha
-                    </Button>
-                    <Button
-                      onClick={() => toggleActiveMutation.mutate({ id: user.id, isActive: !user.isActive })}
+                      disabled={!usersMeta || usersMeta.page <= 1}
+                      onClick={() => setUserPage((current) => Math.max(1, current - 1))}
                       type="button"
                       variant="ghost"
                     >
-                      {user.isActive ? "Desativar" : "Ativar"}
+                      Anterior
                     </Button>
-                    {!user.isPlatformAdmin ? (
-                      <Button
-                        className="border-[var(--color-destructive)] text-[var(--color-destructive)] hover:bg-[color-mix(in_srgb,var(--color-destructive)_10%,transparent)]"
-                        disabled={deleteUserMutation.isPending}
-                        onClick={() => {
-                          const confirmation = window.prompt(
-                            `Digite ${user.email} para excluir definitivamente esta pessoa e todos os dados vinculados.`
-                          );
-
-                          if (!confirmation) {
-                            return;
-                          }
-
-                          if (confirmation.trim().toLowerCase() !== user.email.trim().toLowerCase()) {
-                            toast.error("O e-mail informado não confere");
-                            return;
-                          }
-
-                          deleteUserMutation.mutate(user.id);
-                        }}
-                        type="button"
-                        variant="ghost"
-                      >
-                        Excluir definitivamente
-                      </Button>
-                    ) : null}
+                    <Button
+                      disabled={!usersMeta || usersMeta.page >= usersMeta.totalPages}
+                      onClick={() => setUserPage((current) => current + 1)}
+                      type="button"
+                      variant="ghost"
+                    >
+                      Próxima
+                    </Button>
                   </div>
                 </div>
-                {isPlatformAdmin && !user.isPlatformAdmin ? (
-                  <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
-                    <Select
-                      onChange={(event) =>
-                        setUserTenantDrafts((current) => ({
-                          ...current,
-                          [user.id]: event.target.value
-                        }))
-                      }
-                      value={userTenantDrafts[user.id] ?? user.tenant.id}
-                    >
-                      {tenants.map((tenant) => (
-                        <option key={tenant.id} value={tenant.id}>
-                          {getTenantLabel(tenant)}
-                        </option>
-                      ))}
-                    </Select>
-                    <Button
-                      disabled={(userTenantDrafts[user.id] ?? user.tenant.id) === user.tenant.id || moveUserTenantMutation.isPending}
-                      onClick={() =>
-                        moveUserTenantMutation.mutate({
-                          id: user.id,
-                          tenantId: userTenantDrafts[user.id] ?? user.tenant.id
-                        })
-                      }
-                      type="button"
-                      variant="ghost"
-                    >
-                      Alterar conta
-                    </Button>
-                  </div>
-                ) : null}
-              </article>
-            ))}
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-              <p className="text-sm text-[var(--color-muted-foreground)]">
-                Página {usersMeta?.page ?? 1} de {usersMeta?.totalPages ?? 1}
-              </p>
-              <div className="flex gap-2">
-                <Button
-                  disabled={!usersMeta || usersMeta.page <= 1}
-                  onClick={() => setUserPage((current) => Math.max(1, current - 1))}
-                  type="button"
-                  variant="ghost"
-                >
-                  Anterior
-                </Button>
-                <Button
-                  disabled={!usersMeta || usersMeta.page >= usersMeta.totalPages}
-                  onClick={() => setUserPage((current) => current + 1)}
-                  type="button"
-                  variant="ghost"
-                >
-                  Próxima
-                </Button>
-              </div>
             </div>
           </div>
         </section>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
-        <section className="surface content-section">
-          <h2 className="text-2xl font-semibold tracking-[-0.03em]">Convidar novo usuário isolado</h2>
-          <p className="mt-2 text-sm leading-7 text-[var(--color-muted-foreground)]">
-            Este convite cria uma nova carteira vazia para a pessoa. Para compartilhar a sua própria carteira, use o módulo Compartilhamento.
-          </p>
-          <form
-            className="mt-6 space-y-4"
-            onSubmit={invitationForm.handleSubmit(
-              (values) => createInvitationMutation.mutate(values),
-              (errors) => {
-                const firstError =
-                  errors.name?.message || errors.email?.message || errors.role?.message;
-                toast.error(firstError ?? "Revise os dados do convite");
-              }
-            )}
-          >
-            {isPlatformAdmin ? (
+      {isPlatformAdmin ? (
+        <div className="grid gap-6 2xl:grid-cols-[0.9fr_1.1fr]">
+          <section className="surface content-section">
+            <h2 className="text-2xl font-semibold tracking-[-0.03em]">Convidar novo Admin de Conta</h2>
+            <p className="mt-2 text-sm leading-7 text-[var(--color-muted-foreground)]">
+              Convites criados aqui sempre abrem uma conta nova e vazia para um novo <strong>Admin de Conta</strong>.
+            </p>
+            <form
+              className="mt-6 space-y-4"
+              onSubmit={invitationForm.handleSubmit(
+                (values) => createInvitationMutation.mutate(values),
+                (errors) => {
+                  const firstError = errors.name?.message || errors.email?.message || errors.role?.message;
+                  toast.error(firstError ?? "Revise os dados do convite");
+                }
+              )}
+            >
               <div className="space-y-2">
                 <Label htmlFor="invite-plan">Plano inicial</Label>
                 <Select id="invite-plan" onChange={(event) => setInvitePlanId(event.target.value)} value={invitePlanId}>
@@ -1491,141 +1624,158 @@ export function AdminClient() {
                   if (!selectedPlan) {
                     return (
                       <p className="text-xs text-[var(--color-muted-foreground)]">
-                        Selecione explicitamente se o usuario entrara no plano gratuito, premium ou outro plano ativo.
+                        Selecione explicitamente se o usuário entrará no plano gratuito, premium ou outro plano ativo.
                       </p>
                     );
                   }
 
-                  const selectedTenant = {
-                    name: "uma carteira nova e vazia",
-                    planName: selectedPlan.name
-                  };
-
                   return (
                     <p className="text-xs text-[var(--color-muted-foreground)]">
-                      A pessoa convidada entrará na conta <strong>{selectedTenant.name}</strong> com plano{" "}
-                      <strong>{selectedTenant.planName}</strong>. Pessoas não têm limite por plano.
+                      A pessoa convidada entrará em uma nova conta com o plano <strong>{selectedPlan.name}</strong> como{" "}
+                      <strong>Admin de Conta</strong>.
                     </p>
                   );
                 })()}
               </div>
-            ) : null}
-            <div className="space-y-2">
-              <Label htmlFor="invite-user-name">Nome</Label>
-              <Input id="invite-user-name" {...invitationForm.register("name")} />
-              {invitationForm.formState.errors.name ? (
-                <p className="text-sm text-[var(--color-destructive)]">
-                  {invitationForm.formState.errors.name.message}
-                </p>
-              ) : null}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="invite-user-email">E-mail</Label>
-              <Input id="invite-user-email" type="email" {...invitationForm.register("email")} />
-              {invitationForm.formState.errors.email ? (
-                <p className="text-sm text-[var(--color-destructive)]">
-                  {invitationForm.formState.errors.email.message}
-                </p>
-              ) : null}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="invite-user-role">Perfil</Label>
-              <Select id="invite-user-role" {...invitationForm.register("role")}>
-                <option value="member">Membro</option>
-                <option value="admin">Administrador</option>
-              </Select>
-              {invitationForm.formState.errors.role ? (
-                <p className="text-sm text-[var(--color-destructive)]">
-                  {invitationForm.formState.errors.role.message}
-                </p>
-              ) : null}
-            </div>
-            <Button className="w-full" disabled={createInvitationMutation.isPending} type="submit">
-              {createInvitationMutation.isPending ? "Criando convite..." : "Gerar convite"}
-            </Button>
-          </form>
-        </section>
+              <div className="space-y-2">
+                <Label htmlFor="invite-user-name">Nome</Label>
+                <Input id="invite-user-name" {...invitationForm.register("name")} />
+                {invitationForm.formState.errors.name ? (
+                  <p className="text-sm text-[var(--color-destructive)]">
+                    {invitationForm.formState.errors.name.message}
+                  </p>
+                ) : null}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="invite-user-email">E-mail</Label>
+                <Input id="invite-user-email" type="email" {...invitationForm.register("email")} />
+                {invitationForm.formState.errors.email ? (
+                  <p className="text-sm text-[var(--color-destructive)]">
+                    {invitationForm.formState.errors.email.message}
+                  </p>
+                ) : null}
+              </div>
+              <div className="space-y-2">
+                <input type="hidden" value="admin" {...invitationForm.register("role")} />
+                <Label htmlFor="invite-user-role">Perfil</Label>
+                <div
+                  className="flex min-h-10 items-center rounded-2xl border border-[var(--color-border)] bg-[var(--color-panel)] px-3 text-sm text-[var(--color-foreground)]"
+                  id="invite-user-role"
+                >
+                  Admin de Conta
+                </div>
+                {invitationForm.formState.errors.role ? (
+                  <p className="text-sm text-[var(--color-destructive)]">
+                    {invitationForm.formState.errors.role.message}
+                  </p>
+                ) : null}
+              </div>
+              <Button className="w-full" disabled={createInvitationMutation.isPending} type="submit">
+                {createInvitationMutation.isPending ? "Criando convite..." : "Gerar convite"}
+              </Button>
+            </form>
+          </section>
 
-        <section className="surface content-section">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="min-w-0 flex-1">
-              <h2 className="text-2xl font-semibold tracking-[-0.03em]">Convites ativos e histórico</h2>
-              <p className="mt-2 text-sm leading-7 text-[var(--color-muted-foreground)]">
-                Acompanhe convites pendentes, aceitos e revogados sem perder o link de acesso.
-              </p>
+          <section className="surface content-section">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="min-w-0 flex-1">
+                <h2 className="text-2xl font-semibold tracking-[-0.03em]">Convites ativos e histórico</h2>
+                <p className="mt-2 text-sm leading-7 text-[var(--color-muted-foreground)]">
+                  Acompanhe convites pendentes, aceitos e revogados sem perder o link de acesso.
+                </p>
+              </div>
+              <article className="metric-card w-full sm:w-auto">
+                <p className="metric-label">No recorte</p>
+                <p className="metric-value">{invitations.length}</p>
+              </article>
             </div>
-            <article className="metric-card w-full sm:w-auto">
-              <p className="metric-label">Convites</p>
-              <p className="metric-value">{invitations.length}</p>
-            </article>
-          </div>
-          <div className="mt-6 space-y-3">
-            <div className="grid gap-3 md:grid-cols-2">
-              <Input
-                onChange={(event) => setInvitationSearch(event.target.value)}
-                placeholder="Buscar convites por nome ou e-mail"
-                value={invitationSearch}
-              />
-              {isPlatformAdmin ? (
+            <div className="mt-6 space-y-3">
+              <div className="filter-shell">
+                <p className="filter-kicker">Recorte de convite</p>
+                <p className="filter-copy">
+                  Localize convites ativos, aceitos ou revogados sem perder o contexto da conta de origem.
+                </p>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                <Input
+                  onChange={(event) => setInvitationSearch(event.target.value)}
+                  placeholder="Encontre convites por nome ou e-mail"
+                  value={invitationSearch}
+                />
                 <Select onChange={(event) => setInvitationTenantFilter(event.target.value)} value={invitationTenantFilter}>
-                  <option value="">Todas as contas</option>
+                  <option value="">Qualquer conta</option>
                   {tenants.map((tenant) => (
                     <option key={tenant.id} value={tenant.id}>
                       {tenant.name}
                     </option>
                   ))}
                 </Select>
-              ) : (
-                <div />
-              )}
-            </div>
-            {invitations.map((invitation) => (
-              <article key={invitation.id} className="data-card p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0 space-y-1">
-                    <p className="font-semibold">{invitation.name}</p>
-                    <p className="break-words text-sm text-[var(--color-muted-foreground)]">{invitation.email} • {formatRoleLabel(invitation.role)}</p>
-                    <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--color-muted-foreground)]">
-                      <a
-                        className="font-medium text-[var(--color-primary)]"
-                        href={toAbsoluteInviteUrl(invitation.inviteUrl)}
-                        rel="noreferrer"
-                        target="_blank"
-                      >
-                        Abrir link do convite
-                      </a>
-                      <button
-                        className="font-medium text-[var(--color-primary)]"
-                        onClick={async () => {
-                          await navigator.clipboard.writeText(toAbsoluteInviteUrl(invitation.inviteUrl));
-                          toast.success("Link copiado");
-                        }}
-                        type="button"
-                      >
-                        Copiar link
-                      </button>
+              </div>
+              {invitations.map((invitation) => (
+                <article key={invitation.id} className="data-card p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0 space-y-1">
+                      <p className="font-semibold">{invitation.name}</p>
+                      <p className="break-words text-sm text-[var(--color-muted-foreground)]">
+                        {invitation.email} • {formatRoleLabel({ role: invitation.role })}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--color-muted-foreground)]">
+                        <a
+                          className="font-medium text-[var(--color-primary)]"
+                          href={toAbsoluteInviteUrl(invitation.inviteUrl)}
+                          rel="noreferrer"
+                          target="_blank"
+                        >
+                          Abrir link do convite
+                        </a>
+                        <button
+                          className="font-medium text-[var(--color-primary)]"
+                          onClick={async () => {
+                            await navigator.clipboard.writeText(toAbsoluteInviteUrl(invitation.inviteUrl));
+                            toast.success("Link copiado");
+                          }}
+                          type="button"
+                        >
+                          Copiar link
+                        </button>
+                      </div>
+                      <p className="text-xs text-[var(--color-muted-foreground)]">
+                        Status: {invitation.acceptedAt ? "aceito" : invitation.revokedAt ? "revogado" : "pendente"}
+                      </p>
                     </div>
-                    <p className="text-xs text-[var(--color-muted-foreground)]">
-                      Status: {invitation.acceptedAt ? "aceito" : invitation.revokedAt ? "revogado" : "pendente"}
-                    </p>
+                    {!invitation.acceptedAt && !invitation.revokedAt ? (
+                      <Button
+                        className="w-full sm:w-auto"
+                        disabled={revokeInvitationMutation.isPending}
+                        onClick={() => revokeInvitationMutation.mutate(invitation.id)}
+                        type="button"
+                        variant="ghost"
+                      >
+                        Revogar
+                      </Button>
+                    ) : null}
                   </div>
-                  {!invitation.acceptedAt && !invitation.revokedAt ? (
-                    <Button
-                      className="w-full sm:w-auto"
-                      disabled={revokeInvitationMutation.isPending}
-                      onClick={() => revokeInvitationMutation.mutate(invitation.id)}
-                      type="button"
-                      variant="ghost"
-                    >
-                      Revogar
-                    </Button>
-                  ) : null}
-                </div>
-              </article>
-            ))}
+                </article>
+              ))}
+            </div>
+          </section>
+        </div>
+      ) : (
+        <section className="surface content-section">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0 flex-1">
+              <h2 className="text-2xl font-semibold tracking-[-0.03em]">Convites familiares</h2>
+              <p className="mt-2 max-w-3xl text-sm leading-7 text-[var(--color-muted-foreground)]">
+                Como <strong>Admin de Conta</strong>, seus convites sempre saem pelo módulo de compartilhamento e entram
+                com o perfil <strong>Familiar</strong>, respeitando as limitações da carteira compartilhada.
+              </p>
+            </div>
+            <Button asChild className="w-full sm:w-auto">
+              <Link href="/dashboard/sharing">Abrir compartilhamento</Link>
+            </Button>
           </div>
         </section>
-      </div>
+      )}
 
       <section className="surface content-section">
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -1636,20 +1786,26 @@ export function AdminClient() {
             </p>
           </div>
           <article className="metric-card w-full sm:w-auto">
-            <p className="metric-label">Eventos</p>
+            <p className="metric-label">No recorte</p>
             <p className="metric-value">{auditItems.length}</p>
           </article>
         </div>
         <div className="mt-6 space-y-3">
+          <div className="filter-shell">
+            <p className="filter-kicker">Recorte de auditoria</p>
+            <p className="filter-copy">
+              Filtre eventos por conta ou ação para ler decisões sensíveis com mais contexto e menos ruído.
+            </p>
+          </div>
           <div className="grid gap-3 md:grid-cols-3">
             <Input
               onChange={(event) => setAuditSearch(event.target.value)}
-              placeholder="Buscar na auditoria"
+              placeholder="Encontre eventos, pessoas ou contas"
               value={auditSearch}
             />
             {isPlatformAdmin ? (
               <Select onChange={(event) => setAuditTenantFilter(event.target.value)} value={auditTenantFilter}>
-                <option value="">Todas as contas</option>
+                <option value="">Qualquer conta</option>
                 {tenants.map((tenant) => (
                   <option key={tenant.id} value={tenant.id}>
                     {tenant.name}
@@ -1660,9 +1816,11 @@ export function AdminClient() {
               <div />
             )}
             <Select onChange={(event) => setAuditActionFilter(event.target.value)} value={auditActionFilter}>
-              <option value="">Todas as ações</option>
+              <option value="">Qualquer ação</option>
               <option value="user.updated">Pessoas atualizadas</option>
+              <option value="user.deleted">Pessoas excluídas</option>
               <option value="tenant.updated">Contas atualizadas</option>
+              <option value="tenant.deleted">Contas excluídas</option>
               <option value="plan.created">Planos criados</option>
               <option value="plan.updated">Planos atualizados</option>
               <option value="plan.deleted">Planos excluídos</option>
@@ -1672,18 +1830,18 @@ export function AdminClient() {
           </div>
           {auditItems.map((item) => (
             <article key={item.id} className="data-card p-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="min-w-0 flex-1">
-                  <p className="font-semibold">{item.summary}</p>
-                  <p className="break-words text-sm text-[var(--color-muted-foreground)]">
+                  <p className="truncate font-semibold">{item.summary}</p>
+                  <p className="text-sm text-[var(--color-muted-foreground)] break-all">
                     {item.actorUser.name} • {item.actorUser.email}
                     {item.targetTenant ? ` • ${item.targetTenant.name}` : ""}
                     {item.targetUser ? ` • ${item.targetUser.email}` : ""}
                   </p>
                 </div>
-                <p className="w-full break-words text-xs text-[var(--color-muted-foreground)] sm:w-auto sm:text-right">
+                <div className="whitespace-nowrap text-xs text-[var(--color-muted-foreground)]">
                   {formatDateTimeDisplay(item.createdAt)}
-                </p>
+                </div>
               </div>
             </article>
           ))}

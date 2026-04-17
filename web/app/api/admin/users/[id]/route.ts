@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { logAdminAudit } from "@/lib/admin/audit";
 import { requireAdminUser } from "@/lib/auth/admin";
+import { revalidateAdminUsers } from "@/lib/cache/admin-read-models";
 import { getTenantSeatSummary } from "@/lib/licensing/server";
 import { prisma } from "@/lib/prisma/client";
 import { deleteUserWithAllData, getDeletableUser } from "@/lib/users/delete-user";
@@ -34,7 +35,18 @@ export async function PATCH(request: Request, context: Params) {
     } = {};
 
     if (typeof body.isActive === "boolean") data.isActive = body.isActive;
-    if (body.role) data.role = body.role;
+
+    if (body.role) {
+      if (!admin.isPlatformAdmin) {
+        return NextResponse.json(
+          { message: "Somente o superadmin pode alterar o perfil entre Admin de Conta e Familiar" },
+          { status: 403 }
+        );
+      }
+
+      data.role = body.role;
+    }
+
     if (body.newPassword) data.passwordHash = await hash(body.newPassword, 10);
 
     if (admin.id === id && body.isActive === false) {
@@ -146,6 +158,9 @@ export async function PATCH(request: Request, context: Params) {
       }
     });
 
+    revalidateAdminUsers(target.tenantId);
+    revalidateAdminUsers(data.tenantId ?? target.tenantId);
+
     return NextResponse.json({ success: true });
   } catch (error) {
     if (error instanceof Error && (error.message === "Unauthorized" || error.message === "Forbidden")) {
@@ -185,6 +200,8 @@ export async function DELETE(_request: Request, context: Params) {
         name: deleted.name
       }
     });
+
+    revalidateAdminUsers(target.tenantId);
 
     return NextResponse.json({ success: true });
   } catch (error) {

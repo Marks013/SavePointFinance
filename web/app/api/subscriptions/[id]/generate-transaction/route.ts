@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { generateSubscriptionTransaction } from "@/lib/automation/subscriptions";
 import { requireSessionUser } from "@/lib/auth/session";
 import { revalidateFinanceReports } from "@/lib/cache/finance-read-models";
+import { BenefitWalletRuleError } from "@/lib/finance/benefit-wallet";
 import { captureRequestError } from "@/lib/observability/sentry";
 
 type Params = {
@@ -28,6 +29,10 @@ export async function POST(request: Request, context: Params) {
 
     if (error instanceof Error && error.message === "Subscription not found") {
       return NextResponse.json({ message: error.message }, { status: 404 });
+    }
+
+    if (error instanceof BenefitWalletRuleError) {
+      return NextResponse.json({ message: error.message }, { status: 400 });
     }
 
     captureRequestError(error, { request, feature: "subscriptions" });

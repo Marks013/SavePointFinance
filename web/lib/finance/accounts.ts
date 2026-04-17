@@ -7,6 +7,7 @@ export type ComputedAccount = {
   tenantId: string;
   name: string;
   type: string;
+  usage: "standard" | "benefit_food";
   openingBalance: number;
   currentBalance: number;
   currency: string;
@@ -22,6 +23,13 @@ export type ComputedAccount = {
   periodTransferOut: number;
   periodNet: number;
 };
+
+type AccountUsageValue = "standard" | "benefit_food";
+
+function readAccountUsage(account: unknown): AccountUsageValue {
+  const usage = (account as { usage?: string }).usage;
+  return usage === "benefit_food" ? "benefit_food" : "standard";
+}
 
 export async function getAccountsWithComputedBalance(
   tenantId: string,
@@ -143,6 +151,7 @@ export async function getAccountsWithComputedBalance(
 
     return {
       ...account,
+      usage: readAccountUsage(account),
       openingBalance,
       currentBalance,
       accumulatedNet: currentBalance - openingBalance,

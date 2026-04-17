@@ -6,6 +6,8 @@ import {
 } from "@/lib/cards/statement";
 import { ensureTenantCardStatementSnapshots } from "@/lib/cards/snapshot-sync";
 import { getAccountsWithComputedBalance } from "@/lib/finance/accounts";
+import { BenefitWalletRuleError, validateBenefitWalletTransaction } from "@/lib/finance/benefit-wallet";
+import { FOOD_BENEFIT_CATEGORY_SYSTEM_KEYS } from "@/lib/finance/benefit-wallet-rules";
 import { normalizeClassificationText } from "@/lib/finance/classification-normalization";
 import { ensureFallbackCategory } from "@/lib/finance/default-categories";
 import { resolveTransactionClassification } from "@/lib/finance/transaction-classification";
@@ -321,11 +323,19 @@ async function createExpenseOrIncomeFromText(user: WhatsAppUser, body: string, t
     type,
     description,
     notes: null,
-    paymentMethod
+    paymentMethod,
+    allowedCategorySystemKeys:
+      type === "expense" && account?.usage === "benefit_food"
+        ? FOOD_BENEFIT_CATEGORY_SYSTEM_KEYS
+        : undefined
   });
 
   const installmentAmounts = splitAmountIntoInstallments(amountData.value, installments);
-  const resolvedCategoryId = classification.categoryId || (await ensureFallbackCategory(user.tenantId, type));
+  const resolvedCategoryId =
+    classification.categoryId ||
+    (type === "expense" && account?.usage === "benefit_food"
+      ? null
+      : await ensureFallbackCategory(user.tenantId, type));
   const resolvedCategory = resolvedCategoryId
     ? await prisma.category.findFirst({
         where: {
@@ -337,6 +347,29 @@ async function createExpenseOrIncomeFromText(user: WhatsAppUser, body: string, t
         }
       })
     : null;
+
+  try {
+    await validateBenefitWalletTransaction({
+      tenantId: user.tenantId,
+      type,
+      paymentMethod,
+      accountId: selectedCard ? null : account?.id ?? null,
+      destinationAccountId: null,
+      categoryId: resolvedCategoryId,
+      cardId: selectedCard?.id ?? null
+    });
+  } catch (error) {
+    if (error instanceof BenefitWalletRuleError) {
+      return {
+        intent: type === "income" ? "launch_income" : "launch_expense",
+        status: "benefit_wallet_rule",
+        response: error.message
+      } satisfies AssistantResult;
+    }
+
+    throw error;
+  }
+
   let parentId: string | null = null;
 
   for (let index = 0; index < installments; index += 1) {

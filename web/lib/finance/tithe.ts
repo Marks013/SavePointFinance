@@ -10,12 +10,8 @@ export function getMonthKey(date: Date) {
   return formatDateKey(date).slice(0, 7);
 }
 
-function getMonthRange(monthKey: string) {
-  const start = new Date(`${monthKey}-01T00:00:00`);
-  const end = new Date(start);
-  end.setMonth(end.getMonth() + 1);
-  end.setMilliseconds(end.getMilliseconds() - 1);
-  return { start, end };
+function normalizeMonthKeys(monthKeys: Array<string | null | undefined>) {
+  return Array.from(new Set(monthKeys.filter((monthKey): monthKey is string => Boolean(monthKey))));
 }
 
 function monthLabel(monthKey: string) {
@@ -76,7 +72,6 @@ export async function syncMonthlyTitheTransaction({
   monthKey: string;
   client?: TitheClient;
 }) {
-  const { start, end } = getMonthRange(monthKey);
   const titheCategoryId = await ensureTitheCategory(tenantId, client);
   const notesTag = `[AUTO_TITHE:${monthKey}]`;
   const title = `Dízimo consolidado ${monthLabel(monthKey)}`;
@@ -86,10 +81,7 @@ export async function syncMonthlyTitheTransaction({
       where: {
         tenantId,
         type: "income",
-        date: {
-          gte: start,
-          lte: end
-        },
+        competence: monthKey,
         titheAmount: {
           gt: new Prisma.Decimal(0)
         }
@@ -204,8 +196,25 @@ export async function syncTitheForTransactionDates({
   dates: Date[];
   client?: TitheClient;
 }) {
-  const monthKeys = Array.from(new Set(dates.map(getMonthKey)));
+  const monthKeys = normalizeMonthKeys(dates.map(getMonthKey));
   for (const monthKey of monthKeys) {
+    await syncMonthlyTitheTransaction({ tenantId, userId, monthKey, client });
+  }
+}
+
+export async function syncTitheForMonthKeys({
+  tenantId,
+  userId,
+  monthKeys,
+  client = prisma
+}: {
+  tenantId: string;
+  userId: string;
+  monthKeys: Array<string | null | undefined>;
+  client?: TitheClient;
+}) {
+  const uniqueMonthKeys = normalizeMonthKeys(monthKeys);
+  for (const monthKey of uniqueMonthKeys) {
     await syncMonthlyTitheTransaction({ tenantId, userId, monthKey, client });
   }
 }

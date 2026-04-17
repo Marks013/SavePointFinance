@@ -7,10 +7,11 @@ import {
   getCurrentPayableStatementMonth,
   getStatementPaymentDate
 } from "@/lib/cards/statement";
+import { validateBenefitWalletTransaction } from "@/lib/finance/benefit-wallet";
 import { revalidateFinanceReports } from "@/lib/cache/finance-read-models";
 import { getFinanceReport } from "@/lib/finance/reports";
 import { resolveTransactionClassification } from "@/lib/finance/transaction-classification";
-import { ensureTitheCategory, getMonthKey, syncMonthlyTitheTransaction } from "@/lib/finance/tithe";
+import { ensureTitheCategory, syncMonthlyTitheTransaction } from "@/lib/finance/tithe";
 import { prisma } from "@/lib/prisma/client";
 import { advanceSubscriptionBillingDate } from "@/lib/subscriptions/recurrence";
 import { format } from "date-fns";
@@ -172,6 +173,15 @@ export async function generateSubscriptionTransaction(subscriptionId: string, te
 
   const nextBillingDate = new Date(subscription.nextBillingDate);
   const followingBillingDate = advanceSubscriptionBillingDate(nextBillingDate, subscription.billingDay);
+  await validateBenefitWalletTransaction({
+    tenantId,
+    type: subscription.type,
+    paymentMethod: subscription.cardId ? PaymentMethod.credit_card : PaymentMethod.money,
+    accountId: subscription.accountId,
+    destinationAccountId: null,
+    categoryId: subscription.categoryId,
+    cardId: subscription.cardId
+  });
   const classification = await resolveTransactionClassification({
     tenantId,
     type: subscription.type,
@@ -262,7 +272,7 @@ export async function generateSubscriptionTransaction(subscriptionId: string, te
     await syncMonthlyTitheTransaction({
       tenantId,
       userId: subscription.userId ?? userId,
-      monthKey: getMonthKey(nextBillingDate)
+      monthKey: transaction.competence
     });
   }
   revalidateFinanceReports(tenantId);

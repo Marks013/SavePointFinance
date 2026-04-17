@@ -36,7 +36,7 @@ npm run bootstrap:web
 
 ### 2. Docker local
 
-Cria `.env` na raiz com URLs locais e segredos gerados:
+Prepara `.env` na raiz para Docker local. Se houver template, ele será usado automaticamente; se o arquivo já existir, o bootstrap apenas reaproveita:
 
 ```bash
 npm run bootstrap:docker
@@ -50,7 +50,7 @@ npm run bootstrap:docker:up
 
 ### 3. Servidor ou producao
 
-Cria `.env` na raiz com base no modelo de servidor:
+Prepara `.env` na raiz para servidor/producao. Se houver template, ele será usado automaticamente; se o arquivo já existir, o bootstrap apenas reaproveita:
 
 ```bash
 npm run bootstrap:server
@@ -67,7 +67,7 @@ npm run bootstrap:server -- --force
 
 Fluxo recomendado para Oracle Cloud com Nginx Proxy Manager:
 
-1. gere `.env` com:
+1. garanta que `.env` exista com as variáveis do servidor:
 
 ```bash
 npm run bootstrap:server
@@ -334,7 +334,28 @@ npm install
 npm run dev
 ```
 
-O ambiente local usa [web/.env.example](/C:/Users/samue/Desktop/SavePoint/SavePoint/web/.env.example) como base.
+O ambiente local usa `web/.env.local`. Se quiser automatizar o modo de manutenção fora do Docker, defina `MAINTENANCE_MODE=true|false` nesse arquivo e reinicie o `next dev` ou o processo `next start`.
+
+## Modo de manutencao
+
+O projeto agora suporta bloqueio operacional por variavel de ambiente em runtime.
+
+- rotas web sao redirecionadas para `/manutencao`
+- rotas `api` bloqueadas retornam `503`
+- rotas criticas em `/api/integrations` continuam liberadas
+
+Para alternar no ambiente Docker sem rebuildar imagem:
+
+```bash
+./ops/toggle-maintenance.sh on
+./ops/toggle-maintenance.sh off
+```
+
+O script atualiza `./.env` por padrao e recria apenas o servico `web`. Para outro arquivo de ambiente:
+
+```bash
+ENV_FILE=./web/.env.local ./ops/toggle-maintenance.sh on
+```
 
 ## Documentacao adicional
 

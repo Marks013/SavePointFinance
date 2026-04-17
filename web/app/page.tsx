@@ -24,6 +24,21 @@ const pillars = [
 
 const highlights = ["Fluxo unico para contas, cartoes e metas", "Leitura objetiva para faturas e relatorios", "Comprovantes e rotina no mesmo contexto"];
 
+const securityPillars = [
+  {
+    title: "Isolamento de dados",
+    copy: "Cada centavo seu é isolado em nossa estrutura multi-tenant. Uma carteira nunca cruza dados com outra."
+  },
+  {
+    title: "Criptografia",
+    copy: "Senhas, sessões e fluxos de autenticação são protegidos com criptografia moderna e controles de acesso em camadas."
+  },
+  {
+    title: "Privacidade total (LGPD)",
+    copy: "Seus dados são seus. O produto opera por assinatura e não monetiza informações com corretoras, anunciantes ou revenda de perfil."
+  }
+];
+
 export default function HomePage() {
   return (
     <main id="main-content" className="page-shell py-6 md:py-10">
@@ -53,6 +68,9 @@ export default function HomePage() {
                 </Link>
               </Button>
             </div>
+            <p className="text-sm leading-7 text-white/78">
+              🔒 Seus dados são criptografados de ponta a ponta e armazenados com segurança.
+            </p>
           </div>
 
           <div className="grid gap-4 self-end">
@@ -191,8 +209,49 @@ export default function HomePage() {
                 </Link>
               </Button>
             </div>
+            <p className="text-sm leading-7 text-white/78">
+              🔒 Seus dados são criptografados de ponta a ponta e armazenados com segurança.
+            </p>
           </div>
         </article>
+      </section>
+
+      <section className="mt-6 grid gap-4 xl:grid-cols-[0.94fr_1.06fr]">
+        <article className="surface rounded-[38px] px-8 py-10 md:px-10 md:py-12">
+          <div className="section-stack">
+            <div className="eyebrow">Segurança de nível bancário</div>
+            <h2 className="section-title">
+              Segurança visível para o usuário, com rastreabilidade de acesso e privacidade por padrão.
+            </h2>
+            <p className="section-copy">
+              O painel deixa claro quando a conta foi acessada pela última vez e mantém um histórico de segurança para eventos sensíveis de autenticação e convite.
+            </p>
+            <div className="editorial-rule" />
+            <div className="rounded-[24px] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-muted)_44%,var(--color-card))] p-5">
+              <div className="flex items-center gap-3">
+                <ShieldCheck className="size-5 text-[var(--color-primary)]" />
+                <p className="text-sm font-semibold text-[var(--color-foreground)]">Histórico de segurança ativo</p>
+              </div>
+              <p className="mt-3 text-sm leading-7 text-[var(--color-ink-700)]">
+                O produto exibe o último acesso do usuário dentro da área autenticada para ajudar a identificar atividade fora do padrão.
+              </p>
+            </div>
+          </div>
+        </article>
+
+        <div className="grid gap-4 md:grid-cols-3">
+          {securityPillars.map((pillar) => (
+            <article key={pillar.title} className="surface content-section">
+              <div className="flex size-12 items-center justify-center rounded-[1.1rem] bg-[var(--color-accent)] text-[var(--color-accent-foreground)]">
+                <ShieldCheck className="size-5" />
+              </div>
+              <h3 className="mt-5 text-xl font-semibold tracking-[-0.04em] text-[var(--color-foreground)]">
+                {pillar.title}
+              </h3>
+              <p className="mt-3 text-sm leading-7 text-[var(--color-ink-700)]">{pillar.copy}</p>
+            </article>
+          ))}
+        </div>
       </section>
     </main>
   );

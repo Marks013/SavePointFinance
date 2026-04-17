@@ -14,6 +14,8 @@ type AdminAuditInput = {
   metadata?: Record<string, unknown> | null;
 };
 
+export type { AdminAuditInput };
+
 export async function logAdminAudit(input: AdminAuditInput) {
   await prisma.adminAuditLog.create({
     data: {

@@ -5,14 +5,59 @@ import { BrandMark } from "@/components/layout/brand-mark";
 import { DashboardSidebarNav } from "@/components/layout/dashboard-sidebar-nav";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { Button } from "@/components/ui/button";
+import { formatDateTimeDisplay } from "@/lib/date";
+import { prisma } from "@/lib/prisma/client";
 import { getSharingAuthority } from "@/lib/sharing/access";
 
 type DashboardShellProps = {
   children: ReactNode;
 };
 
+function formatLastAccess(value: Date | null) {
+  if (!value) {
+    return "Primeiro acesso registrado nesta conta";
+  }
+
+  const now = new Date();
+  const access = new Date(value);
+  const todayKey = now.toDateString();
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  const timeLabel = new Intl.DateTimeFormat("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(access);
+
+  if (access.toDateString() === todayKey) {
+    return `Hoje às ${timeLabel}`;
+  }
+
+  if (access.toDateString() === yesterday.toDateString()) {
+    return `Ontem às ${timeLabel}`;
+  }
+
+  return formatDateTimeDisplay(access);
+}
+
 export async function DashboardShell({ children }: DashboardShellProps) {
   const session = await auth();
+  const accessAudit = session?.user?.id
+    ? await prisma.adminAuditLog.findMany({
+        where: {
+          actorUserId: session.user.id,
+          action: "auth.login"
+        },
+        orderBy: {
+          createdAt: "desc"
+        },
+        take: 2,
+        select: {
+          createdAt: true
+        }
+      })
+    : null;
+  const previousAccessAt = accessAudit?.[1]?.createdAt ?? accessAudit?.[0]?.createdAt ?? null;
   const isPlatformAdmin = Boolean(session?.user?.isPlatformAdmin);
   const canManageSharing = session?.user?.id && session.user.tenantId
     ? (
@@ -29,12 +74,12 @@ export async function DashboardShell({ children }: DashboardShellProps) {
     : canManageSharing
       ? "Titular da carteira familiar"
       : session?.user?.role === "admin"
-        ? "Administrador da conta"
-        : "Membro da carteira compartilhada";
+        ? "Admin de Conta"
+        : "Familiar da carteira compartilhada";
 
   return (
     <div className="page-shell flex min-h-screen flex-col gap-5 py-4 md:py-5 lg:grid lg:h-screen lg:grid-cols-[256px_minmax(0,1fr)] lg:gap-5 lg:overflow-y-hidden xl:grid-cols-[264px_minmax(0,1fr)] xl:gap-6">
-      <aside className="surface flex min-h-0 flex-col overflow-visible rounded-[30px] p-4 lg:max-h-none lg:overflow-y-auto xl:p-5">
+      <aside className="surface subtle-scrollbar flex min-h-0 flex-col overflow-visible rounded-[30px] p-4 lg:max-h-none lg:overflow-y-auto xl:p-5">
         <div className="mb-6 rounded-[24px] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-card)_86%,transparent)] p-4">
           <div className="flex flex-col gap-3">
             <BrandMark compact />
@@ -55,6 +100,17 @@ export async function DashboardShell({ children }: DashboardShellProps) {
           </p>
           <p className="mt-2 text-sm font-semibold">{session?.user?.name ?? session?.user?.email ?? "Usuário"}</p>
           <p className="mt-1 text-xs leading-6 text-[var(--color-muted-foreground)]">{accessDescription}</p>
+          <div className="mt-4 rounded-[18px] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-card)_84%,transparent)] px-3 py-3">
+            <p className="text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-[var(--color-muted-foreground)]">
+              Histórico de segurança
+            </p>
+            <p className="mt-2 text-sm font-medium text-[var(--color-foreground)]">
+              Último acesso: {formatLastAccess(previousAccessAt)}
+            </p>
+            <p className="mt-1 text-xs leading-6 text-[var(--color-muted-foreground)]">
+              Cada autenticação gera registro de acesso para reforçar a segurança da sua conta.
+            </p>
+          </div>
           <form
             aria-label="Encerrar sessão"
             action={async () => {
@@ -71,7 +127,7 @@ export async function DashboardShell({ children }: DashboardShellProps) {
 
       <main
         id="main-content"
-        className="min-h-0 min-w-0 w-full max-w-full overflow-x-hidden overflow-y-auto pb-8 pr-1 lg:pb-10"
+        className="subtle-scrollbar min-h-0 min-w-0 w-full max-w-full overflow-x-hidden overflow-y-auto pb-8 pr-0 lg:pb-10 lg:pr-1"
       >
         {children}
       </main>

@@ -9,6 +9,10 @@ import { getMonthRange, normalizeMonthKey } from "@/lib/month";
 import { captureRequestError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
 
+function readAccountUsage(account: unknown) {
+  return (account as { usage?: "standard" | "benefit_food" }).usage ?? "standard";
+}
+
 export async function GET(request: Request) {
   try {
     const user = await requireSessionUser();
@@ -32,6 +36,7 @@ export async function GET(request: Request) {
         id: account.id,
         name: account.name,
         type: account.type,
+        usage: account.usage,
         balance: account.currentBalance,
         openingBalance: account.openingBalance,
         currency: account.currency,
@@ -101,6 +106,7 @@ export async function POST(request: Request) {
         ownerUserId: user.id,
         name: normalizedName,
         type: body.type,
+        usage: body.usage,
         openingBalance: body.balance,
         currency: body.currency.toUpperCase(),
         color: body.color,
@@ -114,6 +120,7 @@ export async function POST(request: Request) {
         id: account.id,
         name: account.name,
         type: account.type,
+        usage: readAccountUsage(account),
         balance: Number(account.openingBalance),
         openingBalance: Number(account.openingBalance),
         currency: account.currency,

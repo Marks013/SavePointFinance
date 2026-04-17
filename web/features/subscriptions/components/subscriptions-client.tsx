@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { subscriptionFormSchema, type SubscriptionFormValues } from "@/features/subscriptions/schemas/subscription-schema";
+import { isAllowedBenefitFoodCategory } from "@/lib/finance/benefit-wallet-rules";
 import { formatDateDisplay, formatDateKey } from "@/lib/date";
 import {
   findSubscriptionServicePreset,
@@ -25,7 +26,7 @@ import { ensureApiResponse } from "@/lib/observability/http";
 import { advanceSubscriptionBillingDate } from "@/lib/subscriptions/recurrence";
 import { formatCurrency } from "@/lib/utils";
 
-type RefItem = { id: string; name: string };
+type RefItem = { id: string; name: string; usage?: "standard" | "benefit_food" };
 type SubscriptionItem = {
   activeMonthDate: string | null;
   activeMonthGenerated: boolean | null;
@@ -85,7 +86,9 @@ async function getSubscriptions(month: string) {
 async function getCategories() {
   const response = await fetch("/api/categories", { cache: "no-store" });
   await ensureApiResponse(response, { fallbackMessage: "Falha ao carregar categorias", method: "GET", path: "/api/categories" });
-  return (await response.json()) as { items: Array<{ id: string; name: string; type: "income" | "expense" }> };
+  return (await response.json()) as {
+    items: Array<{ id: string; name: string; systemKey?: string | null; type: "income" | "expense" }>;
+  };
 }
 
 async function getAccounts() {
@@ -146,6 +149,10 @@ function SubscriptionServiceCard({
       </div>
     </button>
   );
+}
+
+function formatAccountOptionLabel(account: RefItem) {
+  return account.usage === "benefit_food" ? `${account.name} • vale alimentação` : account.name;
 }
 
 export function SubscriptionsClient() {
@@ -291,7 +298,19 @@ export function SubscriptionsClient() {
   const selectedType = useWatch({ control: form.control, name: "type" }) ?? "expense";
   const selectedAccountId = useWatch({ control: form.control, name: "accountId" }) ?? "";
   const selectedCardId = useWatch({ control: form.control, name: "cardId" }) ?? "";
-  const filteredCategories = (categoriesQuery.data?.items ?? []).filter((item) => item.type === selectedType);
+  const selectedAccount = (accountsQuery.data?.items ?? []).find((item) => item.id === selectedAccountId) ?? null;
+  const isBenefitWalletSelected = selectedAccount?.usage === "benefit_food";
+  const filteredCategories = (categoriesQuery.data?.items ?? []).filter((item) => {
+    if (item.type !== selectedType) {
+      return false;
+    }
+
+    if (isBenefitWalletSelected && selectedType === "expense") {
+      return isAllowedBenefitFoodCategory(item.systemKey);
+    }
+
+    return true;
+  });
   const isEditing = editingId !== null;
   const showEditor = isEditorOpen || isEditing || subscriptions.length === 0;
   const selectedName = useWatch({ control: form.control, name: "name" }) ?? "";
@@ -318,6 +337,10 @@ export function SubscriptionsClient() {
   };
 
   useEffect(() => {
+    if (isBenefitWalletSelected && selectedCardId) {
+      form.setValue("cardId", "");
+    }
+
     if (selectedType === "income" && selectedCardId) {
       form.setValue("cardId", "");
     }
@@ -334,7 +357,23 @@ export function SubscriptionsClient() {
     if (selectedType !== "income") {
       form.setValue("autoTithe", false);
     }
-  }, [editingId, form, preferredAutoTithe, selectedAccountId, selectedCardId, selectedType]);
+  }, [editingId, form, isBenefitWalletSelected, preferredAutoTithe, selectedAccountId, selectedCardId, selectedType]);
+
+  useEffect(() => {
+    if (!isBenefitWalletSelected || selectedType !== "expense") {
+      return;
+    }
+
+    const currentCategoryId = form.getValues("categoryId");
+    if (!currentCategoryId) {
+      return;
+    }
+
+    const currentCategory = (categoriesQuery.data?.items ?? []).find((item) => item.id === currentCategoryId);
+    if (currentCategory && !isAllowedBenefitFoodCategory(currentCategory.systemKey)) {
+      form.setValue("categoryId", "");
+    }
+  }, [categoriesQuery.data?.items, form, isBenefitWalletSelected, selectedType]);
 
   useEffect(() => {
     if (!editingId) {
@@ -376,12 +415,12 @@ export function SubscriptionsClient() {
           a rotina financeira.
         </p>
         <p className="mt-3 text-sm font-medium text-[var(--color-primary)]">
-          Competência ativa: {formatMonthKeyLabel(month)}
+          Mês de análise: {formatMonthKeyLabel(month)}
         </p>
         {showEditor ? (
           <>
             <div className="mt-6 space-y-3">
-              <Label>Serviços populares</Label>
+              <Label>Modelos rápidos</Label>
               <div className="grid gap-3 sm:grid-cols-2">
                 {subscriptionServicePresets.map((preset) => (
                   <SubscriptionServiceCard
@@ -393,7 +432,7 @@ export function SubscriptionsClient() {
                 ))}
               </div>
               <p className="text-sm text-[var(--color-muted-foreground)]">
-                Toque em um modelo para preencher rapidamente o nome e sugerir a categoria certa de streaming.
+                Use um modelo apenas para preencher mais rápido. Ajuste nome, conta, cartão e categoria conforme a sua rotina.
               </p>
             </div>
             <form className="mt-8 space-y-5" onSubmit={form.handleSubmit((values) => saveMutation.mutate(values))}>
@@ -429,7 +468,9 @@ export function SubscriptionsClient() {
             <div className="space-y-2">
               <Label htmlFor="sub-category">Categoria</Label>
               <Select id="sub-category" {...form.register("categoryId")}>
-                <option value="">Sem categoria</option>
+                <option value="">
+                  {isBenefitWalletSelected && selectedType === "expense" ? "Selecione uma categoria elegível" : "Sem categoria"}
+                </option>
                 {filteredCategories.map((item) => (
                   <option key={item.id} value={item.id}>{item.name}</option>
                 ))}
@@ -442,7 +483,7 @@ export function SubscriptionsClient() {
               <Select id="sub-account" {...form.register("accountId")}>
                 <option value="">Sem conta</option>
                 {(accountsQuery.data?.items ?? []).map((item) => (
-                  <option key={item.id} value={item.id}>{item.name}</option>
+                  <option key={item.id} value={item.id}>{formatAccountOptionLabel(item)}</option>
                 ))}
               </Select>
               {form.formState.errors.accountId ? (
@@ -451,7 +492,7 @@ export function SubscriptionsClient() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="sub-card">Cartão</Label>
-              <Select id="sub-card" {...form.register("cardId")}>
+              <Select disabled={isBenefitWalletSelected} id="sub-card" {...form.register("cardId")}>
                 <option value="">Sem cartão</option>
                 {(cardsQuery.data?.items ?? []).map((item) => (
                   <option key={item.id} value={item.id}>{item.name}</option>
@@ -469,8 +510,9 @@ export function SubscriptionsClient() {
             </label>
           ) : null}
           <p className="text-sm text-[var(--color-muted-foreground)]">
-            Vincule a recorrência à conta ou ao cartão correto para que relatórios, fatura e painel reflitam o impacto
-            financeiro no lugar certo.
+            {isBenefitWalletSelected
+              ? "Vale Alimentação aceita créditos recorrentes e consumos pela própria carteira, sem cartão e com categorias elegíveis."
+              : "Vincule a recorrência à conta ou ao cartão correto para que relatórios, fatura e painel reflitam o impacto financeiro no lugar certo."}
           </p>
           <Button className="w-full" disabled={saveMutation.isPending} type="submit">
             {saveMutation.isPending ? "Salvando..." : isEditing ? "Salvar assinatura" : "Criar assinatura"}
@@ -542,16 +584,21 @@ export function SubscriptionsClient() {
                       {formatDateDisplay(item.activeMonthDateResolved)}
                     </p>
                     <p className="break-words text-sm text-[var(--color-muted-foreground)]">
-                      {item.card?.name ?? item.account?.name ?? "Sem origem financeira"} •{" "}
+                      {item.card?.name ??
+                        (item.account?.usage === "benefit_food"
+                          ? `${item.account?.name ?? "Sem origem financeira"} • vale alimentação`
+                          : item.account?.name) ??
+                        "Sem origem financeira"}{" "}
+                      •{" "}
                       {item.type === "expense" ? "Despesa recorrente" : "Receita recorrente"}
                     </p>
                     <p className="break-words text-xs text-[var(--color-muted-foreground)]">
-                      Competência {formatMonthKeyLabel(month)} • próxima cobrança real em {formatDateDisplay(item.nextBillingDate)}
+                      Entra em {formatMonthKeyLabel(month)} • próxima cobrança real em {formatDateDisplay(item.nextBillingDate)}
                     </p>
                     <p className="break-words text-xs text-[var(--color-muted-foreground)]">
                       {item.activeMonthGenerated
                         ? `Lançamento já gerado em ${formatDateDisplay(item.activeMonthTransactionDate ?? item.activeMonthDateResolved)}`
-                        : `Lançamento ainda não gerado nesta competência`}
+                        : `Lançamento ainda não gerado para este mês de análise`}
                     </p>
                     {item.autoTithe ? (
                       <p className="break-words text-xs text-[var(--color-muted-foreground)]">

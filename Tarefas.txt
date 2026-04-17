@@ -1,0 +1,68 @@
+Analisando o código do arquivo admin-client.tsx que você enviou, identifiquei exatamente onde o "bug visual" de textos comprimidos e cortes está acontecendo. O problema principal é o uso de flex-wrap e configurações de grid que não limitam a largura mínima dos elementos, fazendo com que o conteúdo esmague em telas médias ou resoluções específicas.
+
+Aqui estão as correções sugeridas para o seu arquivo, focadas em CSS (Tailwind) e estrutura:
+1. Fix nos Cards de Estatísticas (Stats)
+
+Atualmente, eles podem estar tentando ocupar todo o espaço sem um limite, o que "comprime" os números. Verifique se o container das stats está assim:
+TypeScript
+
+// Altere a div que envolve os cards de estatísticas (Stats)
+<div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+  {/* Cada card deve ter um min-width para não esmagar o texto */}
+  <div className="data-card p-4 min-w-[200px]">
+    <p className="text-sm text-muted-foreground">Total de Contas</p>
+    <p className="text-2xl font-bold">{stats?.totalTenants}</p>
+  </div>
+  {/* ... outros cards */}
+</div>
+
+2. O Problema das Listas de Usuários e Tenants
+
+No seu código, as seções de "Pessoas" e "Contas" estão em containers que podem não ter rolagem horizontal. Se o e-mail for muito longo, ele quebra o layout.
+
+Correção sugerida para as listas:
+Envolva as áreas de listagem em um container com overflow-x-auto:
+TypeScript
+
+<div className="mt-6 overflow-x-auto rounded-lg border border-[var(--color-border)]">
+  <div className="min-w-[800px]"> {/* Força uma largura mínima para a tabela não esmagar */}
+    {/* Cabeçalho e Linhas da Tabela aqui */}
+  </div>
+</div>
+
+3. Ajuste no Log de Auditoria (Audit Items)
+
+No final do seu arquivo, no mapeamento do auditItems, você está usando flex-wrap items-start. O problema é o min-w-0 flex-1. Se houver muita informação (Nome + E-mail + Conta + Data), o texto vai ser comprimido até ficar ilegível.
+
+Substitua o trecho do Audit por este:
+TypeScript
+
+{auditItems.map((item) => (
+  <article key={item.id} className="data-card p-4">
+    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="min-w-0 flex-1">
+        <p className="font-semibold truncate">{item.summary}</p> {/* truncate impede quebra de linha maluca */}
+        <p className="text-sm text-[var(--color-muted-foreground)] break-all"> {/* break-all para e-mails longos */}
+          {item.actorUser.name} • {item.actorUser.email}
+          {item.targetTenant ? ` • ${item.targetTenant.name}` : ""}
+        </p>
+      </div>
+      <div className="whitespace-nowrap text-xs text-[var(--color-muted-foreground)]">
+        {formatDateTimeDisplay(item.createdAt)}
+      </div>
+    </div>
+  </article>
+))}
+
+Por que isso aconteceu?
+
+O projeto SavePointFinance utiliza variáveis de CSS customizadas (ex: var(--color-muted-foreground)). Se essas variáveis não estiverem bem definidas no seu globals.css (que vimos na estrutura do repositório original), o contraste visual fica ruim, dando a impressão de "bug".
+Resumo da Solução:
+
+    Adicione overflow-x-auto em volta de todas as tabelas/listas.
+
+    Use min-w-[valor] em elementos que não podem ser comprimidos.
+
+    Use truncate ou break-all em campos de texto dinâmico (nomes e e-mails).
+
+Aplique essas mudanças no admin-client.tsx, rode o seu script save-up e o layout deverá se comportar de forma muito mais profissional e legível!

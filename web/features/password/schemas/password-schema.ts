@@ -50,11 +50,21 @@ export const acceptInvitationSchema = z
     token: z.preprocess(normalizeTokenValue, z.string().min(1, "Token obrigatorio")),
     name: z.string().min(2, "Informe seu nome"),
     password: z.string().min(8, "Minimo de 8 caracteres"),
-    confirmPassword: z.string().min(8, "Confirme a senha")
+    confirmPassword: z.string().min(8, "Confirme a senha"),
+    acceptTermsOfUse: z.boolean(),
+    acceptPrivacyPolicy: z.boolean()
   })
   .refine((value) => value.password === value.confirmPassword, {
     path: ["confirmPassword"],
     message: "As senhas nao conferem"
+  })
+  .refine((value) => value.acceptTermsOfUse, {
+    path: ["acceptTermsOfUse"],
+    message: "Voce precisa aceitar os Termos de Uso"
+  })
+  .refine((value) => value.acceptPrivacyPolicy, {
+    path: ["acceptPrivacyPolicy"],
+    message: "Voce precisa aceitar a Politica de Privacidade"
   });
 
 export type ForgotPasswordValues = z.infer<typeof forgotPasswordSchema>;

@@ -1,14 +1,12 @@
-import { redirect } from "next/navigation";
-
 import { AdminClient } from "@/features/admin/components/admin-client";
-import { requireAdminUser } from "@/lib/auth/admin";
+import { assertAdminAccess } from "@/lib/auth/admin";
+import { requireProtectedPageAccess } from "@/lib/auth/session";
 
 export default async function AdminPage() {
-  try {
-    await requireAdminUser();
-  } catch {
-    redirect("/dashboard");
-  }
+  await requireProtectedPageAccess(async (user) => {
+    assertAdminAccess(user);
+    return true;
+  });
 
   return <AdminClient />;
 }

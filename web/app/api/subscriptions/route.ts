@@ -4,12 +4,17 @@ import { subscriptionFormSchema } from "@/features/subscriptions/schemas/subscri
 import { syncDueSubscriptionTransactions } from "@/lib/automation/subscriptions";
 import { requireSessionUser } from "@/lib/auth/session";
 import { revalidateFinanceReports } from "@/lib/cache/finance-read-models";
+import { BenefitWalletRuleError, validateBenefitWalletTransaction } from "@/lib/finance/benefit-wallet";
 import { resolveTransactionClassification } from "@/lib/finance/transaction-classification";
 import { assertTenantTransactionReferences, TenantReferenceError } from "@/lib/finance/tenant-reference-guard";
 import { getMonthRange, normalizeMonthKey } from "@/lib/month";
 import { captureRequestError, captureUnexpectedError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
 import { getSubscriptionBillingDate } from "@/lib/subscriptions/recurrence";
+
+function readAccountUsage(account: unknown) {
+  return (account as { usage?: "standard" | "benefit_food" }).usage ?? "standard";
+}
 
 function getProjectedOccurrenceDate(subscription: { nextBillingDate: Date; billingDay: number }, month: string) {
   const nextBillingMonth = subscription.nextBillingDate.toISOString().slice(0, 7);
@@ -95,7 +100,9 @@ export async function GET(request: Request) {
           isActive: subscription.isActive,
           autoTithe: subscription.autoTithe,
           category: subscription.category ? { id: subscription.category.id, name: subscription.category.name } : null,
-          account: subscription.account ? { id: subscription.account.id, name: subscription.account.name } : null,
+          account: subscription.account
+            ? { id: subscription.account.id, name: subscription.account.name, usage: readAccountUsage(subscription.account) }
+            : null,
           card: subscription.card ? { id: subscription.card.id, name: subscription.card.name } : null
         };
       })
@@ -122,6 +129,15 @@ export async function POST(request: Request) {
       accountId: body.accountId,
       cardId: body.cardId,
       categoryId: body.categoryId
+    });
+    await validateBenefitWalletTransaction({
+      tenantId: user.tenantId,
+      type: body.type,
+      paymentMethod: body.cardId ? "credit_card" : "money",
+      accountId: body.accountId,
+      destinationAccountId: null,
+      categoryId: body.categoryId || null,
+      cardId: body.cardId
     });
 
     const classification = await resolveTransactionClassification({
@@ -175,6 +191,10 @@ export async function POST(request: Request) {
 
     if (error instanceof TenantReferenceError) {
       return NextResponse.json({ message: error.message }, { status: 404 });
+    }
+
+    if (error instanceof BenefitWalletRuleError) {
+      return NextResponse.json({ message: error.message }, { status: 400 });
     }
 
     captureRequestError(error, { request, feature: "subscriptions" });

@@ -99,6 +99,32 @@ body {
     color 240ms ease;
 }
 
+.subtle-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--color-border) 76%, transparent) transparent;
+  scrollbar-gutter: stable;
+}
+
+.subtle-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.subtle-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.subtle-scrollbar::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  background-color: color-mix(in srgb, var(--color-border) 72%, transparent);
+}
+
+.subtle-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in srgb, var(--color-primary) 38%, var(--color-border));
+}
+
 .skip-link {
   position: fixed;
   left: 1rem;
@@ -537,6 +563,40 @@ button {
   padding: 1rem;
 }
 
+.filter-shell {
+  border-radius: 1.5rem;
+  border: 1px solid rgba(80, 107, 96, 0.42);
+  background:
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.08), transparent 32%),
+    linear-gradient(180deg, rgba(21, 31, 35, 0.96) 0%, rgba(17, 25, 29, 0.98) 100%);
+  padding: 1rem 1.05rem;
+}
+
+.filter-kicker {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-primary) 62%, white);
+}
+
+.filter-copy {
+  margin-top: 0.45rem;
+  max-width: 58rem;
+  font-size: 0.92rem;
+  line-height: 1.65;
+  color: var(--color-muted-foreground);
+}
+
+.filter-summary-meta {
+  font-weight: 600;
+  color: var(--color-foreground);
+}
+
+.filter-summary-copy {
+  color: var(--color-muted-foreground);
+}
+
 .attention-panel,
 .warning-panel {
   border-radius: 1.5rem;
@@ -566,9 +626,65 @@ button {
   font-weight: 600;
 }
 
+.danger-panel {
+  border-radius: 1.35rem;
+  border: 1px solid color-mix(in srgb, var(--color-destructive) 28%, var(--color-border));
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--color-destructive) 9%, var(--color-card)) 0%,
+      color-mix(in srgb, var(--color-destructive) 4%, var(--color-card)) 100%
+    );
+  padding: 0.95rem 1rem;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.danger-kicker {
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-destructive) 78%, var(--color-foreground));
+}
+
+.danger-copy {
+  margin-top: 0.45rem;
+  font-size: 0.82rem;
+  line-height: 1.6;
+  color: var(--color-muted-foreground);
+}
+
+:root[data-theme="light"] .danger-panel {
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--color-destructive) 8%, white) 0%,
+      color-mix(in srgb, var(--color-destructive) 4%, var(--color-card)) 100%
+    );
+}
+
+:root[data-theme="light"] .danger-copy {
+  color: var(--color-ink-700);
+}
+
 :root[data-theme="light"] .muted-panel {
   background: rgba(249, 242, 228, 0.96);
   border-color: rgba(214, 199, 172, 0.75);
+}
+
+:root[data-theme="light"] .filter-shell {
+  border-color: rgba(174, 151, 112, 0.3);
+  background:
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.62), transparent 32%),
+    linear-gradient(180deg, rgba(255, 248, 236, 0.97) 0%, rgba(250, 242, 226, 0.99) 100%);
+}
+
+:root[data-theme="light"] .filter-kicker {
+  color: color-mix(in srgb, var(--color-primary) 68%, var(--color-ink-900));
+}
+
+:root[data-theme="light"] .filter-copy {
+  color: color-mix(in srgb, var(--color-muted-foreground) 86%, var(--color-ink-900));
 }
 
 :root[data-theme="light"] .attention-panel {

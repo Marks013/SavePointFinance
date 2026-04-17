@@ -4,6 +4,7 @@ import { logAdminAudit } from "@/lib/admin/audit";
 import { requireAdminUser } from "@/lib/auth/admin";
 import { applyPlanDefaultsToTenant } from "@/lib/licensing/default-plans";
 import { prisma } from "@/lib/prisma/client";
+import { deleteTenantWithAllData, getDeletableTenant } from "@/lib/tenants/delete-tenant";
 
 type Params = {
   params: Promise<{ id: string }>;
@@ -103,5 +104,59 @@ export async function PATCH(request: Request, context: Params) {
     }
 
     return NextResponse.json({ message: "Failed to update tenant" }, { status: 400 });
+  }
+}
+
+export async function DELETE(_request: Request, context: Params) {
+  try {
+    const admin = await requireAdminUser();
+    const { id } = await context.params;
+
+    if (!admin.isPlatformAdmin) {
+      return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+    }
+
+    if (id === admin.tenantId) {
+      return NextResponse.json(
+        { message: "A conta principal do superadmin não pode ser excluída por este fluxo" },
+        { status: 400 }
+      );
+    }
+
+    const target = await getDeletableTenant(id);
+
+    if (!target) {
+      return NextResponse.json({ message: "Conta não encontrada" }, { status: 404 });
+    }
+
+    const deleted = await deleteTenantWithAllData({ tenantId: id });
+
+    await logAdminAudit({
+      actorUserId: admin.id,
+      actorTenantId: admin.tenantId,
+      action: "tenant.deleted",
+      entityType: "tenant",
+      entityId: deleted.id,
+      summary: `Conta removida definitivamente: ${deleted.name}`,
+      metadata: {
+        deletedTenantId: deleted.id,
+        deletedTenantName: deleted.name,
+        deletedTenantSlug: deleted.slug,
+        totalUsers: deleted.totalUsers,
+        activeUsers: deleted.activeUsers
+      }
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    if (error instanceof Error && (error.message === "Unauthorized" || error.message === "Forbidden")) {
+      return NextResponse.json({ message: error.message }, { status: error.message === "Forbidden" ? 403 : 401 });
+    }
+
+    if (error instanceof Error) {
+      return NextResponse.json({ message: error.message }, { status: 400 });
+    }
+
+    return NextResponse.json({ message: "Falha ao excluir conta" }, { status: 400 });
   }
 }

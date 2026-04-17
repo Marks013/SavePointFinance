@@ -329,12 +329,14 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
         },
         financialAccount: {
           select: {
-            name: true
+            name: true,
+            usage: true
           }
         },
         destinationAccount: {
           select: {
-            name: true
+            name: true,
+            usage: true
           }
         },
         card: {
@@ -449,6 +451,7 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
     {
       id: string;
       name: string;
+      usage: string;
       income: number;
       expense: number;
       transferIn: number;
@@ -479,6 +482,12 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
     savingsRate: 0,
     uncategorizedExpense: 0
   };
+  const benefits = {
+    foodWallets: 0,
+    foodBalance: 0,
+    foodIncome: 0,
+    foodExpense: 0
+  };
   let classifiedAutomatically = 0;
   let uncategorizedTransactions = 0;
   for (const transaction of transactions) {
@@ -496,11 +505,19 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
     if (transaction.type === TransactionType.income) {
       summary.income += amount;
       monthly.income += amount;
+
+      if (transaction.financialAccount?.usage === "benefit_food") {
+        benefits.foodIncome += amount;
+      }
     }
 
     if (transaction.type === TransactionType.expense) {
       summary.expense += amount;
       monthly.expense += amount;
+
+      if (transaction.financialAccount?.usage === "benefit_food") {
+        benefits.foodExpense += amount;
+      }
 
       const categoryName = transaction.category?.name ?? "Sem categoria";
       if (!transaction.categoryId) {
@@ -535,6 +552,7 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
       const account = accountMap.get(transaction.accountId) ?? {
         id: transaction.accountId,
         name: transaction.financialAccount.name,
+        usage: transaction.financialAccount.usage,
         income: 0,
         expense: 0,
         transferIn: 0,
@@ -564,6 +582,7 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
       const account = accountMap.get(transaction.destinationAccountId) ?? {
         id: transaction.destinationAccountId,
         name: transaction.destinationAccount.name,
+        usage: transaction.destinationAccount.usage,
         income: 0,
         expense: 0,
         transferIn: 0,
@@ -822,6 +841,8 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
   }));
   const topCategory = categoryInsights[0] ?? null;
   const activeAccountBalances = new Map<string, AccountBalancePoint>();
+  const benefitAccounts = accounts.filter((account) => account.isActive && account.usage === "benefit_food");
+  benefits.foodWallets = benefitAccounts.length;
 
   for (const account of accounts) {
     if (!account.isActive) {
@@ -888,6 +909,10 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
       opening: 0,
       closing: 0
     }
+  );
+  benefits.foodBalance = benefitAccounts.reduce(
+    (sum, account) => sum + (activeAccountBalances.get(account.id)?.closing ?? Number(account.openingBalance)),
+    0
   );
   const periodScope = detectPeriodScope(projectionStart, projectionEnd);
   const periodMonths = periodMonthKeys.length;
@@ -1056,6 +1081,7 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
       baseMonthLabel: formatMonthKeyLabel(baseMonthKey)
     },
     summary,
+    benefits,
     classification: {
       autoClassified: classifiedAutomatically,
       uncategorized: uncategorizedTransactions,
@@ -1151,7 +1177,10 @@ export async function getFinanceReport(tenantId: string, filters: FinanceReportF
         amount: Number(transaction.amount),
         type: transaction.type,
         date: transaction.date.toISOString(),
-        category: transaction.category?.name ?? "Sem categoria",
+        category:
+          transaction.type === TransactionType.transfer
+            ? "Transferência entre contas"
+            : transaction.category?.name ?? "Sem categoria",
         account: transaction.financialAccount?.name ?? null,
         destinationAccount: transaction.destinationAccount?.name ?? null,
         card: transaction.card?.name ?? null
