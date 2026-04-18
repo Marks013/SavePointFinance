@@ -375,8 +375,11 @@ button {
 .data-card,
 .editorial-panel {
   position: relative;
-  overflow: hidden;
   isolation: isolate;
+}
+
+.motion-card {
+  overflow: hidden;
 }
 
 .motion-card::before,
