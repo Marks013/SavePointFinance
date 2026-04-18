@@ -775,6 +775,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               <QuickAccessLink copy="Saldo, bancos e movimentação por conta." href="/dashboard/accounts" label="Contas" month={month} />
               <QuickAccessLink copy="Faturas, limite e uso mensal." href="/dashboard/cards" label="Cartões" month={month} />
               <QuickAccessLink copy="Objetivos e reservas planejadas." href="/dashboard/goals" label="Metas" month={month} />
+              <QuickAccessLink copy="Lançamentos rápidos, comandos e integração principal." href="/dashboard/whatsapp" label="WhatsApp" month={month} />
               <QuickAccessLink copy="Perfil, notificações e automações." href="/dashboard/settings" label="Configurações" month={month} />
             </div>
           </article>

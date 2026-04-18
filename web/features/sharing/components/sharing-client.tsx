@@ -236,53 +236,66 @@ export function SharingClient() {
       ) : null}
 
       <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-        <section className="surface content-section">
-          <h2 className="text-2xl font-semibold tracking-[-0.03em]">Convidar familiar ou cônjuge</h2>
-          <p className="mt-2 text-sm leading-7 text-[var(--color-muted-foreground)]">
-            O compartilhamento permite apenas 1 convidado por vez. Para trocar a pessoa, primeiro revogue o acesso atual
-            ou o convite pendente.
-          </p>
-          <form
-            className="mt-6 space-y-4"
-            onSubmit={form.handleSubmit(
-              (values) => createInvitationMutation.mutate(values),
-              (errors) => {
-                const firstError = errors.name?.message || errors.email?.message;
-                toast.error(firstError ?? "Revise os dados do convite");
-              }
-            )}
-          >
-            <div className="space-y-2">
-              <Label htmlFor="sharing-family-name">Nome</Label>
-              <Input
-                disabled={!canManage || Boolean(activeMembers[0]) || Boolean(activeInvitation)}
-                id="sharing-family-name"
-                placeholder="Ex.: Ana Silva"
-                {...form.register("name")}
-              />
+        {activeMembers[0] ? (
+          <section className="surface content-section">
+            <h2 className="text-2xl font-semibold tracking-[-0.03em]">Compartilhamento ativo</h2>
+            <p className="mt-2 text-sm leading-7 text-[var(--color-muted-foreground)]">
+              Esta carteira já está compartilhada com uma pessoa ativa. Para convidar outra, primeiro revogue o acesso
+              atual.
+            </p>
+            <div className="muted-panel mt-6 text-sm text-[var(--color-muted-foreground)]">
+              O formulário de convite fica oculto enquanto houver um compartilhamento aceito em andamento.
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="sharing-family-email">E-mail</Label>
-              <Input
-                disabled={!canManage || Boolean(activeMembers[0]) || Boolean(activeInvitation)}
-                id="sharing-family-email"
-                placeholder="ana@email.com"
-                type="email"
-                {...form.register("email")}
-              />
-            </div>
-            <div className="muted-panel text-sm text-[var(--color-muted-foreground)]">
-              A pessoa convidada entra sempre como familiar da carteira compartilhada e não pode gerenciar convites.
-            </div>
-            <Button
-              className="w-full"
-              disabled={!canManage || Boolean(activeMembers[0]) || Boolean(activeInvitation) || createInvitationMutation.isPending}
-              type="submit"
+          </section>
+        ) : (
+          <section className="surface content-section">
+            <h2 className="text-2xl font-semibold tracking-[-0.03em]">Convidar familiar ou cônjuge</h2>
+            <p className="mt-2 text-sm leading-7 text-[var(--color-muted-foreground)]">
+              O compartilhamento permite apenas 1 convidado por vez. Para trocar a pessoa, primeiro revogue o acesso atual
+              ou o convite pendente.
+            </p>
+            <form
+              className="mt-6 space-y-4"
+              onSubmit={form.handleSubmit(
+                (values) => createInvitationMutation.mutate(values),
+                (errors) => {
+                  const firstError = errors.name?.message || errors.email?.message;
+                  toast.error(firstError ?? "Revise os dados do convite");
+                }
+              )}
             >
-              {createInvitationMutation.isPending ? "Enviando convite..." : "Enviar convite"}
-            </Button>
-          </form>
-        </section>
+              <div className="space-y-2">
+                <Label htmlFor="sharing-family-name">Nome</Label>
+                <Input
+                  disabled={!canManage || Boolean(activeInvitation)}
+                  id="sharing-family-name"
+                  placeholder="Ex.: Ana Silva"
+                  {...form.register("name")}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="sharing-family-email">E-mail</Label>
+                <Input
+                  disabled={!canManage || Boolean(activeInvitation)}
+                  id="sharing-family-email"
+                  placeholder="ana@email.com"
+                  type="email"
+                  {...form.register("email")}
+                />
+              </div>
+              <div className="muted-panel text-sm text-[var(--color-muted-foreground)]">
+                A pessoa convidada entra sempre como familiar da carteira compartilhada e não pode gerenciar convites.
+              </div>
+              <Button
+                className="w-full"
+                disabled={!canManage || Boolean(activeInvitation) || createInvitationMutation.isPending}
+                type="submit"
+              >
+                {createInvitationMutation.isPending ? "Enviando convite..." : "Enviar convite"}
+              </Button>
+            </form>
+          </section>
+        )}
 
         <section className="surface content-section">
           <h2 className="text-2xl font-semibold tracking-[-0.03em]">Pessoa compartilhando a carteira</h2>

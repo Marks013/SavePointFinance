@@ -18,6 +18,7 @@ import {
   ShieldCheck,
   Split,
   Target,
+  MessageCircleMore,
   Wallet,
   UsersRound
 } from "lucide-react";
@@ -38,6 +39,7 @@ const navigation = [
   { href: "/dashboard/installments" as Route, label: "Parcelas", icon: Split },
   { href: "/dashboard/goals" as Route, label: "Metas", icon: Target },
   { href: "/dashboard/reports" as Route, label: "Relatórios", icon: ChartColumnBig },
+  { href: "/dashboard/whatsapp" as Route, label: "WhatsApp", icon: MessageCircleMore },
   { href: "/dashboard/settings" as Route, label: "Configurações", icon: Settings }
 ];
 

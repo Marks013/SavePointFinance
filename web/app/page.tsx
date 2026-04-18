@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, BarChart3, CircleDollarSign, CreditCard, ShieldCheck, Sparkles, Target } from "lucide-react";
+import { ArrowRight, BarChart3, CircleDollarSign, CreditCard, MessageCircleMore, ShieldCheck, Sparkles, Target } from "lucide-react";
 
 import { BrandMark } from "@/components/layout/brand-mark";
 import { Button } from "@/components/ui/button";
@@ -11,18 +11,23 @@ const pillars = [
     icon: CircleDollarSign
   },
   {
-    title: "Operacao verticalizada",
-    copy: "O produto conduz a rotina em blocos objetivos, com menos dispersao visual e menos cara de planilha web.",
+    title: "Operação verticalizada",
+    copy: "O produto conduz a rotina em blocos objetivos, com menos dispersão visual e menos cara de planilha web.",
     icon: CreditCard
   },
   {
     title: "Controle com previsibilidade",
-    copy: "Relatorios, metas e vencimentos ajudam a antecipar decisoes, e nao apenas reagir ao mes fechado.",
+    copy: "Relatórios, metas e vencimentos ajudam a antecipar decisões, e não apenas reagir ao mês fechado.",
     icon: Target
+  },
+  {
+    title: "WhatsApp como atalho principal",
+    copy: "Lançamentos, consultas e rotina do dia ganham velocidade com comandos naturais no canal mais usado.",
+    icon: MessageCircleMore
   }
 ];
 
-const highlights = ["Fluxo unico para contas, cartoes e metas", "Leitura objetiva para faturas e relatorios", "Comprovantes e rotina no mesmo contexto"];
+const highlights = ["Fluxo único para contas, cartões e metas", "Leitura objetiva para faturas e relatórios", "Comprovantes e rotina no mesmo contexto"];
 
 const securityPillars = [
   {
@@ -51,8 +56,8 @@ export default function HomePage() {
               Controle financeiro com linguagem visual mais forte, mais noturna e mais proprietária.
             </h1>
             <p className="max-w-2xl text-base leading-8 text-white/82 md:text-lg">
-              O Save Point Finança organiza contas, cartoes, metas, recorrencias, alertas e
-              leitura mensal em uma interface mais premium, mais ritmada e mais facil de acompanhar.
+              O Save Point Finança organiza contas, cartões, metas, recorrências, alertas e
+              leitura mensal em uma interface mais premium, mais ritmada e mais fácil de acompanhar.
             </p>
             <div className="flex flex-wrap gap-3">
               <Button asChild>
@@ -91,10 +96,10 @@ export default function HomePage() {
               </div>
             </article>
 
-            <article className="grid gap-3 md:grid-cols-3">
+            <article className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               <div className="rounded-[26px] border border-white/12 bg-white/9 p-5">
-                <p className="metric-label text-white/76">Operacao</p>
-                <p className="mt-3 text-2xl font-semibold tracking-[-0.05em] text-white">Contas e cartoes</p>
+                <p className="metric-label text-white/76">Operação</p>
+                <p className="mt-3 text-2xl font-semibold tracking-[-0.05em] text-white">Contas e cartões</p>
               </div>
               <div className="rounded-[26px] border border-white/12 bg-white/9 p-5">
                 <p className="metric-label text-white/76">Acompanhamento</p>
@@ -102,7 +107,11 @@ export default function HomePage() {
               </div>
               <div className="rounded-[26px] border border-white/12 bg-white/9 p-5">
                 <p className="metric-label text-white/76">Leitura</p>
-                <p className="mt-3 text-2xl font-semibold tracking-[-0.05em] text-white">Relatorios mensais</p>
+                <p className="mt-3 text-2xl font-semibold tracking-[-0.05em] text-white">Relatórios mensais</p>
+              </div>
+              <div className="rounded-[26px] border border-white/12 bg-white/9 p-5">
+                <p className="metric-label text-white/76">Canal principal</p>
+                <p className="mt-3 text-2xl font-semibold tracking-[-0.05em] text-white">WhatsApp integrado</p>
               </div>
             </article>
           </div>
@@ -112,18 +121,18 @@ export default function HomePage() {
       <section className="mt-6 grid gap-4 xl:grid-cols-[0.92fr_1.08fr]" id="visao-geral">
         <article className="surface content-section">
           <div className="section-stack">
-            <div className="eyebrow">Antes da operacao</div>
+            <div className="eyebrow">Antes da operação</div>
             <h2 className="section-title">A entrada no produto agora antecipa a sensação do painel e deixa a marca mais memorável.</h2>
             <p className="section-copy">
               A estrutura foi ajustada para o que importa: marca mais forte, contraste mais rico,
-              camadas suaves de movimento e leitura editorial. O foco aqui e valor percebido, nao excesso de componentes.
+              camadas suaves de movimento e leitura editorial. O foco aqui é valor percebido, não excesso de componentes.
             </p>
             <div className="editorial-rule" />
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="editorial-panel">
                 <p className="metric-label">Marca</p>
                 <p className="mt-3 text-lg font-semibold tracking-[-0.04em] text-[var(--color-foreground)]">
-                  Identidade mais proprietaria e menos genérica.
+                  Identidade mais proprietária e menos genérica.
                 </p>
               </div>
               <div className="editorial-panel">
@@ -159,10 +168,11 @@ export default function HomePage() {
         <article className="surface rounded-[38px] px-8 py-10 md:px-10 md:py-12">
           <div className="section-stack">
             <div className="eyebrow">Rotina centralizada</div>
-            <h2 className="section-title">Uma experiencia mais escura, mais densa e mais elegante para quem acompanha dinheiro todos os dias.</h2>
+            <h2 className="section-title">Uma experiência mais escura, mais densa e mais elegante para quem acompanha dinheiro todos os dias.</h2>
             <p className="section-copy">
-              O foco agora e deixar a pagina de entrada mais sofisticada e mais coerente com o
-              produto que existe depois do login: controle, leitura, previsibilidade e ritmo visual.
+              O foco agora é deixar a página de entrada mais sofisticada e mais coerente com o
+              produto que existe depois do login: controle, leitura, previsibilidade, ritmo visual e um WhatsApp que
+              realmente acelera a operação.
             </p>
           </div>
 
@@ -173,7 +183,7 @@ export default function HomePage() {
                 <p className="font-semibold text-[var(--color-foreground)]">Acesso protegido</p>
               </div>
               <p className="mt-3 text-sm leading-7 text-[var(--color-ink-700)]">
-                Entrada direta no sistema com foco na operacao do usuario.
+                Entrada direta no sistema com foco na operação do usuário.
               </p>
             </article>
             <article className="muted-panel">
@@ -182,7 +192,16 @@ export default function HomePage() {
                 <p className="font-semibold text-[var(--color-foreground)]">Leitura mensal</p>
               </div>
               <p className="mt-3 text-sm leading-7 text-[var(--color-ink-700)]">
-                Relatorios e faturas reunidos em leitura rapida e objetiva.
+                Relatórios e faturas reunidos em leitura rápida e objetiva.
+              </p>
+            </article>
+            <article className="muted-panel">
+              <div className="flex items-center gap-3">
+                <MessageCircleMore className="size-5 text-[var(--color-primary)]" />
+                <p className="font-semibold text-[var(--color-foreground)]">WhatsApp em primeiro plano</p>
+              </div>
+              <p className="mt-3 text-sm leading-7 text-[var(--color-ink-700)]">
+                Registre gastos e consulte o financeiro sem sair da conversa.
               </p>
             </article>
           </div>
@@ -195,10 +214,10 @@ export default function HomePage() {
               <span className="text-sm font-semibold uppercase tracking-[0.18em]">Entrada no painel</span>
             </div>
             <h2 className="max-w-md text-[clamp(2rem,4vw,3.4rem)] font-semibold tracking-[-0.06em] text-white">
-              Sua conta ja esta pronta para o uso diario.
+              Sua conta já está pronta para o uso diário.
             </h2>
             <p className="max-w-md text-base leading-8 text-white/82">
-              Entre no painel para testar transacoes, contas, metas, relatorios e controle de acesso no
+              Entre no painel para testar transações, contas, metas, relatórios e controle de acesso no
               mesmo fluxo operacional.
             </p>
             <div className="flex flex-wrap gap-3">

@@ -3,8 +3,11 @@ import { z } from "zod";
 
 import { requireSessionUser } from "@/lib/auth/session";
 import { revalidateFinanceReports } from "@/lib/cache/finance-read-models";
-import { deriveRuleKeyword } from "@/lib/finance/category-rules";
-import { invalidateTenantClassificationCache } from "@/lib/finance/classification-cache";
+import { deriveAiLearnedRuleKeyword, deriveRuleKeyword } from "@/lib/finance/category-rules";
+import {
+  invalidateGlobalClassificationCache,
+  invalidateTenantClassificationCache
+} from "@/lib/finance/classification-cache";
 import { captureRequestError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
 
@@ -53,7 +56,8 @@ export async function PATCH(request: Request, context: Params) {
         type: categoryType
       },
       select: {
-        id: true
+        id: true,
+        systemKey: true
       }
     });
 
@@ -69,9 +73,12 @@ export async function PATCH(request: Request, context: Params) {
       select: {
         id: true,
         parentId: true,
+        categoryId: true,
         description: true,
         notes: true,
-        classificationKeyword: true
+        classificationKeyword: true,
+        aiClassified: true,
+        aiConfidence: true
       }
     });
 
@@ -79,23 +86,54 @@ export async function PATCH(request: Request, context: Params) {
       return NextResponse.json({ message: "Transaction not found" }, { status: 404 });
     }
 
-    const ruleKeyword = deriveRuleKeyword({
+    const manualRuleKeyword = deriveRuleKeyword({
       existingKeyword: target.classificationKeyword,
       description: target.description,
       notes: target.notes
     });
+    const globalRuleKeyword =
+      target.aiClassified && category.systemKey
+        ? deriveAiLearnedRuleKeyword({
+            existingKeyword: target.classificationKeyword,
+            description: target.description,
+            notes: target.notes
+          })
+        : null;
+    const shouldPromoteAiSuggestionGlobally =
+      target.aiClassified &&
+      target.categoryId === category.id &&
+      Boolean(category.systemKey) &&
+      Boolean(globalRuleKeyword);
     const rootId = target.parentId ?? target.id;
 
     await prisma.$transaction(async (tx) => {
-      const transactionData = {
-        categoryId: category.id,
-        classificationSource: "manual_rule" as const,
-        classificationKeyword: ruleKeyword,
-        classificationReason: "Classificacao revisada manualmente",
-        classificationVersion: 2,
-        aiClassified: false,
-        aiConfidence: null
-      };
+      const globalCategoryRuleDelegate = (
+        tx as typeof tx & {
+          globalCategoryRule: {
+            upsert: (args: Record<string, unknown>) => Promise<unknown>;
+          };
+        }
+      ).globalCategoryRule;
+
+      const transactionData = shouldPromoteAiSuggestionGlobally
+        ? {
+            categoryId: category.id,
+            classificationSource: "ai_learned" as const,
+            classificationKeyword: globalRuleKeyword,
+            classificationReason: "Sugestao de IA validada e promovida para memoria global",
+            classificationVersion: 2,
+            aiClassified: true,
+            aiConfidence: target.aiConfidence
+          }
+        : {
+            categoryId: category.id,
+            classificationSource: "manual_rule" as const,
+            classificationKeyword: manualRuleKeyword,
+            classificationReason: "Classificacao revisada manualmente",
+            classificationVersion: 2,
+            aiClassified: false,
+            aiConfidence: null
+          };
 
       if (body.applyToInstallments) {
         await tx.transaction.updateMany({
@@ -115,7 +153,46 @@ export async function PATCH(request: Request, context: Params) {
         });
       }
 
-      if (!ruleKeyword) {
+      if (shouldPromoteAiSuggestionGlobally && globalRuleKeyword && category.systemKey) {
+        await globalCategoryRuleDelegate.upsert({
+          where: {
+            type_normalizedKeyword_matchMode: {
+              type: categoryType,
+              normalizedKeyword: globalRuleKeyword,
+              matchMode: "exact_phrase"
+            }
+          },
+          update: {
+            categorySystemKey: category.systemKey,
+            priority: 750,
+            confidence: target.aiConfidence ?? 0.99,
+            acceptedCount: {
+              increment: 1
+            },
+            lastAcceptedAt: new Date(),
+            isActive: true,
+            createdFromTenantId: user.tenantId,
+            createdFromTransactionId: target.id
+          },
+          create: {
+            type: categoryType,
+            categorySystemKey: category.systemKey,
+            normalizedKeyword: globalRuleKeyword,
+            matchMode: "exact_phrase",
+            priority: 750,
+            confidence: target.aiConfidence ?? 0.99,
+            acceptedCount: 1,
+            lastAcceptedAt: new Date(),
+            isActive: true,
+            createdFromTenantId: user.tenantId,
+            createdFromTransactionId: target.id
+          }
+        });
+
+        return;
+      }
+
+      if (!manualRuleKeyword) {
         return;
       }
 
@@ -123,7 +200,7 @@ export async function PATCH(request: Request, context: Params) {
         where: {
           tenantId: user.tenantId,
           type: categoryType,
-          normalizedKeyword: ruleKeyword,
+          normalizedKeyword: manualRuleKeyword,
           source: "ai_learned",
           isActive: true
         },
@@ -136,7 +213,7 @@ export async function PATCH(request: Request, context: Params) {
         where: {
           tenantId: user.tenantId,
           type: categoryType,
-          normalizedKeyword: ruleKeyword,
+          normalizedKeyword: manualRuleKeyword,
           source: "manual",
           matchMode: "exact_phrase"
         },
@@ -164,7 +241,7 @@ export async function PATCH(request: Request, context: Params) {
             tenantId: user.tenantId,
             categoryId: category.id,
             type: categoryType,
-            normalizedKeyword: ruleKeyword,
+            normalizedKeyword: manualRuleKeyword,
             source: "manual",
             matchMode: "exact_phrase",
             priority: 1000,
@@ -176,6 +253,7 @@ export async function PATCH(request: Request, context: Params) {
     });
 
     invalidateTenantClassificationCache(user.tenantId);
+    invalidateGlobalClassificationCache();
     revalidateFinanceReports(user.tenantId);
 
     return NextResponse.json({ success: true });

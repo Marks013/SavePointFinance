@@ -267,6 +267,27 @@ model CategoryRule {
   @@index([categoryId, isActive])
 }
 
+model GlobalCategoryRule {
+  id                       String                @id @default(cuid())
+  type                     CategoryType
+  categorySystemKey        String
+  normalizedKeyword        String
+  matchMode                CategoryRuleMatchMode @default(exact_phrase)
+  priority                 Int                   @default(700)
+  confidence               Decimal?              @db.Decimal(3, 2)
+  acceptedCount            Int                   @default(1)
+  createdFromTenantId      String?
+  createdFromTransactionId String?
+  lastAcceptedAt           DateTime?
+  isActive                 Boolean               @default(true)
+  createdAt                DateTime              @default(now())
+  updatedAt                DateTime              @updatedAt
+
+  @@unique([type, normalizedKeyword, matchMode])
+  @@index([type, isActive, priority])
+  @@index([categorySystemKey, isActive])
+}
+
 model FinancialAccount {
   id           String        @id @default(cuid())
   tenantId     String

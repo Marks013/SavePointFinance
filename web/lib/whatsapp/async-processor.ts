@@ -3,7 +3,9 @@ import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma/client";
 import { captureUnexpectedError } from "@/lib/observability/sentry";
 import { processIncomingWhatsAppTextMessage } from "@/lib/whatsapp/assistant";
+import { buildCommandFromWhatsAppMedia } from "@/lib/whatsapp/media-understanding";
 import { sendWhatsAppTextMessage } from "@/lib/whatsapp/cloud-api";
+import { sanitizeAssistantText } from "@/lib/whatsapp/text-sanitizer";
 import { type WhatsAppWebhookPayload } from "@/lib/whatsapp/webhook-payload";
 
 type ProcessWhatsAppMessageAsyncInput = {
@@ -11,6 +13,9 @@ type ProcessWhatsAppMessageAsyncInput = {
   phoneNumber: string | null;
   body: string | null;
   type: string | null;
+  mediaId: string | null;
+  mimeType: string | null;
+  caption: string | null;
   payload: WhatsAppWebhookPayload;
 };
 
@@ -88,23 +93,92 @@ export async function processWhatsAppMessageAsync(input: ProcessWhatsAppMessageA
       return;
     }
 
-    if (input.type !== "text" || !input.phoneNumber || !input.body) {
+    if (!input.phoneNumber) {
       await markWebhookStatus(
         input.eventId,
         "SUCCESS",
-        "Ignored webhook without a supported text message payload."
+        "Ignored webhook without a phone number."
       );
       return;
     }
 
-    const result = await processIncomingWhatsAppTextMessage({
-      messageId: input.eventId,
-      phoneNumber: input.phoneNumber,
-      body: input.body
-    });
+    let result:
+      | Awaited<ReturnType<typeof processIncomingWhatsAppTextMessage>>
+      | {
+          handled: true;
+          to: string;
+          response: string;
+          logContext?: undefined;
+        };
+
+    if (input.type === "text" && input.body) {
+      result = await processIncomingWhatsAppTextMessage({
+        messageId: input.eventId,
+        phoneNumber: input.phoneNumber,
+        body: input.body
+      });
+    } else if ((input.type === "audio" || input.type === "image") && input.mediaId) {
+      let mediaDraft:
+        | Awaited<ReturnType<typeof buildCommandFromWhatsAppMedia>>
+        | {
+            ok: false;
+            response: string;
+          };
+
+      try {
+        mediaDraft = await buildCommandFromWhatsAppMedia({
+          mediaId: input.mediaId,
+          type: input.type,
+          mimeType: input.mimeType,
+          caption: input.caption
+        });
+      } catch (mediaError) {
+        console.error(`[WhatsApp] Failed to analyze media for event ${input.eventId}`, mediaError);
+        mediaDraft = {
+          ok: false,
+          response:
+            input.type === "audio"
+              ? "🎙️ Recebi seu áudio, mas não consegui transcrevê-lo agora. Tente reenviar ou mandar o lançamento em texto."
+              : "🧾 Recebi sua imagem, mas não consegui ler o comprovante agora. Tente reenviar uma foto mais nítida ou mandar a descrição em texto."
+        };
+      }
+
+      if (!mediaDraft.ok) {
+        result = {
+          handled: true,
+          to: input.phoneNumber,
+          response: mediaDraft.response
+        };
+      } else {
+        const parsed = await processIncomingWhatsAppTextMessage({
+          messageId: input.eventId,
+          phoneNumber: input.phoneNumber,
+          body: mediaDraft.command
+        });
+
+        result = {
+          ...parsed,
+          response: [
+            input.type === "audio"
+              ? `🎙️ Entendi seu áudio como: _${mediaDraft.command}_`
+              : `🧾 Li seu comprovante como: _${mediaDraft.command}_`,
+            "",
+            parsed.response
+          ].join("\n")
+        };
+      }
+    } else {
+      await markWebhookStatus(
+        input.eventId,
+        "SUCCESS",
+        `Ignored webhook without supported payload. Type: ${input.type ?? "unknown"}`
+      );
+      return;
+    }
 
     if (result.handled) {
-      const delivery = await sendWhatsAppTextMessage(result.to, result.response);
+      const sanitizedResponse = sanitizeAssistantText(result.response);
+      const delivery = await sendWhatsAppTextMessage(result.to, sanitizedResponse);
 
       if (result.logContext) {
         await prisma.whatsAppMessage.create({
@@ -114,10 +188,10 @@ export async function processWhatsAppMessageAsync(input: ProcessWhatsAppMessageA
             phoneNumber: result.logContext.phoneNumber,
             direction: "outbound",
             messageId: delivery.messageId,
-            body: result.response,
+            body: sanitizedResponse,
             intent: result.logContext.intent,
             status: delivery.ok ? "sent" : `failed:${delivery.status}`,
-            response: result.response
+            response: sanitizedResponse
           }
         });
       }

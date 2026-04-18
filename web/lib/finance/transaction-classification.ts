@@ -7,18 +7,16 @@ import {
 
 import { classifyTransactionCategory } from "@/lib/finance/category-classifier";
 import {
-  getTenantClassificationContext,
-  invalidateTenantClassificationCache
+  getGlobalClassificationRules,
+  getTenantClassificationContext
 } from "@/lib/finance/classification-cache";
 import {
-  deriveAiLearnedRuleKeyword,
   matchCategoryKeywords,
+  matchGlobalCategoryRules,
   matchTenantCategoryRules,
-  upsertAiLearnedCategoryRule
 } from "@/lib/finance/category-rules";
 import { ensureFallbackCategory } from "@/lib/finance/default-categories";
 import { matchGlobalKeywordContext } from "@/lib/finance/global-keywords";
-import { captureUnexpectedError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
 import { isAllowedBenefitFoodCategory } from "@/lib/finance/benefit-wallet-rules";
 
@@ -41,8 +39,6 @@ type ClassificationOutput = {
   classificationKeyword: string | null;
   reason: string;
 };
-
-const MIN_AI_LEARNING_CONFIDENCE = 0.82;
 
 export async function resolveTransactionClassification(
   input: ClassificationInput
@@ -69,7 +65,10 @@ export async function resolveTransactionClassification(
     };
   }
 
-  const { categories: tenantCategories, rules: tenantCategoryRules } = await getTenantClassificationContext(input.tenantId);
+  const [{ categories: tenantCategories, rules: tenantCategoryRules }, globalClassificationRules] = await Promise.all([
+    getTenantClassificationContext(input.tenantId),
+    getGlobalClassificationRules()
+  ]);
   const allowedCategorySystemKeys = new Set(input.allowedCategorySystemKeys ?? []);
   const restrictCategories = allowedCategorySystemKeys.size > 0;
   const categories = tenantCategories.filter((category) => {
@@ -150,6 +149,23 @@ export async function resolveTransactionClassification(
     };
   }
 
+  const globalAiLearnedRuleMatch = matchGlobalCategoryRules(globalClassificationRules, categories, {
+    type: input.type,
+    description: input.description,
+    notes: input.notes ?? null
+  });
+
+  if (globalAiLearnedRuleMatch) {
+    return {
+      categoryId: globalAiLearnedRuleMatch.categoryId,
+      confidence: globalAiLearnedRuleMatch.confidence,
+      aiClassified: true,
+      classificationSource: globalAiLearnedRuleMatch.classificationSource,
+      classificationKeyword: globalAiLearnedRuleMatch.classificationKeyword,
+      reason: globalAiLearnedRuleMatch.reason
+    };
+  }
+
   const globalMatch = matchGlobalKeywordContext({
     description: input.description,
     notes: input.notes ?? null,
@@ -225,48 +241,8 @@ export async function resolveTransactionClassification(
       }))
   });
 
-  let classificationKeyword = classification.classificationKeyword;
-
-  if (
-    classification.aiClassified &&
-    classification.categoryId &&
-    (classification.confidence ?? 0) >= MIN_AI_LEARNING_CONFIDENCE
-  ) {
-    const learnedKeyword = deriveAiLearnedRuleKeyword({
-      existingKeyword: classification.classificationKeyword,
-      description: input.description,
-      notes: input.notes ?? null
-    });
-
-    if (learnedKeyword) {
-      classificationKeyword = learnedKeyword;
-
-      try {
-        await upsertAiLearnedCategoryRule({
-          tenantId: input.tenantId,
-          categoryId: classification.categoryId,
-          type: input.type,
-          description: input.description,
-          notes: input.notes ?? null,
-          existingKeyword: learnedKeyword,
-          confidence: classification.confidence
-        });
-        invalidateTenantClassificationCache(input.tenantId);
-      } catch (error) {
-        captureUnexpectedError(error, {
-          surface: "classification",
-          operation: "learn-ai-rule",
-          feature: "transactions",
-          tenantId: input.tenantId,
-          dedupeKey: `classification:ai-learned:${input.tenantId}:${classification.categoryId}:${learnedKeyword}`
-        });
-      }
-    }
-  }
-
   return {
     ...classification,
-    classificationKeyword,
     categoryId:
       classification.categoryId ??
       (restrictCategories ? null : await ensureFallbackCategory(input.tenantId, input.type))

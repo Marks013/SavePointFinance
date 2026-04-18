@@ -65,6 +65,9 @@ export async function POST(request: Request) {
             phoneNumber: message.phoneNumber,
             body: message.body,
             type: message.type,
+            mediaId: message.mediaId,
+            mimeType: message.mimeType,
+            caption: message.caption,
             payload
           })
         )

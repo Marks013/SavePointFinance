@@ -1156,9 +1156,9 @@ export function AdminClient() {
               </div>
             ) : null}
             <div className="filter-shell">
-              <p className="filter-kicker">Recorte operacional</p>
+              <p className="filter-kicker">Filtros de contas</p>
               <p className="filter-copy">
-                Encontre rapidamente a conta certa e ajuste plano, ciclo e status sem poluir a leitura do painel.
+                Encontre a conta certa e ajuste plano, ciclo e status com mais clareza.
               </p>
             </div>
             <div className="grid gap-3 xl:grid-cols-4">
@@ -1184,7 +1184,7 @@ export function AdminClient() {
               <article key={tenant.id} className="data-card p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
-                    <p className="font-semibold">{tenant.name}</p>
+                    <p className="break-words font-semibold">{tenant.name}</p>
                     <p className="break-words text-sm text-[var(--color-muted-foreground)]">
                       Conta {tenant.slug} • Plano {tenant.planName}
                     </p>
@@ -1192,7 +1192,7 @@ export function AdminClient() {
                       {formatLifecycleLabel(tenant)}
                     </p>
                   </div>
-                  <div className="w-full shrink-0 sm:w-auto sm:text-right">
+                  <div className="w-full shrink-0 sm:min-w-[128px] sm:w-auto sm:text-right">
                     <p className="text-sm font-semibold">{tenant.activeUsers}</p>
                     <p className="text-xs text-[var(--color-muted-foreground)]">pessoas ativas</p>
                   </div>
@@ -1338,9 +1338,9 @@ export function AdminClient() {
               </div>
             ) : null}
             <div className="filter-shell">
-              <p className="filter-kicker">Recorte de acesso</p>
+              <p className="filter-kicker">Filtros de colaboradores</p>
               <p className="filter-copy">
-                Combine conta, perfil, status e atividade recente para navegar pela base com mais clareza.
+                Selecione conta, perfil, status e atividade para localizar cada pessoa com mais rapidez.
               </p>
             </div>
             <div className="grid gap-3 md:grid-cols-4">
@@ -1401,7 +1401,7 @@ export function AdminClient() {
                 }}
                 value={userLastLoginFilter}
               >
-                <option value="">Sem recorte de acesso</option>
+                <option value="">Qualquer atividade</option>
                 <option value="recent">Login nos últimos 30 dias</option>
                 <option value="never">Nunca acessaram</option>
               </Select>
@@ -1424,9 +1424,9 @@ export function AdminClient() {
             <div className="space-y-3">
                 {users.map((user) => (
                   <article key={user.id} className="data-card p-4">
-                    <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_auto] 2xl:items-start">
+                    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(280px,auto)] xl:items-start">
                       <div className="min-w-0 space-y-1">
-                        <p className="truncate font-semibold">{user.name}</p>
+                        <p className="break-words font-semibold">{user.name}</p>
                         <p className="break-all text-sm leading-6 text-[var(--color-muted-foreground)]">
                           {user.email} • {user.tenant.name}
                           {user.isPlatformAdmin ? " • Superadmin" : ""}
@@ -1459,7 +1459,7 @@ export function AdminClient() {
                           Último login: {user.lastLogin ? formatDateTimeDisplay(user.lastLogin) : "Nunca acessou"}
                         </p>
                       </div>
-                      <div className="flex flex-wrap gap-2 2xl:justify-end">
+                      <div className="flex flex-wrap gap-2 xl:justify-end">
                         {isPlatformAdmin ? (
                           <Button
                             onClick={() => toggleRoleMutation.mutate({ id: user.id, role: user.role === "admin" ? "member" : "admin" })}

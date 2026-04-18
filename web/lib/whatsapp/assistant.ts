@@ -10,11 +10,13 @@ import { BenefitWalletRuleError, validateBenefitWalletTransaction } from "@/lib/
 import { FOOD_BENEFIT_CATEGORY_SYSTEM_KEYS } from "@/lib/finance/benefit-wallet-rules";
 import { normalizeClassificationText } from "@/lib/finance/classification-normalization";
 import { ensureFallbackCategory } from "@/lib/finance/default-categories";
+import { getFinanceReport } from "@/lib/finance/reports";
 import { resolveTransactionClassification } from "@/lib/finance/transaction-classification";
 import { resolveTenantLicenseState } from "@/lib/licensing/policy";
+import { getCurrentMonthKey } from "@/lib/month";
 import { prisma } from "@/lib/prisma/client";
 import { addMonthsClamped, formatCurrency, splitAmountIntoInstallments } from "@/lib/utils";
-import { formatWhatsAppPhone, normalizeWhatsAppPhone } from "@/lib/whatsapp/phone";
+import { formatWhatsAppPhone, getWhatsAppPhoneLookupVariants } from "@/lib/whatsapp/phone";
 
 type WhatsAppUser = {
   id: string;
@@ -56,6 +58,24 @@ type IncomingTextMessage = {
   body: string;
 };
 
+const assistantEncodingFixes: Array<[string, string]> = [
+  ["â˜€ï¸", "☀️"],
+  ["ðŸŒ¤ï¸", "🌤️"],
+  ["ðŸŒ™", "🌙"],
+  ["ðŸ¤”", "🤔"],
+  ["ðŸ”’", "🔒"],
+  ["âš ï¸", "⚠️"],
+  ["NÃ£o", "Não"],
+  ["nÃ£o", "não"],
+  ["nÃºmero", "número"],
+  ["estÃ¡", "está"],
+  ["vocÃª", "você"],
+  ["licenÃ§a", "licença"],
+  ["lanÃ§ar", "lançar"],
+  ["relatÃ³rio", "relatório"],
+  ["ConfiguraÃ§Ãµes", "Configurações"]
+];
+
 const regExpConstructor = RegExp as RegExpConstructor & {
   escape?: (value: string) => string;
 };
@@ -63,6 +83,12 @@ const regExpConstructor = RegExp as RegExpConstructor & {
 const escapeRegExp =
   regExpConstructor.escape ??
   ((value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+
+export function sanitizeAssistantText(value: string) {
+  return assistantEncodingFixes.reduce((current, [search, replacement]) => {
+    return current.split(search).join(replacement);
+  }, value);
+}
 
 function normalizeText(value: string) {
   return normalizeClassificationText(value);
@@ -73,6 +99,42 @@ function formatDate(value: Date) {
     day: "2-digit",
     month: "2-digit"
   }).format(value);
+}
+
+function composeMessage(lines: Array<string | null | undefined | false>) {
+  return lines.filter((line): line is string => Boolean(line)).join("\n");
+}
+
+function bold(value: string) {
+  return `*${value}*`;
+}
+
+function formatColoredBalance(value: number) {
+  return `${value < 0 ? "🔴" : "🔵"} ${formatCurrency(value)}`;
+}
+
+function getGreeting() {
+  const hour = Number(
+    new Intl.DateTimeFormat("en-US", {
+      hour: "numeric",
+      hour12: false,
+      timeZone: "America/Sao_Paulo"
+    }).format(new Date())
+  );
+
+  if (hour < 12) {
+    return "☀️ Bom dia!";
+  }
+
+  if (hour < 18) {
+    return "🌤️ Boa tarde!";
+  }
+
+  return "🌙 Boa noite!";
+}
+
+function withGreeting(lines: Array<string | null | undefined | false>) {
+  return composeMessage([getGreeting(), "", ...lines]);
 }
 
 function parseCurrencyValue(text: string) {
@@ -107,6 +169,22 @@ function parseInstallments(text: string) {
   return Number.isFinite(installments) && installments >= 2 && installments <= 120 ? installments : 1;
 }
 
+function getPreviousMonthKey(baseMonthKey: string) {
+  const [year, month] = baseMonthKey.split("-").map(Number);
+  const date = new Date(year, (month ?? 1) - 2, 1, 12, 0, 0, 0);
+
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function getMonthLabel(monthKey: string) {
+  const [year, month] = monthKey.split("-").map(Number);
+
+  return new Intl.DateTimeFormat("pt-BR", {
+    month: "long",
+    year: "numeric"
+  }).format(new Date(year, (month ?? 1) - 1, 1, 12, 0, 0, 0));
+}
+
 function inferPaymentMethod(text: string, hasCard: boolean): PaymentMethod {
   if (hasCard) {
     return "credit_card";
@@ -129,12 +207,80 @@ function inferPaymentMethod(text: string, hasCard: boolean): PaymentMethod {
   return "pix";
 }
 
-function stripDescriptionNoise(text: string, amountRaw: string, accountHints: string[], cardHints: string[]) {
-  let description = text.trim();
+function capitalizeDescription(value: string) {
+  if (!value) {
+    return value;
+  }
 
-  description = description.replace(/^(gastei|paguei|comprei|recebi|ganhei|entrou)\s+/i, "");
-  description = description.replace(amountRaw, "");
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function removeTrailingPaymentClause(value: string) {
+  const paymentClausePatterns = [
+    /\s+e\s+paguei\b.*$/i,
+    /\s+e\s+usei\b.*$/i,
+    /\s+e\s+foi\b.*$/i,
+    /\s+paguei\b.*$/i,
+    /\s+usei\b.*$/i,
+    /\s+foi\s+(?:no|na|com|via|pelo|pela)\b.*$/i,
+    /\s+(?:no|na|com|via|pelo|pela)\s+(?:pix|picpay|credito|crédito|debito|débito|cartao|cartão)\b.*$/i
+  ];
+
+  let current = value;
+
+  for (const pattern of paymentClausePatterns) {
+    current = current.replace(pattern, "");
+  }
+
+  return current;
+}
+
+function humanizeDescription(value: string) {
+  let normalized = value.trim();
+
+  if (!normalized) {
+    return normalized;
+  }
+
+  normalized = normalized
+    .replace(/^(?:usei)\s+(?:o|a)?\s*.+?\s+para\s+(.+)$/i, "$1")
+    .replace(/^(?:foi)\s+(?:no|na|com|via|pelo|pela)\s+.+?\s+(.+)$/i, "$1")
+    .replace(/\bfoi\b$/i, "")
+    .trim();
+
+  const humanizationRules: Array<[RegExp, string]> = [
+    [/^(?:acabei de\s+)?compr(?:ei|ar)\s+(.+)$/i, "Compra de $1"],
+    [/^(?:acabei de\s+)?gastei\s+(.+)$/i, "$1"],
+    [/^(?:acabei de\s+)?pague(?:i|i a|i o)?\s+(.+)$/i, "Pagamento de $1"],
+    [/^(?:acabei de\s+)?receb(?:i|er)\s+(.+)$/i, "Recebimento de $1"],
+    [/^(?:acabei de\s+)?ganh(?:ei|ar)\s+(.+)$/i, "Recebimento de $1"],
+    [/^(?:acabei de\s+)?assinei\s+(.+)$/i, "Assinatura de $1"]
+  ];
+
+  for (const [pattern, replacement] of humanizationRules) {
+    if (pattern.test(normalized)) {
+      return normalized.replace(pattern, replacement);
+    }
+  }
+
+  return normalized
+    .replace(/\bde a\b/gi, "da")
+    .replace(/\bde o\b/gi, "do")
+    .replace(/\bde as\b/gi, "das")
+    .replace(/\bde os\b/gi, "dos")
+    .trim();
+}
+
+export function stripDescriptionNoise(text: string, amountRaw: string, accountHints: string[], cardHints: string[]) {
+  let description = text.trim();
+  const escapedAmount = escapeRegExp(amountRaw);
+
+  description = description.replace(/^(?:por favor\s+)?(?:acabei de\s+)?/i, "");
+  description = description.replace(new RegExp(`(?:r\\$\\s*)?${escapedAmount}`, "i"), "");
+  description = description.replace(/\br\$\b/gi, "");
+  description = description.replace(/\b(?:real|reais)\b/gi, "");
   description = description.replace(/\b(\d{1,2})\s*(x|parcelas?)\b/gi, "");
+  description = description.replace(/\b(?:hoje|agora|mesmo|mesma)\b/gi, "");
 
   for (const hint of [...accountHints, ...cardHints]) {
     if (!hint) {
@@ -147,11 +293,29 @@ function stripDescriptionNoise(text: string, amountRaw: string, accountHints: st
   }
 
   description = description
+    .replace(/\b(?:usei|foi)\s+(?:o|a)?\s*(?:pix|picpay|credito|crédito|debito|débito|cartao|cartão)\b/gi, "")
+    .replace(/\b(?:pix|picpay|credito|crédito|debito|débito|cartao|cartão)\b/gi, "")
+    .replace(/\b(?:com|no|na|em|via|pelo|pela)\b\s*$/i, "")
+    .replace(/\be\s*$/i, "")
+    .replace(/\s+[,:;.-]\s*/g, " ")
+    .replace(/[,:;.-]+$/g, "")
     .replace(/\s+/g, " ")
     .replace(/^[\s-]+|[\s-]+$/g, "")
     .trim();
 
-  return description || "Lançamento via WhatsApp";
+  description = removeTrailingPaymentClause(description)
+    .replace(/\b(?:se)\s+comprar\b/i, "comprar")
+    .replace(/\b(?:pro|pra)\b/gi, "para")
+    .replace(/\bfoi\b$/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  description = humanizeDescription(description)
+    .replace(/\s+/g, " ")
+    .replace(/^[\s-]+|[\s-]+$/g, "")
+    .trim();
+
+  return capitalizeDescription(description || "Lançamento via WhatsApp");
 }
 
 function scoreAliasMatch(text: string, aliases: string[]) {
@@ -178,9 +342,7 @@ function scoreAliasMatch(text: string, aliases: string[]) {
 }
 
 async function findUserByPhoneNumber(phoneNumber: string) {
-  const normalized = normalizeWhatsAppPhone(phoneNumber);
-  const formatted = formatWhatsAppPhone(phoneNumber);
-  const values = Array.from(new Set([normalized, formatted].filter(Boolean))) as string[];
+  const values = getWhatsAppPhoneLookupVariants(phoneNumber);
 
   if (!values.length) {
     return null;
@@ -235,8 +397,8 @@ async function createExpenseOrIncomeFromText(user: WhatsAppUser, body: string, t
       status: "needs_amount",
       response:
         type === "income"
-          ? "Não encontrei o valor da entrada. Exemplo: recebi 3200 salário no Itaú."
-          : "Não encontrei o valor da despesa. Exemplo: gastei 42,50 mercado na Nubank."
+          ? "🟡 Não encontrei o valor da entrada.\n\nExemplo:\n`recebi 3200 salário no Itaú`"
+          : "🟡 Não encontrei o valor da despesa.\n\nExemplo:\n`gastei 42,50 mercado na Nubank`"
     } satisfies AssistantResult;
   }
 
@@ -284,7 +446,7 @@ async function createExpenseOrIncomeFromText(user: WhatsAppUser, body: string, t
     return {
       intent: "launch_income",
       status: "unsupported_target",
-      response: "Entradas pelo WhatsApp precisam ser vinculadas a uma conta, não a um cartão."
+      response: "⚠️ Entradas pelo WhatsApp precisam ser vinculadas a uma conta, não a um cartão."
     } satisfies AssistantResult;
   }
 
@@ -292,7 +454,7 @@ async function createExpenseOrIncomeFromText(user: WhatsAppUser, body: string, t
     return {
       intent: "launch_expense",
       status: "needs_card",
-      response: "Informe qual cartão usar. Exemplo: gastei 120 farmácia no Nubank Visa."
+      response: "🟡 Me diga qual cartão usar.\n\nExemplo:\n`gastei 120 farmácia no Nubank Visa`"
     } satisfies AssistantResult;
   }
 
@@ -304,8 +466,8 @@ async function createExpenseOrIncomeFromText(user: WhatsAppUser, body: string, t
       status: "needs_account",
       response:
         accounts.length > 1
-          ? "Informe a conta do lançamento. Exemplo: recebi 3200 salário no Itaú."
-          : "Cadastre ao menos uma conta ativa para usar o assistente no WhatsApp."
+          ? "🟡 Me diga em qual conta lançar.\n\nExemplo:\n`recebi 3200 salário no Itaú`"
+          : "⚠️ Você precisa ter ao menos uma conta ativa para usar o assistente no WhatsApp."
     } satisfies AssistantResult;
   }
 
@@ -343,7 +505,8 @@ async function createExpenseOrIncomeFromText(user: WhatsAppUser, body: string, t
           id: resolvedCategoryId
         },
         select: {
-          name: true
+          name: true,
+          monthlyLimit: true
         }
       })
     : null;
@@ -363,7 +526,7 @@ async function createExpenseOrIncomeFromText(user: WhatsAppUser, body: string, t
       return {
         intent: type === "income" ? "launch_income" : "launch_expense",
         status: "benefit_wallet_rule",
-        response: error.message
+        response: `⚠️ ${error.message}`
       } satisfies AssistantResult;
     }
 
@@ -409,14 +572,47 @@ async function createExpenseOrIncomeFromText(user: WhatsAppUser, body: string, t
     ? `cartão ${selectedCard.name}`
     : `conta ${account?.name ?? "informada"}`;
   const category = resolvedCategory?.name ?? "Outros";
+  let alertSuffix = "";
+
+  if (type === "expense" && resolvedCategoryId) {
+    const currentMonthKey = getCurrentMonthKey();
+    const previousMonthKey = getPreviousMonthKey(currentMonthKey);
+    const [currentMonthReport, previousMonthReport] = await Promise.all([
+      getFinanceReport(user.tenantId, { month: currentMonthKey }),
+      getFinanceReport(user.tenantId, { month: previousMonthKey })
+    ]);
+    const currentCategory = currentMonthReport.byCategory.find((item) => item.id === resolvedCategoryId) ?? null;
+    const previousCategory = previousMonthReport.byCategory.find((item) => item.id === resolvedCategoryId) ?? null;
+    const currentTotal = currentCategory?.total ?? 0;
+    const previousTotal = previousCategory?.total ?? 0;
+    const limitAmount = Number(resolvedCategory?.monthlyLimit ?? 0);
+
+    if (limitAmount > 0 && currentTotal >= limitAmount) {
+      alertSuffix =
+        `🚨 Alerta SavePoint: ${category} já está em ${formatCurrency(currentTotal)} no mês e passou do limite de ` +
+        `${formatCurrency(limitAmount)}.`;
+    } else if (limitAmount > 0 && currentTotal >= limitAmount * 0.8) {
+      alertSuffix =
+        `⚠️ Alerta SavePoint: ${category} já consumiu ${Math.round((currentTotal / limitAmount) * 100)}% ` +
+        `do limite mensal (${formatCurrency(currentTotal)} de ${formatCurrency(limitAmount)}).`;
+    } else if (previousTotal > 0 && currentTotal >= previousTotal * 1.5 && currentTotal - previousTotal >= 100) {
+      alertSuffix =
+        `📈 Alerta SavePoint: ${category} acelerou forte neste mês, com ${formatCurrency(currentTotal)} ` +
+        `contra ${formatCurrency(previousTotal)} no mês anterior.`;
+    }
+  }
 
   return {
     intent: type === "income" ? "launch_income" : "launch_expense",
     status: "created",
-    response:
-      `${type === "income" ? "Entrada registrada" : "Despesa registrada"}: ${formatCurrency(amountData.value)} em ${targetLabel}. ` +
-      `Categoria: ${category}.` +
-      (installments > 1 ? ` Parcelado em ${installments}x.` : "")
+    response: withGreeting([
+      type === "income" ? "✅ Entrada registrada com sucesso" : "✅ Despesa registrada com sucesso",
+      `💰 Valor: ${formatCurrency(amountData.value)}`,
+      selectedCard ? `💳 Destino: ${targetLabel}` : `🏦 Destino: ${targetLabel}`,
+      `🏷️ Categoria: ${bold(category)}`,
+      installments > 1 ? `🧾 Parcelamento: ${installments}x` : null,
+      alertSuffix ? `\n${alertSuffix}` : null
+    ])
   } satisfies AssistantResult;
 }
 
@@ -427,7 +623,7 @@ async function replyWithBalance(user: WhatsAppUser, body: string) {
     return {
       intent: "balance",
       status: "no_accounts",
-      response: "Não encontrei contas ativas nesta carteira compartilhada."
+      response: "⚠️ Não encontrei contas ativas nesta carteira compartilhada."
     } satisfies AssistantResult;
   }
 
@@ -443,20 +639,27 @@ async function replyWithBalance(user: WhatsAppUser, body: string) {
     return {
       intent: "balance",
       status: "ok",
-      response: `Saldo atual da conta ${match.account.name}: ${formatCurrency(match.account.currentBalance)}.`
+      response: withGreeting([
+        `💰 Saldo da conta ${bold(match.account.name)}`,
+        `• Atual: ${formatColoredBalance(match.account.currentBalance)}`
+      ])
     } satisfies AssistantResult;
   }
 
   const total = accounts.reduce((sum, item) => sum + item.currentBalance, 0);
   const preview = accounts
     .slice(0, 3)
-    .map((item) => `${item.name}: ${formatCurrency(item.currentBalance)}`)
-    .join(" | ");
+    .map((item) => `• ${bold(item.name)}: ${formatColoredBalance(item.currentBalance)}`)
+    .join("\n");
 
   return {
     intent: "balance",
     status: "ok",
-    response: `Saldo consolidado: ${formatCurrency(total)}. ${preview}`
+    response: withGreeting([
+      "💼 Visão consolidada do seu caixa",
+      `• Total: ${formatColoredBalance(total)}`,
+      preview
+    ])
   } satisfies AssistantResult;
 }
 
@@ -476,7 +679,7 @@ async function replyWithCardInfo(user: WhatsAppUser, body: string) {
     return {
       intent: "card_info",
       status: "no_cards",
-      response: "Não encontrei cartões ativos nesta carteira compartilhada."
+      response: "⚠️ Não encontrei cartões ativos nesta carteira compartilhada."
     } satisfies AssistantResult;
   }
 
@@ -493,7 +696,7 @@ async function replyWithCardInfo(user: WhatsAppUser, body: string) {
     return {
       intent: "card_info",
       status: "needs_card",
-      response: "Informe qual cartão consultar. Exemplo: fatura Nubank Visa ou limite Mastercard."
+      response: "🟡 Me diga qual cartão você quer consultar.\n\nExemplo:\n`fatura Nubank Visa` ou `limite Mastercard`"
     } satisfies AssistantResult;
   }
 
@@ -508,23 +711,276 @@ async function replyWithCardInfo(user: WhatsAppUser, body: string) {
   return {
     intent: "card_info",
     status: "ok",
-    response:
-      `Cartão ${card.name}. Fatura atual: ${formatCurrency(statement.totalAmount)}. ` +
-      `Limite disponível: ${formatCurrency(statement.availableLimit)} de ${formatCurrency(Number(card.limitAmount))}. ` +
-      `Fecha em ${formatDate(statement.closeDate)} e vence em ${formatDate(statement.dueDate)}.`
+    response: withGreeting([
+      `💳 Cartão ${bold(card.name)}`,
+      `• Fatura atual: ${formatCurrency(statement.totalAmount)}`,
+      `• Limite disponível: ${formatCurrency(statement.availableLimit)} de ${formatCurrency(Number(card.limitAmount))}`,
+      `• Fecha em: ${formatDate(statement.closeDate)}`,
+      `• Vence em: ${formatDate(statement.dueDate)}`
+    ])
   } satisfies AssistantResult;
+}
+
+async function replyWithCardInstallments(user: WhatsAppUser, body: string) {
+  const cards = await prisma.card.findMany({
+    where: {
+      tenantId: user.tenantId,
+      isActive: true
+    },
+    orderBy: {
+      name: "asc"
+    }
+  });
+
+  if (!cards.length) {
+    return {
+      intent: "card_installments",
+      status: "no_cards",
+      response: "⚠️ Não encontrei cartões ativos nesta carteira compartilhada."
+    } satisfies AssistantResult;
+  }
+
+  const match =
+    cards
+      .map((card) => ({
+        card,
+        score: scoreAliasMatch(body, [card.name, card.brand, card.institution ?? "", card.last4 ?? ""])
+      }))
+      .sort((a, b) => b.score - a.score)[0] ?? null;
+  const card = match?.score > 0 ? match.card : cards.length === 1 ? cards[0] : null;
+
+  if (!card) {
+    return {
+      intent: "card_installments",
+      status: "needs_card",
+      response: "🟡 Me diga qual cartão você quer consultar.\n\nExemplo:\n`quais parcelados no PicPay`"
+    } satisfies AssistantResult;
+  }
+
+  const roots = await prisma.transaction.findMany({
+    where: {
+      tenantId: user.tenantId,
+      cardId: card.id,
+      parentId: null,
+      installmentsTotal: {
+        gt: 1
+      }
+    },
+    include: {
+      category: {
+        select: {
+          name: true
+        }
+      }
+    },
+    orderBy: {
+      date: "desc"
+    },
+    take: 8
+  });
+
+  if (!roots.length) {
+    return {
+      intent: "card_installments",
+      status: "no_installments",
+      response: withGreeting([
+        `💳 Cartão ${bold(card.name)}`,
+        "✅ Não encontrei compras parceladas registradas nesse cartão."
+      ])
+    } satisfies AssistantResult;
+  }
+
+  const groups = await Promise.all(
+    roots.map(async (root) => {
+      const installments = await prisma.transaction.findMany({
+        where: {
+          tenantId: user.tenantId,
+          OR: [{ id: root.id }, { parentId: root.id }]
+        },
+        orderBy: {
+          installmentNumber: "asc"
+        }
+      });
+
+      const settledInstallments = installments.filter((item) => item.settledAt).length;
+      const nextInstallment = installments.find((item) => !item.settledAt) ?? null;
+
+      return {
+        description: root.description.replace(/\s\(\d+\/\d+\)$/, ""),
+        categoryName: root.category?.name ?? "Outros",
+        installmentAmount: installments[0] ? Number(installments[0].amount) : 0,
+        totalAmount: installments.reduce((sum, item) => sum + Number(item.amount), 0),
+        installmentsTotal: root.installmentsTotal,
+        settledInstallments,
+        remainingInstallments: Math.max(root.installmentsTotal - settledInstallments, 0),
+        nextInstallmentDate: nextInstallment?.date ?? null
+      };
+    })
+  );
+
+  const lines = groups.slice(0, 5).map((group) =>
+    composeMessage([
+      `• ${bold(group.description)}`,
+      `  🏷️ ${bold(group.categoryName)} | 💸 ${formatCurrency(group.installmentAmount)} por parcela`,
+      `  📦 ${group.settledInstallments}/${group.installmentsTotal} pagas | ${group.remainingInstallments} restantes`,
+      group.nextInstallmentDate ? `  📅 Próxima: ${formatDate(group.nextInstallmentDate)}` : null
+    ])
+  );
+
+  return {
+    intent: "card_installments",
+    status: "ok",
+    response: withGreeting([
+      `💳 Parcelados do cartão ${bold(card.name)}`,
+      `• Compras parceladas encontradas: ${groups.length}`,
+      `• Valor total em parcelados: ${formatCurrency(groups.reduce((sum, item) => sum + item.totalAmount, 0))}`,
+      "",
+      ...lines
+    ])
+  } satisfies AssistantResult;
+}
+
+async function replyWithFinanceReport(user: WhatsAppUser, body: string) {
+  const normalized = normalizeText(body);
+  const requestedMonth =
+    /\b(mes passado|mês passado|ultimo mes|último mês|anterior)\b/.test(normalized)
+      ? getPreviousMonthKey(getCurrentMonthKey())
+      : getCurrentMonthKey();
+  const report = await getFinanceReport(user.tenantId, {
+    month: requestedMonth
+  });
+  const topCategory = report.spendingInsights.topCategory;
+  const categoryPreview = report.byCategory
+    .slice(0, 3)
+    .map((item) => `• ${bold(item.name)}: ${formatCurrency(item.total)}`)
+    .join("\n");
+  const alerts = report.annualInsights.alerts.slice(0, 2).join(" ");
+
+  return {
+    intent: "finance_report",
+    status: "ok",
+    response: withGreeting([
+      `📊 Relatório SavePoint de ${bold(getMonthLabel(requestedMonth))}`,
+      `• Receitas: ${formatCurrency(report.summary.income)}`,
+      `• Despesas: ${formatCurrency(report.summary.expense)}`,
+      `• Saldo: ${formatColoredBalance(report.summary.balance)}`,
+      topCategory ? `🏷️ Categoria mais pesada: ${bold(topCategory.name)} com ${formatCurrency(topCategory.total)}` : null,
+      categoryPreview ? `\n📌 Destaques por categoria\n${categoryPreview}` : null,
+      alerts ? `\n⚠️ Alertas\n${alerts}` : null
+    ])
+  } satisfies AssistantResult;
+}
+
+async function replyWithLastExpense(user: WhatsAppUser) {
+  const lastExpense = await prisma.transaction.findFirst({
+    where: {
+      tenantId: user.tenantId,
+      type: "expense",
+      date: {
+        lte: new Date()
+      }
+    },
+    select: {
+      description: true,
+      amount: true,
+      date: true,
+      category: {
+        select: {
+          name: true
+        }
+      },
+      financialAccount: {
+        select: {
+          name: true
+        }
+      },
+      card: {
+        select: {
+          name: true
+        }
+      }
+    },
+    orderBy: [{ date: "desc" }, { createdAt: "desc" }]
+  });
+
+  if (!lastExpense) {
+    return {
+      intent: "last_expense",
+      status: "no_expenses",
+      response: withGreeting(["⚠️ Ainda não encontrei despesas registradas nessa carteira."])
+    } satisfies AssistantResult;
+  }
+
+  return {
+    intent: "last_expense",
+    status: "ok",
+    response: withGreeting([
+      "🧾 Seu último gasto registrado",
+      `• ${bold(lastExpense.description)}`,
+      `• Valor: ${formatCurrency(Number(lastExpense.amount))}`,
+      `• Data: ${formatDate(lastExpense.date)}`,
+      `• Categoria: ${bold(lastExpense.category?.name ?? "Sem categoria")}`,
+      `• Origem: ${lastExpense.financialAccount?.name ?? lastExpense.card?.name ?? "Sem origem"}`
+    ])
+  } satisfies AssistantResult;
+}
+
+function isGreeting(normalized: string) {
+  return /^(ajuda|menu|help|oi|ola|olá)\b/.test(normalized);
+}
+
+function isCardIntent(normalized: string) {
+  return /\b(fatura|limite|cartao|cartão)\b/.test(normalized);
+}
+
+function isInstallmentsIntent(normalized: string) {
+  return /\b(parcelad\w*|parcela\w*)\b/.test(normalized);
+}
+
+function isBalanceIntent(normalized: string) {
+  return /\b(saldo|conta|contas|quanto tenho|como esta meu saldo|como está meu saldo)\b/.test(normalized);
+}
+
+function isReportIntent(normalized: string) {
+  return /\b(relatorio|relatório|resumo|fechamento|como estou|visao do mes|visão do mês|gastos do mes|gastos do mês|maiores categorias|categoria .*gastei mais|gastei mais .*mes|gastei mais .*mês|maior gasto .*mes|maior gasto .*mês|onde gastei mais)\b/.test(
+    normalized
+  );
+}
+
+function isLastExpenseIntent(normalized: string) {
+  return /\b(ultimo gasto|último gasto|ultima despesa|última despesa|meu ultimo gasto|minha ultima despesa|qual foi meu ultimo gasto|qual foi minha ultima despesa)\b/.test(
+    normalized
+  );
+}
+
+function isExpenseIntent(normalized: string) {
+  return /\b(gastei|paguei|comprei|gasto|despesa|debita|débita|lanca despesa|lança despesa|registra despesa|anota despesa)\b/.test(
+    normalized
+  );
+}
+
+function isIncomeIntent(normalized: string) {
+  return /\b(recebi|ganhei|entrou|entrada|receita|credito|crédito|lanca receita|lança receita|registra receita|anota receita)\b/.test(
+    normalized
+  );
+}
+
+function isLaunchIntent(normalized: string) {
+  return /\b(lanca|lança|registra|registre|anota|adicione|adiciona|cadastra|cadastre)\b/.test(normalized);
 }
 
 function buildHelpResponse() {
   return (
-    "Comandos do assistente:\n" +
-    "- gastei 42,50 mercado na Nubank\n" +
-    "- gastei 320 farmácia no cartão Visa 3x\n" +
-    "- recebi 3200 salario no Itau\n" +
-    "- saldo\n" +
-    "- saldo Nubank\n" +
-    "- fatura Visa\n" +
-    "- limite Mastercard"
+    "Sou o assistente financeiro do SavePoint no WhatsApp.\n" +
+    "Posso lançar receitas e despesas, consultar saldo e cartões, resumir o mês e alertar quando uma categoria estiver pesando.\n" +
+    "\n✨ Exemplos:\n" +
+    "• gastei 42,50 mercado na Nubank\n" +
+    "• lança 120 de farmácia no cartão Visa 3x\n" +
+    "• recebi 3200 salario no Itau\n" +
+    "• me mostra meu saldo\n" +
+    "• resumo do mês\n" +
+    "• relatorio do mes passado\n" +
+    "• fatura Visa"
   );
 }
 
@@ -535,39 +991,61 @@ async function handleAssistantCommand(user: WhatsAppUser, body: string) {
     return {
       intent: "empty",
       status: "ignored",
-      response: buildHelpResponse()
+      response: withGreeting([buildHelpResponse()])
     } satisfies AssistantResult;
   }
 
-  if (/^(ajuda|menu|help|oi|ola|olá)\b/.test(normalized)) {
+  if (isGreeting(normalized)) {
     return {
       intent: "help",
       status: "ok",
-      response: buildHelpResponse()
+      response: withGreeting([buildHelpResponse()])
     } satisfies AssistantResult;
   }
 
-  if (/^(gastei|paguei|comprei)\b/.test(normalized)) {
-    return createExpenseOrIncomeFromText(user, body, "expense");
+  if (isReportIntent(normalized)) {
+    return replyWithFinanceReport(user, body);
   }
 
-  if (/^(recebi|ganhei|entrou)\b/.test(normalized)) {
+  if (isLastExpenseIntent(normalized)) {
+    return replyWithLastExpense(user);
+  }
+
+  if (isLaunchIntent(normalized) && isIncomeIntent(normalized)) {
     return createExpenseOrIncomeFromText(user, body, "income");
   }
 
-  if (/\b(fatura|limite)\b/.test(normalized)) {
+  if (isLaunchIntent(normalized) && (isExpenseIntent(normalized) || Boolean(parseCurrencyValue(body)))) {
+    return createExpenseOrIncomeFromText(user, body, "expense");
+  }
+
+  if (isExpenseIntent(normalized)) {
+    return createExpenseOrIncomeFromText(user, body, "expense");
+  }
+
+  if (isIncomeIntent(normalized)) {
+    return createExpenseOrIncomeFromText(user, body, "income");
+  }
+
+  if (isInstallmentsIntent(normalized)) {
+    return replyWithCardInstallments(user, body);
+  }
+
+  if (isCardIntent(normalized)) {
     return replyWithCardInfo(user, body);
   }
 
-  if (/\b(saldo|conta|contas)\b/.test(normalized)) {
+  if (isBalanceIntent(normalized)) {
     return replyWithBalance(user, body);
   }
 
   return {
     intent: "fallback",
     status: "unknown_command",
-    response:
-      "Não entendi o comando. Envie 'ajuda' para ver exemplos de lançamento, saldo, fatura e limite."
+    response: withGreeting([
+      "🤔 Não entendi esse pedido ainda.",
+      "Me chama com `ajuda` que eu te mostro jeitos de lançar, consultar saldo, ver fatura e pedir relatório."
+    ])
   } satisfies AssistantResult;
 }
 
@@ -579,7 +1057,9 @@ export async function processIncomingWhatsAppTextMessage(message: IncomingTextMe
     return {
       handled: true,
       to: formattedPhone,
-      response: "Seu número ainda não está vinculado a uma pessoa ativa no Save Point. Atualize o WhatsApp em Configurações."
+      response:
+        "⚠️ Seu número ainda não está vinculado a uma pessoa ativa no Save Point.\n\n" +
+        "Abra Configurações no app e atualize o WhatsApp cadastrado."
     };
   }
 
@@ -589,7 +1069,7 @@ export async function processIncomingWhatsAppTextMessage(message: IncomingTextMe
     return {
       handled: true,
       to: formattedPhone,
-      response: "A conta vinculada a você está com a licença indisponível no momento."
+      response: "⚠️ A conta vinculada a você está com a licença indisponível no momento."
     };
   }
 
@@ -597,7 +1077,7 @@ export async function processIncomingWhatsAppTextMessage(message: IncomingTextMe
     return {
       handled: true,
       to: formattedPhone,
-      response: "O assistente no WhatsApp está disponível apenas no plano Premium."
+      response: "🔒 O assistente no WhatsApp está disponível apenas no plano Premium."
     };
   }
 

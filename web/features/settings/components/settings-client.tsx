@@ -592,6 +592,11 @@ export function SettingsClient() {
           Vincule o seu número para lançar receitas, despesas e consultar saldo, limite e fatura por mensagem. O
           número salvo no perfil será usado para identificar apenas a sua conta.
         </p>
+        <div className="mt-4">
+          <Button asChild variant="secondary">
+            <Link href="/dashboard/whatsapp">Abrir central do WhatsApp</Link>
+          </Button>
+        </div>
         <div className="mt-6 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
           <article className="data-card p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">

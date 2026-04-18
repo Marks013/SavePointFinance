@@ -933,13 +933,14 @@ export function TransactionsClient() {
         <div className="mt-6">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <p className="metric-label">Sugestões para revisar</p>
+              <p className="metric-label">Classificações para validar</p>
               <p className="mt-1 text-sm text-[var(--color-muted-foreground)]">
-                Classificações automáticas recentes, priorizando as de menor confiança.
+                Esses lançamentos já foram registrados e entram nos totais do período. Revise apenas a categoria para
+                deixar a leitura mais precisa.
               </p>
             </div>
             <p className="shrink-0 text-sm font-medium text-[var(--color-muted-foreground)]">
-              {automaticSuggestions.length} em análise
+              {automaticSuggestions.length} aguardando validação
             </p>
           </div>
 
@@ -993,7 +994,7 @@ export function TransactionsClient() {
                         </Select>
                         <div className="flex flex-wrap gap-2">
                           <Button
-                            className="hidden"
+                            className="min-w-[160px]"
                             disabled={!transaction.category?.id || reviewMutation.isPending}
                             onClick={() =>
                               reviewMutation.mutate({
@@ -1005,7 +1006,7 @@ export function TransactionsClient() {
                             type="button"
                             variant="secondary"
                           >
-                            Confirmar sugestão
+                            Manter sugestão
                           </Button>
                           <Button
                             disabled={!selectedCategoryId || reviewMutation.isPending}
@@ -1044,16 +1045,16 @@ export function TransactionsClient() {
               })
             ) : (
               <div className="muted-panel border border-dashed px-4 py-6 text-sm text-[var(--color-muted-foreground)]">
-                Nenhuma classificação automática pendente de revisão nesta amostra recente.
+                Nenhuma classificação automática recente precisa da sua atenção.
               </div>
             )}
           </div>
         </div>
 
         <div className="filter-shell mt-6">
-          <p className="filter-kicker">Leitura</p>
+          <p className="filter-kicker">Filtragem</p>
           <p className="filter-copy">
-            Refine o recorte para revisar movimentações com mais contexto, sem perder a referência do mês em foco.
+            Selecione o filtro desejado para ter mais visibilidade e contexto por Tipo, Categorias, Contas e Cartões.
           </p>
         </div>
 

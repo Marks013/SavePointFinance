@@ -5,7 +5,18 @@ import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, CalendarRange, Sparkles, TrendingDown, TrendingUp } from "lucide-react";
-import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis
+} from "recharts";
 
 import { Button } from "@/components/ui/button";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
@@ -161,6 +172,7 @@ type ReportResponse = {
 type OptionItem = { id: string; name: string };
 
 const palette = ["#1F8F62", "#DB6B4D", "#3B82F6", "#B9851B", "#0F766E", "#7A8F44"];
+const chartGlowPalette = ["rgba(31,143,98,0.28)", "rgba(219,107,77,0.24)", "rgba(59,130,246,0.24)", "rgba(185,133,27,0.22)"];
 
 function pct(value: number, digits = 0) {
   return `${(value * 100).toFixed(digits)}%`;
@@ -196,6 +208,10 @@ function toneLabel(tone: Tone) {
   if (tone === "warning") return "Pressao";
   if (tone === "positive") return "Saudavel";
   return "Atencao";
+}
+
+function categoryShareLabel(value: number) {
+  return value >= 0.01 ? pct(value, value >= 0.1 ? 0 : 1) : "<1%";
 }
 
 function ChartTooltipContent({
@@ -313,12 +329,13 @@ export function ReportsClient() {
   const periodLabel = periodMode === "year" ? formatYearLabel(month) : monthLabel;
   const annualAlerts = data?.annualInsights?.alerts ?? [];
   const monthlySeries = data?.monthly ?? [];
-  const categoryData = data?.byCategory ?? [];
+  const categoryData = useMemo(() => data?.byCategory ?? [], [data?.byCategory]);
   const byAccounts = data?.byAccount ?? [];
   const byCards = data?.byCard ?? [];
   const upcomingItems = data?.upcoming ?? [];
   const recentItems = data?.recent ?? [];
   const categoryBreakdown = data?.spendingInsights?.categoryBreakdown ?? [];
+  const [activeCategoryIndex, setActiveCategoryIndex] = useState(0);
   const benefitSummary = data?.benefits;
   const selectedAccount = (accountsQuery.data ?? []).find((item) => item.id === filters.accountId);
   const selectedCard = (cardsQuery.data ?? []).find((item) => item.id === filters.cardId);
@@ -337,6 +354,27 @@ export function ReportsClient() {
     Object.entries(filters).forEach(([key, value]) => value && params.set(key, value));
     return `/api/reports/pdf?${params.toString()}`;
   }, [activeRange.from, activeRange.to, filters, month]);
+  const displayedCategoryIndex =
+    categoryData.length === 0 ? 0 : Math.min(activeCategoryIndex, categoryData.length - 1);
+  const activeCategory = categoryData[displayedCategoryIndex] ?? null;
+  const leadingSeriesMonth =
+    monthlySeries.reduce<MonthlySeriesItem | null>((best, item) => {
+      const currentScore = Math.max(item.income, item.expense, Math.abs(item.balance ?? item.transfer));
+      if (!best) {
+        return item;
+      }
+
+      const bestScore = Math.max(best.income, best.expense, Math.abs(best.balance ?? best.transfer));
+      return currentScore > bestScore ? item : best;
+    }, null) ?? null;
+  const strongestAccount =
+    byAccounts.reduce<AccountItem | null>((best, item) => {
+      if (!best) {
+        return item;
+      }
+
+      return Math.abs(item.net) > Math.abs(best.net) ? item : best;
+    }, null) ?? null;
 
   return (
     <div className="space-y-6">
@@ -377,9 +415,10 @@ export function ReportsClient() {
           </div>
         </div>
         <div className="filter-shell mt-8">
-          <p className="filter-kicker">Leitura</p>
+          <p className="filter-kicker">Filtragem</p>
           <p className="filter-copy">
-            Ajuste a janela e os recortes para interpretar o período com mais clareza, sem perder a base de comparação.
+            Selecione os filtros do período para comparar resultados com mais clareza por competência, categorias,
+            contas e cartões.
           </p>
         </div>
         <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
@@ -484,30 +523,152 @@ export function ReportsClient() {
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <section className="surface content-section">
           <h2 className="text-xl font-semibold">{isYearScope ? "Receitas, despesas e saldo mensal" : "Receitas, despesas e transferências"}</h2>
+          <div className="mt-4 flex flex-wrap gap-3 text-sm text-[var(--color-muted-foreground)]">
+            {leadingSeriesMonth ? (
+              <div className="rounded-full border border-white/10 bg-white/6 px-3 py-1.5">
+                Pico do período em <span className="font-semibold text-[var(--color-foreground)]">{leadingSeriesMonth.label}</span>
+              </div>
+            ) : null}
+            {strongestAccount ? (
+              <div className="rounded-full border border-white/10 bg-white/6 px-3 py-1.5">
+                Conta mais intensa: <span className={`font-semibold ${amountClass(strongestAccount.net)}`}>{strongestAccount.name}</span>
+              </div>
+            ) : null}
+          </div>
           <DeferredResponsiveChart>
             <BarChart data={monthlySeries}>
               <CartesianGrid stroke="rgba(69,82,70,0.08)" vertical={false} />
               <XAxis axisLine={false} dataKey="label" tick={{ fill: "var(--color-muted-foreground)", fontSize: 12 }} tickLine={false} tickMargin={12} />
               <YAxis axisLine={false} tick={{ fill: "var(--color-muted-foreground)", fontSize: 12 }} tickFormatter={(value: number) => formatCurrency(value).replace("R$ ", "R$")} tickLine={false} width={94} />
               <Tooltip content={<ChartTooltipContent />} cursor={{ fill: "rgba(19,111,79,0.08)" }} />
-              <Bar dataKey="income" name="Receitas" fill="#1F8F62" radius={[8, 8, 0, 0]} />
-              <Bar dataKey="expense" name="Despesas" fill="#DB6B4D" radius={[8, 8, 0, 0]} />
-              <Bar dataKey={isYearScope ? "balance" : "transfer"} name={isYearScope ? "Saldo" : "Transferências"} fill={isYearScope ? "#3B82F6" : "#B9851B"} radius={[8, 8, 0, 0]} />
+              <Bar
+                dataKey="income"
+                name="Receitas"
+                fill="#1F8F62"
+                radius={[8, 8, 0, 0]}
+                animationDuration={900}
+                animationEasing="ease-out"
+                activeBar={{ fill: "#27a773", stroke: "rgba(255,255,255,0.22)", strokeWidth: 1 }}
+              />
+              <Bar
+                dataKey="expense"
+                name="Despesas"
+                fill="#DB6B4D"
+                radius={[8, 8, 0, 0]}
+                animationBegin={120}
+                animationDuration={950}
+                animationEasing="ease-out"
+                activeBar={{ fill: "#e77d60", stroke: "rgba(255,255,255,0.22)", strokeWidth: 1 }}
+              />
+              <Bar
+                dataKey={isYearScope ? "balance" : "transfer"}
+                name={isYearScope ? "Saldo" : "Transferências"}
+                fill={isYearScope ? "#3B82F6" : "#B9851B"}
+                radius={[8, 8, 0, 0]}
+                animationBegin={220}
+                animationDuration={1000}
+                animationEasing="ease-out"
+                activeBar={{
+                  fill: isYearScope ? "#5a9cff" : "#cc9a29",
+                  stroke: "rgba(255,255,255,0.22)",
+                  strokeWidth: 1
+                }}
+              />
             </BarChart>
           </DeferredResponsiveChart>
         </section>
         <section className="surface content-section">
           <h2 className="text-xl font-semibold">Despesas por categoria</h2>
+          {activeCategory ? (
+            <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+              <div>
+                <p className="text-sm text-[var(--color-muted-foreground)]">Categoria em destaque</p>
+                <p className="mt-2 text-2xl font-semibold text-[var(--color-foreground)]">{activeCategory.name}</p>
+                <p className="mt-2 text-sm text-[var(--color-muted-foreground)]">
+                  {activeCategory.items} lançamentos • {categoryShareLabel(activeCategory.share)} do total de despesas
+                </p>
+              </div>
+              <div className="rounded-[1.25rem] border border-white/10 bg-white/6 px-4 py-3 text-right shadow-[0_18px_40px_-24px_rgba(31,143,98,0.55)]">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/55">Volume</p>
+                <p className="mt-2 text-xl font-semibold amount-negative">{formatCurrency(activeCategory.total)}</p>
+              </div>
+            </div>
+          ) : null}
           <DeferredResponsiveChart>
             <PieChart>
-              <Pie data={categoryData} dataKey="total" nameKey="name" innerRadius={64} outerRadius={110}>
+              <defs>
+                {chartGlowPalette.map((color, index) => (
+                  <filter key={`chart-glow-${index}`} id={`chart-glow-${index}`} x="-40%" y="-40%" width="180%" height="180%">
+                    <feDropShadow dx="0" dy="8" stdDeviation="8" floodColor={color} />
+                  </filter>
+                ))}
+              </defs>
+              <Pie
+                data={categoryData}
+                dataKey="total"
+                nameKey="name"
+                innerRadius={72}
+                outerRadius={116}
+                paddingAngle={3}
+                onMouseEnter={(_, index) => setActiveCategoryIndex(index)}
+                animationDuration={1100}
+                animationEasing="ease-out"
+              >
                 {categoryData.map((entry, index: number) => (
-                  <Cell key={entry.name} fill={palette[index % palette.length]} />
+                  <Cell
+                    key={entry.name}
+                    fill={palette[index % palette.length]}
+                    stroke="rgba(255,255,255,0.14)"
+                    strokeWidth={index === displayedCategoryIndex ? 2 : 1}
+                    style={{
+                      filter: `url(#chart-glow-${index % chartGlowPalette.length})`,
+                      opacity: index === displayedCategoryIndex ? 1 : 0.72,
+                      cursor: "pointer"
+                    }}
+                  />
                 ))}
               </Pie>
+              {activeCategory ? (
+                <>
+                  <text x="50%" y="46%" textAnchor="middle" dominantBaseline="middle" fill="rgba(214,199,172,0.8)" fontSize="12">
+                    Explorando
+                  </text>
+                  <text x="50%" y="55%" textAnchor="middle" dominantBaseline="middle" fill="var(--color-foreground)" fontSize="18" fontWeight="600">
+                    {activeCategory.name}
+                  </text>
+                  <text x="50%" y="65%" textAnchor="middle" dominantBaseline="middle" fill={palette[displayedCategoryIndex % palette.length]} fontSize="16" fontWeight="700">
+                    {formatCurrency(activeCategory.total)}
+                  </text>
+                </>
+              ) : null}
               <Tooltip content={<ChartTooltipContent />} />
             </PieChart>
           </DeferredResponsiveChart>
+          {categoryData.length ? (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {categoryData.slice(0, 6).map((item, index) => {
+                const isActive = index === displayedCategoryIndex;
+
+                return (
+                  <button
+                    key={`category-chip-${item.name}`}
+                    type="button"
+                    onMouseEnter={() => setActiveCategoryIndex(index)}
+                    onFocus={() => setActiveCategoryIndex(index)}
+                    onClick={() => setActiveCategoryIndex(index)}
+                    className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition duration-200 ${
+                      isActive
+                        ? "border-white/20 bg-white/12 text-[var(--color-foreground)] shadow-[0_14px_30px_-18px_rgba(255,255,255,0.45)]"
+                        : "border-white/8 bg-white/5 text-[var(--color-muted-foreground)] hover:border-white/16 hover:bg-white/9"
+                    }`}
+                  >
+                    <span className="mr-2 inline-block size-2 rounded-full align-middle" style={{ backgroundColor: palette[index % palette.length] }} />
+                    {item.name}
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
         </section>
       </div>
 

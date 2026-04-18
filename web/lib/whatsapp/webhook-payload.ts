@@ -12,6 +12,16 @@ export type WhatsAppWebhookPayload = {
           text?: {
             body?: string;
           };
+          image?: {
+            id?: string;
+            mime_type?: string;
+            caption?: string;
+          };
+          audio?: {
+            id?: string;
+            mime_type?: string;
+            voice?: boolean;
+          };
         }>;
       };
     }>;
@@ -23,6 +33,9 @@ export type IncomingWhatsAppWebhookMessage = {
   phoneNumber: string | null;
   body: string | null;
   type: string | null;
+  mediaId: string | null;
+  mimeType: string | null;
+  caption: string | null;
 };
 
 export function extractIncomingWhatsAppWebhookMessages(
@@ -44,7 +57,10 @@ export function extractIncomingWhatsAppWebhookMessages(
           eventId: message.id,
           phoneNumber: message.from ?? fallbackPhoneNumber,
           body: message.text?.body?.trim() ?? null,
-          type: message.type ?? null
+          type: message.type ?? null,
+          mediaId: message.image?.id ?? message.audio?.id ?? null,
+          mimeType: message.image?.mime_type ?? message.audio?.mime_type ?? null,
+          caption: message.image?.caption?.trim() ?? null
         });
       }
     }

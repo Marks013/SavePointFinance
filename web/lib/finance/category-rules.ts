@@ -11,7 +11,10 @@ import {
   normalizeClassificationKeyword,
   tokenizeClassificationText
 } from "@/lib/finance/classification-normalization";
-import type { TenantClassificationCategory } from "@/lib/finance/classification-cache";
+import type {
+  GlobalClassificationRule,
+  TenantClassificationCategory
+} from "@/lib/finance/classification-cache";
 import { dedupeKeywords } from "@/lib/finance/default-categories";
 import { prisma } from "@/lib/prisma/client";
 
@@ -182,6 +185,57 @@ export function matchTenantCategoryRules(
         rule.source === "manual"
           ? `Regra manual: ${rule.normalizedKeyword}`
           : `Regra aprendida: ${rule.normalizedKeyword}`
+    };
+  }
+
+  return null;
+}
+
+export function matchGlobalCategoryRules(
+  rules: GlobalClassificationRule[],
+  categories: TenantClassificationCategory[],
+  input: {
+    type: "income" | "expense";
+    description: string;
+    notes?: string | null;
+  }
+): RuleMatch | null {
+  const haystack = buildNormalizedBankStatementText(input.description, input.notes ?? null);
+  const tokenSet = new Set(tokenizeClassificationText(haystack));
+  const eligibleCategories = new Map(
+    categories
+      .filter((category) => category.type === input.type && category.systemKey)
+      .map((category) => [category.systemKey as string, category.id])
+  );
+
+  const sortedRules = [...rules].sort((left, right) => {
+    if (right.priority !== left.priority) {
+      return right.priority - left.priority;
+    }
+
+    return right.normalizedKeyword.length - left.normalizedKeyword.length;
+  });
+
+  for (const rule of sortedRules) {
+    if (rule.type !== input.type) {
+      continue;
+    }
+
+    const categoryId = eligibleCategories.get(rule.categorySystemKey);
+    if (!categoryId) {
+      continue;
+    }
+
+    if (!matchesRule(haystack, tokenSet, rule.normalizedKeyword, rule.matchMode)) {
+      continue;
+    }
+
+    return {
+      categoryId,
+      confidence: rule.confidence !== null && rule.confidence !== undefined ? Number(rule.confidence) : 0.9,
+      classificationSource: "ai_learned",
+      classificationKeyword: rule.normalizedKeyword,
+      reason: `Regra global aprendida: ${rule.normalizedKeyword}`
     };
   }
 
