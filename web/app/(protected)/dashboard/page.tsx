@@ -346,7 +346,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           </div>
         </article>
 
-        <article className="surface-strong motion-card rounded-[34px] p-6 md:p-8">
+        <article className="surface-strong rounded-[34px] p-6 md:p-8">
           <div className="section-stack">
             <div>
               <p className="metric-label text-white/78">Caixa contabilizado na competência</p>

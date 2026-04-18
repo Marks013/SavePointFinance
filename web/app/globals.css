@@ -366,9 +366,12 @@ button {
   width: 7rem;
   border-radius: 9999px;
   background: radial-gradient(circle, rgba(19, 111, 79, 0.12), transparent 70%);
+  pointer-events: none;
 }
 
 .motion-card {
+  position: relative;
+  overflow: hidden;
   isolation: isolate;
 }
 
@@ -376,21 +379,28 @@ button {
   content: "";
   position: absolute;
   inset: 0;
-  z-index: -1;
+  z-index: 0;
   border-radius: inherit;
   background:
     linear-gradient(120deg, transparent 0%, rgba(255, 255, 255, 0.08) 44%, transparent 62%),
     radial-gradient(circle at 18% 0%, rgba(47, 141, 104, 0.18), transparent 34%);
   opacity: 0;
-  transform: translateX(-16%);
+  pointer-events: none;
+  transform: translate3d(-8%, 0, 0);
   transition:
-    opacity 220ms ease,
-    transform 420ms ease;
+    opacity 180ms ease,
+    transform 260ms ease;
 }
 
-.motion-card:hover::before {
+.motion-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.motion-card:hover::before,
+.motion-card:focus-within::before {
   opacity: 1;
-  transform: translateX(0);
+  transform: translate3d(0, 0, 0);
 }
 
 .motion-card:hover .motion-icon {
@@ -406,6 +416,7 @@ button {
   transition:
     transform 180ms ease,
     color 180ms ease;
+  will-change: transform;
 }
 
 .stagger-item {
@@ -842,6 +853,15 @@ button {
     inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
+.metric-card,
+.editorial-panel {
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    background-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
 .service-preset-card {
   position: relative;
   overflow: hidden;
@@ -1022,11 +1042,29 @@ button {
   min-width: 0;
 }
 
-.surface:hover,
-.metric-card:hover,
-.editorial-panel:hover {
-  transform: translateY(-2px);
-  border-color: color-mix(in srgb, var(--color-primary) 26%, var(--color-border));
+@media (hover: hover) and (pointer: fine) {
+  .surface:hover,
+  .metric-card:hover,
+  .editorial-panel:hover {
+    transform: translateY(-1px);
+    border-color: color-mix(in srgb, var(--color-primary) 26%, var(--color-border));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .surface,
+  .metric-card,
+  .data-card,
+  .editorial-panel,
+  .progress-fill {
+    animation: none;
+  }
+
+  .motion-card::before,
+  .motion-icon,
+  .motion-arrow {
+    transition: none;
+  }
 }
 
 @media (min-width: 640px) {
