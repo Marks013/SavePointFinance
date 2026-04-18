@@ -281,7 +281,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
   return (
     <div className="space-y-6 py-4">
       <section className="grid gap-4 2xl:grid-cols-[1.2fr_0.8fr]">
-        <article className="surface overflow-hidden rounded-[34px] p-6 md:p-8">
+        <article className="surface motion-card overflow-hidden rounded-[34px] p-6 md:p-8">
           <div className="section-stack">
             <div className="page-intro">
               <div className="eyebrow">Painel financeiro</div>
@@ -293,7 +293,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             </div>
 
             <div className="metric-grid-compact">
-              <div className="editorial-panel">
+              <div className="editorial-panel motion-card">
                 <p className="metric-label">Resultado do período</p>
                 <p
                   className={`subtle-metric-value amount-nowrap mt-3 ${
@@ -306,7 +306,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                   Diferença entre receitas e despesas pela competência financeira.
                 </p>
               </div>
-              <div className="editorial-panel">
+              <div className="editorial-panel motion-card">
                 <p className="metric-label">Saldo inicial do período</p>
                 <p
                   className={`subtle-metric-value amount-nowrap mt-3 ${
@@ -319,7 +319,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                   Caixa real das contas no primeiro dia da competência.
                 </p>
               </div>
-              <div className="editorial-panel">
+              <div className="editorial-panel motion-card">
                 <p className="metric-label">Saldo final do período</p>
                 <p
                   className={`subtle-metric-value amount-nowrap mt-3 ${
@@ -346,7 +346,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           </div>
         </article>
 
-        <article className="surface-strong rounded-[34px] p-6 md:p-8">
+        <article className="surface-strong motion-card rounded-[34px] p-6 md:p-8">
           <div className="section-stack">
             <div>
               <p className="metric-label text-white/78">Caixa contabilizado na competência</p>
@@ -363,7 +363,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             </div>
 
             <div className="grid gap-3">
-              <div className="rounded-[24px] border border-white/12 bg-white/8 px-4 py-4">
+              <div className="motion-card rounded-[24px] border border-white/12 bg-white/8 px-4 py-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-white/66">Faturas com vencimento no período</p>
                 <p className="subtle-metric-value amount-nowrap mt-2 text-white">
                   {formatCurrency(data.monthlyCardPayments)}
@@ -372,7 +372,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                   Soma das faturas que vencem dentro da competência aberta na navegação.
                 </p>
               </div>
-              <div className="rounded-[24px] border border-white/12 bg-white/8 px-4 py-4">
+              <div className="motion-card rounded-[24px] border border-white/12 bg-white/8 px-4 py-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-white/66">Saídas previstas no período</p>
                 <p
                   className={`subtle-metric-value amount-nowrap mt-2 ${
@@ -413,7 +413,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           </div>
 
           <div className="mt-5 grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
-            <div className="data-card p-4">
+            <div className="data-card motion-card p-4">
               <p className="metric-label">Maior pressão</p>
               <p className="mt-3 text-base font-semibold">{data.spendingInsights.topCategory?.name ?? "Sem dados suficientes"}</p>
               <p className="mt-2 text-sm text-[var(--color-muted-foreground)]">
@@ -424,7 +424,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                   : "As categorias aparecerão aqui conforme você registrar movimentações."}
               </p>
             </div>
-            <div className="data-card p-4">
+            <div className="data-card motion-card p-4">
               <p className="metric-label">Estruturais</p>
               <p className="amount-nowrap mt-3 text-base font-semibold">
                 {formatCurrency(data.spendingInsights.essentialExpenses)}
@@ -433,7 +433,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                 Moradia, utilidades e despesas de manutenção da rotina.
               </p>
             </div>
-            <div className="data-card p-4">
+            <div className="data-card motion-card p-4">
               <p className="metric-label">Cobertura de categoria</p>
               <p className="mt-3 text-base font-semibold">{Math.round(data.classification.coverage * 100)}%</p>
               <p className="mt-2 text-sm text-[var(--color-muted-foreground)]">
@@ -444,7 +444,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
           <div className="metric-grid-compact mt-5">
             {data.spendingInsights.categoryBreakdown.slice(0, 4).map((item) => (
-              <div key={item.name} className="data-card px-4 py-3">
+              <div key={item.name} className="data-card motion-card px-4 py-3">
                 <div className="flex items-center justify-between gap-4">
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium">{item.name}</p>
@@ -482,7 +482,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           <div className="mt-5 space-y-3">
             {data.recentTransactions.length > 0 ? (
               data.recentTransactions.map((transaction) => (
-                <div key={transaction.id} className="data-card flex flex-wrap items-start justify-between gap-4 px-4 py-3">
+                <div key={transaction.id} className="data-card motion-card flex flex-wrap items-start justify-between gap-4 px-4 py-3">
                   <div className="min-w-0 flex-1">
                     <p className="break-words text-sm font-medium">{transaction.description}</p>
                     <p className="break-words text-xs text-[var(--color-muted-foreground)]">
@@ -534,7 +534,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             <div className="mt-5 space-y-3">
               {data.upcomingProjection.length > 0 ? (
                 data.upcomingProjection.map((item) => (
-                  <div key={`${item.source}-${item.reference}`} className="data-card px-4 py-3">
+                  <div key={`${item.source}-${item.reference}`} className="data-card motion-card px-4 py-3">
                     <div className="flex flex-wrap items-start justify-between gap-4">
                       <p className="min-w-0 flex-1 break-words text-sm font-medium">{item.label}</p>
                       <p
@@ -576,7 +576,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                     Number(goal.targetAmount) > 0 ? Number(goal.currentAmount) / Number(goal.targetAmount) : 0;
 
                   return (
-                    <div key={goal.id} className="data-card px-4 py-3">
+                    <div key={goal.id} className="data-card motion-card px-4 py-3">
                       <div className="flex items-start justify-between gap-4">
                         <p className="min-w-0 flex-1 break-words text-sm font-medium">{goal.name}</p>
                         <p className="shrink-0 text-xs font-semibold text-[var(--color-muted-foreground)]">
@@ -608,7 +608,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           </div>
 
           <div className="metric-grid-compact mt-5">
-            <div className="data-card px-4 py-4">
+            <div className="data-card motion-card px-4 py-4">
               <p className="metric-label">Contas ativas</p>
               <p className="mt-3 text-2xl font-semibold tracking-[-0.05em] text-[var(--color-foreground)]">
                 {data.activeAccounts.length}
@@ -619,7 +619,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
                   : "Nenhuma conta ativa cadastrada."}
               </p>
             </div>
-            <div className="data-card px-4 py-4">
+            <div className="data-card motion-card px-4 py-4">
               <p className="metric-label">Maior saldo</p>
               <p
                 className={`amount-nowrap mt-3 max-w-full text-[clamp(1.25rem,4vw,2rem)] font-semibold tracking-[-0.05em] ${
@@ -633,7 +633,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
               </p>
             </div>
             {data.benefits.foodWallets > 0 ? (
-              <div className="data-card px-4 py-4">
+              <div className="data-card motion-card px-4 py-4">
                 <p className="metric-label">Vale alimentação</p>
                 <p
                   className={`amount-nowrap mt-3 max-w-full text-[clamp(1.25rem,4vw,2rem)] font-semibold tracking-[-0.05em] ${
@@ -661,7 +661,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             <div className="mt-5 space-y-3">
               {data.activeCards.length > 0 ? (
                 data.activeCards.map((card) => (
-                  <div key={card.id} className="data-card space-y-3 px-4 py-4">
+                  <div key={card.id} className="data-card motion-card space-y-3 px-4 py-4">
                     <div className="flex flex-wrap items-start justify-between gap-4">
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium">{card.name}</p>
@@ -798,14 +798,14 @@ function QuickAccessLink({
 }) {
   return (
     <Link
-      className="data-card group flex items-start justify-between gap-4 px-4 py-3 transition hover:border-[rgba(19,111,79,0.22)]"
+      className="data-card motion-card group flex items-start justify-between gap-4 px-4 py-3 transition hover:border-[rgba(19,111,79,0.22)]"
       href={`${href}?month=${month}`}
     >
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium text-[var(--color-foreground)]">{label}</p>
         <p className="mt-1 break-words text-xs leading-5 text-[var(--color-muted-foreground)]">{copy}</p>
       </div>
-      <ArrowRight className="mt-0.5 size-4 shrink-0 text-[var(--color-muted-foreground)] transition group-hover:translate-x-0.5 group-hover:text-[var(--color-primary)]" />
+      <ArrowRight className="motion-arrow mt-0.5 size-4 shrink-0 text-[var(--color-muted-foreground)] transition group-hover:text-[var(--color-primary)]" />
     </Link>
   );
 }

@@ -854,7 +854,10 @@ async function replyWithFinanceReport(user: WhatsAppUser, body: string) {
     .slice(0, 3)
     .map((item) => `• ${bold(item.name)}: ${formatCurrency(item.total)}`)
     .join("\n");
-  const alerts = report.annualInsights.alerts.slice(0, 2).join(" ");
+  const alerts = report.annualInsights.alerts
+    .slice(0, 2)
+    .map((alert) => `• ${bold(alert.title)}: ${alert.detail}`)
+    .join("\n");
 
   return {
     intent: "finance_report",

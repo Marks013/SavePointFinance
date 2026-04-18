@@ -51,6 +51,8 @@ const guidance = [
   "Evite misturar duas compras na mesma mensagem."
 ];
 
+const whatsappSettingsHref = "/dashboard/settings#whatsapp-assistant";
+
 export function WhatsAppClient() {
   const profileQuery = useQuery({
     queryKey: ["profile", "whatsapp-hub"],
@@ -77,7 +79,7 @@ export function WhatsAppClient() {
           </div>
           <div className="flex flex-wrap gap-2">
             <Button asChild variant="secondary">
-              <Link href="/dashboard/settings">Abrir configurações</Link>
+              <Link href={whatsappSettingsHref}>Configurar WhatsApp</Link>
             </Button>
             <Button asChild>
               <Link href="/dashboard/transactions">Ver transações</Link>
@@ -86,21 +88,21 @@ export function WhatsAppClient() {
         </div>
 
         <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <article className="metric-card">
+          <article className="metric-card motion-card">
             <p className="metric-label">Plano</p>
             <p className="metric-value">{profile?.license.planLabel ?? "Carregando..."}</p>
           </article>
-          <article className="metric-card">
+          <article className="metric-card motion-card">
             <p className="metric-label">Assistente</p>
             <p className="metric-value">
               {!whatsappEnabledForPlan ? "Bloqueado" : assistantEnabled ? "Ativo" : "Desativado"}
             </p>
           </article>
-          <article className="metric-card">
+          <article className="metric-card motion-card">
             <p className="metric-label">Webhook</p>
             <p className="metric-value">{webhookConfigured ? "Pronto" : "Pendente"}</p>
           </article>
-          <article className="metric-card">
+          <article className="metric-card motion-card">
             <p className="metric-label">Número vinculado</p>
             <p className="metric-value text-lg">{profile?.whatsappNumber || "Não informado"}</p>
           </article>
@@ -119,7 +121,7 @@ export function WhatsAppClient() {
           </div>
           <div className="mt-6 space-y-3">
             {commandExamples.map((command) => (
-              <article key={command} className="data-card px-4 py-3">
+              <article key={command} className="data-card motion-card px-4 py-3">
                 <p className="break-words text-sm text-[var(--color-foreground)]">`{command}`</p>
               </article>
             ))}
@@ -148,19 +150,19 @@ export function WhatsAppClient() {
             <h2 className="text-2xl font-semibold tracking-[-0.03em]">Fluxo recomendado</h2>
           </div>
           <div className="mt-6 grid gap-3">
-            <article className="data-card p-4">
+            <article className="data-card motion-card p-4">
               <p className="text-sm font-semibold">1. Cadastre seu número</p>
               <p className="mt-2 text-sm leading-7 text-[var(--color-muted-foreground)]">
                 O número salvo no perfil identifica somente a sua carteira.
               </p>
             </article>
-            <article className="data-card p-4">
+            <article className="data-card motion-card p-4">
               <p className="text-sm font-semibold">2. Lance com contexto</p>
               <p className="mt-2 text-sm leading-7 text-[var(--color-muted-foreground)]">
                 Valor, conta ou cartão e uma descrição simples já bastam para o SavePoint entender melhor.
               </p>
             </article>
-            <article className="data-card p-4">
+            <article className="data-card motion-card p-4">
               <p className="text-sm font-semibold">3. Valide só quando precisar</p>
               <p className="mt-2 text-sm leading-7 text-[var(--color-muted-foreground)]">
                 As classificações automáticas aparecem em Transações apenas para refinar categoria, não para criar o
@@ -178,28 +180,35 @@ export function WhatsAppClient() {
           <div className="mt-6 space-y-4">
             <div className="muted-panel">
               <p className="text-sm leading-7 text-[var(--color-muted-foreground)]">
-                O aprendizado automático de categoria é reaproveitado por carteira, não de forma global entre todos os
-                usuários da plataforma. Isso protege o contexto de cada operação e evita contaminação entre contas.
+                Sugestões confiáveis da IA que você aceita podem fortalecer a memória global da plataforma. Ajustes
+                manuais ou alterações feitas por uma carteira continuam locais, preservando o contexto de cada família.
               </p>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
-              <article className="data-card p-4">
+              <article className="data-card motion-card p-4">
                 <p className="text-sm font-semibold">Regras manuais</p>
                 <p className="mt-2 text-sm leading-7 text-[var(--color-muted-foreground)]">
-                  Quando você revisa uma sugestão, o sistema fortalece uma regra local da sua carteira.
+                  Quando você troca a categoria sugerida, o sistema fortalece uma regra local da sua carteira.
                 </p>
               </article>
-              <article className="data-card p-4">
-                <p className="text-sm font-semibold">IA com memória local</p>
+              <article className="data-card motion-card p-4">
+                <p className="text-sm font-semibold">IA com memória global</p>
                 <p className="mt-2 text-sm leading-7 text-[var(--color-muted-foreground)]">
-                  Quando a confiança é alta, a IA aprende atalhos reutilizáveis para a mesma carteira.
+                  Quando você mantém uma sugestão confiável, ela pode ajudar outras carteiras com categorias equivalentes.
                 </p>
               </article>
+            </div>
+            <div className="danger-panel">
+              <p className="danger-kicker">Acesso seguro</p>
+              <p className="danger-copy">
+                Os atalhos desta central levam apenas para a configuração do WhatsApp e validação de transações. Convites
+                familiares continuam isolados na área própria e obedecem às permissões do titular.
+              </p>
             </div>
 
             <div className="flex flex-wrap gap-2">
               <Button asChild variant="secondary">
-                <Link href="/dashboard/settings">
+                <Link href={whatsappSettingsHref}>
                   <Settings2 className="size-4" />
                   Ajustar integração
                 </Link>

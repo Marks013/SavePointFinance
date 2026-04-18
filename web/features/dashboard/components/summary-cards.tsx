@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { ArrowDownCircle, ArrowUpCircle, Landmark } from "lucide-react";
 
 import { formatCurrency } from "@/lib/utils";
@@ -58,12 +59,17 @@ const cards = [
 export function SummaryCards({ data }: SummaryCardsProps) {
   return (
     <div className="metric-grid">
-      {cards.map((card) => {
+      {cards.map((card, index) => {
         const Icon = card.icon;
         const value = data[card.key];
 
         return (
-          <article aria-label={card.title} key={card.key} className="metric-card">
+          <article
+            aria-label={card.title}
+            key={card.key}
+            className="metric-card motion-card stagger-item"
+            style={{ "--motion-delay": `${index * 45}ms` } as CSSProperties}
+          >
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0 flex-1">
                 <p className="metric-label">{card.title}</p>
@@ -74,7 +80,7 @@ export function SummaryCards({ data }: SummaryCardsProps) {
                 </p>
                 <p className="mt-3 text-sm leading-6 text-[var(--color-ink-700)]">{card.note}</p>
               </div>
-              <div className={`flex size-11 shrink-0 items-center justify-center rounded-[1.1rem] ${card.accent}`}>
+              <div className={`motion-icon flex size-11 shrink-0 items-center justify-center rounded-[1.1rem] ${card.accent}`}>
                 <Icon className="size-5" />
               </div>
             </div>

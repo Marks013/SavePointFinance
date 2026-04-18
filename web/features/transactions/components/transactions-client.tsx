@@ -916,15 +916,15 @@ export function TransactionsClient() {
         </div>
 
         <div className="mt-6 grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
-          <article className="metric-card">
+          <article className="metric-card motion-card">
             <p className="metric-label">Receitas filtradas</p>
             <p className="metric-value amount-nowrap">{formatCurrency(incomeTotal)}</p>
           </article>
-          <article className="metric-card">
+          <article className="metric-card motion-card">
             <p className="metric-label">Despesas filtradas</p>
             <p className="metric-value amount-nowrap amount-negative">{formatCurrency(expenseTotal)}</p>
           </article>
-          <article className="metric-card">
+          <article className="metric-card motion-card">
             <p className="metric-label">Transferências filtradas</p>
             <p className="metric-value amount-nowrap">{formatCurrency(transferTotal)}</p>
           </article>
@@ -961,7 +961,7 @@ export function TransactionsClient() {
                 });
 
                 return (
-                  <article key={`review-${transaction.id}`} className="data-card p-4">
+                  <article key={`review-${transaction.id}`} className="data-card motion-card p-4">
                     <div className="flex flex-wrap items-start justify-between gap-4">
                       <div className="min-w-0 flex-1">
                         <p className="break-words text-sm font-semibold">{transaction.description}</p>
@@ -1190,7 +1190,7 @@ export function TransactionsClient() {
           {visibleTransactions.map((transaction) => (
             <article
               key={transaction.id}
-              className="data-card p-4"
+              className="data-card motion-card p-4"
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">

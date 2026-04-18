@@ -368,6 +368,50 @@ button {
   background: radial-gradient(circle, rgba(19, 111, 79, 0.12), transparent 70%);
 }
 
+.motion-card {
+  isolation: isolate;
+}
+
+.motion-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background:
+    linear-gradient(120deg, transparent 0%, rgba(255, 255, 255, 0.08) 44%, transparent 62%),
+    radial-gradient(circle at 18% 0%, rgba(47, 141, 104, 0.18), transparent 34%);
+  opacity: 0;
+  transform: translateX(-16%);
+  transition:
+    opacity 220ms ease,
+    transform 420ms ease;
+}
+
+.motion-card:hover::before {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.motion-card:hover .motion-icon {
+  transform: rotate(-5deg) scale(1.06);
+}
+
+.motion-card:hover .motion-arrow {
+  transform: translateX(0.2rem);
+}
+
+.motion-icon,
+.motion-arrow {
+  transition:
+    transform 180ms ease,
+    color 180ms ease;
+}
+
+.stagger-item {
+  animation-delay: var(--motion-delay, 0ms);
+}
+
 .metric-label {
   font-size: 0.83rem;
   font-weight: 600;
@@ -884,6 +928,8 @@ button {
   height: 100%;
   border-radius: 999px;
   background: linear-gradient(90deg, var(--color-primary) 0%, color-mix(in srgb, var(--color-primary) 68%, white) 100%);
+  transform-origin: left center;
+  animation: progress-grow 700ms ease both;
   transition: width 220ms ease;
 }
 
@@ -956,6 +1002,15 @@ button {
   }
   50% {
     transform: translate3d(18px, 14px, 0) scale(1.06);
+  }
+}
+
+@keyframes progress-grow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
   }
 }
 

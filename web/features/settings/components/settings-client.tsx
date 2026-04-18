@@ -585,7 +585,7 @@ export function SettingsClient() {
         </section>
       </div>
 
-      <section className="surface content-section">
+      <section id="whatsapp-assistant" className="surface content-section scroll-mt-24">
         <div className="eyebrow">WhatsApp</div>
         <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em]">Assistente virtual</h2>
         <p className="mt-4 max-w-3xl text-sm leading-7 text-[var(--color-muted-foreground)]">
