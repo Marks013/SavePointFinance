@@ -467,14 +467,14 @@ export function ReportsClient() {
       </section>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <article className="metric-card"><p className="metric-label">Resultado do período</p><p className={`metric-value amount-nowrap ${amountClass(data?.summary?.balance ?? 0)}`}>{formatCurrency(data?.summary?.balance ?? 0)}</p><p className="metric-footnote">{`Taxa de economia: ${formatSavingsRate(data?.summary?.savingsRate ?? 0, data?.summary?.income ?? 0)}`}</p></article>
-        <article className="metric-card"><p className="metric-label">Saldo inicial</p><p className={`metric-value amount-nowrap ${amountClass(data?.periodBalances?.opening ?? 0)}`}>{formatCurrency(data?.periodBalances?.opening ?? 0)}</p><p className="metric-footnote">Caixa consolidado no início do recorte.</p></article>
-        <article className="metric-card"><p className="metric-label">Saldo final</p><p className={`metric-value amount-nowrap ${amountClass(data?.periodBalances?.closing ?? 0)}`}>{formatCurrency(data?.periodBalances?.closing ?? 0)}</p><p className="metric-footnote">Caixa consolidado no fim do período.</p></article>
-        <article className="metric-card"><p className="metric-label">{isYearScope ? "Média mensal de resultado" : "Despesa média diária"}</p><p className={`metric-value amount-nowrap ${amountClass(isYearScope ? data?.annualInsights?.cadence?.averageMonthlyBalance ?? 0 : -(data?.summary?.averageDailyExpense ?? 0))}`}>{formatCurrency(isYearScope ? data?.annualInsights?.cadence?.averageMonthlyBalance ?? 0 : data?.summary?.averageDailyExpense ?? 0)}</p><p className="metric-footnote">{isYearScope ? `${data?.annualInsights?.cadence?.positiveMonths ?? 0} meses positivos de ${data?.period?.months ?? 0}.` : "Saída média por dia no período."}</p></article>
+        <article className="metric-card motion-card"><p className="metric-label">Resultado do período</p><p className={`metric-value amount-nowrap ${amountClass(data?.summary?.balance ?? 0)}`}>{formatCurrency(data?.summary?.balance ?? 0)}</p><p className="metric-footnote">{`Taxa de economia: ${formatSavingsRate(data?.summary?.savingsRate ?? 0, data?.summary?.income ?? 0)}`}</p></article>
+        <article className="metric-card motion-card"><p className="metric-label">Saldo inicial</p><p className={`metric-value amount-nowrap ${amountClass(data?.periodBalances?.opening ?? 0)}`}>{formatCurrency(data?.periodBalances?.opening ?? 0)}</p><p className="metric-footnote">Caixa consolidado no início do recorte.</p></article>
+        <article className="metric-card motion-card"><p className="metric-label">Saldo final</p><p className={`metric-value amount-nowrap ${amountClass(data?.periodBalances?.closing ?? 0)}`}>{formatCurrency(data?.periodBalances?.closing ?? 0)}</p><p className="metric-footnote">Caixa consolidado no fim do período.</p></article>
+        <article className="metric-card motion-card"><p className="metric-label">{isYearScope ? "Média mensal de resultado" : "Despesa média diária"}</p><p className={`metric-value amount-nowrap ${amountClass(isYearScope ? data?.annualInsights?.cadence?.averageMonthlyBalance ?? 0 : -(data?.summary?.averageDailyExpense ?? 0))}`}>{formatCurrency(isYearScope ? data?.annualInsights?.cadence?.averageMonthlyBalance ?? 0 : data?.summary?.averageDailyExpense ?? 0)}</p><p className="metric-footnote">{isYearScope ? `${data?.annualInsights?.cadence?.positiveMonths ?? 0} meses positivos de ${data?.period?.months ?? 0}.` : "Saída média por dia no período."}</p></article>
       </div>
 
       {(benefitSummary?.foodWallets ?? 0) > 0 ? (
-        <section className="surface content-section">
+        <section className="surface motion-card content-section">
           <div className="flex items-center justify-between gap-4">
             <div>
               <h2 className="text-xl font-semibold">Vale Alimentação</h2>
@@ -487,16 +487,16 @@ export function ReportsClient() {
             </p>
           </div>
           <div className="mt-6 grid gap-4 md:grid-cols-3">
-            <article className="data-card p-4"><p className="metric-label">Saldo disponível</p><p className={`subtle-metric-value amount-nowrap mt-3 ${amountClass(benefitSummary?.foodBalance ?? 0)}`}>{formatCurrency(benefitSummary?.foodBalance ?? 0)}</p><p className="mt-2 text-sm text-[var(--color-muted-foreground)]">Saldo somado das carteiras de Vale Alimentação.</p></article>
-            <article className="data-card p-4"><p className="metric-label">Créditos no período</p><p className="subtle-metric-value amount-nowrap mt-3 amount-positive">{formatCurrency(benefitSummary?.foodIncome ?? 0)}</p><p className="mt-2 text-sm text-[var(--color-muted-foreground)]">Entradas lançadas na carteira de benefício.</p></article>
-            <article className="data-card p-4"><p className="metric-label">Consumo no período</p><p className="subtle-metric-value amount-nowrap mt-3 amount-negative">{formatCurrency(benefitSummary?.foodExpense ?? 0)}</p><p className="mt-2 text-sm text-[var(--color-muted-foreground)]">Despesas elegíveis de alimentação consumidas no recorte.</p></article>
+            <article className="data-card motion-card p-4"><p className="metric-label">Saldo disponível</p><p className={`subtle-metric-value amount-nowrap mt-3 ${amountClass(benefitSummary?.foodBalance ?? 0)}`}>{formatCurrency(benefitSummary?.foodBalance ?? 0)}</p><p className="mt-2 text-sm text-[var(--color-muted-foreground)]">Saldo somado das carteiras de Vale Alimentação.</p></article>
+            <article className="data-card motion-card p-4"><p className="metric-label">Créditos no período</p><p className="subtle-metric-value amount-nowrap mt-3 amount-positive">{formatCurrency(benefitSummary?.foodIncome ?? 0)}</p><p className="mt-2 text-sm text-[var(--color-muted-foreground)]">Entradas lançadas na carteira de benefício.</p></article>
+            <article className="data-card motion-card p-4"><p className="metric-label">Consumo no período</p><p className="subtle-metric-value amount-nowrap mt-3 amount-negative">{formatCurrency(benefitSummary?.foodExpense ?? 0)}</p><p className="mt-2 text-sm text-[var(--color-muted-foreground)]">Despesas elegíveis de alimentação consumidas no recorte.</p></article>
           </div>
         </section>
       ) : null}
 
       {isYearScope ? (
         <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-          <section className="surface content-section">
+          <section className="surface motion-card content-section">
             <h2 className="text-xl font-semibold">Narrativa anual</h2>
             <div className="mt-6 grid gap-4 lg:grid-cols-2">
               <article className={`rounded-[1.5rem] border p-5 ${tonePanelClass(data?.annualInsights?.narrative?.tone ?? "attention")}`}>
@@ -508,20 +508,20 @@ export function ReportsClient() {
               </div>
             </div>
           </section>
-          <section className="surface content-section">
+          <section className="surface motion-card content-section">
             <h2 className="text-xl font-semibold">Cadência e concentração</h2>
             <div className="mt-6 grid gap-4 md:grid-cols-2">
-              <article className="data-card p-4"><div className="flex items-start justify-between gap-3"><div><p className="metric-label">Meses ativos</p><p className="subtle-metric-value mt-3">{`${data?.annualInsights?.cadence?.activeMonths ?? 0}/${data?.period?.months ?? 0}`}</p></div><CalendarRange className="size-4" /></div><p className="mt-3 text-sm text-[var(--color-muted-foreground)]">{`${data?.annualInsights?.cadence?.positiveMonths ?? 0} positivos • ${data?.annualInsights?.cadence?.negativeMonths ?? 0} negativos • ${data?.annualInsights?.cadence?.neutralMonths ?? 0} neutros`}</p></article>
-              <article className="data-card p-4"><div className="flex items-start justify-between gap-3"><div><p className="metric-label">Top 3 categorias</p><p className="subtle-metric-value mt-3">{pct(data?.annualInsights?.concentration?.topCategoriesShare ?? 0)}</p></div><TrendingDown className="size-4" /></div><p className="mt-3 text-sm text-[var(--color-muted-foreground)]">Concentração das maiores despesas sobre o total anual.</p></article>
-              <article className="data-card p-4"><div className="flex items-start justify-between gap-3"><div><p className="metric-label">Sem categoria</p><p className="subtle-metric-value mt-3">{pct(data?.annualInsights?.concentration?.uncategorizedExpenseShare ?? 0)}</p></div><AlertTriangle className="size-4" /></div><p className="mt-3 text-sm text-[var(--color-muted-foreground)]">{formatCurrency(data?.summary?.uncategorizedExpense ?? 0)}</p></article>
-              <article className="data-card p-4"><div className="flex items-start justify-between gap-3"><div><p className="metric-label">Amplitude anual</p><p className="subtle-metric-value mt-3">{formatCurrency(data?.annualInsights?.cadence?.balanceSpread ?? 0)}</p></div><TrendingUp className="size-4" /></div><p className="mt-3 text-sm text-[var(--color-muted-foreground)]">Diferença entre o melhor e o pior mês em saldo.</p></article>
+              <article className="data-card motion-card p-4"><div className="flex items-start justify-between gap-3"><div><p className="metric-label">Meses ativos</p><p className="subtle-metric-value mt-3">{`${data?.annualInsights?.cadence?.activeMonths ?? 0}/${data?.period?.months ?? 0}`}</p></div><CalendarRange className="size-4" /></div><p className="mt-3 text-sm text-[var(--color-muted-foreground)]">{`${data?.annualInsights?.cadence?.positiveMonths ?? 0} positivos • ${data?.annualInsights?.cadence?.negativeMonths ?? 0} negativos • ${data?.annualInsights?.cadence?.neutralMonths ?? 0} neutros`}</p></article>
+              <article className="data-card motion-card p-4"><div className="flex items-start justify-between gap-3"><div><p className="metric-label">Top 3 categorias</p><p className="subtle-metric-value mt-3">{pct(data?.annualInsights?.concentration?.topCategoriesShare ?? 0)}</p></div><TrendingDown className="size-4" /></div><p className="mt-3 text-sm text-[var(--color-muted-foreground)]">Concentração das maiores despesas sobre o total anual.</p></article>
+              <article className="data-card motion-card p-4"><div className="flex items-start justify-between gap-3"><div><p className="metric-label">Sem categoria</p><p className="subtle-metric-value mt-3">{pct(data?.annualInsights?.concentration?.uncategorizedExpenseShare ?? 0)}</p></div><AlertTriangle className="size-4" /></div><p className="mt-3 text-sm text-[var(--color-muted-foreground)]">{formatCurrency(data?.summary?.uncategorizedExpense ?? 0)}</p></article>
+              <article className="data-card motion-card p-4"><div className="flex items-start justify-between gap-3"><div><p className="metric-label">Amplitude anual</p><p className="subtle-metric-value mt-3">{formatCurrency(data?.annualInsights?.cadence?.balanceSpread ?? 0)}</p></div><TrendingUp className="size-4" /></div><p className="mt-3 text-sm text-[var(--color-muted-foreground)]">Diferença entre o melhor e o pior mês em saldo.</p></article>
             </div>
           </section>
         </div>
       ) : null}
 
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-        <section className="surface content-section">
+        <section className="surface motion-card content-section">
           <h2 className="text-xl font-semibold">{isYearScope ? "Receitas, despesas e saldo mensal" : "Receitas, despesas e transferências"}</h2>
           <div className="mt-4 flex flex-wrap gap-3 text-sm text-[var(--color-muted-foreground)]">
             {leadingSeriesMonth ? (
@@ -577,7 +577,7 @@ export function ReportsClient() {
             </BarChart>
           </DeferredResponsiveChart>
         </section>
-        <section className="surface content-section">
+        <section className="surface motion-card content-section">
           <h2 className="text-xl font-semibold">Despesas por categoria</h2>
           {activeCategory ? (
             <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
@@ -673,28 +673,28 @@ export function ReportsClient() {
       </div>
 
       <div className="grid gap-6 xl:grid-cols-2">
-        <section className="surface content-section">
+        <section className="surface motion-card content-section">
           <h2 className="text-xl font-semibold">{isYearScope ? "Destaques do ano" : "Leitura de gasto"}</h2>
           <div className="mt-6 grid gap-4 md:grid-cols-2">
-            <article className="data-card p-4"><p className="metric-label">{isYearScope ? "Melhor mês" : "Maior categoria"}</p><p className="mt-3 text-base font-semibold">{isYearScope ? data?.annualInsights?.highlights?.bestMonth?.label ?? "Sem dados" : data?.spendingInsights?.topCategory?.name ?? "Sem dados"}</p><p className={`mt-2 text-sm ${isYearScope ? amountClass(data?.annualInsights?.highlights?.bestMonth?.balance ?? 0) : "text-[var(--color-muted-foreground)]"}`}>{isYearScope ? formatCurrency(data?.annualInsights?.highlights?.bestMonth?.balance ?? 0) : data?.spendingInsights?.topCategory ? `${formatCurrency(data.spendingInsights.topCategory.total)} • ${pct(data.spendingInsights.topCategory.share)} das despesas` : "Ainda não há dados suficientes."}</p></article>
-            <article className="data-card p-4"><p className="metric-label">{isYearScope ? "Pior mês" : "Essenciais"}</p><p className="mt-3 text-base font-semibold">{isYearScope ? data?.annualInsights?.highlights?.worstMonth?.label ?? "Sem dados" : formatCurrency(data?.spendingInsights?.essentialExpenses ?? 0)}</p><p className={`mt-2 text-sm ${isYearScope ? amountClass(data?.annualInsights?.highlights?.worstMonth?.balance ?? 0) : "text-[var(--color-muted-foreground)]"}`}>{isYearScope ? formatCurrency(data?.annualInsights?.highlights?.worstMonth?.balance ?? 0) : "Moradia, saúde, utilidades e despesas estruturais."}</p></article>
-            <article className="data-card p-4"><p className="metric-label">{isYearScope ? "Melhor trimestre" : "Estilo de vida"}</p><p className="mt-3 text-base font-semibold">{isYearScope ? data?.annualInsights?.highlights?.strongestQuarter?.label ?? "Sem dados" : formatCurrency(data?.spendingInsights?.lifestyleExpenses ?? 0)}</p><p className={`mt-2 text-sm ${isYearScope ? amountClass(data?.annualInsights?.highlights?.strongestQuarter?.balance ?? 0) : "text-[var(--color-muted-foreground)]"}`}>{isYearScope ? formatCurrency(data?.annualInsights?.highlights?.strongestQuarter?.balance ?? 0) : "Consumo flexível como lazer, delivery, viagens e streaming."}</p></article>
-            <article className="data-card p-4"><p className="metric-label">{isYearScope ? "Trimestre mais fraco" : "Transferências no fluxo"}</p><p className="mt-3 text-base font-semibold">{isYearScope ? data?.annualInsights?.highlights?.weakestQuarter?.label ?? "Sem dados" : pct(data?.comparison?.transferShare ?? 0)}</p><p className={`mt-2 text-sm ${isYearScope ? amountClass(data?.annualInsights?.highlights?.weakestQuarter?.balance ?? 0) : "text-[var(--color-muted-foreground)]"}`}>{isYearScope ? formatCurrency(data?.annualInsights?.highlights?.weakestQuarter?.balance ?? 0) : "Peso das transferências na movimentação total."}</p></article>
+            <article className="data-card motion-card p-4"><p className="metric-label">{isYearScope ? "Melhor mês" : "Maior categoria"}</p><p className="mt-3 text-base font-semibold">{isYearScope ? data?.annualInsights?.highlights?.bestMonth?.label ?? "Sem dados" : data?.spendingInsights?.topCategory?.name ?? "Sem dados"}</p><p className={`mt-2 text-sm ${isYearScope ? amountClass(data?.annualInsights?.highlights?.bestMonth?.balance ?? 0) : "text-[var(--color-muted-foreground)]"}`}>{isYearScope ? formatCurrency(data?.annualInsights?.highlights?.bestMonth?.balance ?? 0) : data?.spendingInsights?.topCategory ? `${formatCurrency(data.spendingInsights.topCategory.total)} • ${pct(data.spendingInsights.topCategory.share)} das despesas` : "Ainda não há dados suficientes."}</p></article>
+            <article className="data-card motion-card p-4"><p className="metric-label">{isYearScope ? "Pior mês" : "Essenciais"}</p><p className="mt-3 text-base font-semibold">{isYearScope ? data?.annualInsights?.highlights?.worstMonth?.label ?? "Sem dados" : formatCurrency(data?.spendingInsights?.essentialExpenses ?? 0)}</p><p className={`mt-2 text-sm ${isYearScope ? amountClass(data?.annualInsights?.highlights?.worstMonth?.balance ?? 0) : "text-[var(--color-muted-foreground)]"}`}>{isYearScope ? formatCurrency(data?.annualInsights?.highlights?.worstMonth?.balance ?? 0) : "Moradia, saúde, utilidades e despesas estruturais."}</p></article>
+            <article className="data-card motion-card p-4"><p className="metric-label">{isYearScope ? "Melhor trimestre" : "Estilo de vida"}</p><p className="mt-3 text-base font-semibold">{isYearScope ? data?.annualInsights?.highlights?.strongestQuarter?.label ?? "Sem dados" : formatCurrency(data?.spendingInsights?.lifestyleExpenses ?? 0)}</p><p className={`mt-2 text-sm ${isYearScope ? amountClass(data?.annualInsights?.highlights?.strongestQuarter?.balance ?? 0) : "text-[var(--color-muted-foreground)]"}`}>{isYearScope ? formatCurrency(data?.annualInsights?.highlights?.strongestQuarter?.balance ?? 0) : "Consumo flexível como lazer, delivery, viagens e streaming."}</p></article>
+            <article className="data-card motion-card p-4"><p className="metric-label">{isYearScope ? "Trimestre mais fraco" : "Transferências no fluxo"}</p><p className="mt-3 text-base font-semibold">{isYearScope ? data?.annualInsights?.highlights?.weakestQuarter?.label ?? "Sem dados" : pct(data?.comparison?.transferShare ?? 0)}</p><p className={`mt-2 text-sm ${isYearScope ? amountClass(data?.annualInsights?.highlights?.weakestQuarter?.balance ?? 0) : "text-[var(--color-muted-foreground)]"}`}>{isYearScope ? formatCurrency(data?.annualInsights?.highlights?.weakestQuarter?.balance ?? 0) : "Peso das transferências na movimentação total."}</p></article>
           </div>
         </section>
-        <section className="surface content-section">
+        <section className="surface motion-card content-section">
           <h2 className="text-xl font-semibold">Movimentação por conta</h2>
-          <div className="mt-6 space-y-3">{byAccounts.length ? byAccounts.slice(0, 8).map((item) => <article key={item.id} className="data-card p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0 flex-1"><p className="break-words font-semibold">{item.usage === "benefit_food" ? `${item.name} • vale alimentação` : item.name}</p><p className="break-words text-sm text-[var(--color-muted-foreground)]">{`Entradas ${formatCurrency(item.income)} • Saídas ${formatCurrency(item.expense)}`}</p></div><p className={`amount-nowrap w-full text-left font-semibold sm:w-auto sm:text-right ${amountClass(item.net)}`}>{formatCurrency(item.net)}</p></div></article>) : <div className="muted-panel border border-dashed px-4 py-6 text-sm text-[var(--color-muted-foreground)]">Nenhuma conta com impacto financeiro foi encontrada neste filtro.</div>}</div>
+          <div className="mt-6 space-y-3">{byAccounts.length ? byAccounts.slice(0, 8).map((item) => <article key={item.id} className="data-card motion-card p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0 flex-1"><p className="break-words font-semibold">{item.usage === "benefit_food" ? `${item.name} • vale alimentação` : item.name}</p><p className="break-words text-sm text-[var(--color-muted-foreground)]">{`Entradas ${formatCurrency(item.income)} • Saídas ${formatCurrency(item.expense)}`}</p></div><p className={`amount-nowrap w-full text-left font-semibold sm:w-auto sm:text-right ${amountClass(item.net)}`}>{formatCurrency(item.net)}</p></div></article>) : <div className="muted-panel border border-dashed px-4 py-6 text-sm text-[var(--color-muted-foreground)]">Nenhuma conta com impacto financeiro foi encontrada neste filtro.</div>}</div>
         </section>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-2">
-        <section className="surface content-section">
+        <section className="surface motion-card content-section">
           <h2 className="text-xl font-semibold">{isYearScope ? "Cartões com maior impacto" : "Controle por cartão"}</h2>
           <div className="mt-6 space-y-3">
             {byCards.length ? (
               byCards.slice(0, 8).map((item) => (
-                <article key={item.id} className="data-card p-4">
+                <article key={item.id} className="data-card motion-card p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <p className="break-words font-semibold">{item.name}</p>
@@ -716,12 +716,12 @@ export function ReportsClient() {
           </div>
         </section>
 
-        <section className="surface content-section">
+        <section className="surface motion-card content-section">
           <h2 className="text-xl font-semibold">{isYearScope ? "Próximos compromissos e projeções" : "Compromissos do período"}</h2>
           <div className="mt-6 space-y-3">
             {upcomingItems.length ? (
               upcomingItems.map((item) => (
-                <article key={`${item.source}-${item.reference}`} className="data-card p-4">
+                <article key={`${item.source}-${item.reference}`} className="data-card motion-card p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <p className="break-words font-semibold">{item.label}</p>
@@ -749,17 +749,17 @@ export function ReportsClient() {
         </section>
       </div>
 
-      <section className="surface content-section">
+        <section className="surface motion-card content-section">
         <h2 className="text-xl font-semibold">Movimentações recentes</h2>
-        <div className="mt-6 space-y-3">{recentItems.map((item) => <article key={item.id} className="data-card p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0 flex-1"><p className="break-words font-semibold">{item.description}</p><p className="break-words text-sm text-[var(--color-muted-foreground)]">{item.type === "transfer" ? "Transferência entre contas" : item.category} • {formatDateDisplay(item.date)}</p><p className="break-words text-sm text-[var(--color-muted-foreground)]">{item.card ?? item.account ?? "Sem origem"}{item.destinationAccount ? ` → ${item.destinationAccount}` : ""}</p></div><p className={`amount-nowrap w-full text-left font-semibold sm:w-auto sm:text-right ${item.type === "expense" ? "amount-negative" : item.type === "income" ? "amount-positive" : "text-[var(--color-foreground)]"}`}>{formatCurrency(item.amount)}</p></div></article>)}</div>
+        <div className="mt-6 space-y-3">{recentItems.map((item) => <article key={item.id} className="data-card motion-card p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0 flex-1"><p className="break-words font-semibold">{item.description}</p><p className="break-words text-sm text-[var(--color-muted-foreground)]">{item.type === "transfer" ? "Transferência entre contas" : item.category} • {formatDateDisplay(item.date)}</p><p className="break-words text-sm text-[var(--color-muted-foreground)]">{item.card ?? item.account ?? "Sem origem"}{item.destinationAccount ? ` → ${item.destinationAccount}` : ""}</p></div><p className={`amount-nowrap w-full text-left font-semibold sm:w-auto sm:text-right ${item.type === "expense" ? "amount-negative" : item.type === "income" ? "amount-positive" : "text-[var(--color-foreground)]"}`}>{formatCurrency(item.amount)}</p></div></article>)}</div>
       </section>
 
-      <section className="surface content-section">
+      <section className="surface motion-card content-section">
         <h2 className="text-xl font-semibold">{isYearScope ? "Mapa anual de categorias" : "Mapa de categorias"}</h2>
         <div className="mt-6 space-y-3">
           {categoryBreakdown.length ? (
             categoryBreakdown.map((item) => (
-              <article key={item.name} className="data-card p-4">
+              <article key={item.name} className="data-card motion-card p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <p className="break-words font-semibold">{item.name}</p>

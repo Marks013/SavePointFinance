@@ -369,13 +369,21 @@ button {
   pointer-events: none;
 }
 
-.motion-card {
+.motion-card,
+.surface:not(.surface-strong),
+.metric-card,
+.data-card,
+.editorial-panel {
   position: relative;
   overflow: hidden;
   isolation: isolate;
 }
 
-.motion-card::before {
+.motion-card::before,
+.surface:not(.surface-strong)::before,
+.metric-card::before,
+.data-card::before,
+.editorial-panel::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -392,13 +400,25 @@ button {
     transform 260ms ease;
 }
 
-.motion-card > * {
+.motion-card > *,
+.surface:not(.surface-strong) > *,
+.metric-card > *,
+.data-card > *,
+.editorial-panel > * {
   position: relative;
   z-index: 1;
 }
 
 .motion-card:hover::before,
-.motion-card:focus-within::before {
+.motion-card:focus-within::before,
+.surface:not(.surface-strong):hover::before,
+.surface:not(.surface-strong):focus-within::before,
+.metric-card:hover::before,
+.metric-card:focus-within::before,
+.data-card:hover::before,
+.data-card:focus-within::before,
+.editorial-panel:hover::before,
+.editorial-panel:focus-within::before {
   opacity: 1;
   transform: translate3d(0, 0, 0);
 }
