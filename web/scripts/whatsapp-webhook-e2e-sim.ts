@@ -29,9 +29,11 @@ async function main() {
   process.env.GEMINI_API_KEY = "test-gemini-key";
   process.env.GEMINI_MODEL = "gemini-2.5-flash";
   process.env.WHATSAPP_ASSISTANT_ENABLED = "true";
+  process.env.WHATSAPP_VERIFY_TOKEN = "test-whatsapp-verify-token";
   process.env.WHATSAPP_ACCESS_TOKEN = "test-whatsapp-token";
   process.env.WHATSAPP_PHONE_NUMBER_ID = "123456789";
   process.env.WHATSAPP_GRAPH_VERSION = "v22.0";
+  process.env.WHATSAPP_APP_SECRET = "test-whatsapp-app-secret";
   process.env.DATABASE_URL ??= "postgresql://savepoint:savepoint@127.0.0.1:5432/savepoint";
   process.env.AUTH_SECRET ??= "test-auth-secret";
   process.env.AUTOMATION_CRON_SECRET ??= "test-automation-secret";
@@ -244,8 +246,8 @@ async function main() {
       JSON.stringify(
         {
           text: parsedText[0],
-          imageCommand: imageCommand.ok ? imageCommand.command : (imageCommand as any).response,
-          audioCommand: audioCommand.ok ? audioCommand.command : (audioCommand as any).response,
+          imageCommand: imageCommand.command,
+          audioCommand: audioCommand.command,
           sanitized
         },
         null,

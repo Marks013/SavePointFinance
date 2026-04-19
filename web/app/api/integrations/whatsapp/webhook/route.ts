@@ -2,7 +2,10 @@ import { after, NextResponse } from "next/server";
 
 import { serverEnv } from "@/lib/env/server";
 import { captureUnexpectedError } from "@/lib/observability/sentry";
-import { processWhatsAppMessageAsync } from "@/lib/whatsapp/async-processor";
+import {
+  enqueueWhatsAppMessage,
+  processQueuedWhatsAppWebhookEvents
+} from "@/lib/whatsapp/async-processor";
 import { verifyWhatsAppSignature } from "@/lib/whatsapp/cloud-api";
 import {
   extractIncomingWhatsAppWebhookMessages,
@@ -56,39 +59,35 @@ export async function POST(request: Request) {
     return NextResponse.json({ status: "ignored" }, { status: 200 });
   }
 
+  const queuedEventIds: string[] = [];
+
+  for (const message of messages) {
+    const queued = await enqueueWhatsAppMessage({
+      eventId: message.eventId,
+      phoneNumber: message.phoneNumber,
+      body: message.body,
+      type: message.type,
+      mediaId: message.mediaId,
+      mimeType: message.mimeType,
+      caption: message.caption,
+      payload
+    });
+
+    if (queued) {
+      queuedEventIds.push(message.eventId);
+    }
+  }
+
+  if (!queuedEventIds.length) {
+    return NextResponse.json({ status: "duplicate" }, { status: 200 });
+  }
+
   after(async () => {
     try {
-      const processingResults = await Promise.allSettled(
-        messages.map((message) =>
-          processWhatsAppMessageAsync({
-            eventId: message.eventId,
-            phoneNumber: message.phoneNumber,
-            body: message.body,
-            type: message.type,
-            mediaId: message.mediaId,
-            mimeType: message.mimeType,
-            caption: message.caption,
-            payload
-          })
-        )
-      );
-
-      for (const [index, result] of processingResults.entries()) {
-        if (result.status === "rejected") {
-          captureUnexpectedError(result.reason, {
-            surface: "webhook-after",
-            route: "/api/integrations/whatsapp/webhook",
-            operation: "POST",
-            feature: "whatsapp",
-            entityId: messages[index]?.eventId ?? null,
-            dedupeKey: `whatsapp:webhook:rejected:${messages[index]?.eventId ?? index}`
-          });
-          console.error(
-            `[WhatsApp] Fatal async error for webhook event ${messages[index]?.eventId ?? "unknown"}`,
-            result.reason
-          );
-        }
-      }
+      await processQueuedWhatsAppWebhookEvents({
+        eventIds: queuedEventIds,
+        limit: queuedEventIds.length
+      });
     } catch (error) {
       captureUnexpectedError(error, {
         surface: "webhook-after",

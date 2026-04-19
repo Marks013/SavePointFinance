@@ -8,7 +8,7 @@ import { sendWhatsAppTextMessage } from "@/lib/whatsapp/cloud-api";
 import { sanitizeAssistantText } from "@/lib/whatsapp/text-sanitizer";
 import { type WhatsAppWebhookPayload } from "@/lib/whatsapp/webhook-payload";
 
-type ProcessWhatsAppMessageAsyncInput = {
+export type ProcessWhatsAppMessageAsyncInput = {
   eventId: string;
   phoneNumber: string | null;
   body: string | null;
@@ -18,6 +18,11 @@ type ProcessWhatsAppMessageAsyncInput = {
   caption: string | null;
   payload: WhatsAppWebhookPayload;
 };
+
+const WHATSAPP_WEBHOOK_BATCH_SIZE = 10;
+const WHATSAPP_WEBHOOK_MAX_ATTEMPTS = 5;
+const WHATSAPP_WEBHOOK_STALE_PROCESSING_MINUTES = 15;
+const WHATSAPP_WEBHOOK_RETRY_BASE_DELAY_SECONDS = 60;
 
 function getErrorMessage(error: unknown) {
   if (error instanceof Error) {
@@ -31,13 +36,15 @@ function getErrorMessage(error: unknown) {
   return "Unknown webhook processing error";
 }
 
-async function markWebhookStatus(eventId: string, status: "SUCCESS" | "FAILED", error?: string) {
+async function markWebhookStatus(eventId: string, status: "SUCCESS", error?: string) {
   try {
     await prisma.$executeRaw`
       UPDATE "WebhookEvent"
       SET
         "status" = ${status},
         "error" = ${error ?? null},
+        "nextAttemptAt" = NULL,
+        "processedAt" = NOW(),
         "updatedAt" = NOW()
       WHERE "eventId" = ${eventId}
     `;
@@ -54,7 +61,82 @@ async function markWebhookStatus(eventId: string, status: "SUCCESS" | "FAILED", 
   }
 }
 
-async function createWebhookLock(eventId: string, payload: WhatsAppWebhookPayload) {
+async function markWebhookFailure(eventId: string, error?: string) {
+  try {
+    await prisma.$executeRaw`
+      UPDATE "WebhookEvent"
+      SET
+        "status" = CASE
+          WHEN "attempts" >= ${WHATSAPP_WEBHOOK_MAX_ATTEMPTS} THEN 'DEAD_LETTER'
+          ELSE 'FAILED'
+        END,
+        "error" = ${error ?? null},
+        "nextAttemptAt" = CASE
+          WHEN "attempts" >= ${WHATSAPP_WEBHOOK_MAX_ATTEMPTS} THEN NULL
+          ELSE NOW() + (${WHATSAPP_WEBHOOK_RETRY_BASE_DELAY_SECONDS} * POWER(2, GREATEST("attempts" - 1, 0)) * INTERVAL '1 second')
+        END,
+        "updatedAt" = NOW()
+      WHERE "eventId" = ${eventId}
+    `;
+  } catch (updateError) {
+    captureUnexpectedError(updateError, {
+      surface: "webhook-failure-update",
+      route: "/api/integrations/whatsapp/webhook",
+      operation: "POST",
+      feature: "whatsapp",
+      entityId: eventId,
+      dedupeKey: `whatsapp:webhook-failure:${eventId}`
+    });
+    console.error(`[WhatsApp] Failed to mark webhook event ${eventId} as failed`, updateError);
+  }
+}
+
+async function markWebhookDeadLetter(eventId: string, error: string) {
+  try {
+    await prisma.$executeRaw`
+      UPDATE "WebhookEvent"
+      SET
+        "status" = 'DEAD_LETTER',
+        "error" = ${error},
+        "nextAttemptAt" = NULL,
+        "updatedAt" = NOW()
+      WHERE "eventId" = ${eventId}
+    `;
+  } catch (updateError) {
+    captureUnexpectedError(updateError, {
+      surface: "webhook-dead-letter-update",
+      route: "/api/integrations/whatsapp/webhook",
+      operation: "POST",
+      feature: "whatsapp",
+      entityId: eventId,
+      dedupeKey: `whatsapp:webhook-dead-letter:${eventId}`
+    });
+    console.error(`[WhatsApp] Failed to dead-letter webhook event ${eventId}`, updateError);
+  }
+}
+
+function isQueuedWhatsAppMessage(value: unknown): value is ProcessWhatsAppMessageAsyncInput {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Partial<ProcessWhatsAppMessageAsyncInput>;
+
+  return (
+    typeof candidate.eventId === "string" &&
+    candidate.eventId.trim().length > 0 &&
+    (typeof candidate.phoneNumber === "string" || candidate.phoneNumber === null) &&
+    (typeof candidate.body === "string" || candidate.body === null) &&
+    (typeof candidate.type === "string" || candidate.type === null) &&
+    (typeof candidate.mediaId === "string" || candidate.mediaId === null) &&
+    (typeof candidate.mimeType === "string" || candidate.mimeType === null) &&
+    (typeof candidate.caption === "string" || candidate.caption === null) &&
+    Boolean(candidate.payload) &&
+    typeof candidate.payload === "object"
+  );
+}
+
+export async function enqueueWhatsAppMessage(input: ProcessWhatsAppMessageAsyncInput) {
   const insertedRows = await prisma.$executeRaw`
     INSERT INTO "WebhookEvent" (
       "id",
@@ -68,9 +150,9 @@ async function createWebhookLock(eventId: string, payload: WhatsAppWebhookPayloa
     VALUES (
       ${randomUUID()},
       'WHATSAPP',
-      ${eventId},
-      'PROCESSING',
-      CAST(${JSON.stringify(payload)} AS jsonb),
+      ${input.eventId},
+      'PENDING',
+      CAST(${JSON.stringify(input)} AS jsonb),
       NOW(),
       NOW()
     )
@@ -78,7 +160,41 @@ async function createWebhookLock(eventId: string, payload: WhatsAppWebhookPayloa
   `;
 
   if (insertedRows === 0) {
-    console.info(`[WhatsApp] Duplicate webhook event ignored: ${eventId}`);
+    console.info(`[WhatsApp] Duplicate queued webhook event ignored: ${input.eventId}`);
+    return false;
+  }
+
+  return true;
+}
+
+async function claimWebhookEvent(eventId: string) {
+  const touchedRows = await prisma.$executeRaw`
+    UPDATE "WebhookEvent"
+    SET
+      "status" = 'PROCESSING',
+      "error" = NULL,
+      "attempts" = "attempts" + 1,
+      "nextAttemptAt" = NULL,
+      "updatedAt" = NOW()
+    WHERE
+      "eventId" = ${eventId}
+      AND (
+        "status" = 'PENDING'
+        OR (
+          "status" = 'FAILED'
+          AND "attempts" < ${WHATSAPP_WEBHOOK_MAX_ATTEMPTS}
+          AND ("nextAttemptAt" IS NULL OR "nextAttemptAt" <= NOW())
+        )
+        OR (
+          "status" = 'PROCESSING'
+          AND "attempts" < ${WHATSAPP_WEBHOOK_MAX_ATTEMPTS}
+          AND "updatedAt" < NOW() - (${WHATSAPP_WEBHOOK_STALE_PROCESSING_MINUTES} * INTERVAL '1 minute')
+        )
+      )
+  `;
+
+  if (touchedRows === 0) {
+    console.info(`[WhatsApp] Duplicate in-flight or completed webhook event ignored: ${eventId}`);
     return false;
   }
 
@@ -87,7 +203,7 @@ async function createWebhookLock(eventId: string, payload: WhatsAppWebhookPayloa
 
 export async function processWhatsAppMessageAsync(input: ProcessWhatsAppMessageAsyncInput) {
   try {
-    const acquiredLock = await createWebhookLock(input.eventId, input.payload);
+    const acquiredLock = await claimWebhookEvent(input.eventId);
 
     if (!acquiredLock) {
       return;
@@ -197,11 +313,7 @@ export async function processWhatsAppMessageAsync(input: ProcessWhatsAppMessageA
       }
 
       if (!delivery.ok) {
-        await markWebhookStatus(
-          input.eventId,
-          "FAILED",
-          `WhatsApp delivery failed with status ${delivery.status}.`
-        );
+        await markWebhookFailure(input.eventId, `WhatsApp delivery failed with status ${delivery.status}.`);
         return;
       }
     }
@@ -219,7 +331,70 @@ export async function processWhatsAppMessageAsync(input: ProcessWhatsAppMessageA
     });
     console.error(`[WhatsApp] Failed to process webhook event ${input.eventId}`, error);
     if (input.eventId) {
-      await markWebhookStatus(input.eventId, "FAILED", errorMessage);
+      await markWebhookFailure(input.eventId, errorMessage);
     }
   }
+}
+
+export async function processQueuedWhatsAppWebhookEvents(options: { eventIds?: string[]; limit?: number } = {}) {
+  const limit = options.limit ?? WHATSAPP_WEBHOOK_BATCH_SIZE;
+  const events = await prisma.webhookEvent.findMany({
+    where: {
+      provider: "WHATSAPP",
+      ...(options.eventIds?.length
+        ? {
+            eventId: {
+              in: options.eventIds
+            }
+          }
+        : {}),
+      OR: [
+        { status: "PENDING" },
+        {
+          status: "FAILED",
+          attempts: {
+            lt: WHATSAPP_WEBHOOK_MAX_ATTEMPTS
+          },
+          OR: [{ nextAttemptAt: null }, { nextAttemptAt: { lte: new Date() } }]
+        },
+        {
+          status: "PROCESSING",
+          attempts: {
+            lt: WHATSAPP_WEBHOOK_MAX_ATTEMPTS
+          },
+          updatedAt: {
+            lt: new Date(Date.now() - WHATSAPP_WEBHOOK_STALE_PROCESSING_MINUTES * 60_000)
+          }
+        }
+      ]
+    },
+    orderBy: {
+      createdAt: "asc"
+    },
+    take: limit,
+    select: {
+      eventId: true,
+      payload: true
+    }
+  });
+
+  let processed = 0;
+  let skipped = 0;
+
+  for (const event of events) {
+    if (!isQueuedWhatsAppMessage(event.payload)) {
+      skipped += 1;
+      await markWebhookDeadLetter(event.eventId, "Invalid queued WhatsApp webhook payload.");
+      continue;
+    }
+
+    await processWhatsAppMessageAsync(event.payload);
+    processed += 1;
+  }
+
+  return {
+    queued: events.length,
+    processed,
+    skipped
+  };
 }

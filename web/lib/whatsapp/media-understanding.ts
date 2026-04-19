@@ -17,7 +17,6 @@ type MediaCommandDraft = {
   confidence: number;
 };
 
-const MAX_INLINE_MEDIA_BYTES = 18 * 1024 * 1024;
 const DEFAULT_MODEL = "gemini-2.5-flash";
 const DEFAULT_TIMEOUT_MS = 12_000;
 
@@ -170,10 +169,6 @@ async function callGeminiWithMedia(input: BuildMessageFromMediaInput) {
   }
 
   const downloaded = await downloadWhatsAppMedia(input.mediaId);
-
-  if (downloaded.fileSize > MAX_INLINE_MEDIA_BYTES) {
-    throw new Error("A mídia enviada é grande demais para análise inline no momento.");
-  }
 
   const model = serverEnv.GEMINI_MODEL || DEFAULT_MODEL;
   const url =

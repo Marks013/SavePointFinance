@@ -24,31 +24,52 @@ const optionalString = z.preprocess(
   z.string().optional()
 );
 
-const serverEnvSchema = z.object({
-  DATABASE_URL: z.string().min(1),
-  AUTH_SECRET: z.string().min(1),
-  AUTH_TRUST_HOST: z.enum(["true", "false"]).default("false"),
-  AUTOMATION_CRON_SECRET: z.string().min(1),
-  MAINTENANCE_MODE: z.enum(["true", "false"]).default("false"),
-  GEMINI_ENABLED: z.enum(["true", "false"]).default("false"),
-  GEMINI_API_KEY: z.string().optional(),
-  GEMINI_MODEL: z.string().optional(),
-  GEMINI_BASE_URL: optionalUrl,
-  WHATSAPP_ASSISTANT_ENABLED: z.enum(["true", "false"]).default("false"),
-  WHATSAPP_VERIFY_TOKEN: z.string().optional(),
-  WHATSAPP_ACCESS_TOKEN: z.string().optional(),
-  WHATSAPP_PHONE_NUMBER_ID: z.string().optional(),
-  WHATSAPP_GRAPH_VERSION: z.string().default("v22.0"),
-  WHATSAPP_APP_SECRET: z.string().optional(),
-  EMAIL_PROVIDER: z.enum(["webhook", "resend", "brevo"]).default("webhook"),
-  EMAIL_FROM: optionalString,
-  EMAIL_FROM_NAME: optionalString,
-  EMAIL_REPLY_TO: optionalString,
-  RESEND_API_KEY: optionalString,
-  BREVO_API_KEY: optionalString,
-  NOTIFICATION_EMAIL_WEBHOOK_URL: optionalUrl,
-  NOTIFICATION_WHATSAPP_WEBHOOK_URL: optionalUrl
-});
+const serverEnvSchema = z
+  .object({
+    DATABASE_URL: z.string().min(1),
+    AUTH_SECRET: z.string().min(1),
+    AUTH_TRUST_HOST: z.enum(["true", "false"]).default("false"),
+    AUTOMATION_CRON_SECRET: z.string().min(1),
+    MAINTENANCE_MODE: z.enum(["true", "false"]).default("false"),
+    GEMINI_ENABLED: z.enum(["true", "false"]).default("false"),
+    GEMINI_API_KEY: optionalString,
+    GEMINI_MODEL: optionalString,
+    GEMINI_BASE_URL: optionalUrl,
+    WHATSAPP_ASSISTANT_ENABLED: z.enum(["true", "false"]).default("false"),
+    WHATSAPP_VERIFY_TOKEN: optionalString,
+    WHATSAPP_ACCESS_TOKEN: optionalString,
+    WHATSAPP_PHONE_NUMBER_ID: optionalString,
+    WHATSAPP_GRAPH_VERSION: z.string().default("v22.0"),
+    WHATSAPP_APP_SECRET: optionalString,
+    EMAIL_PROVIDER: z.enum(["webhook", "resend", "brevo"]).default("webhook"),
+    EMAIL_FROM: optionalString,
+    EMAIL_FROM_NAME: optionalString,
+    EMAIL_REPLY_TO: optionalString,
+    RESEND_API_KEY: optionalString,
+    BREVO_API_KEY: optionalString,
+    NOTIFICATION_EMAIL_WEBHOOK_URL: optionalUrl,
+    NOTIFICATION_WHATSAPP_WEBHOOK_URL: optionalUrl
+  })
+  .superRefine((value, context) => {
+    if (value.WHATSAPP_ASSISTANT_ENABLED !== "true") {
+      return;
+    }
+
+    for (const key of [
+      "WHATSAPP_VERIFY_TOKEN",
+      "WHATSAPP_ACCESS_TOKEN",
+      "WHATSAPP_PHONE_NUMBER_ID",
+      "WHATSAPP_APP_SECRET"
+    ] as const) {
+      if (!value[key]) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [key],
+          message: `${key} is required when WHATSAPP_ASSISTANT_ENABLED=true`
+        });
+      }
+    }
+  });
 
 export const serverEnv = serverEnvSchema.parse({
   DATABASE_URL: process.env.DATABASE_URL,

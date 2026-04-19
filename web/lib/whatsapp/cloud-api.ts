@@ -57,6 +57,8 @@ type WhatsAppMediaMetadata = {
   file_size?: number;
 };
 
+const MAX_WHATSAPP_MEDIA_BYTES = 18 * 1024 * 1024;
+
 function ensureWhatsAppMediaEnv() {
   if (
     serverEnv.WHATSAPP_ASSISTANT_ENABLED !== "true" ||
@@ -97,6 +99,11 @@ export async function getWhatsAppMediaMetadata(mediaId: string) {
 
 export async function downloadWhatsAppMedia(mediaId: string) {
   const metadata = await getWhatsAppMediaMetadata(mediaId);
+
+  if (metadata.file_size && metadata.file_size > MAX_WHATSAPP_MEDIA_BYTES) {
+    throw new Error("A mídia enviada é grande demais para análise inline no momento.");
+  }
+
   const response = await fetch(metadata.url, {
     headers: {
       Authorization: `Bearer ${serverEnv.WHATSAPP_ACCESS_TOKEN}`
@@ -110,7 +117,16 @@ export async function downloadWhatsAppMedia(mediaId: string) {
     );
   }
 
+  const contentLength = Number(response.headers.get("content-length") ?? 0);
+  if (contentLength > MAX_WHATSAPP_MEDIA_BYTES) {
+    throw new Error("A mídia enviada é grande demais para análise inline no momento.");
+  }
+
   const bytes = Buffer.from(await response.arrayBuffer());
+
+  if (bytes.byteLength > MAX_WHATSAPP_MEDIA_BYTES) {
+    throw new Error("A mídia enviada é grande demais para análise inline no momento.");
+  }
 
   return {
     bytes,
@@ -121,7 +137,7 @@ export async function downloadWhatsAppMedia(mediaId: string) {
 
 export function verifyWhatsAppSignature(rawBody: string, signatureHeader: string | null) {
   if (!serverEnv.WHATSAPP_APP_SECRET) {
-    return true;
+    return false;
   }
 
   if (!signatureHeader?.startsWith("sha256=")) {

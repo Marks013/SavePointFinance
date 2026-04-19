@@ -5,6 +5,7 @@ import { serverEnv } from "@/lib/env/server";
 import { resolveTenantLicenseState } from "@/lib/licensing/policy";
 import { captureRequestError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
+import { processQueuedWhatsAppWebhookEvents } from "@/lib/whatsapp/async-processor";
 
 function isAuthorized(request: Request) {
   const authHeader = request.headers.get("authorization");
@@ -95,11 +96,13 @@ export async function POST(request: Request) {
       });
     }
 
+    const whatsappWebhookQueue = await processQueuedWhatsAppWebhookEvents();
     const prunedWebhookEvents = await pruneWebhookEvents();
 
     return NextResponse.json({
       processedTenants: results.filter((item) => !item.skipped).length,
       skippedTenants: results.filter((item) => item.skipped).length,
+      whatsappWebhookQueue,
       prunedWebhookEvents,
       results
     });

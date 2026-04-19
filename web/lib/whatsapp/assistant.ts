@@ -58,6 +58,8 @@ type IncomingTextMessage = {
   body: string;
 };
 
+const WHATSAPP_CONTEXT_WINDOW_MINUTES = 15;
+
 const assistantEncodingFixes: Array<[string, string]> = [
   ["â˜€ï¸", "☀️"],
   ["ðŸŒ¤ï¸", "🌤️"],
@@ -174,6 +176,90 @@ function getPreviousMonthKey(baseMonthKey: string) {
   const date = new Date(year, (month ?? 1) - 2, 1, 12, 0, 0, 0);
 
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function isQueryIntent(normalized: string) {
+  return isBalanceIntent(normalized) || isCardIntent(normalized) || isInstallmentsIntent(normalized);
+}
+
+function hasTransactionDetail(text: string) {
+  const normalized = normalizeText(text);
+
+  return (
+    Boolean(parseCurrencyValue(text)) ||
+    /\b(?:pix|picpay|dinheiro|credito|crédito|debito|débito|cartao|cartão)\b/i.test(text) ||
+    /\b\d{1,2}\s*(?:x|parcelas?)\b/i.test(normalized)
+  );
+}
+
+function isTransactionDetailFollowUp(body: string, normalized: string) {
+  return (
+    !parseCurrencyValue(body) &&
+    !isLaunchIntent(normalized) &&
+    (/\b(?:pix|picpay|dinheiro|credito|crédito|debito|débito|cartao|cartão)\b/i.test(body) ||
+      /\b\d{1,2}\s*(?:x|parcelas?)\b/i.test(normalized))
+  );
+}
+
+function shouldUseRecentContext(body: string) {
+  const normalized = normalizeText(body);
+
+  if (isTransactionDetailFollowUp(body, normalized)) {
+    return true;
+  }
+
+  if (
+    !normalized ||
+    isExpenseIntent(normalized) ||
+    isIncomeIntent(normalized) ||
+    isQueryIntent(normalized) ||
+    isGreeting(normalized)
+  ) {
+    return false;
+  }
+
+  return hasTransactionDetail(body);
+}
+
+async function buildContextualAssistantBody(
+  user: WhatsAppUser,
+  body: string,
+  currentMessageRowId: string
+) {
+  if (!shouldUseRecentContext(body)) {
+    return body;
+  }
+
+  const since = new Date(Date.now() - WHATSAPP_CONTEXT_WINDOW_MINUTES * 60 * 1000);
+  const recentInbound = await prisma.whatsAppMessage.findFirst({
+    where: {
+      tenantId: user.tenantId,
+      userId: user.id,
+      direction: "inbound",
+      id: {
+        not: currentMessageRowId
+      },
+      createdAt: {
+        gte: since
+      }
+    },
+    orderBy: {
+      createdAt: "desc"
+    },
+    select: {
+      body: true
+    }
+  });
+
+  if (!recentInbound?.body) {
+    return body;
+  }
+
+  const previousNormalized = normalizeText(recentInbound.body);
+  const previousLooksTransactional =
+    isExpenseIntent(previousNormalized) || isIncomeIntent(previousNormalized) || hasTransactionDetail(recentInbound.body);
+
+  return previousLooksTransactional ? `${recentInbound.body} ${body}` : body;
 }
 
 function getMonthLabel(monthKey: string) {
@@ -388,7 +474,16 @@ async function findUserByPhoneNumber(phoneNumber: string) {
   });
 }
 
-async function createExpenseOrIncomeFromText(user: WhatsAppUser, body: string, type: "income" | "expense") {
+function buildTransactionExternalMessageId(messageId: string | null | undefined, installmentNumber: number) {
+  return messageId ? `${messageId}:${installmentNumber}` : null;
+}
+
+async function createExpenseOrIncomeFromText(
+  user: WhatsAppUser,
+  body: string,
+  type: "income" | "expense",
+  messageId?: string | null
+) {
   const amountData = parseCurrencyValue(body);
 
   if (!amountData) {
@@ -534,8 +629,36 @@ async function createExpenseOrIncomeFromText(user: WhatsAppUser, body: string, t
   }
 
   let parentId: string | null = null;
+  const existingTransactions = messageId
+    ? await prisma.transaction.findMany({
+        where: {
+          tenantId: user.tenantId,
+          source: TransactionSource.whatsapp,
+          externalMessageId: {
+            startsWith: `${messageId}:`
+          }
+        },
+        select: {
+          id: true,
+          installmentNumber: true
+        }
+      })
+    : [];
+  const existingByInstallment = new Map(
+    existingTransactions.map((transaction) => [transaction.installmentNumber, transaction.id])
+  );
 
   for (let index = 0; index < installments; index += 1) {
+    const installmentNumber = index + 1;
+    const existingId = existingByInstallment.get(installmentNumber);
+
+    if (existingId) {
+      if (index === 0) {
+        parentId = existingId;
+      }
+      continue;
+    }
+
     const created: Transaction = await prisma.transaction.create({
       data: {
         tenantId: user.tenantId,
@@ -551,8 +674,9 @@ async function createExpenseOrIncomeFromText(user: WhatsAppUser, body: string, t
         accountId: selectedCard ? null : account?.id ?? null,
         cardId: selectedCard?.id ?? null,
         installmentsTotal: installments,
-        installmentNumber: index + 1,
+        installmentNumber,
         parentId,
+        externalMessageId: buildTransactionExternalMessageId(messageId, installmentNumber),
         classificationSource: classification.classificationSource,
         classificationKeyword: classification.classificationKeyword,
         classificationReason: classification.reason,
@@ -972,6 +1096,20 @@ function isLaunchIntent(normalized: string) {
   return /\b(lanca|lança|registra|registre|anota|adicione|adiciona|cadastra|cadastre)\b/.test(normalized);
 }
 
+function isMutationBlockedOnWhatsAppIntent(normalized: string) {
+  return /\b(exclui|excluir|exclua|apaga|apagar|apague|deleta|deletar|delete|remove|remover|remova|cancela|cancelar|cancele|estorna|estornar|estorne|edita|editar|edite|altera|alterar|altere|corrige|corrigir|corrija)\b/.test(
+    normalized
+  );
+}
+
+function buildBlockedMutationResponse() {
+  return (
+    "Por segurança, eu não excluo nem altero lançamentos pelo WhatsApp.\n\n" +
+    "Acesse o site do SavePoint, revise o lançamento e confirme a exclusão por lá. " +
+    "Assim evitamos apagar ou mudar uma transação financeira por engano."
+  );
+}
+
 function buildHelpResponse() {
   return (
     "Sou o assistente financeiro do SavePoint no WhatsApp.\n" +
@@ -987,7 +1125,7 @@ function buildHelpResponse() {
   );
 }
 
-async function handleAssistantCommand(user: WhatsAppUser, body: string) {
+async function handleAssistantCommand(user: WhatsAppUser, body: string, messageId?: string | null) {
   const normalized = normalizeText(body);
 
   if (!normalized) {
@@ -995,6 +1133,14 @@ async function handleAssistantCommand(user: WhatsAppUser, body: string) {
       intent: "empty",
       status: "ignored",
       response: withGreeting([buildHelpResponse()])
+    } satisfies AssistantResult;
+  }
+
+  if (isMutationBlockedOnWhatsAppIntent(normalized)) {
+    return {
+      intent: "blocked_mutation",
+      status: "requires_site",
+      response: withGreeting([buildBlockedMutationResponse()])
     } satisfies AssistantResult;
   }
 
@@ -1015,19 +1161,19 @@ async function handleAssistantCommand(user: WhatsAppUser, body: string) {
   }
 
   if (isLaunchIntent(normalized) && isIncomeIntent(normalized)) {
-    return createExpenseOrIncomeFromText(user, body, "income");
+    return createExpenseOrIncomeFromText(user, body, "income", messageId);
   }
 
   if (isLaunchIntent(normalized) && (isExpenseIntent(normalized) || Boolean(parseCurrencyValue(body)))) {
-    return createExpenseOrIncomeFromText(user, body, "expense");
+    return createExpenseOrIncomeFromText(user, body, "expense", messageId);
   }
 
   if (isExpenseIntent(normalized)) {
-    return createExpenseOrIncomeFromText(user, body, "expense");
+    return createExpenseOrIncomeFromText(user, body, "expense", messageId);
   }
 
   if (isIncomeIntent(normalized)) {
-    return createExpenseOrIncomeFromText(user, body, "income");
+    return createExpenseOrIncomeFromText(user, body, "income", messageId);
   }
 
   if (isInstallmentsIntent(normalized)) {
@@ -1084,7 +1230,7 @@ export async function processIncomingWhatsAppTextMessage(message: IncomingTextMe
     };
   }
 
-  await prisma.whatsAppMessage.create({
+  const inboundMessage = await prisma.whatsAppMessage.create({
     data: {
       tenantId: user.tenantId,
       userId: user.id,
@@ -1096,7 +1242,8 @@ export async function processIncomingWhatsAppTextMessage(message: IncomingTextMe
     }
   });
 
-  const result = await handleAssistantCommand(user, message.body);
+  const assistantBody = await buildContextualAssistantBody(user, message.body, inboundMessage.id);
+  const result = await handleAssistantCommand(user, assistantBody, message.messageId);
 
   return {
     handled: true,
