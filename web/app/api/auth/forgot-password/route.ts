@@ -37,18 +37,20 @@ export async function POST(request: Request) {
     const body = forgotPasswordSchema.parse(await request.json());
     const normalizedEmail = normalizeEmail(body.email);
     const clientIp = getClientIpAddress(request);
-    const ipThrottle = takeThrottleHit({
-      namespace: "forgot-password:ip",
-      key: clientIp,
-      limit: FORGOT_PASSWORD_IP_LIMIT,
-      windowMs: FORGOT_PASSWORD_IP_WINDOW_MS
-    });
+    if (clientIp) {
+      const ipThrottle = await takeThrottleHit({
+        namespace: "forgot-password:ip",
+        key: clientIp,
+        limit: FORGOT_PASSWORD_IP_LIMIT,
+        windowMs: FORGOT_PASSWORD_IP_WINDOW_MS
+      });
 
-    if (!ipThrottle.allowed) {
-      return buildThrottleResponse(ipThrottle.retryAfterMs);
+      if (!ipThrottle.allowed) {
+        return buildThrottleResponse(ipThrottle.retryAfterMs);
+      }
     }
 
-    const emailCooldown = takeThrottleHit({
+    const emailCooldown = await takeThrottleHit({
       namespace: "forgot-password:email-cooldown",
       key: normalizedEmail,
       limit: 1,
@@ -59,7 +61,7 @@ export async function POST(request: Request) {
       return buildThrottleResponse(emailCooldown.retryAfterMs);
     }
 
-    const emailThrottle = takeThrottleHit({
+    const emailThrottle = await takeThrottleHit({
       namespace: "forgot-password:email-window",
       key: normalizedEmail,
       limit: FORGOT_PASSWORD_EMAIL_LIMIT,

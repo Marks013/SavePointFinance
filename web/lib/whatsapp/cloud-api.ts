@@ -2,6 +2,35 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 
 import { serverEnv } from "@/lib/env/server";
 
+const WHATSAPP_SEND_TIMEOUT_MS = 10_000;
+const WHATSAPP_MEDIA_METADATA_TIMEOUT_MS = 10_000;
+const WHATSAPP_MEDIA_DOWNLOAD_TIMEOUT_MS = 15_000;
+
+async function fetchWithTimeout(
+  input: string,
+  init: RequestInit,
+  timeoutMs: number,
+  timeoutMessage: string
+) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(input, {
+      ...init,
+      signal: controller.signal
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(timeoutMessage);
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export async function sendWhatsAppTextMessage(to: string, body: string) {
   if (
     serverEnv.WHATSAPP_ASSISTANT_ENABLED !== "true" ||
@@ -15,7 +44,7 @@ export async function sendWhatsAppTextMessage(to: string, body: string) {
     };
   }
 
-  const response = await fetch(
+  const response = await fetchWithTimeout(
     `https://graph.facebook.com/${serverEnv.WHATSAPP_GRAPH_VERSION}/${serverEnv.WHATSAPP_PHONE_NUMBER_ID}/messages`,
     {
       method: "POST",
@@ -33,7 +62,9 @@ export async function sendWhatsAppTextMessage(to: string, body: string) {
           body
         }
       })
-    }
+    },
+    WHATSAPP_SEND_TIMEOUT_MS,
+    `WhatsApp Cloud API excedeu o tempo limite de ${WHATSAPP_SEND_TIMEOUT_MS}ms ao enviar a mensagem.`
   );
 
   const payload = (await response.json().catch(() => null)) as
@@ -72,13 +103,15 @@ function ensureWhatsAppMediaEnv() {
 export async function getWhatsAppMediaMetadata(mediaId: string) {
   ensureWhatsAppMediaEnv();
 
-  const response = await fetch(
+  const response = await fetchWithTimeout(
     `https://graph.facebook.com/${serverEnv.WHATSAPP_GRAPH_VERSION}/${mediaId}`,
     {
       headers: {
         Authorization: `Bearer ${serverEnv.WHATSAPP_ACCESS_TOKEN}`
       }
-    }
+    },
+    WHATSAPP_MEDIA_METADATA_TIMEOUT_MS,
+    `WhatsApp Cloud API excedeu o tempo limite de ${WHATSAPP_MEDIA_METADATA_TIMEOUT_MS}ms ao consultar a mídia.`
   );
 
   if (!response.ok) {
@@ -104,11 +137,16 @@ export async function downloadWhatsAppMedia(mediaId: string) {
     throw new Error("A mídia enviada é grande demais para análise inline no momento.");
   }
 
-  const response = await fetch(metadata.url, {
-    headers: {
-      Authorization: `Bearer ${serverEnv.WHATSAPP_ACCESS_TOKEN}`
-    }
-  });
+  const response = await fetchWithTimeout(
+    metadata.url,
+    {
+      headers: {
+        Authorization: `Bearer ${serverEnv.WHATSAPP_ACCESS_TOKEN}`
+      }
+    },
+    WHATSAPP_MEDIA_DOWNLOAD_TIMEOUT_MS,
+    `WhatsApp Cloud API excedeu o tempo limite de ${WHATSAPP_MEDIA_DOWNLOAD_TIMEOUT_MS}ms ao baixar a mídia.`
+  );
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => "");

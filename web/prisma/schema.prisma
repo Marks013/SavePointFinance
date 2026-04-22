@@ -588,6 +588,19 @@ model WebhookEvent {
   updatedAt     DateTime  @updatedAt
 }
 
+model RequestThrottle {
+  id        String   @id @default(cuid())
+  namespace String
+  key       String
+  hits      Json
+  windowMs  Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([namespace, key])
+  @@index([updatedAt])
+}
+
 model AdminAuditLog {
   id             String   @id @default(cuid())
   actorUserId     String
