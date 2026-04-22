@@ -13,14 +13,22 @@ import { formatWhatsAppDisplayPhone, formatWhatsAppPhone } from "@/lib/whatsapp/
 export async function GET(request: Request) {
   try {
     const user = await requireSessionUser();
-    const profile = await prisma.user.findUnique({
-      where: {
-        id: user.id
-      },
-      include: {
-        preferences: true
-      }
-    });
+    const [profile, currentBillingSubscription] = await Promise.all([
+      prisma.user.findUnique({
+        where: {
+          id: user.id
+        },
+        include: {
+          preferences: true
+        }
+      }),
+      prisma.billingSubscription.findFirst({
+        where: {
+          tenantId: user.tenantId
+        },
+        orderBy: [{ createdAt: "desc" }]
+      })
+    ]);
 
     if (!profile) {
       return NextResponse.json({ message: "User not found" }, { status: 404 });
@@ -58,6 +66,16 @@ export async function GET(request: Request) {
         features: user.license.features,
         limits: user.license.effectiveLimits
       },
+      billing: currentBillingSubscription
+        ? {
+            status: currentBillingSubscription.status,
+            amount: Number(currentBillingSubscription.amount),
+            currencyId: currentBillingSubscription.currencyId,
+            nextBillingAt: currentBillingSubscription.nextBillingAt?.toISOString() ?? null,
+            canceledAt: currentBillingSubscription.canceledAt?.toISOString() ?? null,
+            planId: currentBillingSubscription.planId
+          }
+        : null,
       integrations: {
         whatsappAssistantEnabled: serverEnv.WHATSAPP_ASSISTANT_ENABLED === "true",
         whatsappConfigured: whatsappHealth.configured,

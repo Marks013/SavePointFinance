@@ -24,6 +24,27 @@ const optionalString = z.preprocess(
   z.string().optional()
 );
 
+const optionalPositiveNumber = z.preprocess(
+  (value) => {
+    if (typeof value === "number") {
+      return value;
+    }
+
+    if (typeof value !== "string") {
+      return value;
+    }
+
+    const normalized = value.trim();
+    if (!normalized.length) {
+      return undefined;
+    }
+
+    const parsed = Number(normalized.replace(",", "."));
+    return Number.isFinite(parsed) ? parsed : value;
+  },
+  z.number().positive().optional()
+);
+
 const serverEnvSchema = z
   .object({
     DATABASE_URL: z.string().min(1),
@@ -48,25 +69,50 @@ const serverEnvSchema = z
     RESEND_API_KEY: optionalString,
     BREVO_API_KEY: optionalString,
     NOTIFICATION_EMAIL_WEBHOOK_URL: optionalUrl,
-    NOTIFICATION_WHATSAPP_WEBHOOK_URL: optionalUrl
+    NOTIFICATION_WHATSAPP_WEBHOOK_URL: optionalUrl,
+    MP_BILLING_ENABLED: z.enum(["true", "false"]).default("false"),
+    MP_ACCESS_TOKEN: optionalString,
+    MP_PUBLIC_KEY: optionalString,
+    MP_WEBHOOK_SECRET: optionalString,
+    MP_BILLING_PLAN_SLUG: z.string().default("premium-completo"),
+    MP_BILLING_REASON: z.string().default("Save Point Financa Premium"),
+    MP_BILLING_AMOUNT: optionalPositiveNumber,
+    MP_BILLING_CURRENCY: z.string().default("BRL"),
+    MP_BILLING_FREQUENCY: z.coerce.number().int().positive().default(1),
+    MP_BILLING_FREQUENCY_TYPE: z.string().default("months")
   })
   .superRefine((value, context) => {
-    if (value.WHATSAPP_ASSISTANT_ENABLED !== "true") {
-      return;
+    if (value.WHATSAPP_ASSISTANT_ENABLED === "true") {
+      for (const key of [
+        "WHATSAPP_VERIFY_TOKEN",
+        "WHATSAPP_ACCESS_TOKEN",
+        "WHATSAPP_PHONE_NUMBER_ID",
+        "WHATSAPP_APP_SECRET"
+      ] as const) {
+        if (!value[key]) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: [key],
+            message: `${key} is required when WHATSAPP_ASSISTANT_ENABLED=true`
+          });
+        }
+      }
     }
 
-    for (const key of [
-      "WHATSAPP_VERIFY_TOKEN",
-      "WHATSAPP_ACCESS_TOKEN",
-      "WHATSAPP_PHONE_NUMBER_ID",
-      "WHATSAPP_APP_SECRET"
-    ] as const) {
-      if (!value[key]) {
-        context.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: [key],
-          message: `${key} is required when WHATSAPP_ASSISTANT_ENABLED=true`
-        });
+    if (value.MP_BILLING_ENABLED === "true") {
+      for (const key of [
+        "MP_ACCESS_TOKEN",
+        "MP_PUBLIC_KEY",
+        "MP_WEBHOOK_SECRET",
+        "MP_BILLING_AMOUNT"
+      ] as const) {
+        if (!value[key]) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: [key],
+            message: `${key} is required when MP_BILLING_ENABLED=true`
+          });
+        }
       }
     }
   });
@@ -94,5 +140,15 @@ export const serverEnv = serverEnvSchema.parse({
   RESEND_API_KEY: process.env.RESEND_API_KEY,
   BREVO_API_KEY: process.env.BREVO_API_KEY,
   NOTIFICATION_EMAIL_WEBHOOK_URL: process.env.NOTIFICATION_EMAIL_WEBHOOK_URL,
-  NOTIFICATION_WHATSAPP_WEBHOOK_URL: process.env.NOTIFICATION_WHATSAPP_WEBHOOK_URL
+  NOTIFICATION_WHATSAPP_WEBHOOK_URL: process.env.NOTIFICATION_WHATSAPP_WEBHOOK_URL,
+  MP_BILLING_ENABLED: process.env.MP_BILLING_ENABLED,
+  MP_ACCESS_TOKEN: process.env.MP_ACCESS_TOKEN,
+  MP_PUBLIC_KEY: process.env.MP_PUBLIC_KEY,
+  MP_WEBHOOK_SECRET: process.env.MP_WEBHOOK_SECRET,
+  MP_BILLING_PLAN_SLUG: process.env.MP_BILLING_PLAN_SLUG,
+  MP_BILLING_REASON: process.env.MP_BILLING_REASON,
+  MP_BILLING_AMOUNT: process.env.MP_BILLING_AMOUNT,
+  MP_BILLING_CURRENCY: process.env.MP_BILLING_CURRENCY,
+  MP_BILLING_FREQUENCY: process.env.MP_BILLING_FREQUENCY,
+  MP_BILLING_FREQUENCY_TYPE: process.env.MP_BILLING_FREQUENCY_TYPE
 });

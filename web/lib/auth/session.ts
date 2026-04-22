@@ -38,7 +38,7 @@ export async function requireProtectedPageUser(options: RequireSessionUserOption
 }
 
 type ProtectedPageAccessOptions = RequireSessionUserOptions & {
-  redirectTo?: "/dashboard";
+  redirectTo?: `/${string}`;
 };
 
 type ProtectedPageUser = Awaited<ReturnType<typeof requireSessionUser>>;
@@ -54,7 +54,7 @@ export async function requireProtectedPageAccess(
     const allowed = await canAccess(user);
 
     if (!allowed) {
-      redirect(redirectTo);
+      redirect(redirectTo as Parameters<typeof redirect>[0]);
     }
   } catch (error) {
     if (isAuthError(error)) {
@@ -62,13 +62,20 @@ export async function requireProtectedPageAccess(
     }
 
     if (isPermissionError(error)) {
-      redirect(redirectTo);
+      redirect(redirectTo as Parameters<typeof redirect>[0]);
     }
 
     throw error;
   }
 
   return user;
+}
+
+export async function requireEndUserDashboardPageUser(options: RequireSessionUserOptions = {}) {
+  return requireProtectedPageAccess((user) => !user.isPlatformAdmin, {
+    ...options,
+    redirectTo: "/dashboard/admin"
+  });
 }
 
 export { getCurrentTenantAccess } from "@/lib/licensing/server";

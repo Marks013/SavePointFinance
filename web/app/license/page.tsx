@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
+import { BillingSummaryCard } from "@/features/billing/components/billing-summary-card";
 import { getCurrentTenantAccess } from "@/lib/auth/session";
 
 function formatDate(value: Date | null) {
@@ -71,6 +72,27 @@ export default async function LicensePage() {
           </Button>
         </div>
       </section>
+
+      <div className="mx-auto mt-6 max-w-5xl">
+        <BillingSummaryCard
+          compact
+          profile={{
+            role: access.role,
+            isPlatformAdmin: access.isPlatformAdmin,
+            tenant: {
+              name: access.tenant.name
+            },
+            license: {
+              plan: access.license.plan,
+              planLabel: access.license.planLabel,
+              status: access.license.status,
+              statusLabel: access.license.statusLabel,
+              features: access.license.features,
+              limits: access.license.effectiveLimits
+            }
+          }}
+        />
+      </div>
     </main>
   );
 }

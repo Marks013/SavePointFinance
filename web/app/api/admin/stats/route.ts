@@ -20,6 +20,10 @@ export async function GET() {
       users,
       activeUsers,
       transactions,
+      billingActiveSubscriptions,
+      billingAttentionSubscriptions,
+      billingWebhookQueueDepth,
+      billingWebhookFailures,
       currentTenantUsers,
       currentTenantActiveUsers
     ] = await Promise.all([
@@ -50,6 +54,32 @@ export async function GET() {
       prisma.user.count({ where: userScope }),
       prisma.user.count({ where: { ...userScope, isActive: true } }),
       prisma.transaction.count({ where: transactionScope }),
+      prisma.billingSubscription.count({
+        where: {
+          ...(admin.isPlatformAdmin ? {} : { tenantId: admin.tenantId }),
+          status: "authorized"
+        }
+      }),
+      prisma.billingSubscription.count({
+        where: {
+          ...(admin.isPlatformAdmin ? {} : { tenantId: admin.tenantId }),
+          status: {
+            in: ["paused", "payment_required", "rejected", "expired"]
+          }
+        }
+      }),
+      prisma.billingWebhookEvent.count({
+        where: {
+          status: {
+            in: ["pending", "processing", "failed"]
+          }
+        }
+      }),
+      prisma.billingWebhookEvent.count({
+        where: {
+          status: "dead_letter"
+        }
+      }),
       prisma.user.count({ where: currentTenantUserScope }),
       prisma.user.count({ where: { ...currentTenantUserScope, isActive: true } })
     ]);
@@ -62,6 +92,10 @@ export async function GET() {
       totalUsers: users,
       activeUsers,
       totalTransactions: transactions,
+      billingActiveSubscriptions,
+      billingAttentionSubscriptions,
+      billingWebhookQueueDepth,
+      billingWebhookFailures,
       currentTenantUsers,
       currentTenantActiveUsers
     });

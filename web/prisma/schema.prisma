@@ -103,6 +103,35 @@ enum NotificationStatus {
   skipped
 }
 
+enum BillingSubscriptionStatus {
+  pending
+  authorized
+  paused
+  canceled
+  expired
+  payment_required
+  rejected
+}
+
+enum BillingWebhookEventStatus {
+  pending
+  processing
+  processed
+  ignored
+  failed
+  dead_letter
+}
+
+enum BillingPaymentStatus {
+  pending
+  approved
+  authorized
+  refunded
+  rejected
+  canceled
+  in_process
+}
+
 enum InvitationKind {
   admin_isolated
   shared_wallet
@@ -140,6 +169,8 @@ model Tenant {
   statementPayments StatementPayment[]
   notifications  NotificationDelivery[]
   whatsappMessages WhatsAppMessage[]
+  billingSubscriptions BillingSubscription[]
+  billingPayments BillingPayment[]
 
   @@index([planId])
 }
@@ -162,6 +193,7 @@ model Plan {
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
   tenants           Tenant[]
+  billingSubscriptions BillingSubscription[]
 
   @@index([tier, isActive])
 }
@@ -586,6 +618,81 @@ model WebhookEvent {
   processedAt   DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+}
+
+model BillingSubscription {
+  id                     String                    @id @default(cuid())
+  tenantId               String
+  planId                 String
+  provider               String                    @default("mercado_pago")
+  externalReference      String                    @unique
+  mercadoPagoPreapprovalId String?                 @unique
+  payerEmail             String
+  status                 BillingSubscriptionStatus @default(pending)
+  reason                 String
+  amount                 Decimal                   @db.Decimal(10, 2)
+  currencyId             String                    @default("BRL")
+  frequency              Int                       @default(1)
+  frequencyType          String                    @default("months")
+  nextBillingAt          DateTime?
+  startedAt              DateTime?
+  lastSyncedAt           DateTime?
+  cancelRequestedAt      DateTime?
+  canceledAt             DateTime?
+  metadata               Json?
+  createdAt              DateTime                  @default(now())
+  updatedAt              DateTime                  @updatedAt
+  tenant                 Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan                   Plan                      @relation(fields: [planId], references: [id], onDelete: Restrict)
+  payments               BillingPayment[]
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, status])
+  @@index([planId, createdAt])
+}
+
+model BillingPayment {
+  id                    String               @id @default(cuid())
+  tenantId              String
+  billingSubscriptionId String
+  providerPaymentId     String               @unique
+  status                BillingPaymentStatus @default(pending)
+  amount                Decimal              @db.Decimal(10, 2)
+  currencyId            String               @default("BRL")
+  approvedAt            DateTime?
+  refundedAt            DateTime?
+  refundStatus          String?
+  rawPayload            Json?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  tenant                Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  billingSubscription   BillingSubscription  @relation(fields: [billingSubscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@index([billingSubscriptionId, createdAt])
+}
+
+model BillingWebhookEvent {
+  id          String                    @id @default(cuid())
+  provider    String                    @default("mercado_pago")
+  topic       String
+  resourceId  String
+  action      String?
+  requestId   String?
+  signatureTs String?
+  dedupeKey   String                    @unique
+  payload     Json?
+  status      BillingWebhookEventStatus @default(pending)
+  attempts    Int                       @default(0)
+  error       String?
+  nextAttemptAt DateTime?
+  processedAt DateTime?
+  createdAt   DateTime                  @default(now())
+  updatedAt   DateTime                  @updatedAt
+
+  @@index([provider, topic, createdAt])
+  @@index([resourceId, createdAt])
+  @@index([status, nextAttemptAt, createdAt])
 }
 
 model RequestThrottle {

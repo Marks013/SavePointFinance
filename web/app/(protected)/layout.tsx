@@ -22,7 +22,7 @@ export default async function ProtectedLayout({ children }: ProtectedLayoutProps
       redirect(`/license?reason=${access.blockedReason ?? "expired"}`);
     }
 
-    if (access.license.features.automation) {
+    if (!access.isPlatformAdmin && access.license.features.automation) {
       const syncContext = {
         tenantId: access.tenantId,
         userId: access.id,

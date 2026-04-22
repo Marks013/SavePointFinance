@@ -43,6 +43,8 @@ const navigation = [
   { href: "/dashboard/settings" as Route, label: "Configurações", icon: Settings }
 ];
 
+const platformAdminNavigation = [{ href: "/dashboard/admin" as Route, label: "Admin", icon: ShieldCheck }];
+
 type DashboardSidebarNavProps = {
   canManageSharing: boolean;
   isPlatformAdmin: boolean;
@@ -55,11 +57,12 @@ export function DashboardSidebarNav({ canManageSharing, isPlatformAdmin }: Dashb
   const month = normalizeMonthKey(searchParams.get("month"));
   const [draftMonth, setDraftMonth] = useState(month);
   const [isPending, startTransition] = useTransition();
-  const items = [
-    ...navigation,
-    ...(canManageSharing ? [{ href: "/dashboard/sharing" as Route, label: "Compartilhar carteira", icon: UsersRound }] : []),
-    ...(isPlatformAdmin ? [{ href: "/dashboard/admin" as Route, label: "Admin", icon: ShieldCheck }] : [])
-  ];
+  const items = isPlatformAdmin
+    ? platformAdminNavigation
+    : [
+        ...navigation,
+        ...(canManageSharing ? [{ href: "/dashboard/sharing" as Route, label: "Compartilhar carteira", icon: UsersRound }] : [])
+      ];
 
   const buildMonthRoute = useCallback(
     (nextMonth: string) => {
@@ -103,77 +106,81 @@ export function DashboardSidebarNav({ canManageSharing, isPlatformAdmin }: Dashb
 
   return (
     <>
-      <section className="mb-5 rounded-[22px] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-muted)_48%,var(--color-card))] p-3.5">
-        <p className="text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-[var(--color-muted-foreground)]">
-          Mês de análise
-        </p>
-        <p aria-live="polite" className="mt-1 text-sm font-semibold leading-5 text-[var(--color-foreground)]">
-          {formatMonthKeyLabel(month)}
-        </p>
+      {isPlatformAdmin ? null : (
+        <section className="mb-5 rounded-[22px] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-muted)_48%,var(--color-card))] p-3.5">
+          <p className="text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-[var(--color-muted-foreground)]">
+            Mês de análise
+          </p>
+          <p aria-live="polite" className="mt-1 text-sm font-semibold leading-5 text-[var(--color-foreground)]">
+            {formatMonthKeyLabel(month)}
+          </p>
 
-        <p className="mt-2 text-xs leading-5 text-[var(--color-muted-foreground)]">
-          Usa o mesmo mês em painel, transações, assinaturas, parcelas e relatórios.
-        </p>
+          <p className="mt-2 text-xs leading-5 text-[var(--color-muted-foreground)]">
+            Usa o mesmo mês em painel, transações, assinaturas, parcelas e relatórios.
+          </p>
 
-        <div className="mt-3 grid gap-2">
-          <DatePickerInput
-            aria-label="Selecionar competência global"
-            className="h-11 w-full min-w-0 px-3 text-center text-[0.9rem]"
-            disabled={isPending}
-            displayAlign="center"
-            id="global-month"
-            monthDisplayMode="compact"
-            type="month"
-            value={draftMonth}
-            onBlur={() => {
-              if (!isValidMonthKey(draftMonth)) {
-                setDraftMonth(month);
-              }
-            }}
-            onChange={(event) => {
-              const nextMonth = event.target.value;
-              setDraftMonth(nextMonth);
-
-              if (isValidMonthKey(nextMonth)) {
-                commitMonth(nextMonth);
-              }
-            }}
-          />
-
-          <div className="grid grid-cols-2 gap-2">
-            <Button
-              aria-label="Competência anterior"
-              className="h-10 rounded-[1rem] px-0"
+          <div className="mt-3 grid gap-2">
+            <DatePickerInput
+              aria-label="Selecionar competência global"
+              className="h-11 w-full min-w-0 px-3 text-center text-[0.9rem]"
               disabled={isPending}
-              type="button"
-              variant="secondary"
-              onClick={() => {
-                commitMonth(addMonthsToMonthKey(month, -1));
+              displayAlign="center"
+              id="global-month"
+              monthDisplayMode="compact"
+              type="month"
+              value={draftMonth}
+              onBlur={() => {
+                if (!isValidMonthKey(draftMonth)) {
+                  setDraftMonth(month);
+                }
               }}
-            >
-              <ChevronLeft className="size-4" />
-            </Button>
-            <Button
-              aria-label="Próxima competência"
-              className="h-10 rounded-[1rem] px-0"
-              disabled={isPending}
-              type="button"
-              variant="secondary"
-              onClick={() => {
-                commitMonth(addMonthsToMonthKey(month, 1));
+              onChange={(event) => {
+                const nextMonth = event.target.value;
+                setDraftMonth(nextMonth);
+
+                if (isValidMonthKey(nextMonth)) {
+                  commitMonth(nextMonth);
+                }
               }}
-            >
-              <ChevronRight className="size-4" />
-            </Button>
+            />
+
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                aria-label="Competência anterior"
+                className="h-10 rounded-[1rem] px-0"
+                disabled={isPending}
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  commitMonth(addMonthsToMonthKey(month, -1));
+                }}
+              >
+                <ChevronLeft className="size-4" />
+              </Button>
+              <Button
+                aria-label="Próxima competência"
+                className="h-10 rounded-[1rem] px-0"
+                disabled={isPending}
+                type="button"
+                variant="secondary"
+                onClick={() => {
+                  commitMonth(addMonthsToMonthKey(month, 1));
+                }}
+              >
+                <ChevronRight className="size-4" />
+              </Button>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       <div className="mb-3 flex items-center justify-between gap-3 px-1">
         <p className="text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">
           Navegação
         </p>
-        <p className="text-xs text-[var(--color-muted-foreground)]">Rotina financeira</p>
+        <p className="text-xs text-[var(--color-muted-foreground)]">
+          {isPlatformAdmin ? "Administração da plataforma" : "Rotina financeira"}
+        </p>
       </div>
 
       <nav className="space-y-2">

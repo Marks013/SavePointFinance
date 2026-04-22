@@ -7,6 +7,7 @@ import { useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 
+import { BillingSummaryCard } from "@/features/billing/components/billing-summary-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -397,6 +398,8 @@ export function SettingsClient() {
           </div>
         ) : null}
       </section>
+
+      {profileQuery.data ? <BillingSummaryCard profile={profileQuery.data} /> : null}
 
       <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
         <section className="surface content-section">

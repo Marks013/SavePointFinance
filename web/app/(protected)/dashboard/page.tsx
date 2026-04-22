@@ -5,7 +5,7 @@ import { ArrowRight, BellRing, CreditCard, Landmark, Target } from "lucide-react
 
 import { SummaryCards } from "@/features/dashboard/components/summary-cards";
 import { syncDueSubscriptionTransactions } from "@/lib/automation/subscriptions";
-import { requireProtectedPageUser } from "@/lib/auth/session";
+import { requireEndUserDashboardPageUser } from "@/lib/auth/session";
 import {
   getNextPayableStatementSnapshot,
   getCardStatementSnapshots
@@ -250,7 +250,7 @@ type DashboardPageProps = {
 };
 
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
-  const user = await requireProtectedPageUser();
+  const user = await requireEndUserDashboardPageUser();
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const month = normalizeMonthKey(resolvedSearchParams?.month);
   await syncDueSubscriptionTransactions({

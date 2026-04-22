@@ -19,12 +19,14 @@
     "db:seed": "tsx prisma/seed.ts",
     "data:import-legacy": "tsx scripts/import-legacy.ts",
     "audit:invitations": "tsx scripts/invitation-isolation-audit.ts",
+    "audit:billing-webhook": "tsx scripts/billing-webhook-e2e-sim.ts",
     "audit:cards-smoke": "tsx scripts/card-statement-smoke-audit.ts",
     "audit:server-smoke": "tsx scripts/server-smoke-audit.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "2.11.1",
     "@hookform/resolvers": "^5.2.2",
+    "@mercadopago/sdk-react": "^1.0.7",
     "@prisma/adapter-pg": "7.7.0",
     "@prisma/client": "7.7.0",
     "@radix-ui/react-label": "2.1.7",
@@ -40,6 +42,7 @@
     "date-fns": "4.1.0",
     "dotenv": "16.5.0",
     "lucide-react": "0.511.0",
+    "mercadopago": "^2.12.0",
     "next": "^16.2.3",
     "next-auth": "5.0.0-beta.30",
     "pg": "8.14.1",

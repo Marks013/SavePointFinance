@@ -24,8 +24,74 @@ type Stats = {
   totalUsers: number;
   activeUsers: number;
   totalTransactions: number;
+  billingActiveSubscriptions: number;
+  billingAttentionSubscriptions: number;
+  billingWebhookQueueDepth: number;
+  billingWebhookFailures: number;
   currentTenantUsers: number;
   currentTenantActiveUsers: number;
+};
+
+type TenantBillingSummary = {
+  subscriptionId: string | null;
+  subscriptionStatus: string | null;
+  preapprovalId: string | null;
+  nextBillingAt: string | null;
+  cancelRequestedAt: string | null;
+  lastSyncedAt: string | null;
+  latestPaymentStatus: string | null;
+  latestPaymentId: string | null;
+  queueDepth: number;
+  failedWebhooks: number;
+  lastFinancialRepair: {
+    action: string;
+    summary: string;
+    createdAt: string;
+  } | null;
+};
+
+type TenantBillingDetails = {
+  tenant: {
+    id: string;
+    name: string;
+    slug: string;
+    planId: string;
+    expiresAt: string | null;
+    trialExpiresAt: string | null;
+  };
+  subscription: {
+    id: string;
+    status: string;
+    reason: string;
+    mercadoPagoPreapprovalId: string | null;
+    payerEmail: string;
+    nextBillingAt: string | null;
+    cancelRequestedAt: string | null;
+    canceledAt: string | null;
+    lastSyncedAt: string | null;
+    createdAt: string;
+    updatedAt: string;
+    payments: Array<{
+      id: string;
+      providerPaymentId: string;
+      status: string;
+      amount: number;
+      approvedAt: string | null;
+      refundedAt: string | null;
+      refundStatus: string | null;
+      createdAt: string;
+    }>;
+  } | null;
+  webhookEvents: Array<{
+    id: string;
+    topic: string;
+    status: string;
+    error: string | null;
+    attempts: number;
+    nextAttemptAt: string | null;
+    processedAt: string | null;
+    createdAt: string;
+  }>;
 };
 
 type TenantItem = {
@@ -42,6 +108,7 @@ type TenantItem = {
   trialDays: number;
   trialExpiresAt: string | null;
   expiresAt: string | null;
+  billing: TenantBillingSummary;
 };
 
 type UserItem = {
@@ -164,6 +231,27 @@ function formatLifecycleLabel(tenant: TenantItem) {
   return tenant.isActive ? "Sem vencimento configurado" : "Conta inativa";
 }
 
+function formatBillingSubscriptionLabel(status: string | null) {
+  switch (status) {
+    case "authorized":
+      return "Assinatura ativa";
+    case "payment_required":
+      return "Pagamento pendente";
+    case "paused":
+      return "Cobrança pausada";
+    case "pending":
+      return "Aguardando autorização";
+    case "canceled":
+      return "Assinatura cancelada";
+    case "expired":
+      return "Assinatura expirada";
+    case "rejected":
+      return "Assinatura recusada";
+    default:
+      return "Sem assinatura Mercado Pago";
+  }
+}
+
 function formatUserTenantPlanLabel(user: UserItem) {
   if (user.tenant.expiresAt) {
     return `${user.tenant.planName} • Expirado`;
@@ -219,6 +307,12 @@ async function getTenants(filters: { search?: string; plan?: string; status?: st
   return (await response.json()) as { items: TenantItem[] };
 }
 
+async function getTenantBillingDetails(tenantId: string) {
+  const response = await fetch(`/api/admin/tenants/${tenantId}/billing`, { cache: "no-store" });
+  if (!response.ok) throw new Error("Falha ao carregar detalhes financeiros da conta");
+  return (await response.json()) as TenantBillingDetails;
+}
+
 async function getPlans(filters: { search?: string; tier?: string; status?: string }) {
   const response = await fetch(`/api/admin/plans${buildQuery(filters)}`, { cache: "no-store" });
   if (!response.ok) throw new Error("Falha ao carregar planos");
@@ -262,6 +356,11 @@ export function AdminClient() {
   const queryClient = useQueryClient();
   const [tenantPlanDrafts, setTenantPlanDrafts] = useState<Record<string, string>>({});
   const [userTenantDrafts, setUserTenantDrafts] = useState<Record<string, string>>({});
+  const [planNameDrafts, setPlanNameDrafts] = useState<Record<string, string>>({});
+  const [planDescriptionDrafts, setPlanDescriptionDrafts] = useState<Record<string, string>>({});
+  const [planMaxAccountsDrafts, setPlanMaxAccountsDrafts] = useState<Record<string, string>>({});
+  const [planMaxCardsDrafts, setPlanMaxCardsDrafts] = useState<Record<string, string>>({});
+  const [planTrialDaysDrafts, setPlanTrialDaysDrafts] = useState<Record<string, string>>({});
   const [newPlanName, setNewPlanName] = useState("");
   const [newPlanSlug, setNewPlanSlug] = useState("");
   const [newPlanTier, setNewPlanTier] = useState<"free" | "pro">("free");
@@ -278,6 +377,7 @@ export function AdminClient() {
   const [tenantSearch, setTenantSearch] = useState("");
   const [tenantPlanFilter, setTenantPlanFilter] = useState("");
   const [tenantStatusFilter, setTenantStatusFilter] = useState("");
+  const [expandedTenantBillingId, setExpandedTenantBillingId] = useState<string | null>(null);
   const [userSearch, setUserSearch] = useState("");
   const [userTenantFilter, setUserTenantFilter] = useState("");
   const [userRoleFilter, setUserRoleFilter] = useState("");
@@ -291,6 +391,12 @@ export function AdminClient() {
   const [auditSearch, setAuditSearch] = useState("");
   const [auditTenantFilter, setAuditTenantFilter] = useState("");
   const [auditActionFilter, setAuditActionFilter] = useState("");
+  const [tenantTitheDrafts, setTenantTitheDrafts] = useState<Record<string, string>>({});
+  const [tenantTrialDrafts, setTenantTrialDrafts] = useState<Record<string, string>>({});
+  const [tenantExpiryDrafts, setTenantExpiryDrafts] = useState<Record<string, string>>({});
+  const [tenantDeleteConfirmDrafts, setTenantDeleteConfirmDrafts] = useState<Record<string, string>>({});
+  const [userPasswordDrafts, setUserPasswordDrafts] = useState<Record<string, string>>({});
+  const [userDeleteConfirmDrafts, setUserDeleteConfirmDrafts] = useState<Record<string, string>>({});
   const invitationForm = useForm<z.input<typeof invitationSchema>, unknown, InvitationValues>({
     resolver: zodResolver(invitationSchema),
     defaultValues: {
@@ -313,6 +419,11 @@ export function AdminClient() {
         plan: tenantPlanFilter || undefined,
         status: tenantStatusFilter || undefined
       })
+  });
+  const tenantBillingDetailsQuery = useQuery({
+    queryKey: ["admin-tenant-billing", expandedTenantBillingId],
+    queryFn: () => getTenantBillingDetails(expandedTenantBillingId!),
+    enabled: Boolean(expandedTenantBillingId)
   });
   const usersQuery = useQuery({
     queryKey: [
@@ -723,6 +834,49 @@ export function AdminClient() {
     }
   });
 
+  const adminTenantBillingMutation = useMutation({
+    mutationFn: async ({
+      tenantId,
+      action,
+      monthKey
+    }: {
+      tenantId: string;
+      action:
+        | "sync_subscription"
+        | "process_queue"
+        | "recalculate_tithe_month"
+        | "sync_due_subscriptions"
+        | "reconcile_due_installments";
+      monthKey?: string;
+    }) => {
+      const response = await fetch(`/api/admin/tenants/${tenantId}/billing`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, monthKey })
+      });
+
+      const payload = (await response.json().catch(() => ({}))) as { message?: string };
+
+      if (!response.ok) {
+        throw new Error(payload.message ?? "Falha ao executar ação de billing");
+      }
+
+      return payload;
+    },
+    onSuccess: async (payload) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin-tenants"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-stats"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-audit"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-tenant-billing"] })
+      ]);
+      toast.success(payload.message ?? "Ação de billing executada");
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    }
+  });
+
   const createInvitationMutation = useMutation({
     mutationFn: async (values: InvitationValues) => {
       if (isPlatformAdmin && !invitePlanId) {
@@ -792,6 +946,127 @@ export function AdminClient() {
       toast.error(error.message);
     }
   });
+
+  function submitTenantTitheRecalculation(tenant: TenantItem) {
+    const monthKey = (tenantTitheDrafts[tenant.id] ?? new Date().toISOString().slice(0, 7)).trim();
+
+    if (!/^\d{4}-\d{2}$/.test(monthKey)) {
+      toast.error("Use o formato YYYY-MM, por exemplo 2026-05");
+      return;
+    }
+
+    adminTenantBillingMutation.mutate({
+      tenantId: tenant.id,
+      action: "recalculate_tithe_month",
+      monthKey
+    });
+  }
+
+  function submitTenantTrialDays(tenant: TenantItem) {
+    const parsed = Number((tenantTrialDrafts[tenant.id] ?? String(tenant.trialDays)).trim());
+
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      toast.error("Informe uma quantidade de dias maior que zero");
+      return;
+    }
+
+    updateTenantMutation.mutate({ id: tenant.id, trialDays: parsed });
+  }
+
+  function submitTenantExpiryDate(tenant: TenantItem) {
+    const rawValue = (tenantExpiryDrafts[tenant.id] ?? (tenant.expiresAt ? formatDateDisplay(tenant.expiresAt) : "")).trim();
+
+    if (!rawValue) {
+      updateTenantMutation.mutate({ id: tenant.id, expiresAt: null });
+      return;
+    }
+
+    const parsedExpiresAt = parseBrazilianDateToDateKey(rawValue);
+
+    if (!parsedExpiresAt) {
+      toast.error("Informe a data no formato DD/MM/AAAA");
+      return;
+    }
+
+    updateTenantMutation.mutate({ id: tenant.id, expiresAt: parsedExpiresAt });
+  }
+
+  function submitTenantDeletion(tenant: TenantItem) {
+    const confirmation = (tenantDeleteConfirmDrafts[tenant.id] ?? "").trim().toLowerCase();
+
+    if (confirmation !== tenant.slug.trim().toLowerCase()) {
+      toast.error("O identificador informado não confere");
+      return;
+    }
+
+    deleteTenantMutation.mutate(tenant.id);
+  }
+
+  function submitUserPasswordReset(user: UserItem) {
+    const newPassword = userPasswordDrafts[user.id] ?? "";
+
+    if (newPassword.length < 8) {
+      toast.error("A senha precisa ter ao menos 8 caracteres");
+      return;
+    }
+
+    resetPasswordMutation.mutate({ id: user.id, newPassword });
+    setUserPasswordDrafts((current) => ({ ...current, [user.id]: "" }));
+  }
+
+  function submitUserDeletion(user: UserItem) {
+    const confirmation = (userDeleteConfirmDrafts[user.id] ?? "").trim().toLowerCase();
+
+    if (confirmation !== user.email.trim().toLowerCase()) {
+      toast.error("O e-mail informado não confere");
+      return;
+    }
+
+    deleteUserMutation.mutate(user.id);
+  }
+
+  function submitPlanName(plan: PlanItem) {
+    const nextName = (planNameDrafts[plan.id] ?? plan.name).trim();
+
+    if (!nextName) {
+      toast.error("Informe um nome para o plano");
+      return;
+    }
+
+    updatePlanMutation.mutate({ id: plan.id, data: { name: nextName } });
+  }
+
+  function submitPlanDescription(plan: PlanItem) {
+    updatePlanMutation.mutate({
+      id: plan.id,
+      data: { description: planDescriptionDrafts[plan.id] ?? plan.description ?? "" }
+    });
+  }
+
+  function submitPlanMaxAccounts(plan: PlanItem) {
+    updatePlanMutation.mutate({
+      id: plan.id,
+      data: { maxAccounts: parseNullableLimit(planMaxAccountsDrafts[plan.id] ?? (plan.maxAccounts?.toString() ?? "")) }
+    });
+  }
+
+  function submitPlanMaxCards(plan: PlanItem) {
+    updatePlanMutation.mutate({
+      id: plan.id,
+      data: { maxCards: parseNullableLimit(planMaxCardsDrafts[plan.id] ?? (plan.maxCards?.toString() ?? "")) }
+    });
+  }
+
+  function submitPlanTrialDays(plan: PlanItem) {
+    const parsed = Number((planTrialDaysDrafts[plan.id] ?? String(plan.trialDays)).trim());
+
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      toast.error("Informe zero ou mais dias de avaliação");
+      return;
+    }
+
+    updatePlanMutation.mutate({ id: plan.id, data: { trialDays: parsed } });
+  }
 
   return (
     <div className="space-y-6">
@@ -933,65 +1208,107 @@ export function AdminClient() {
                 </span>
               </div>
               {isPlatformAdmin ? (
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <Button
-                    onClick={() => {
-                      const nextName = window.prompt(`Novo nome para ${plan.name}`, plan.name);
-                      if (nextName === null || !nextName.trim()) return;
-                      updatePlanMutation.mutate({ id: plan.id, data: { name: nextName.trim() } });
-                    }}
-                    type="button"
-                    variant="secondary"
-                  >
-                    Nome
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      const nextDescription = window.prompt(`Descrição do plano ${plan.name}`, plan.description || "");
-                      if (nextDescription === null) return;
-                      updatePlanMutation.mutate({ id: plan.id, data: { description: nextDescription } });
-                    }}
-                    type="button"
-                    variant="ghost"
-                  >
-                    Descrição
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      const nextMaxAccounts = window.prompt(`Novo limite de contas para ${plan.name}`, plan.maxAccounts?.toString() || "");
-                      if (nextMaxAccounts === null) return;
-                      updatePlanMutation.mutate({ id: plan.id, data: { maxAccounts: parseNullableLimit(nextMaxAccounts) } });
-                    }}
-                    type="button"
-                    variant="ghost"
-                  >
-                    Contas
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      const nextMaxCards = window.prompt(`Novo limite de cartões para ${plan.name}`, plan.maxCards?.toString() || "");
-                      if (nextMaxCards === null) return;
-                      updatePlanMutation.mutate({ id: plan.id, data: { maxCards: parseNullableLimit(nextMaxCards) } });
-                    }}
-                    type="button"
-                    variant="ghost"
-                  >
-                    Cartões
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      const nextTrialDays = window.prompt(`Dias de avaliação para ${plan.name}`, String(plan.trialDays));
-                      if (nextTrialDays === null) return;
-                      const parsed = Number(nextTrialDays);
-                      if (Number.isFinite(parsed) && parsed >= 0) {
-                        updatePlanMutation.mutate({ id: plan.id, data: { trialDays: parsed } });
-                      }
-                    }}
-                    type="button"
-                    variant="ghost"
-                  >
-                    Avaliação
-                  </Button>
+                <div className="mt-4 space-y-3">
+                  <div className="grid gap-3 lg:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor={`plan-${plan.id}-name`}>Nome</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id={`plan-${plan.id}-name`}
+                          value={planNameDrafts[plan.id] ?? plan.name}
+                          onChange={(event) =>
+                            setPlanNameDrafts((current) => ({
+                              ...current,
+                              [plan.id]: event.target.value
+                            }))
+                          }
+                        />
+                        <Button type="button" variant="secondary" onClick={() => submitPlanName(plan)}>
+                          Aplicar
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor={`plan-${plan.id}-description`}>Descrição</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id={`plan-${plan.id}-description`}
+                          value={planDescriptionDrafts[plan.id] ?? plan.description ?? ""}
+                          onChange={(event) =>
+                            setPlanDescriptionDrafts((current) => ({
+                              ...current,
+                              [plan.id]: event.target.value
+                            }))
+                          }
+                        />
+                        <Button type="button" variant="ghost" onClick={() => submitPlanDescription(plan)}>
+                          Aplicar
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="grid gap-3 lg:grid-cols-3">
+                    <div className="space-y-2">
+                      <Label htmlFor={`plan-${plan.id}-max-accounts`}>Limite de contas</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id={`plan-${plan.id}-max-accounts`}
+                          inputMode="numeric"
+                          placeholder="Livre"
+                          value={planMaxAccountsDrafts[plan.id] ?? (plan.maxAccounts?.toString() ?? "")}
+                          onChange={(event) =>
+                            setPlanMaxAccountsDrafts((current) => ({
+                              ...current,
+                              [plan.id]: event.target.value
+                            }))
+                          }
+                        />
+                        <Button type="button" variant="ghost" onClick={() => submitPlanMaxAccounts(plan)}>
+                          Aplicar
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor={`plan-${plan.id}-max-cards`}>Limite de cartões</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id={`plan-${plan.id}-max-cards`}
+                          inputMode="numeric"
+                          placeholder="Livre"
+                          value={planMaxCardsDrafts[plan.id] ?? (plan.maxCards?.toString() ?? "")}
+                          onChange={(event) =>
+                            setPlanMaxCardsDrafts((current) => ({
+                              ...current,
+                              [plan.id]: event.target.value
+                            }))
+                          }
+                        />
+                        <Button type="button" variant="ghost" onClick={() => submitPlanMaxCards(plan)}>
+                          Aplicar
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor={`plan-${plan.id}-trial-days`}>Dias de avaliação</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id={`plan-${plan.id}-trial-days`}
+                          inputMode="numeric"
+                          value={planTrialDaysDrafts[plan.id] ?? String(plan.trialDays)}
+                          onChange={(event) =>
+                            setPlanTrialDaysDrafts((current) => ({
+                              ...current,
+                              [plan.id]: event.target.value
+                            }))
+                          }
+                        />
+                        <Button type="button" variant="ghost" onClick={() => submitPlanTrialDays(plan)}>
+                          Aplicar
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
                   <Button
                     onClick={() =>
                       updatePlanMutation.mutate({
@@ -1053,6 +1370,7 @@ export function AdminClient() {
                     </>
                   ) : null}
                 </div>
+                </div>
               ) : null}
             </article>
           ))}
@@ -1081,6 +1399,22 @@ export function AdminClient() {
             <article className="metric-card min-w-0">
               <p className="metric-label">Pessoas ativas nesta conta</p>
               <p className="metric-value">{statsQuery.data?.currentTenantActiveUsers ?? 0}</p>
+            </article>
+            <article className="metric-card min-w-0">
+              <p className="metric-label">Assinaturas ativas</p>
+              <p className="metric-value">{statsQuery.data?.billingActiveSubscriptions ?? 0}</p>
+            </article>
+            <article className="metric-card min-w-0">
+              <p className="metric-label">Billing com atenção</p>
+              <p className="metric-value">{statsQuery.data?.billingAttentionSubscriptions ?? 0}</p>
+            </article>
+            <article className="metric-card min-w-0">
+              <p className="metric-label">Fila de webhooks</p>
+              <p className="metric-value">{statsQuery.data?.billingWebhookQueueDepth ?? 0}</p>
+            </article>
+            <article className="metric-card min-w-0">
+              <p className="metric-label">Falhas críticas</p>
+              <p className="metric-value">{statsQuery.data?.billingWebhookFailures ?? 0}</p>
             </article>
           </>
         ) : null}
@@ -1197,6 +1531,229 @@ export function AdminClient() {
                     <p className="text-xs text-[var(--color-muted-foreground)]">pessoas ativas</p>
                   </div>
                 </div>
+                <div className="mt-4 grid gap-3 lg:grid-cols-[1.15fr_0.85fr]">
+                  <div className="muted-panel">
+                    <p className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">Billing</p>
+                    <p className="mt-2 text-sm font-semibold">
+                      {formatBillingSubscriptionLabel(tenant.billing.subscriptionStatus)}
+                    </p>
+                    <div className="mt-3 space-y-1 text-xs text-[var(--color-muted-foreground)]">
+                      <p>
+                        Próxima cobrança:{" "}
+                        {tenant.billing.nextBillingAt ? formatDateTimeDisplay(tenant.billing.nextBillingAt) : "não exposta"}
+                      </p>
+                      <p>
+                        Última sincronização:{" "}
+                        {tenant.billing.lastSyncedAt ? formatDateTimeDisplay(tenant.billing.lastSyncedAt) : "nunca"}
+                      </p>
+                      <p>Fila pendente: {tenant.billing.queueDepth}</p>
+                      <p>Falhas de webhook: {tenant.billing.failedWebhooks}</p>
+                      <p>
+                        Último pagamento: {tenant.billing.latestPaymentStatus ?? "sem pagamento sincronizado"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="muted-panel">
+                    <p className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">Suporte</p>
+                    <div className="mt-2 space-y-1 text-xs text-[var(--color-muted-foreground)]">
+                      <p className="break-all">Preapproval: {tenant.billing.preapprovalId ?? "não vinculado"}</p>
+                      <p>
+                        Cancelamento agendado: {tenant.billing.cancelRequestedAt ? formatDateTimeDisplay(tenant.billing.cancelRequestedAt) : "não"}
+                      </p>
+                      <p>
+                        Último reparo financeiro:{" "}
+                        {tenant.billing.lastFinancialRepair
+                          ? formatDateTimeDisplay(tenant.billing.lastFinancialRepair.createdAt)
+                          : "nenhum reparo registrado"}
+                      </p>
+                      {tenant.billing.lastFinancialRepair ? (
+                        <p className="leading-5">{tenant.billing.lastFinancialRepair.summary}</p>
+                      ) : null}
+                    </div>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <Button
+                        onClick={() =>
+                          setExpandedTenantBillingId((current) => (current === tenant.id ? null : tenant.id))
+                        }
+                        type="button"
+                        variant="secondary"
+                      >
+                        {expandedTenantBillingId === tenant.id ? "Ocultar detalhes" : "Ver detalhes financeiros"}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+                {expandedTenantBillingId === tenant.id ? (
+                  <div className="mt-4 rounded-[1.4rem] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-card)_92%,var(--color-muted))] p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">
+                          Drill-down financeiro
+                        </p>
+                        <p className="mt-2 text-sm text-[var(--color-muted-foreground)]">
+                          Use este painel para suporte operacional, reconciliação de cobrança e leitura rápida dos últimos eventos.
+                        </p>
+                      </div>
+                    </div>
+                    {tenantBillingDetailsQuery.isLoading ? (
+                      <p className="mt-4 text-sm text-[var(--color-muted-foreground)]">Carregando detalhes financeiros...</p>
+                    ) : tenantBillingDetailsQuery.isError ? (
+                      <p className="mt-4 text-sm text-[var(--color-destructive)]">
+                        Não foi possível carregar os detalhes financeiros desta conta.
+                      </p>
+                    ) : tenantBillingDetailsQuery.data ? (
+                      <div className="mt-4 space-y-4">
+                        <div className="grid gap-3 lg:grid-cols-3">
+                          <div className="muted-panel">
+                            <p className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">Assinatura</p>
+                            <div className="mt-2 space-y-1 text-xs text-[var(--color-muted-foreground)]">
+                              <p>Status: {formatBillingSubscriptionLabel(tenantBillingDetailsQuery.data.subscription?.status ?? null)}</p>
+                              <p className="break-all">Preapproval: {tenantBillingDetailsQuery.data.subscription?.mercadoPagoPreapprovalId ?? "não vinculado"}</p>
+                              <p className="break-all">Pagador: {tenantBillingDetailsQuery.data.subscription?.payerEmail || "não informado"}</p>
+                              <p>
+                                Próxima cobrança:{" "}
+                                {tenantBillingDetailsQuery.data.subscription?.nextBillingAt
+                                  ? formatDateTimeDisplay(tenantBillingDetailsQuery.data.subscription.nextBillingAt)
+                                  : "não exposta"}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="muted-panel">
+                            <p className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">Pagamentos recentes</p>
+                            <div className="mt-2 space-y-2 text-xs text-[var(--color-muted-foreground)]">
+                              {tenantBillingDetailsQuery.data.subscription?.payments.length ? (
+                                tenantBillingDetailsQuery.data.subscription.payments.map((payment) => (
+                                  <div key={payment.id} className="rounded-2xl border border-[var(--color-border)] px-3 py-2">
+                                    <p className="break-all font-medium text-[var(--color-foreground)]">
+                                      {payment.providerPaymentId}
+                                    </p>
+                                    <p>
+                                      {payment.status} • R$ {payment.amount.toFixed(2)}
+                                    </p>
+                                    <p>{payment.createdAt ? formatDateTimeDisplay(payment.createdAt) : "sem data"}</p>
+                                  </div>
+                                ))
+                              ) : (
+                                <p>Nenhum pagamento sincronizado.</p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="muted-panel">
+                            <p className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">Webhooks recentes</p>
+                            <div className="mt-2 space-y-2 text-xs text-[var(--color-muted-foreground)]">
+                              {tenantBillingDetailsQuery.data.webhookEvents.length ? (
+                                tenantBillingDetailsQuery.data.webhookEvents.slice(0, 5).map((event) => (
+                                  <div key={event.id} className="rounded-2xl border border-[var(--color-border)] px-3 py-2">
+                                    <p className="font-medium text-[var(--color-foreground)]">{event.topic}</p>
+                                    <p>{event.status} • tentativas {event.attempts}</p>
+                                    <p>{formatDateTimeDisplay(event.createdAt)}</p>
+                                    {event.error ? <p className="line-clamp-2 text-[var(--color-destructive)]">{event.error}</p> : null}
+                                  </div>
+                                ))
+                              ) : (
+                                <p>Nenhum webhook recente.</p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        {isPlatformAdmin ? (
+                          <div className="rounded-[1.2rem] border border-[var(--color-border)] bg-[var(--color-panel)] p-4">
+                            <p className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">
+                              Operações financeiras
+                            </p>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              <Button
+                                disabled={!tenant.billing.preapprovalId || adminTenantBillingMutation.isPending}
+                                onClick={() =>
+                                  adminTenantBillingMutation.mutate({
+                                    tenantId: tenant.id,
+                                    action: "sync_subscription"
+                                  })
+                                }
+                                type="button"
+                                variant="secondary"
+                              >
+                                Sincronizar billing
+                              </Button>
+                              <Button
+                                disabled={!tenant.billing.preapprovalId || adminTenantBillingMutation.isPending}
+                                onClick={() =>
+                                  adminTenantBillingMutation.mutate({
+                                    tenantId: tenant.id,
+                                    action: "process_queue"
+                                  })
+                                }
+                                type="button"
+                                variant="ghost"
+                              >
+                                Reprocessar fila
+                              </Button>
+                              <Button
+                                disabled={adminTenantBillingMutation.isPending}
+                                onClick={() => submitTenantTitheRecalculation(tenant)}
+                                type="button"
+                                variant="ghost"
+                              >
+                                Recalcular dízimo
+                              </Button>
+                              <Button
+                                disabled={adminTenantBillingMutation.isPending}
+                                onClick={() =>
+                                  adminTenantBillingMutation.mutate({
+                                    tenantId: tenant.id,
+                                    action: "sync_due_subscriptions"
+                                  })
+                                }
+                                type="button"
+                                variant="ghost"
+                              >
+                                Sincronizar recorrências
+                              </Button>
+                              <Button
+                                disabled={adminTenantBillingMutation.isPending}
+                                onClick={() =>
+                                  adminTenantBillingMutation.mutate({
+                                    tenantId: tenant.id,
+                                    action: "reconcile_due_installments"
+                                  })
+                                }
+                                type="button"
+                                variant="ghost"
+                              >
+                                Conciliar parcelas vencidas
+                              </Button>
+                            </div>
+                            <div className="mt-4 grid gap-2 lg:grid-cols-[minmax(0,180px)_auto]">
+                              <div className="space-y-2">
+                                <Label htmlFor={`tenant-${tenant.id}-tithe-month`}>Competência do reparo</Label>
+                                <Input
+                                  id={`tenant-${tenant.id}-tithe-month`}
+                                  placeholder="2026-05"
+                                  value={tenantTitheDrafts[tenant.id] ?? new Date().toISOString().slice(0, 7)}
+                                  onChange={(event) =>
+                                    setTenantTitheDrafts((current) => ({
+                                      ...current,
+                                      [tenant.id]: event.target.value
+                                    }))
+                                  }
+                                />
+                              </div>
+                              <Button
+                                className="lg:self-end"
+                                disabled={adminTenantBillingMutation.isPending}
+                                onClick={() => submitTenantTitheRecalculation(tenant)}
+                                type="button"
+                                variant="secondary"
+                              >
+                                Aplicar reparo
+                              </Button>
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
                 <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
                   <Select
                     onChange={(event) =>
@@ -1228,38 +1785,45 @@ export function AdminClient() {
                   </Button>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <Button
-                    onClick={() => {
-                      const nextTrialDays = window.prompt(`Novos dias de avaliação para ${tenant.name}`, String(tenant.trialDays));
-                      if (!nextTrialDays) return;
-                      const parsed = Number(nextTrialDays);
-                      if (Number.isFinite(parsed) && parsed > 0) {
-                        updateTenantMutation.mutate({ id: tenant.id, trialDays: parsed });
+                  <div className="min-w-[12rem] flex-1 space-y-2">
+                    <Label htmlFor={`tenant-${tenant.id}-trial-days`}>Dias de avaliação</Label>
+                    <Input
+                      id={`tenant-${tenant.id}-trial-days`}
+                      inputMode="numeric"
+                      value={tenantTrialDrafts[tenant.id] ?? String(tenant.trialDays)}
+                      onChange={(event) =>
+                        setTenantTrialDrafts((current) => ({
+                          ...current,
+                          [tenant.id]: event.target.value
+                        }))
                       }
-                    }}
+                    />
+                  </div>
+                  <Button
+                    className="self-end"
+                    onClick={() => submitTenantTrialDays(tenant)}
                     type="button"
                     variant="ghost"
                   >
                     Avaliação
                   </Button>
+                  <div className="min-w-[14rem] flex-1 space-y-2">
+                    <Label htmlFor={`tenant-${tenant.id}-expires-at`}>Expiração</Label>
+                    <Input
+                      id={`tenant-${tenant.id}-expires-at`}
+                      placeholder="DD/MM/AAAA"
+                      value={tenantExpiryDrafts[tenant.id] ?? (tenant.expiresAt ? formatDateDisplay(tenant.expiresAt) : "")}
+                      onChange={(event) =>
+                        setTenantExpiryDrafts((current) => ({
+                          ...current,
+                          [tenant.id]: event.target.value
+                        }))
+                      }
+                    />
+                  </div>
                   <Button
-                    onClick={() => {
-                      const nextExpiresAt = window.prompt(
-                        `Nova data de expiração DD/MM/AAAA para ${tenant.name}`,
-                        tenant.expiresAt ? formatDateDisplay(tenant.expiresAt) : ""
-                      );
-                      if (nextExpiresAt === null) return;
-                      if (!nextExpiresAt.trim()) {
-                        updateTenantMutation.mutate({ id: tenant.id, expiresAt: null });
-                        return;
-                      }
-                      const parsedExpiresAt = parseBrazilianDateToDateKey(nextExpiresAt);
-                      if (!parsedExpiresAt) {
-                        toast.error("Informe a data no formato DD/MM/AAAA");
-                        return;
-                      }
-                      updateTenantMutation.mutate({ id: tenant.id, expiresAt: parsedExpiresAt });
-                    }}
+                    className="self-end"
+                    onClick={() => submitTenantExpiryDate(tenant)}
                     type="button"
                     variant="ghost"
                   >
@@ -1283,30 +1847,31 @@ export function AdminClient() {
                           financeiras, transações e demais registros relacionados.
                         </p>
                       </div>
-                      <Button
-                        className="w-full border-[var(--color-destructive)] bg-[color-mix(in_srgb,var(--color-destructive)_8%,transparent)] text-[var(--color-destructive)] hover:bg-[color-mix(in_srgb,var(--color-destructive)_14%,transparent)] lg:w-auto"
-                        disabled={deleteTenantMutation.isPending}
-                        onClick={() => {
-                          const confirmation = window.prompt(
-                            `Digite ${tenant.slug} para excluir definitivamente esta conta e todos os dados vinculados.`
-                          );
-
-                          if (!confirmation) {
-                            return;
-                          }
-
-                          if (confirmation.trim().toLowerCase() !== tenant.slug.trim().toLowerCase()) {
-                            toast.error("O identificador informado não confere");
-                            return;
-                          }
-
-                          deleteTenantMutation.mutate(tenant.id);
-                        }}
-                        type="button"
-                        variant="ghost"
-                      >
-                        Excluir conta e dados
-                      </Button>
+                      <div className="w-full space-y-2 lg:w-auto">
+                        <Label htmlFor={`tenant-${tenant.id}-delete-confirm`}>Confirme digitando o slug</Label>
+                        <div className="flex flex-col gap-2 lg:flex-row">
+                          <Input
+                            id={`tenant-${tenant.id}-delete-confirm`}
+                            placeholder={tenant.slug}
+                            value={tenantDeleteConfirmDrafts[tenant.id] ?? ""}
+                            onChange={(event) =>
+                              setTenantDeleteConfirmDrafts((current) => ({
+                                ...current,
+                                [tenant.id]: event.target.value
+                              }))
+                            }
+                          />
+                          <Button
+                            className="w-full border-[var(--color-destructive)] bg-[color-mix(in_srgb,var(--color-destructive)_8%,transparent)] text-[var(--color-destructive)] hover:bg-[color-mix(in_srgb,var(--color-destructive)_14%,transparent)] lg:w-auto"
+                            disabled={deleteTenantMutation.isPending}
+                            onClick={() => submitTenantDeletion(tenant)}
+                            type="button"
+                            variant="ghost"
+                          >
+                            Excluir conta e dados
+                          </Button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 ) : null}
@@ -1469,15 +2034,24 @@ export function AdminClient() {
                             Tornar {user.role === "admin" ? "familiar" : "admin de conta"}
                           </Button>
                         ) : null}
-                        <Button
-                          onClick={() => {
-                            const newPassword = window.prompt(`Nova senha para ${user.name}`);
-                            if (newPassword && newPassword.length >= 8) {
-                              resetPasswordMutation.mutate({ id: user.id, newPassword });
-                            } else if (newPassword) {
-                              toast.error("A senha precisa ter ao menos 8 caracteres");
+                        <div className="min-w-[14rem] flex-1 space-y-2 xl:max-w-xs">
+                          <Label htmlFor={`user-${user.id}-password`}>Nova senha</Label>
+                          <Input
+                            id={`user-${user.id}-password`}
+                            placeholder="Ao menos 8 caracteres"
+                            type="password"
+                            value={userPasswordDrafts[user.id] ?? ""}
+                            onChange={(event) =>
+                              setUserPasswordDrafts((current) => ({
+                                ...current,
+                                [user.id]: event.target.value
+                              }))
                             }
-                          }}
+                          />
+                        </div>
+                        <Button
+                          className="self-end"
+                          onClick={() => submitUserPasswordReset(user)}
                           type="button"
                           variant="secondary"
                         >
@@ -1534,30 +2108,31 @@ export function AdminClient() {
                               respeita as travas de segurança para não desmontar a administração principal da conta.
                             </p>
                           </div>
-                          <Button
-                            className="w-full border-[var(--color-destructive)] bg-[color-mix(in_srgb,var(--color-destructive)_8%,transparent)] text-[var(--color-destructive)] hover:bg-[color-mix(in_srgb,var(--color-destructive)_14%,transparent)] lg:w-auto"
-                            disabled={deleteUserMutation.isPending}
-                            onClick={() => {
-                              const confirmation = window.prompt(
-                                `Digite ${user.email} para excluir definitivamente esta pessoa e todos os dados vinculados.`
-                              );
-
-                              if (!confirmation) {
-                                return;
-                              }
-
-                              if (confirmation.trim().toLowerCase() !== user.email.trim().toLowerCase()) {
-                                toast.error("O e-mail informado não confere");
-                                return;
-                              }
-
-                              deleteUserMutation.mutate(user.id);
-                            }}
-                            type="button"
-                            variant="ghost"
-                          >
-                            Excluir pessoa e dados
-                          </Button>
+                          <div className="w-full space-y-2 lg:w-auto">
+                            <Label htmlFor={`user-${user.id}-delete-confirm`}>Confirme digitando o e-mail</Label>
+                            <div className="flex flex-col gap-2 lg:flex-row">
+                              <Input
+                                id={`user-${user.id}-delete-confirm`}
+                                placeholder={user.email}
+                                value={userDeleteConfirmDrafts[user.id] ?? ""}
+                                onChange={(event) =>
+                                  setUserDeleteConfirmDrafts((current) => ({
+                                    ...current,
+                                    [user.id]: event.target.value
+                                  }))
+                                }
+                              />
+                              <Button
+                                className="w-full border-[var(--color-destructive)] bg-[color-mix(in_srgb,var(--color-destructive)_8%,transparent)] text-[var(--color-destructive)] hover:bg-[color-mix(in_srgb,var(--color-destructive)_14%,transparent)] lg:w-auto"
+                                disabled={deleteUserMutation.isPending}
+                                onClick={() => submitUserDeletion(user)}
+                                type="button"
+                                variant="ghost"
+                              >
+                                Excluir pessoa e dados
+                              </Button>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     ) : null}
@@ -1826,6 +2401,11 @@ export function AdminClient() {
               <option value="plan.deleted">Planos excluídos</option>
               <option value="invitation.created">Convites criados</option>
               <option value="invitation.revoked">Convites revogados</option>
+              <option value="billing.subscription.synced">Billing sincronizado</option>
+              <option value="billing.queue.reprocessed">Fila de billing reprocessada</option>
+              <option value="finance.tithe.recalculated">Dízimo recalculado</option>
+              <option value="finance.subscriptions.synced">Recorrências sincronizadas</option>
+              <option value="finance.installments.reconciled">Parcelas conciliadas</option>
             </Select>
           </div>
           {auditItems.map((item) => (

@@ -89,6 +89,31 @@ export async function GET(request: Request) {
           select: {
             id: true
           }
+        },
+        billingSubscriptions: {
+          orderBy: {
+            createdAt: "desc"
+          },
+          take: 1,
+          select: {
+            id: true,
+            status: true,
+            mercadoPagoPreapprovalId: true,
+            nextBillingAt: true,
+            cancelRequestedAt: true,
+            lastSyncedAt: true,
+            payments: {
+              orderBy: {
+                createdAt: "desc"
+              },
+              take: 1,
+              select: {
+                id: true,
+                status: true,
+                providerPaymentId: true
+              }
+            }
+          }
         }
       },
       orderBy: {
@@ -97,8 +122,117 @@ export async function GET(request: Request) {
       take: 100
     });
 
+    const latestSubscriptionByTenant = new Map(
+      tenants
+        .map((tenant) => [tenant.id, tenant.billingSubscriptions[0] ?? null] as const)
+    );
+    const resourceIds = Array.from(
+      new Set(
+        tenants
+          .map((tenant) => tenant.billingSubscriptions[0]?.mercadoPagoPreapprovalId ?? null)
+          .filter((value): value is string => Boolean(value))
+      )
+    );
+    const webhookEvents = resourceIds.length
+      ? await prisma.billingWebhookEvent.findMany({
+          where: {
+            resourceId: {
+              in: resourceIds
+            },
+            status: {
+              in: ["pending", "processing", "failed", "dead_letter"]
+            }
+          },
+          select: {
+            resourceId: true,
+            status: true
+          }
+        })
+      : [];
+    const webhookSummaryByResourceId = webhookEvents.reduce<Record<string, { queueDepth: number; failed: number }>>(
+      (accumulator, event) => {
+        const summary = accumulator[event.resourceId] ?? {
+          queueDepth: 0,
+          failed: 0
+        };
+
+        if (event.status === "pending" || event.status === "processing") {
+          summary.queueDepth += 1;
+        }
+
+        if (event.status === "failed" || event.status === "dead_letter") {
+          summary.failed += 1;
+        }
+
+        accumulator[event.resourceId] = summary;
+        return accumulator;
+      },
+      {}
+    );
+    const tenantIds = tenants.map((tenant) => tenant.id);
+    const repairAuditActions = [
+      "finance.tithe.recalculated",
+      "finance.subscriptions.synced",
+      "finance.installments.reconciled"
+    ] as const;
+    const latestRepairAuditEntries = tenantIds.length
+      ? await prisma.adminAuditLog.findMany({
+          where: {
+            targetTenantId: {
+              in: tenantIds
+            },
+            action: {
+              in: [...repairAuditActions]
+            }
+          },
+          orderBy: [{ createdAt: "desc" }],
+          select: {
+            targetTenantId: true,
+            action: true,
+            summary: true,
+            createdAt: true
+          }
+        })
+      : [];
+    const latestRepairByTenantId = latestRepairAuditEntries.reduce<
+      Record<string, { action: string; summary: string; createdAt: string }>
+    >((accumulator, entry) => {
+      if (!entry.targetTenantId || accumulator[entry.targetTenantId]) {
+        return accumulator;
+      }
+
+      accumulator[entry.targetTenantId] = {
+        action: entry.action,
+        summary: entry.summary,
+        createdAt: entry.createdAt.toISOString()
+      };
+
+      return accumulator;
+    }, {});
+
     return NextResponse.json({
       items: tenants.map((tenant) => ({
+        billing: (() => {
+          const subscription = latestSubscriptionByTenant.get(tenant.id);
+          const webhookSummary =
+            subscription?.mercadoPagoPreapprovalId
+              ? webhookSummaryByResourceId[subscription.mercadoPagoPreapprovalId]
+              : undefined;
+
+          return {
+            subscriptionId: subscription?.id ?? null,
+            subscriptionStatus: subscription?.status ?? null,
+            preapprovalId: subscription?.mercadoPagoPreapprovalId ?? null,
+            nextBillingAt: subscription?.nextBillingAt?.toISOString() ?? null,
+            cancelRequestedAt: subscription?.cancelRequestedAt?.toISOString() ?? null,
+            lastSyncedAt: subscription?.lastSyncedAt?.toISOString() ?? null,
+            latestPaymentStatus: subscription?.payments[0]?.status ?? null,
+            latestPaymentId: subscription?.payments[0]?.providerPaymentId ?? null,
+            queueDepth: webhookSummary?.queueDepth ?? 0,
+            failedWebhooks: webhookSummary?.failed ?? 0,
+            lastFinancialRepair: latestRepairByTenantId[tenant.id] ?? null
+          };
+        })(),
         id: tenant.id,
         name: tenant.name,
         slug: tenant.slug,
