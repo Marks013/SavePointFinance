@@ -15,6 +15,10 @@ function isAllowedDuringMaintenance(pathname: string) {
 export function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const isMaintenanceModeEnabled = process.env.MAINTENANCE_MODE === "true";
+  const requestHeaders = new Headers(request.headers);
+
+  requestHeaders.set("x-savepoint-pathname", pathname);
+  requestHeaders.set("x-savepoint-search", request.nextUrl.search);
 
   if (pathname === "/dashboard/admin" && request.nextUrl.searchParams.has("month")) {
     const canonicalUrl = request.nextUrl.clone();
@@ -40,7 +44,11 @@ export function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
-  return NextResponse.next();
+  return NextResponse.next({
+    request: {
+      headers: requestHeaders
+    }
+  });
 }
 
 export const config = {

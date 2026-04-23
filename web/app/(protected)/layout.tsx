@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { headers } from "next/headers";
 import { after } from "next/server";
 import { redirect } from "next/navigation";
 
@@ -12,14 +13,27 @@ type ProtectedLayoutProps = {
   children: ReactNode;
 };
 
+function isNextRedirectError(error: unknown) {
+  return typeof error === "object" && error !== null && "digest" in error && String(error.digest).startsWith("NEXT_REDIRECT");
+}
+
 export default async function ProtectedLayout({ children }: ProtectedLayoutProps) {
   try {
+    const requestHeaders = await headers();
+    const pathname = requestHeaders.get("x-savepoint-pathname");
+    const search = requestHeaders.get("x-savepoint-search") ?? "";
     const access = await getCurrentTenantAccess({
       allowBlocked: true
     });
 
     if (!access.license.canAccessApp) {
       redirect(`/license?reason=${access.blockedReason ?? "expired"}`);
+    }
+
+    if (access.isPlatformAdmin && pathname?.startsWith("/dashboard")) {
+      if (pathname !== "/dashboard/admin" || new URLSearchParams(search).has("month")) {
+        redirect("/dashboard/admin");
+      }
     }
 
     if (!access.isPlatformAdmin && access.license.features.automation) {
@@ -49,6 +63,10 @@ export default async function ProtectedLayout({ children }: ProtectedLayoutProps
       });
     }
   } catch (error) {
+    if (isNextRedirectError(error)) {
+      throw error;
+    }
+
     if (isAuthError(error)) {
       redirect("/login");
     }

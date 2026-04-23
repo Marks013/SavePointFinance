@@ -258,7 +258,7 @@ async function getJson<T>(jar: CookieJar, path: string, init: RequestInit = {}) 
 }
 
 async function getSession(jar: CookieJar) {
-  const { response, payload } = await getJson<{ user?: { email?: string } } | null>(
+  const { response, payload } = await getJson<{ user?: { email?: string; isPlatformAdmin?: boolean } } | null>(
     jar,
     "/api/auth/session"
   );
@@ -344,40 +344,6 @@ async function expectRedirect(path: string, redirectPath: string, jar = new Cook
   assertCondition(
     location === redirectPath,
     `${path} deveria redirecionar para ${redirectPath}, mas foi para ${location ?? "sem location"}`
-  );
-}
-
-async function expectOkOrRedirect(
-  jar: CookieJar,
-  path: string,
-  options: {
-    redirectPath: string;
-    pageMarkers: string[];
-    minimumMatches?: number;
-  }
-) {
-  const { response, html } = await getHtml(jar, path);
-
-  if (response.ok) {
-    const markers = options.pageMarkers;
-    const minimumMatches = options.minimumMatches ?? markers.length;
-    const matchedMarkers = markers.filter((marker) => htmlContainsMarker(html, marker));
-
-    assertCondition(
-      matchedMarkers.length >= minimumMatches,
-      `${path} nao atingiu o minimo de marcadores esperados (${matchedMarkers.length}/${minimumMatches}).`
-    );
-    return;
-  }
-
-  const location = formatLocationHeader(response);
-  assertCondition(
-    response.status === 302 || response.status === 307,
-    `${path} deveria responder 200 ou redirecionar, mas respondeu ${response.status}`
-  );
-  assertCondition(
-    location === options.redirectPath,
-    `${path} deveria redirecionar para ${options.redirectPath}, mas foi para ${location ?? "sem location"}`
   );
 }
 
@@ -554,13 +520,17 @@ async function run() {
 
   const adminJar = await signIn(adminEmail, adminPassword);
   results.push("Login por credenciais estabelece sessao valida");
+  const adminSession = await getSession(adminJar);
 
-  await expectOkOrRedirect(adminJar, "/dashboard", {
-    redirectPath: "/dashboard/admin",
-    pageMarkers: ['aria-label="Encerrar', "Encerrar sessão", "Resumo das contas"],
-    minimumMatches: 2
-  });
-  results.push("Entrada autenticada do admin responde com dashboard ou redireciona corretamente para o painel admin");
+  assertCondition(
+    adminSession?.user?.isPlatformAdmin === true,
+    "ADMIN_EMAIL autenticado nao veio como isPlatformAdmin=true; execute o bootstrap-admin ou confira o usuario usado no smoke"
+  );
+  results.push("Admin configurado foi reconhecido como Superadmin da plataforma");
+
+  await expectRedirect(`/dashboard?month=${smokeMonth}`, "/dashboard/admin", adminJar);
+  await expectRedirect(`/dashboard/admin?month=${smokeMonth}`, "/dashboard/admin", adminJar);
+  results.push("Superadmin e isolado da competencia global em /dashboard e /dashboard/admin");
 
   await expectPage(adminJar, "/dashboard/admin", {
     markers: ["Painel administrativo", "Auditoria administrativa", "Colaboradores"],
@@ -580,7 +550,7 @@ async function run() {
   );
   results.push("API de perfil autenticada respondeu com o admin esperado");
 
-  let dataJar = adminJar;
+  let dataJar: CookieJar | null = null;
 
   if (smokeUserEmail.toLowerCase() !== adminEmail.toLowerCase()) {
     await signOut(adminJar);
@@ -589,6 +559,25 @@ async function run() {
     results.push("Area protegida volta a exigir autenticacao apos logout do admin");
     dataJar = await signIn(smokeUserEmail, smokeUserPassword);
     results.push("Login do usuario de dados estabelece sessao valida");
+  } else {
+    await signOut(adminJar);
+    results.push("Logout do Superadmin encerra a sessao");
+    results.push("Auditoria das telas financeiras ignorada porque SMOKE_USER_EMAIL aponta para o Superadmin");
+  }
+
+  if (!dataJar) {
+    await auditFamilyRestrictions(results);
+
+    console.log("Server smoke audit OK");
+    console.log(`Base URL: ${baseUrl}`);
+    console.log(`Admin usado: ${adminEmail}`);
+    console.log(`Usuario de dados: ${smokeUserEmail}`);
+    console.log(`Familiar usado: ${familyUserEmail ?? "nao configurado"}`);
+    console.log(`Mes do smoke: ${smokeMonth}`);
+    for (const item of results) {
+      console.log(`- ${item}`);
+    }
+    return;
   }
 
   await expectPage(dataJar, "/dashboard", {
