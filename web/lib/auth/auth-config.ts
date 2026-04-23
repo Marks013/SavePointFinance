@@ -130,15 +130,28 @@ export const authConfig = {
 
       return token;
     },
-    session({ session, token, user }) {
-      const sessionUser = user ?? token;
-
+    async session({ session, token, user }) {
       if (session.user) {
-        session.user.id = typeof sessionUser.id === "string" ? sessionUser.id : "";
-        session.user.role = sessionUser.role === "admin" ? "admin" : "member";
-        session.user.tenantId =
-          typeof sessionUser.tenantId === "string" ? sessionUser.tenantId : "";
-        session.user.isPlatformAdmin = Boolean(sessionUser.isPlatformAdmin);
+        const sessionUser = user ?? token;
+        const currentUser =
+          typeof token.id === "string"
+            ? await prisma.user.findUnique({
+                where: {
+                  id: token.id
+                },
+                select: {
+                  id: true,
+                  role: true,
+                  tenantId: true,
+                  isPlatformAdmin: true
+                }
+              })
+            : null;
+
+        session.user.id = currentUser?.id ?? (typeof sessionUser.id === "string" ? sessionUser.id : "");
+        session.user.role = currentUser?.role ?? (sessionUser.role === "admin" ? "admin" : "member");
+        session.user.tenantId = currentUser?.tenantId ?? (typeof sessionUser.tenantId === "string" ? sessionUser.tenantId : "");
+        session.user.isPlatformAdmin = currentUser?.isPlatformAdmin ?? Boolean(sessionUser.isPlatformAdmin);
       }
 
       return session;
