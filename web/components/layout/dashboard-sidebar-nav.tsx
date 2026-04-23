@@ -93,12 +93,16 @@ export function DashboardSidebarNav({ canManageSharing, isPlatformAdmin }: Dashb
   );
 
   useEffect(() => {
+    if (isPlatformAdmin) {
+      return;
+    }
+
     if (searchParams.get("month")) {
       return;
     }
 
     commitMonth(getCurrentMonthKey());
-  }, [commitMonth, searchParams]);
+  }, [commitMonth, isPlatformAdmin, searchParams]);
 
   useEffect(() => {
     setDraftMonth(month);
