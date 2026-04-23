@@ -26,6 +26,7 @@ type Stats = {
   totalTransactions: number;
   billingActiveSubscriptions: number;
   billingAttentionSubscriptions: number;
+  internalActiveSubscriptions: number;
   billingWebhookQueueDepth: number;
   billingWebhookFailures: number;
   retention: {
@@ -539,7 +540,7 @@ export function AdminClient({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
     return `${tenant.name} • ${tenant.planName}`;
   }
 
-  const resetPasswordMutation = useMutation({
+  const setPasswordMutation = useMutation({
     mutationFn: async ({ id, newPassword }: { id: string; newPassword: string }) => {
       const response = await fetch(`/api/admin/users/${id}`, {
         method: "PATCH",
@@ -551,6 +552,27 @@ export function AdminClient({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["admin-audit"] });
       toast.success("Senha atualizada");
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    }
+  });
+
+  const sendPasswordResetMutation = useMutation({
+    mutationFn: async ({ id }: { id: string }) => {
+      const response = await fetch(`/api/admin/users/${id}/password-reset`, {
+        method: "POST"
+      });
+      const payload = (await response.json().catch(() => ({}))) as { message?: string };
+      if (!response.ok) throw new Error(payload.message ?? "Falha ao iniciar redefinição de senha");
+      return payload;
+    },
+    onSuccess: async (payload) => {
+      await queryClient.invalidateQueries({ queryKey: ["admin-audit"] });
+      toast.success(payload.message ?? "Link de redefinição enviado");
+    },
+    onError: (error) => {
+      toast.error(error.message);
     }
   });
 
@@ -1101,6 +1123,11 @@ export function AdminClient({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
   }
 
   function submitUserPasswordReset(user: UserItem) {
+    if (isPlatformAdmin) {
+      sendPasswordResetMutation.mutate({ id: user.id });
+      return;
+    }
+
     const newPassword = userPasswordDrafts[user.id] ?? "";
 
     if (newPassword.length < 8) {
@@ -1108,7 +1135,7 @@ export function AdminClient({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
       return;
     }
 
-    resetPasswordMutation.mutate({ id: user.id, newPassword });
+    setPasswordMutation.mutate({ id: user.id, newPassword });
     setUserPasswordDrafts((current) => ({ ...current, [user.id]: "" }));
   }
 
@@ -1628,18 +1655,22 @@ export function AdminClient({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
         <article className="metric-card min-w-0"><p className="metric-label">Em avaliação</p><p className="metric-value">{statsQuery.data?.trialTenants ?? 0}</p></article>
         <article className="metric-card min-w-0"><p className="metric-label">Expirados</p><p className="metric-value">{statsQuery.data?.expiredTenants ?? 0}</p></article>
         <article className="metric-card min-w-0">
-          <p className="metric-label">{isPlatformAdmin ? "Usuários plataforma" : "Pessoas da conta"}</p>
+          <p className="metric-label">{isPlatformAdmin ? "Usuários cadastrados" : "Pessoas da conta"}</p>
           <p className="metric-value">{statsQuery.data?.totalUsers ?? 0}</p>
         </article>
         <article className="metric-card min-w-0">
-          <p className="metric-label">{isPlatformAdmin ? "Ativos plataforma" : "Pessoas ativas"}</p>
+          <p className="metric-label">{isPlatformAdmin ? "Usuários ativos" : "Pessoas ativas"}</p>
           <p className="metric-value">{statsQuery.data?.activeUsers ?? 0}</p>
         </article>
         {isPlatformAdmin ? (
           <>
             <article className="metric-card min-w-0">
-              <p className="metric-label">Assinaturas MP</p>
+              <p className="metric-label">Assinaturas MP ativas</p>
               <p className="metric-value">{statsQuery.data?.billingActiveSubscriptions ?? 0}</p>
+            </article>
+            <article className="metric-card min-w-0">
+              <p className="metric-label">Recorrências internas</p>
+              <p className="metric-value">{statsQuery.data?.internalActiveSubscriptions ?? 0}</p>
             </article>
             <article className="metric-card min-w-0">
               <p className="metric-label">Billing alerta</p>
@@ -2264,9 +2295,11 @@ export function AdminClient({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
                         <p className="break-words text-xs leading-5 text-[var(--color-muted-foreground)]">
                           Conta {user.tenant.slug} • {formatUserTenantPlanLabel(user)}
                         </p>
-                        <p className="break-words text-xs leading-5 text-[var(--color-muted-foreground)]">
-                          Último login: {user.lastLogin ? formatDateTimeDisplay(user.lastLogin) : "Nunca acessou"}
-                        </p>
+                        <div className="pt-1">
+                          <p className="inline-flex max-w-full items-center rounded-full border border-[var(--color-border)] bg-[var(--color-panel)] px-3 py-1 text-xs leading-5 text-[var(--color-muted-foreground)]">
+                            Último login: {user.lastLogin ? formatDateTimeDisplay(user.lastLogin) : "Nunca acessou"}
+                          </p>
+                        </div>
                       </div>
                       <div className="flex flex-wrap gap-2 xl:justify-end">
                         {isPlatformAdmin ? (
@@ -2278,33 +2311,46 @@ export function AdminClient({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
                             Tornar {user.role === "admin" ? "familiar" : "admin de conta"}
                           </Button>
                         ) : null}
-                        <div className="min-w-[14rem] flex-1 space-y-2 xl:max-w-xs">
-                          <Label htmlFor={`user-${user.id}-password`}>Definir nova senha</Label>
-                          <Input
-                            id={`user-${user.id}-password`}
-                            autoComplete="new-password"
-                            placeholder="Senha temporária, mínimo 8 caracteres"
-                            type="password"
-                            value={userPasswordDrafts[user.id] ?? ""}
-                            onChange={(event) =>
-                              setUserPasswordDrafts((current) => ({
-                                ...current,
-                                [user.id]: event.target.value
-                              }))
-                            }
-                          />
-                          <p className="text-xs leading-5 text-[var(--color-muted-foreground)]">
-                            Este painel não envia link: ele grava a nova senha informada pelo suporte.
-                          </p>
-                        </div>
+                        {isPlatformAdmin ? (
+                          <div className="min-w-[15rem] flex-1 space-y-2 xl:max-w-sm">
+                            <Label>Redefinição segura</Label>
+                            <p className="rounded-[1rem] border border-[var(--color-border)] bg-[var(--color-panel)] px-3 py-2 text-xs leading-5 text-[var(--color-muted-foreground)]">
+                              O suporte apenas dispara o link. A nova senha é definida pelo próprio usuário no fluxo autenticado por token.
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="min-w-[14rem] flex-1 space-y-2 xl:max-w-xs">
+                            <Label htmlFor={`user-${user.id}-password`}>Definir nova senha</Label>
+                            <Input
+                              id={`user-${user.id}-password`}
+                              autoComplete="new-password"
+                              placeholder="Senha temporária, mínimo 8 caracteres"
+                              type="password"
+                              value={userPasswordDrafts[user.id] ?? ""}
+                              onChange={(event) =>
+                                setUserPasswordDrafts((current) => ({
+                                  ...current,
+                                  [user.id]: event.target.value
+                                }))
+                              }
+                            />
+                            <p className="text-xs leading-5 text-[var(--color-muted-foreground)]">
+                              Este painel não envia link: ele grava a nova senha informada pelo suporte.
+                            </p>
+                          </div>
+                        )}
                         <Button
                           className="self-end"
-                          disabled={(userPasswordDrafts[user.id] ?? "").length < 8 || resetPasswordMutation.isPending}
+                          disabled={
+                            isPlatformAdmin
+                              ? sendPasswordResetMutation.isPending
+                              : (userPasswordDrafts[user.id] ?? "").length < 8 || setPasswordMutation.isPending
+                          }
                           onClick={() => submitUserPasswordReset(user)}
                           type="button"
                           variant="secondary"
                         >
-                          Salvar nova senha
+                          {isPlatformAdmin ? "Enviar link de redefinição" : "Salvar nova senha"}
                         </Button>
                         <Button
                           onClick={() => toggleActiveMutation.mutate({ id: user.id, isActive: !user.isActive })}

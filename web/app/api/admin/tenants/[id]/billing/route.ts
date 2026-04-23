@@ -10,7 +10,7 @@ import {
 } from "@/lib/billing/service";
 import { syncDueSubscriptionTransactions } from "@/lib/automation/subscriptions";
 import { revalidateFinanceReports } from "@/lib/cache/finance-read-models";
-import { syncTitheForMonthKeys } from "@/lib/finance/tithe";
+import { buildTitheIncomeTransactionWhere, syncTitheForMonthKeys } from "@/lib/finance/tithe";
 import { prisma } from "@/lib/prisma/client";
 
 type Params = {
@@ -49,10 +49,25 @@ function ensurePlatformAdmin(admin: Awaited<ReturnType<typeof requireAdminUser>>
 }
 
 async function getTenantRepairUser(tenantId: string) {
-  return prisma.user.findFirst({
+  const activeUser = await prisma.user.findFirst({
     where: {
       tenantId,
       isActive: true
+    },
+    orderBy: [{ role: "asc" }, { createdAt: "asc" }],
+    select: {
+      id: true,
+      email: true
+    }
+  });
+
+  if (activeUser) {
+    return activeUser;
+  }
+
+  return prisma.user.findFirst({
+    where: {
+      tenantId
     },
     orderBy: [{ role: "asc" }, { createdAt: "asc" }],
     select: {
@@ -208,9 +223,7 @@ export async function POST(request: Request, context: Params) {
 
       const incomeTransactions = await prisma.transaction.findMany({
         where: {
-          tenantId: id,
-          type: "income",
-          competence: body.monthKey
+          ...buildTitheIncomeTransactionWhere(id, body.monthKey)
         },
         select: {
           id: true,

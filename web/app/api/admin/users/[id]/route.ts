@@ -175,15 +175,22 @@ export async function DELETE(_request: Request, context: Params) {
   try {
     const admin = await requireAdminUser();
     const { id } = await context.params;
-    const target = await getDeletableUser(id);
+    const target = await prisma.user.findFirst({
+      where: {
+        id,
+        ...(admin.isPlatformAdmin ? {} : { tenantId: admin.tenantId })
+      },
+      select: {
+        id: true,
+        tenantId: true
+      }
+    });
 
     if (!target) {
       return NextResponse.json({ message: "Usuário não encontrado" }, { status: 404 });
     }
 
-    if (!admin.isPlatformAdmin && target.tenantId !== admin.tenantId) {
-      return NextResponse.json({ message: "Usuário não encontrado" }, { status: 404 });
-    }
+    await getDeletableUser(target.id);
 
     const deleted = await deleteUserWithAllData({ userId: target.id });
 

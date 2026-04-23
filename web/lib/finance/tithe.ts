@@ -22,6 +22,24 @@ function monthLabel(monthKey: string) {
   }).format(new Date(year, (month ?? 1) - 1, 1));
 }
 
+export function getMonthDateRange(monthKey: string) {
+  const start = new Date(`${monthKey}-01T00:00:00.000`);
+  const end = new Date(start);
+  end.setMonth(end.getMonth() + 1);
+  end.setMilliseconds(end.getMilliseconds() - 1);
+  return { start, end };
+}
+
+export function buildTitheIncomeTransactionWhere(tenantId: string, monthKey: string): Prisma.TransactionWhereInput {
+  const { start, end } = getMonthDateRange(monthKey);
+
+  return {
+    tenantId,
+    type: "income",
+    OR: [{ competence: monthKey }, { competence: "", date: { gte: start, lte: end } }]
+  };
+}
+
 export async function ensureTitheCategory(tenantId: string, client: TitheClient = prisma) {
   const existing = await client.category.findFirst({
     where: {
@@ -75,13 +93,13 @@ export async function syncMonthlyTitheTransaction({
   const titheCategoryId = await ensureTitheCategory(tenantId, client);
   const notesTag = `[AUTO_TITHE:${monthKey}]`;
   const title = `Dízimo consolidado ${monthLabel(monthKey)}`;
+  const { start, end } = getMonthDateRange(monthKey);
+  const incomeWhere = buildTitheIncomeTransactionWhere(tenantId, monthKey);
 
   const [incomeTransactions, existingAutoTithes] = await Promise.all([
     client.transaction.findMany({
       where: {
-        tenantId,
-        type: "income",
-        competence: monthKey,
+        ...incomeWhere,
         titheAmount: {
           gt: new Prisma.Decimal(0)
         }
@@ -124,6 +142,24 @@ export async function syncMonthlyTitheTransaction({
     }
     return null;
   }
+
+  await client.transaction.updateMany({
+    where: {
+      tenantId,
+      type: "income",
+      competence: "",
+      date: {
+        gte: start,
+        lte: end
+      },
+      titheAmount: {
+        gt: new Prisma.Decimal(0)
+      }
+    },
+    data: {
+      competence: monthKey
+    }
+  });
 
   const primaryAutoTithe = existingAutoTithes[0] ?? null;
   const duplicateIds = existingAutoTithes.slice(1).map((item) => item.id);

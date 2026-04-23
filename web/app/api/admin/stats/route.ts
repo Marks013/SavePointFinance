@@ -23,6 +23,7 @@ export async function GET() {
       transactions,
       billingActiveSubscriptions,
       billingAttentionSubscriptions,
+      internalActiveSubscriptions,
       billingWebhookQueueDepth,
       billingWebhookFailures,
       retention,
@@ -70,6 +71,12 @@ export async function GET() {
           }
         }
       }),
+      prisma.subscription.count({
+        where: {
+          ...(admin.isPlatformAdmin ? {} : { tenantId: admin.tenantId }),
+          isActive: true
+        }
+      }),
       prisma.billingWebhookEvent.count({
         where: {
           status: {
@@ -97,6 +104,7 @@ export async function GET() {
       totalTransactions: transactions,
       billingActiveSubscriptions,
       billingAttentionSubscriptions,
+      internalActiveSubscriptions,
       billingWebhookQueueDepth,
       billingWebhookFailures,
       retention,

@@ -1,11 +1,8 @@
-import crypto from "node:crypto";
-import { NotificationChannel } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 import { forgotPasswordSchema } from "@/features/password/schemas/password-schema";
 import { normalizeEmail } from "@/lib/auth/normalize-email";
-import { deliverNotification } from "@/lib/notifications/delivery";
-import { buildPasswordResetMessage } from "@/lib/notifications/password-reset";
+import { issuePasswordResetForUser } from "@/lib/auth/password-reset";
 import { captureRequestError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
 import { getClientIpAddress, takeThrottleHit } from "@/lib/security/request-throttle";
@@ -85,28 +82,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true });
     }
 
-    const token = crypto.randomBytes(24).toString("hex");
-    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
-
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        resetToken: hashedToken,
-        resetTokenExpires: expiresAt
-      }
-    });
-
-    const resetMessage = buildPasswordResetMessage(token, user.name);
-
-    await deliverNotification({
+    await issuePasswordResetForUser({
+      id: user.id,
       tenantId: user.tenantId,
-      userId: user.id,
-      channel: NotificationChannel.email,
-      target: user.email,
-      subject: resetMessage.subject,
-      message: resetMessage.message,
-      html: resetMessage.html
+      email: user.email,
+      name: user.name
     });
 
     return NextResponse.json({ success: true });
