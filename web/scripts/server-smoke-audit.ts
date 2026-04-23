@@ -347,6 +347,40 @@ async function expectRedirect(path: string, redirectPath: string, jar = new Cook
   );
 }
 
+async function expectOkOrRedirect(
+  jar: CookieJar,
+  path: string,
+  options: {
+    redirectPath: string;
+    pageMarkers: string[];
+    minimumMatches?: number;
+  }
+) {
+  const { response, html } = await getHtml(jar, path);
+
+  if (response.ok) {
+    const markers = options.pageMarkers;
+    const minimumMatches = options.minimumMatches ?? markers.length;
+    const matchedMarkers = markers.filter((marker) => htmlContainsMarker(html, marker));
+
+    assertCondition(
+      matchedMarkers.length >= minimumMatches,
+      `${path} nao atingiu o minimo de marcadores esperados (${matchedMarkers.length}/${minimumMatches}).`
+    );
+    return;
+  }
+
+  const location = formatLocationHeader(response);
+  assertCondition(
+    response.status === 302 || response.status === 307,
+    `${path} deveria responder 200 ou redirecionar, mas respondeu ${response.status}`
+  );
+  assertCondition(
+    location === options.redirectPath,
+    `${path} deveria redirecionar para ${options.redirectPath}, mas foi para ${location ?? "sem location"}`
+  );
+}
+
 async function expectPage(jar: CookieJar, path: string, expectation: PageExpectation) {
   const { response, html } = await getHtml(jar, path);
   assertCondition(response.ok, `${path} respondeu ${response.status}`);
@@ -521,11 +555,12 @@ async function run() {
   const adminJar = await signIn(adminEmail, adminPassword);
   results.push("Login por credenciais estabelece sessao valida");
 
-  await expectPage(adminJar, "/dashboard", {
-    markers: ['aria-label="Encerrar', "Encerrar sessão", "Resumo das contas"],
+  await expectOkOrRedirect(adminJar, "/dashboard", {
+    redirectPath: "/dashboard/admin",
+    pageMarkers: ['aria-label="Encerrar', "Encerrar sessão", "Resumo das contas"],
     minimumMatches: 2
   });
-  results.push("Dashboard autenticado responde para o admin");
+  results.push("Entrada autenticada do admin responde com dashboard ou redireciona corretamente para o painel admin");
 
   await expectPage(adminJar, "/dashboard/admin", {
     markers: ["Painel administrativo", "Auditoria administrativa", "Colaboradores"],
