@@ -4,10 +4,818 @@ Error: spawn EPERM
     at fork (node:child_process:174:10)
     at C:\Users\samue\Desktop\SavePointFinance\web\node_modules\next\dist\cli\next-dev.js:253:45
     at new Promise (<anonymous>)
-    at startServer (C:\Users\samue\Desktop\SavePointFinance\web\node_modules\next\dist\cli\next-dev.js:221:16)
-    at runDevServer (C:\Users\samue\Desktop\SavePointFinance\web\node_modules\next\dist\cli\next-dev.js:355:23)
-    at Module.nextDev (C:\Users\samue\Desktop\SavePointFinance\web\node_modules\next\dist\cli\next-dev.js:363:11) {
-  errno: -4048,
-  code: 'EPERM',
-  syscall: 'spawn'
+    at startServer (C:\Users\samue\Desktop\SavePointFinance\web\node_⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
 }
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+⨯ Error: DATABASE_URL is not configured.
+    at <unknown> (lib\prisma\client.ts:7:9)
+   5 |
+   6 | if (!connectionString) {
+>  7 |   throw new Error("DATABASE_URL is not configured.");
+     |         ^
+   8 | }
+   9 |
+  10 | const adapter = new PrismaPg({ {
+  page: '/api/health'
+}
+^C
