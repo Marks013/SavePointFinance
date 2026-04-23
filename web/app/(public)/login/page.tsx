@@ -1,8 +1,10 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 
 import { LoginForm } from "@/features/auth/components/login-form";
 import { getCurrentTenantAccess } from "@/lib/auth/session";
 import { BrandMark } from "@/components/layout/brand-mark";
+import { Button } from "@/components/ui/button";
 
 export default async function LoginPage() {
   try {
@@ -62,8 +64,19 @@ export default async function LoginPage() {
             </p>
           </div>
           <LoginForm />
-          <div className="mt-6 text-center text-sm text-[var(--color-muted-foreground)]">
+          <div className="mt-6 grid gap-3 rounded-[1.25rem] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-muted)_46%,var(--color-card))] p-4">
+            <p className="text-sm font-semibold text-[var(--color-foreground)]">Ainda escolhendo o plano?</p>
+            <p className="text-sm leading-6 text-[var(--color-muted-foreground)]">
+              Compare limites, WhatsApp, automações e checkout Mercado Pago antes de assinar.
+            </p>
+            <Button asChild variant="secondary">
+              <Link href="/planos">Ver planos e assinatura</Link>
+            </Button>
+          </div>
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3 text-center text-sm text-[var(--color-muted-foreground)]">
             <a href="/forgot-password">Esqueci minha senha</a>
+            <span aria-hidden="true">•</span>
+            <Link href="/billing">Assinar Premium</Link>
           </div>
         </div>
       </section>

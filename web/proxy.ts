@@ -16,6 +16,12 @@ export function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const isMaintenanceModeEnabled = process.env.MAINTENANCE_MODE === "true";
 
+  if (pathname === "/dashboard/admin" && request.nextUrl.searchParams.has("month")) {
+    const canonicalUrl = request.nextUrl.clone();
+    canonicalUrl.searchParams.delete("month");
+    return NextResponse.redirect(canonicalUrl);
+  }
+
   if (isMaintenanceModeEnabled && !isAllowedDuringMaintenance(pathname)) {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json(

@@ -67,6 +67,12 @@ export default function HomePage() {
                 </Link>
               </Button>
               <Button asChild variant="secondary">
+                <Link href="/planos">
+                  Ver planos
+                  <ArrowRight className="size-4" />
+                </Link>
+              </Button>
+              <Button asChild variant="secondary">
                 <Link href="#visao-geral">
                   Ver estrutura
                   <ArrowRight className="size-4" />
@@ -115,6 +121,43 @@ export default function HomePage() {
               </div>
             </article>
           </div>
+        </div>
+      </section>
+
+      <section className="mt-6 grid gap-4 lg:grid-cols-[0.82fr_1.18fr]" id="planos">
+        <article className="surface content-section">
+          <div className="section-stack">
+            <div className="eyebrow">Planos e assinatura</div>
+            <h2 className="section-title">Compare antes de entrar no checkout.</h2>
+            <p className="section-copy">
+              O Save Point separa o uso gratuito da experiência premium com WhatsApp, automações, PDF e limites
+              ampliados. A assinatura usa Mercado Pago e só libera acesso após confirmação real do pagamento.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <Button asChild>
+                <Link href="/planos">
+                  Comparar planos
+                  <ArrowRight className="size-4" />
+                </Link>
+              </Button>
+              <Button asChild variant="secondary">
+                <Link href="/billing">Assinar Premium</Link>
+              </Button>
+            </div>
+          </div>
+        </article>
+
+        <div className="grid gap-4 md:grid-cols-3">
+          {[
+            ["Gratuito", "1 conta e 1 cartão para começar com controle básico."],
+            ["Premium", "WhatsApp, automações, PDF e limites ampliados."],
+            ["Avaliação", "Teste premium quando liberado para a conta."]
+          ].map(([title, copy]) => (
+            <article key={title} className="surface content-section">
+              <p className="metric-label">{title}</p>
+              <p className="mt-4 text-xl font-semibold tracking-[-0.04em] text-[var(--color-foreground)]">{copy}</p>
+            </article>
+          ))}
         </div>
       </section>
 
