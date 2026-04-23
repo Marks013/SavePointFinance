@@ -20,12 +20,6 @@ export function proxy(request: NextRequest) {
   requestHeaders.set("x-savepoint-pathname", pathname);
   requestHeaders.set("x-savepoint-search", request.nextUrl.search);
 
-  if (pathname === "/dashboard/admin" && request.nextUrl.searchParams.has("month")) {
-    const canonicalUrl = request.nextUrl.clone();
-    canonicalUrl.searchParams.delete("month");
-    return NextResponse.redirect(canonicalUrl);
-  }
-
   if (isMaintenanceModeEnabled && !isAllowedDuringMaintenance(pathname)) {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json(
