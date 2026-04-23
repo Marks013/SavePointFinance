@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { Session } from "next-auth";
 import { SessionProvider, useSession } from "next-auth/react";
@@ -54,6 +55,30 @@ function SentryAccessScope() {
   return null;
 }
 
+function PlatformAdminRouteIsolation() {
+  const { data: session, status } = useSession();
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    if (status !== "authenticated" || !session?.user?.isPlatformAdmin) {
+      return;
+    }
+
+    if (pathname === "/dashboard/admin" && searchParams.has("month")) {
+      router.replace("/dashboard/admin");
+      return;
+    }
+
+    if (pathname.startsWith("/dashboard") && pathname !== "/dashboard/admin") {
+      router.replace("/dashboard/admin");
+    }
+  }, [pathname, router, searchParams, session, status]);
+
+  return null;
+}
+
 export function AppProviders({ children, initialTheme, initialSession }: AppProvidersProps) {
   const [queryClient] = useState(
     () =>
@@ -102,6 +127,7 @@ export function AppProviders({ children, initialTheme, initialSession }: AppProv
       <SessionProvider session={initialSession}>
         <QueryClientProvider client={queryClient}>
           <SentryAccessScope />
+          <PlatformAdminRouteIsolation />
           {children}
           <Toaster richColors position="top-right" />
           <QueryDevtools initialIsOpen={false} />

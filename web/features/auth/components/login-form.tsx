@@ -47,7 +47,16 @@ export function LoginForm() {
       }
 
       toast.success("Sessao iniciada");
-      router.push("/dashboard");
+      const sessionResponse = await fetch("/api/auth/session", {
+        cache: "no-store"
+      });
+      const session = (await sessionResponse.json().catch(() => null)) as {
+        user?: {
+          isPlatformAdmin?: boolean;
+        };
+      } | null;
+
+      router.replace(session?.user?.isPlatformAdmin ? "/dashboard/admin" : "/dashboard");
       router.refresh();
     });
   });
