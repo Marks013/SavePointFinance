@@ -3,6 +3,7 @@ import { ArrowRight, BarChart3, CircleDollarSign, CreditCard, MessageCircleMore,
 
 import { BrandMark } from "@/components/layout/brand-mark";
 import { Button } from "@/components/ui/button";
+import { PlanCheckoutLink } from "@/features/billing/components/plan-checkout-link";
 
 const pillars = [
   {
@@ -141,7 +142,7 @@ export default function HomePage() {
                 </Link>
               </Button>
               <Button asChild variant="secondary">
-                <Link href="/cadastro?plan=pro">Assinar Premium</Link>
+                <PlanCheckoutLink>Assinar Premium</PlanCheckoutLink>
               </Button>
             </div>
           </div>

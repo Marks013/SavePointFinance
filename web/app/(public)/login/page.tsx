@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 
 import { LoginForm } from "@/features/auth/components/login-form";
+import { PlanCheckoutLink } from "@/features/billing/components/plan-checkout-link";
 import { getCurrentTenantAccess } from "@/lib/auth/session";
 import { BrandMark } from "@/components/layout/brand-mark";
 import { Button } from "@/components/ui/button";
@@ -76,7 +77,7 @@ export default async function LoginPage() {
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3 text-center text-sm text-[var(--color-muted-foreground)]">
             <a href="/forgot-password">Esqueci minha senha</a>
             <span aria-hidden="true">•</span>
-            <Link href="/cadastro?plan=pro">Assinar Premium</Link>
+            <PlanCheckoutLink>Assinar Premium</PlanCheckoutLink>
           </div>
         </div>
       </section>

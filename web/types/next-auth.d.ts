@@ -10,6 +10,7 @@ declare module "next-auth" {
       role?: string;
       tenantId?: string;
       isPlatformAdmin?: boolean;
+      previousLastLogin?: string | null;
     };
   }
 
@@ -17,6 +18,7 @@ declare module "next-auth" {
     role?: string;
     tenantId?: string;
     isPlatformAdmin?: boolean;
+    previousLastLogin?: string | null;
   }
 }
 
@@ -26,5 +28,6 @@ declare module "next-auth/jwt" {
     role?: string;
     tenantId?: string;
     isPlatformAdmin?: boolean;
+    previousLastLogin?: string | null;
   }
 }

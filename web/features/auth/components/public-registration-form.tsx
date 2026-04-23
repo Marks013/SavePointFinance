@@ -94,7 +94,7 @@ export function PublicRegistrationForm({ initialPlan }: PublicRegistrationFormPr
               }
 
               toast.success(values.plan === "pro" ? "Conta criada. Abrindo checkout." : "Conta criada com sucesso.");
-              const nextPath = payload.nextPath ?? ((values.plan === "pro" ? "/billing" : "/dashboard") as Route);
+              const nextPath = payload.nextPath ?? ((values.plan === "pro" ? "/billing?intent=checkout" : "/dashboard") as Route);
 
               router.replace(nextPath);
               router.refresh();

@@ -4,6 +4,7 @@ import { ArrowRight, Check, CircleDollarSign, LockKeyhole, MessageCircleMore, Sh
 
 import { BrandMark } from "@/components/layout/brand-mark";
 import { Button } from "@/components/ui/button";
+import { PlanCheckoutLink } from "@/features/billing/components/plan-checkout-link";
 
 const planCards = [
   {
@@ -81,15 +82,15 @@ export default function PlansPage() {
               Escolha o nível certo para operar seu financeiro com controle, automação e WhatsApp.
             </h1>
             <p className="max-w-2xl text-base leading-8 text-white/82 md:text-lg">
-              Compare limites, permissões e recursos antes de entrar no checkout. A contratação premium usa Mercado
-              Pago e a liberação acontece pelo backend via webhook.
+              Compare limites, permissões e recursos antes de contratar. A assinatura premium usa Mercado Pago e a
+              liberação acontece automaticamente após a confirmação do pagamento.
             </p>
             <div className="flex flex-wrap gap-3">
               <Button asChild>
-                <Link href="/cadastro?plan=pro">
+                <PlanCheckoutLink>
                   Assinar Premium
                   <ArrowRight className="size-4" />
-                </Link>
+                </PlanCheckoutLink>
               </Button>
               <Button asChild variant="secondary">
                 <Link href="/login">Já tenho acesso</Link>
@@ -103,8 +104,8 @@ export default function PlansPage() {
               <p className="text-sm font-semibold uppercase tracking-[0.16em]">Checkout seguro</p>
             </div>
             <p className="mt-5 text-2xl font-semibold tracking-[-0.05em] text-white">
-              O pagamento não libera acesso pelo frontend. A assinatura só fica ativa após confirmação real do Mercado
-              Pago.
+              O pagamento é confirmado pelo Mercado Pago e a assinatura da conta é ativada automaticamente sem depender
+              de conferência manual.
             </p>
           </article>
         </div>
@@ -159,10 +160,17 @@ export default function PlansPage() {
               </div>
 
               <Button asChild className="mt-7 w-full" variant={isStrong ? "default" : "secondary"}>
-                <Link href={plan.href}>
-                  {plan.cta}
-                  <ArrowRight className="size-4" />
-                </Link>
+                {plan.name === "Premium Completo" ? (
+                  <PlanCheckoutLink>
+                    {plan.cta}
+                    <ArrowRight className="size-4" />
+                  </PlanCheckoutLink>
+                ) : (
+                  <Link href={plan.href}>
+                    {plan.cta}
+                    <ArrowRight className="size-4" />
+                  </Link>
+                )}
               </Button>
             </article>
           );
@@ -176,7 +184,7 @@ export default function PlansPage() {
             <h2 className="mt-3 text-2xl font-semibold tracking-[-0.04em]">Permissões e limites por plano</h2>
           </div>
           <Button asChild variant="secondary">
-            <Link href="/cadastro?plan=pro">Criar conta e ir para checkout</Link>
+            <PlanCheckoutLink>Criar conta e ir para checkout</PlanCheckoutLink>
           </Button>
         </div>
 
@@ -223,7 +231,7 @@ export default function PlansPage() {
           <ShieldCheck className="size-5 text-[var(--color-primary)]" />
           <h3 className="mt-4 text-lg font-semibold tracking-[-0.03em]">Liberação por webhook</h3>
           <p className="mt-2 text-sm leading-7 text-[var(--color-muted-foreground)]">
-            A licença da conta é atualizada pelo backend após confirmação do pagamento.
+            A licença da conta é atualizada automaticamente após a confirmação do pagamento.
           </p>
         </article>
       </section>

@@ -23,7 +23,7 @@ const planSlugByIntent = {
 const nextPathByIntent = {
   free: "/dashboard",
   trial: "/dashboard",
-  pro: "/billing"
+  pro: "/billing?intent=checkout"
 } as const;
 
 function slugify(value: string) {

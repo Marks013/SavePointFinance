@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { requireAdminUser } from "@/lib/auth/admin";
 import { prisma } from "@/lib/prisma/client";
+import { getRetentionStats } from "@/lib/retention/service";
 
 export async function GET() {
   try {
@@ -24,6 +25,7 @@ export async function GET() {
       billingAttentionSubscriptions,
       billingWebhookQueueDepth,
       billingWebhookFailures,
+      retention,
       currentTenantUsers,
       currentTenantActiveUsers
     ] = await Promise.all([
@@ -80,6 +82,7 @@ export async function GET() {
           status: "dead_letter"
         }
       }),
+      admin.isPlatformAdmin ? getRetentionStats(now) : Promise.resolve(null),
       prisma.user.count({ where: currentTenantUserScope }),
       prisma.user.count({ where: { ...currentTenantUserScope, isActive: true } })
     ]);
@@ -96,6 +99,7 @@ export async function GET() {
       billingAttentionSubscriptions,
       billingWebhookQueueDepth,
       billingWebhookFailures,
+      retention,
       currentTenantUsers,
       currentTenantActiveUsers
     });

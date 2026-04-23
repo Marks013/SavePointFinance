@@ -24,6 +24,7 @@ Quando houver alteracao real de schema:
 ```bash
 git pull
 docker compose build web migrate
+docker compose up -d --force-recreate web
 docker compose --profile ops run --rm migrate
 docker compose up -d postgres
 docker compose build web migrate

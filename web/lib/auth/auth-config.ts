@@ -113,7 +113,8 @@ export const authConfig = {
           name: user.name,
           role: user.role,
           tenantId: user.tenantId,
-          isPlatformAdmin: user.isPlatformAdmin
+          isPlatformAdmin: user.isPlatformAdmin,
+          previousLastLogin: (user.lastLogin ?? user.createdAt).toISOString()
         };
       }
     })
@@ -126,6 +127,7 @@ export const authConfig = {
         token.role = user.role;
         token.tenantId = user.tenantId;
         token.isPlatformAdmin = Boolean(user.isPlatformAdmin);
+        token.previousLastLogin = user.previousLastLogin ?? null;
       }
 
       return token;
@@ -152,6 +154,8 @@ export const authConfig = {
         session.user.role = currentUser?.role ?? (sessionUser.role === "admin" ? "admin" : "member");
         session.user.tenantId = currentUser?.tenantId ?? (typeof sessionUser.tenantId === "string" ? sessionUser.tenantId : "");
         session.user.isPlatformAdmin = currentUser?.isPlatformAdmin ?? Boolean(sessionUser.isPlatformAdmin);
+        session.user.previousLastLogin =
+          typeof token.previousLastLogin === "string" ? token.previousLastLogin : null;
       }
 
       return session;

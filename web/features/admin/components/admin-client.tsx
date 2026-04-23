@@ -28,8 +28,44 @@ type Stats = {
   billingAttentionSubscriptions: number;
   billingWebhookQueueDepth: number;
   billingWebhookFailures: number;
+  retention: {
+    inactiveAccounts30: number;
+    inactiveAccounts60: number;
+    inactiveAccountsClosure: number;
+    trialNonPayment30: number;
+    trialNonPayment60: number;
+    trialNonPaymentClosure: number;
+    closureDue: number;
+    warningEmailsLast30Days: number;
+    lastRunAt: string | null;
+    lastRunSummary: string | null;
+    protectedDuringGrace: number;
+    policy: {
+      enabled: boolean;
+      firstWarningDays: number;
+      secondWarningDays: number;
+      closureDays: number;
+      enabledAt: string | null;
+      graceUntil: string | null;
+    };
+  } | null;
   currentTenantUsers: number;
   currentTenantActiveUsers: number;
+};
+
+type RetentionRunResponse = {
+  message: string;
+  result: {
+    dryRun: boolean;
+    scannedTenants: number;
+    warningsPlanned: number;
+    warningsSent: number;
+    skippedWarnings: number;
+    inactiveAccountsWarned: number;
+    inactiveAccountsClosed: number;
+    trialAccountsWarned: number;
+    trialAccountsClosed: number;
+  };
 };
 
 type TenantBillingSummary = {
@@ -297,6 +333,39 @@ async function getStats() {
   return (await response.json()) as Stats;
 }
 
+async function runRetention(dryRun: boolean) {
+  const response = await fetch("/api/admin/retention", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      dryRun,
+      confirm: dryRun ? undefined : "ENCERRAR-CONTAS"
+    })
+  });
+  const payload = (await response.json().catch(() => ({}))) as Partial<RetentionRunResponse> & { message?: string };
+
+  if (!response.ok) {
+    throw new Error(payload.message ?? "Falha ao executar retenção");
+  }
+
+  return payload as RetentionRunResponse;
+}
+
+async function updateRetentionPolicy(input: { enabled: boolean; closureDays: number }) {
+  const response = await fetch("/api/admin/retention", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input)
+  });
+  const payload = (await response.json().catch(() => ({}))) as { message?: string };
+
+  if (!response.ok) {
+    throw new Error(payload.message ?? "Falha ao atualizar retenção");
+  }
+
+  return payload;
+}
+
 async function getTenants(filters: { search?: string; plan?: string; status?: string }) {
   const response = await fetch(`/api/admin/tenants${buildQuery(filters)}`, { cache: "no-store" });
   if (!response.ok) throw new Error("Falha ao carregar contas");
@@ -382,6 +451,8 @@ export function AdminClient({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
   const [auditTenantFilter, setAuditTenantFilter] = useState("");
   const [auditActionFilter, setAuditActionFilter] = useState("");
   const [auditLimit, setAuditLimit] = useState("30");
+  const [retentionEnabledDraft, setRetentionEnabledDraft] = useState<boolean | null>(null);
+  const [retentionClosureDaysDraft, setRetentionClosureDaysDraft] = useState<string | null>(null);
   const [tenantTitheDrafts, setTenantTitheDrafts] = useState<Record<string, string>>({});
   const [tenantTrialDrafts, setTenantTrialDrafts] = useState<Record<string, string>>({});
   const [tenantExpiryDrafts, setTenantExpiryDrafts] = useState<Record<string, string>>({});
@@ -825,6 +896,42 @@ export function AdminClient({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
     }
   });
 
+  const retentionPolicyMutation = useMutation({
+    mutationFn: async () =>
+      updateRetentionPolicy({
+        enabled: retentionEnabledDraft ?? statsQuery.data?.retention?.policy.enabled ?? true,
+        closureDays: Number(retentionClosureDaysDraft ?? statsQuery.data?.retention?.policy.closureDays ?? 90)
+      }),
+    onSuccess: async (payload) => {
+      setRetentionEnabledDraft(null);
+      setRetentionClosureDaysDraft(null);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin-stats"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-audit"] })
+      ]);
+      toast.success(payload.message ?? "Política de retenção atualizada");
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    }
+  });
+
+  const retentionRunMutation = useMutation({
+    mutationFn: runRetention,
+    onSuccess: async (payload) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin-stats"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-tenants"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-audit"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-users"] })
+      ]);
+      toast.success(payload.message);
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    }
+  });
+
   const adminTenantBillingMutation = useMutation({
     mutationFn: async ({
       tenantId,
@@ -1105,6 +1212,112 @@ export function AdminClient({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
               <p className="mt-2 text-sm leading-6 text-[var(--color-muted-foreground)]">Acesso ativo na plataforma.</p>
             </article>
           </div>
+        ) : null}
+        {isPlatformAdmin && statsQuery.data?.retention ? (
+          <article className="mt-5 rounded-[1.6rem] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-card)_92%,var(--color-muted))] p-5">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="min-w-0 flex-1">
+                <p className="text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">
+                  Retenção e encerramento
+                </p>
+                <h2 className="mt-2 text-xl font-semibold tracking-[-0.03em]">Proteção contra contas abandonadas</h2>
+                <p className="mt-2 max-w-3xl text-sm leading-7 text-[var(--color-muted-foreground)]">
+                  A política envia avisos aos {statsQuery.data.retention.policy.firstWarningDays},{" "}
+                  {statsQuery.data.retention.policy.secondWarningDays} e{" "}
+                  {statsQuery.data.retention.policy.closureDays} dias. Se você reativar a regra depois de um período
+                  desligada, o sistema segura encerramentos por 7 dias para evitar exclusões em massa de contas antigas.
+                </p>
+              </div>
+              <div className="grid min-w-[250px] gap-3 rounded-[1.2rem] border border-[var(--color-border)]/70 bg-[var(--color-card)] p-4">
+                <label className="flex items-center justify-between gap-3 text-sm font-medium">
+                  <span>Encerramento automático ativo</span>
+                  <input
+                    checked={retentionEnabledDraft ?? statsQuery.data.retention.policy.enabled}
+                    className="h-4 w-4 accent-[var(--color-primary)]"
+                    onChange={(event) => setRetentionEnabledDraft(event.target.checked)}
+                    type="checkbox"
+                  />
+                </label>
+                <div className="space-y-2">
+                  <Label htmlFor="retention-closure-days">Prazo final de encerramento</Label>
+                  <Input
+                    id="retention-closure-days"
+                    min="90"
+                    onChange={(event) => setRetentionClosureDaysDraft(event.target.value)}
+                    type="number"
+                    value={retentionClosureDaysDraft ?? String(statsQuery.data.retention.policy.closureDays)}
+                  />
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <Button
+                    disabled={retentionPolicyMutation.isPending}
+                    onClick={() => retentionPolicyMutation.mutate()}
+                    type="button"
+                    variant="secondary"
+                  >
+                    {retentionPolicyMutation.isPending ? "Salvando..." : "Salvar política"}
+                  </Button>
+                  <Button
+                    disabled={retentionRunMutation.isPending}
+                    onClick={() => retentionRunMutation.mutate(true)}
+                    type="button"
+                    variant="secondary"
+                  >
+                    {retentionRunMutation.isPending ? "Simulando..." : "Simular agora"}
+                  </Button>
+                </div>
+                <Button
+                  disabled={retentionRunMutation.isPending || !statsQuery.data.retention.policy.enabled}
+                  onClick={() => retentionRunMutation.mutate(false)}
+                  type="button"
+                >
+                  {retentionRunMutation.isPending ? "Executando..." : "Executar rotina"}
+                </Button>
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+              <div className="rounded-[1.1rem] border border-[var(--color-border)]/70 bg-[var(--color-card)] p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--color-muted-foreground)]">Inatividade 30/60</p>
+                <p className="mt-2 text-lg font-semibold">
+                  {statsQuery.data.retention.inactiveAccounts30} / {statsQuery.data.retention.inactiveAccounts60}
+                </p>
+                <p className="mt-1 text-sm text-[var(--color-muted-foreground)]">Contas já em trilha de aviso.</p>
+              </div>
+              <div className="rounded-[1.1rem] border border-[var(--color-border)]/70 bg-[var(--color-card)] p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--color-muted-foreground)]">Trial 30/60</p>
+                <p className="mt-2 text-lg font-semibold">
+                  {statsQuery.data.retention.trialNonPayment30} / {statsQuery.data.retention.trialNonPayment60}
+                </p>
+                <p className="mt-1 text-sm text-[var(--color-muted-foreground)]">Trials vencidos sem assinatura.</p>
+              </div>
+              <div className="rounded-[1.1rem] border border-[var(--color-border)]/70 bg-[var(--color-card)] p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--color-muted-foreground)]">Prontas para encerrar</p>
+                <p className="mt-2 text-lg font-semibold">{statsQuery.data.retention.closureDue}</p>
+                <p className="mt-1 text-sm text-[var(--color-muted-foreground)]">
+                  Considera o prazo final de {statsQuery.data.retention.policy.closureDays} dias.
+                </p>
+              </div>
+              <div className="rounded-[1.1rem] border border-[var(--color-border)]/70 bg-[var(--color-card)] p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--color-muted-foreground)]">Protegidas pela reativação</p>
+                <p className="mt-2 text-lg font-semibold">{statsQuery.data.retention.protectedDuringGrace}</p>
+                <p className="mt-1 text-sm text-[var(--color-muted-foreground)]">
+                  {statsQuery.data.retention.policy.graceUntil
+                    ? `Janela segura até ${formatDateTimeDisplay(statsQuery.data.retention.policy.graceUntil)}.`
+                    : "Sem janela extra de proteção aberta."}
+                </p>
+              </div>
+              <div className="rounded-[1.1rem] border border-[var(--color-border)]/70 bg-[var(--color-card)] p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--color-muted-foreground)]">Avisos nos últimos 30 dias</p>
+                <p className="mt-2 text-lg font-semibold">{statsQuery.data.retention.warningEmailsLast30Days}</p>
+                <p className="mt-1 text-sm text-[var(--color-muted-foreground)]">
+                  {statsQuery.data.retention.lastRunAt
+                    ? `Última varredura em ${formatDateTimeDisplay(statsQuery.data.retention.lastRunAt)}.`
+                    : "Nenhuma varredura administrativa registrada ainda."}
+                </p>
+              </div>
+            </div>
+          </article>
         ) : null}
         {isPlatformAdmin ? null : (
           <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-[1.4rem] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-card)_88%,var(--color-muted))] px-4 py-4">
