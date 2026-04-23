@@ -191,10 +191,6 @@ type AuditItem = {
   } | null;
 };
 
-type CurrentProfile = {
-  isPlatformAdmin: boolean;
-};
-
 type PlanItem = {
   id: string;
   name: string;
@@ -346,13 +342,7 @@ async function getAudit(filters: { search?: string; tenantId?: string; action?: 
   return (await response.json()) as { items: AuditItem[] };
 }
 
-async function getCurrentProfile() {
-  const response = await fetch("/api/profile", { cache: "no-store" });
-  if (!response.ok) throw new Error("Falha ao carregar perfil");
-  return (await response.json()) as CurrentProfile;
-}
-
-export function AdminClient() {
+export function AdminClient({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
   const queryClient = useQueryClient();
   const [tenantPlanDrafts, setTenantPlanDrafts] = useState<Record<string, string>>({});
   const [userTenantDrafts, setUserTenantDrafts] = useState<Record<string, string>>({});
@@ -406,7 +396,6 @@ export function AdminClient() {
     }
   });
   const statsQuery = useQuery({ queryKey: ["admin-stats"], queryFn: getStats });
-  const profileQuery = useQuery({ queryKey: ["profile"], queryFn: getCurrentProfile });
   const plansQuery = useQuery({
     queryKey: ["admin-plans"],
     queryFn: () => getPlans({})
@@ -471,7 +460,6 @@ export function AdminClient() {
   const usersMeta = usersQuery.data;
   const invitations = invitationsQuery.data?.items ?? [];
   const auditItems = auditQuery.data?.items ?? [];
-  const isPlatformAdmin = Boolean(profileQuery.data?.isPlatformAdmin);
 
   function getTenantLabel(tenant: TenantItem) {
     return `${tenant.name} • ${tenant.planName}`;

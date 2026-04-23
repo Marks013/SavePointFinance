@@ -3,10 +3,10 @@ import { assertAdminAccess } from "@/lib/auth/admin";
 import { requireProtectedPageAccess } from "@/lib/auth/session";
 
 export default async function AdminPage() {
-  await requireProtectedPageAccess(async (user) => {
+  const user = await requireProtectedPageAccess(async (user) => {
     assertAdminAccess(user);
     return true;
   });
 
-  return <AdminClient />;
+  return <AdminClient isPlatformAdmin={user.isPlatformAdmin} />;
 }
