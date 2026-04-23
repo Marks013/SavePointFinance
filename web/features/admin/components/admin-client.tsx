@@ -1091,6 +1091,30 @@ export function AdminClient() {
         <div className="info-banner mt-5">
           <strong>{isPlatformAdmin ? "Modo operação." : "Planos por conta."}</strong> {adminIntroBanner}
         </div>
+        {isPlatformAdmin ? (
+          <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <article className="rounded-[1.4rem] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-card)_90%,var(--color-muted))] p-4">
+              <p className="text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-[var(--color-muted-foreground)]">Contas ativas</p>
+              <p className="mt-3 text-2xl font-semibold tracking-[-0.04em]">{statsQuery.data?.activeTenants ?? 0}</p>
+              <p className="mt-2 text-sm leading-6 text-[var(--color-muted-foreground)]">Tenants operando normalmente.</p>
+            </article>
+            <article className="rounded-[1.4rem] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-card)_90%,var(--color-muted))] p-4">
+              <p className="text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-[var(--color-muted-foreground)]">Billing alerta</p>
+              <p className="mt-3 text-2xl font-semibold tracking-[-0.04em]">{statsQuery.data?.billingAttentionSubscriptions ?? 0}</p>
+              <p className="mt-2 text-sm leading-6 text-[var(--color-muted-foreground)]">Assinaturas que pedem ação.</p>
+            </article>
+            <article className="rounded-[1.4rem] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-card)_90%,var(--color-muted))] p-4">
+              <p className="text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-[var(--color-muted-foreground)]">Fila webhook</p>
+              <p className="mt-3 text-2xl font-semibold tracking-[-0.04em]">{statsQuery.data?.billingWebhookQueueDepth ?? 0}</p>
+              <p className="mt-2 text-sm leading-6 text-[var(--color-muted-foreground)]">Eventos aguardando processamento.</p>
+            </article>
+            <article className="rounded-[1.4rem] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-card)_90%,var(--color-muted))] p-4">
+              <p className="text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-[var(--color-muted-foreground)]">Usuários ativos</p>
+              <p className="mt-3 text-2xl font-semibold tracking-[-0.04em]">{statsQuery.data?.activeUsers ?? 0}</p>
+              <p className="mt-2 text-sm leading-6 text-[var(--color-muted-foreground)]">Acesso ativo na plataforma.</p>
+            </article>
+          </div>
+        ) : null}
         {isPlatformAdmin ? null : (
           <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-[1.4rem] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-card)_88%,var(--color-muted))] px-4 py-4">
             <p className="min-w-0 flex-1 break-words text-sm leading-7 text-[var(--color-muted-foreground)]">
@@ -1526,7 +1550,7 @@ export function AdminClient() {
               </Select>
             </div>
             {tenants.map((tenant) => (
-              <article key={tenant.id} className="data-card rounded-[1.6rem] p-5">
+              <article key={tenant.id} className="data-card rounded-[1.75rem] p-5 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <p className="break-words font-semibold">{tenant.name}</p>
@@ -1542,9 +1566,9 @@ export function AdminClient() {
                     <p className="text-xs text-[var(--color-muted-foreground)]">pessoas ativas</p>
                   </div>
                 </div>
-                <div className={`mt-4 grid gap-3 ${isPlatformAdmin ? "xl:grid-cols-2" : "lg:grid-cols-[1.15fr_0.85fr]"}`}>
-                  <div className="muted-panel">
-                    <p className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">Billing</p>
+                <div className={`mt-5 grid gap-3 ${isPlatformAdmin ? "xl:grid-cols-2" : "lg:grid-cols-[1.15fr_0.85fr]"}`}>
+                  <div className="muted-panel rounded-[1.3rem] p-4">
+                    <p className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">Status de cobrança</p>
                     <p className="mt-2 text-sm font-semibold">
                       {formatBillingSubscriptionLabel(tenant.billing.subscriptionStatus)}
                     </p>
@@ -1564,8 +1588,8 @@ export function AdminClient() {
                       </p>
                     </div>
                   </div>
-                  <div className="muted-panel">
-                    <p className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">Suporte</p>
+                  <div className="muted-panel rounded-[1.3rem] p-4">
+                    <p className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">Suporte operacional</p>
                     <div className="mt-2 space-y-1 text-xs text-[var(--color-muted-foreground)]">
                       <p className="break-all">Preapproval: {tenant.billing.preapprovalId ?? "não vinculado"}</p>
                       <p>
@@ -1618,7 +1642,7 @@ export function AdminClient() {
                     ) : tenantBillingDetailsQuery.data ? (
                       <div className="mt-4 space-y-4">
                         <div className={`grid gap-3 ${isPlatformAdmin ? "xl:grid-cols-2" : "lg:grid-cols-3"}`}>
-                          <div className="muted-panel">
+                          <div className="muted-panel rounded-[1.2rem] p-4">
                             <p className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">Assinatura</p>
                             <div className="mt-2 space-y-1 text-xs text-[var(--color-muted-foreground)]">
                               <p>Status: {formatBillingSubscriptionLabel(tenantBillingDetailsQuery.data.subscription?.status ?? null)}</p>
@@ -1632,7 +1656,7 @@ export function AdminClient() {
                               </p>
                             </div>
                           </div>
-                          <div className="muted-panel">
+                          <div className="muted-panel rounded-[1.2rem] p-4">
                             <p className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">Pagamentos recentes</p>
                             <div className="mt-2 space-y-2 text-xs text-[var(--color-muted-foreground)]">
                               {tenantBillingDetailsQuery.data.subscription?.payments.length ? (
@@ -1652,7 +1676,7 @@ export function AdminClient() {
                               )}
                             </div>
                           </div>
-                          <div className="muted-panel">
+                          <div className="muted-panel rounded-[1.2rem] p-4">
                             <p className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">Webhooks recentes</p>
                             <div className="mt-2 space-y-2 text-xs text-[var(--color-muted-foreground)]">
                               {tenantBillingDetailsQuery.data.webhookEvents.length ? (
@@ -1798,60 +1822,62 @@ export function AdminClient() {
                     Aplicar plano
                   </Button>
                 </div>
-                <div className="mt-4 grid gap-3 xl:grid-cols-2">
-                  <div className="min-w-0 space-y-2">
-                    <Label htmlFor={`tenant-${tenant.id}-trial-days`}>Dias de avaliação</Label>
-                    <Input
-                      id={`tenant-${tenant.id}-trial-days`}
-                      inputMode="numeric"
-                      value={tenantTrialDrafts[tenant.id] ?? String(tenant.trialDays)}
-                      onChange={(event) =>
-                        setTenantTrialDrafts((current) => ({
-                          ...current,
-                          [tenant.id]: event.target.value
-                        }))
-                      }
-                    />
-                  </div>
-                    <Button
-                      className="w-full sm:w-auto"
-                      onClick={() => submitTenantTrialDays(tenant)}
-                      type="button"
-                      variant="ghost"
-                    >
-                      Aplicar avaliação
-                    </Button>
-                  </div>
-                  <div className="min-w-0 space-y-2">
-                    <Label htmlFor={`tenant-${tenant.id}-expires-at`}>Expiração</Label>
-                    <Input
-                      id={`tenant-${tenant.id}-expires-at`}
-                      placeholder="DD/MM/AAAA"
-                      value={tenantExpiryDrafts[tenant.id] ?? (tenant.expiresAt ? formatDateDisplay(tenant.expiresAt) : "")}
-                      onChange={(event) =>
-                        setTenantExpiryDrafts((current) => ({
-                          ...current,
-                          [tenant.id]: event.target.value
-                        }))
-                      }
-                    />
-                  </div>
-                    <div className="flex flex-wrap gap-2">
+                <div className="mt-4 grid gap-4 xl:grid-cols-2">
+                  <div className="rounded-[1.2rem] border border-[var(--color-border)]/70 bg-[color-mix(in_srgb,var(--color-card)_92%,var(--color-muted))] p-4">
+                    <div className="min-w-0 space-y-2">
+                      <Label htmlFor={`tenant-${tenant.id}-trial-days`}>Dias de avaliação</Label>
+                      <Input
+                        id={`tenant-${tenant.id}-trial-days`}
+                        inputMode="numeric"
+                        value={tenantTrialDrafts[tenant.id] ?? String(tenant.trialDays)}
+                        onChange={(event) =>
+                          setTenantTrialDrafts((current) => ({
+                            ...current,
+                            [tenant.id]: event.target.value
+                          }))
+                        }
+                      />
                       <Button
-                        className="w-full sm:w-auto"
-                        onClick={() => submitTenantExpiryDate(tenant)}
+                        className="mt-2 w-full sm:w-auto"
+                        onClick={() => submitTenantTrialDays(tenant)}
                         type="button"
                         variant="ghost"
                       >
-                        Aplicar expiração
+                        Aplicar avaliação
                       </Button>
-                      <Button
-                        onClick={() => updateTenantMutation.mutate({ id: tenant.id, isActive: !tenant.isActive })}
-                        type="button"
-                        variant="ghost"
-                      >
-                        {tenant.isActive ? "Desativar conta" : "Ativar conta"}
-                      </Button>
+                    </div>
+                  </div>
+                  <div className="rounded-[1.2rem] border border-[var(--color-border)]/70 bg-[color-mix(in_srgb,var(--color-card)_92%,var(--color-muted))] p-4">
+                    <div className="min-w-0 space-y-2">
+                      <Label htmlFor={`tenant-${tenant.id}-expires-at`}>Expiração</Label>
+                      <Input
+                        id={`tenant-${tenant.id}-expires-at`}
+                        placeholder="DD/MM/AAAA"
+                        value={tenantExpiryDrafts[tenant.id] ?? (tenant.expiresAt ? formatDateDisplay(tenant.expiresAt) : "")}
+                        onChange={(event) =>
+                          setTenantExpiryDrafts((current) => ({
+                            ...current,
+                            [tenant.id]: event.target.value
+                          }))
+                        }
+                      />
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        <Button
+                          className="w-full sm:w-auto"
+                          onClick={() => submitTenantExpiryDate(tenant)}
+                          type="button"
+                          variant="ghost"
+                        >
+                          Aplicar expiração
+                        </Button>
+                        <Button
+                          onClick={() => updateTenantMutation.mutate({ id: tenant.id, isActive: !tenant.isActive })}
+                          type="button"
+                          variant="ghost"
+                        >
+                          {tenant.isActive ? "Desativar conta" : "Ativar conta"}
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </div>
