@@ -6,6 +6,7 @@ import { auth } from "@/auth";
 import { GlobalThemeToggle } from "@/components/layout/global-theme-toggle";
 import { AppProviders } from "@/components/providers/app-providers";
 import { captureUnexpectedError } from "@/lib/observability/sentry";
+import { themeBootstrapScript } from "@/lib/security/theme-bootstrap";
 
 import "./globals.css";
 
@@ -13,21 +14,6 @@ export const metadata: Metadata = {
   title: "Save Point Finança",
   description: "Plataforma financeira para contas, cartões, metas, relatórios, automações e rotina operacional."
 };
-
-const themeBootstrapScript = `
-  (function () {
-    try {
-      var key = "savepoint-theme";
-      var stored = window.localStorage.getItem(key);
-      var theme = stored === "light" ? "light" : "dark";
-      document.documentElement.dataset.theme = theme;
-      document.documentElement.style.colorScheme = theme;
-    } catch (error) {
-      document.documentElement.dataset.theme = "dark";
-      document.documentElement.style.colorScheme = "dark";
-    }
-  })();
-`;
 
 type RootLayoutProps = {
   children: ReactNode;
@@ -51,7 +37,7 @@ export default async function RootLayout({ children }: RootLayoutProps) {
     <html data-theme={initialTheme} lang="pt-BR" suppressHydrationWarning>
       <body>
         <a className="skip-link" href="#main-content">
-          Pular para o conteudo principal
+          Pular para o conteúdo principal
         </a>
         <script dangerouslySetInnerHTML={{ __html: themeBootstrapScript }} />
         <AppProviders initialSession={initialSession} initialTheme={initialTheme}>

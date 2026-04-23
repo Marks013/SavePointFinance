@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
 import { logAdminAudit } from "@/lib/admin/audit";
 import { requireAdminUser } from "@/lib/auth/admin";
@@ -10,18 +11,27 @@ type Params = {
   params: Promise<{ id: string }>;
 };
 
+const tenantAdminPatchSchema = z.object({
+  name: z.string().trim().min(1).max(120).optional(),
+  planId: z.string().trim().min(1).optional(),
+  isActive: z.boolean().optional(),
+  trialDays: z.number().int().min(0).optional(),
+  trialExpiresAt: z.string().trim().min(1).nullable().optional(),
+  expiresAt: z.string().trim().min(1).nullable().optional()
+}).strict();
+
+const tenantSelfPatchSchema = z.object({
+  name: z.string().trim().min(1).max(120).optional()
+}).strict();
+
 export async function PATCH(request: Request, context: Params) {
   try {
     const admin = await requireAdminUser();
     const { id } = await context.params;
-    const body = (await request.json()) as {
-      name?: string;
-      planId?: string;
-      isActive?: boolean;
-      trialDays?: number;
-      trialExpiresAt?: string | null;
-      expiresAt?: string | null;
-    };
+    const requestBody = await request.json();
+    const body: z.infer<typeof tenantAdminPatchSchema> = admin.isPlatformAdmin
+      ? tenantAdminPatchSchema.parse(requestBody)
+      : tenantSelfPatchSchema.parse(requestBody);
 
     if (!admin.isPlatformAdmin && id !== admin.tenantId) {
       return NextResponse.json({ message: "Forbidden" }, { status: 403 });
@@ -79,7 +89,9 @@ export async function PATCH(request: Request, context: Params) {
         ...(planUpdate ?? {}),
         ...(typeof body.isActive === "boolean" ? { isActive: body.isActive } : {}),
         ...(typeof body.trialDays === "number" ? { trialDays: body.trialDays } : {}),
-        ...(body.trialExpiresAt !== undefined ? { trialExpiresAt: body.trialExpiresAt ? new Date(`${body.trialExpiresAt}T12:00:00`) : null } : {}),
+        ...(body.trialExpiresAt !== undefined
+          ? { trialExpiresAt: body.trialExpiresAt ? new Date(`${body.trialExpiresAt}T12:00:00`) : null }
+          : {}),
         ...(body.expiresAt !== undefined ? { expiresAt: body.expiresAt ? new Date(`${body.expiresAt}T12:00:00`) : null } : {})
       }
     });

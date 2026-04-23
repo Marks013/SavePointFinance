@@ -118,9 +118,10 @@ export async function POST(request: Request) {
     if (existingUser) {
       return NextResponse.json(
         {
-          message: "Este e-mail ja possui acesso. Entre pelo login ou recupere a senha."
+          success: true,
+          nextPath: nextPathByIntent[body.plan]
         },
-        { status: 409 }
+        { status: 201 }
       );
     }
 
@@ -179,18 +180,13 @@ export async function POST(request: Request) {
       }
     });
 
-    return NextResponse.json({
-      success: true,
-      nextPath: nextPathByIntent[body.plan],
-      user: {
-        id: user.id,
-        email: user.email
+    return NextResponse.json(
+      {
+        success: true,
+        nextPath: nextPathByIntent[body.plan]
       },
-      tenant: {
-        id: tenant.id,
-        name: tenant.name
-      }
-    });
+      { status: 201 }
+    );
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ message: error.issues[0]?.message ?? "Dados invalidos" }, { status: 400 });

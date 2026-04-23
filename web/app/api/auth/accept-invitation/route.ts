@@ -11,6 +11,7 @@ import { PRIVACY_POLICY_VERSION, TERMS_OF_USE_VERSION } from "@/lib/legal/docume
 import { getTenantSeatSummary } from "@/lib/licensing/server";
 import { captureRequestError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
+import { hashInvitationToken } from "@/lib/security/invitation-token";
 import { assessUserReassignment, buildReassignmentBlockReason } from "@/lib/users/reassign-user";
 
 async function tenantHasFinancialData(tenantId: string) {
@@ -29,10 +30,11 @@ async function tenantHasFinancialData(tenantId: string) {
 export async function POST(request: Request) {
   try {
     const body = acceptInvitationSchema.parse(await request.json());
+    const hashedToken = hashInvitationToken(body.token);
 
-    const invitation = await prisma.invitation.findUnique({
+    const invitation = await prisma.invitation.findFirst({
       where: {
-        token: body.token
+        OR: [{ token: hashedToken }, { token: body.token }]
       }
     });
 
@@ -96,6 +98,7 @@ export async function POST(request: Request) {
           id: invitation.id
         },
         data: {
+          token: hashedToken,
           acceptedAt: new Date(),
           name: body.name,
           role: invitationRole
@@ -153,6 +156,7 @@ export async function POST(request: Request) {
         id: invitation.id
       },
         data: {
+          token: hashedToken,
           acceptedAt: new Date(),
           name: body.name,
           role: invitationRole

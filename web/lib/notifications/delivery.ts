@@ -24,6 +24,9 @@ type DeliveryResult = {
   error: string | null;
 };
 
+const EMAIL_DELIVERY_TIMEOUT_MS = 8_000;
+const WEBHOOK_DELIVERY_TIMEOUT_MS = 8_000;
+
 function resolveEmailSender() {
   if (!serverEnv.EMAIL_FROM) {
     return null;
@@ -48,6 +51,31 @@ function buildEmailHtml(input: NotificationInput) {
   return input.html ?? buildGenericNotificationEmail(input.subject, input.message);
 }
 
+async function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init: RequestInit,
+  timeoutMs: number,
+  timeoutLabel: string
+) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(`${timeoutLabel} timed out after ${timeoutMs}ms`), timeoutMs);
+
+  try {
+    return await fetch(input, {
+      ...init,
+      signal: controller.signal
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(`${timeoutLabel} excedeu ${Math.round(timeoutMs / 1000)}s`);
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 async function sendWithResend(input: NotificationInput) {
   const from = resolveEmailSender();
 
@@ -60,7 +88,9 @@ async function sendWithResend(input: NotificationInput) {
     } satisfies DeliveryResult;
   }
 
-  const response = await fetch("https://api.resend.com/emails", {
+  const response = await fetchWithTimeout(
+    "https://api.resend.com/emails",
+    {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -74,7 +104,10 @@ async function sendWithResend(input: NotificationInput) {
       html: buildEmailHtml(input),
       ...(serverEnv.EMAIL_REPLY_TO ? { reply_to: serverEnv.EMAIL_REPLY_TO } : {})
     })
-  });
+    },
+    EMAIL_DELIVERY_TIMEOUT_MS,
+    "Entrega de e-mail via Resend"
+  );
 
   const payloadText = await response.text().catch(() => "");
   let providerError: string | null = null;
@@ -108,7 +141,9 @@ async function sendWithBrevo(input: NotificationInput) {
     } satisfies DeliveryResult;
   }
 
-  const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+  const response = await fetchWithTimeout(
+    "https://api.brevo.com/v3/smtp/email",
+    {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -125,7 +160,10 @@ async function sendWithBrevo(input: NotificationInput) {
       htmlContent: buildEmailHtml(input),
       ...(serverEnv.EMAIL_REPLY_TO ? { replyTo: { email: serverEnv.EMAIL_REPLY_TO } } : {})
     })
-  });
+    },
+    EMAIL_DELIVERY_TIMEOUT_MS,
+    "Entrega de e-mail via Brevo"
+  );
 
   return {
     ok: response.ok,
@@ -147,7 +185,9 @@ async function sendViaWebhook(input: NotificationInput, attemptedAt: Date) {
     } satisfies DeliveryResult;
   }
 
-  const response = await fetch(webhookUrl, {
+  const response = await fetchWithTimeout(
+    webhookUrl,
+    {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
@@ -163,7 +203,10 @@ async function sendViaWebhook(input: NotificationInput, attemptedAt: Date) {
       html: input.channel === NotificationChannel.email ? buildEmailHtml(input) : undefined,
       attemptedAt: attemptedAt.toISOString()
     })
-  });
+    },
+    WEBHOOK_DELIVERY_TIMEOUT_MS,
+    "Entrega via webhook"
+  );
 
   return {
     ok: response.ok,

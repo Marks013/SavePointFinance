@@ -14,7 +14,7 @@ RELEASE_RETENTION_COUNT="${RELEASE_RETENTION_COUNT:-5}"
 ROLLBACK_IMAGE_RETENTION_COUNT="${ROLLBACK_IMAGE_RETENTION_COUNT:-2}"
 RUN_DB_MIGRATIONS="${RUN_DB_MIGRATIONS:-false}"
 RUN_BACKUP_ON_DEPLOY="${RUN_BACKUP_ON_DEPLOY:-false}"
-SMOKE_REQUIRED="${SMOKE_REQUIRED:-false}"
+SMOKE_REQUIRED="${SMOKE_REQUIRED:-true}"
 KEEP_MAINTENANCE_ON_FAILURE="${KEEP_MAINTENANCE_ON_FAILURE:-true}"
 MAINTENANCE_WAS_ENABLED="false"
 MAINTENANCE_IS_ENABLED="false"
@@ -383,6 +383,10 @@ if (( SMOKE_EXIT_CODE != 0 )); then
 
   if [[ "$SMOKE_REQUIRED" == "true" ]]; then
     log "Auditoria de fumaça falhou e esta configurada como obrigatoria."
+    if [[ "$MAINTENANCE_IS_ENABLED" != "true" ]]; then
+      log "Religando modo de manutencao apos falha na auditoria de fumaca"
+      set_maintenance_mode on || true
+    fi
     exit "$SMOKE_EXIT_CODE"
   fi
 

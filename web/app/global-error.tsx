@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 
-import { captureUnexpectedError } from "@/lib/observability/sentry";
+import { captureUnexpectedError, sanitizeSearch } from "@/lib/observability/sentry";
 
 type GlobalErrorProps = {
   error: Error & {
@@ -24,7 +24,7 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
       feature: "app-router",
       extra: {
         digest: error.digest ?? null,
-        search: searchParams.toString() || null
+        search: sanitizeSearch(searchParams)
       }
     });
   }, [error, pathname, searchParams]);

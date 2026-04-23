@@ -60,6 +60,37 @@ function getRetryAfterMs(hits: number[], now: number, windowMs: number) {
   return oldestHit ? Math.max(1, windowMs - (now - oldestHit)) : windowMs;
 }
 
+function buildThrottleResult(hits: number[], limit: number, now: number, windowMs: number): ThrottleResult {
+  if (hits.length >= limit) {
+    return {
+      allowed: false,
+      remaining: 0,
+      retryAfterMs: getRetryAfterMs(hits, now, windowMs)
+    };
+  }
+
+  return {
+    allowed: true,
+    remaining: Math.max(0, limit - hits.length),
+    retryAfterMs: 0
+  };
+}
+
+function peekInMemoryThrottle({
+  key,
+  limit,
+  namespace,
+  now = Date.now(),
+  windowMs
+}: ThrottleOptions): ThrottleResult {
+  const storeKey = buildStoreKey(namespace, key);
+  const cutoff = now - windowMs;
+  const currentState = throttleStore.get(storeKey);
+  const hits = normalizeHits(currentState?.hits, cutoff);
+
+  return buildThrottleResult(hits, limit, now, windowMs);
+}
+
 function applyInMemoryThrottle({
   key,
   limit,
@@ -72,22 +103,16 @@ function applyInMemoryThrottle({
   const currentState = throttleStore.get(storeKey);
   const hits = normalizeHits(currentState?.hits, cutoff);
 
-  if (hits.length >= limit) {
-    return {
-          allowed: false,
-          remaining: 0,
-          retryAfterMs: getRetryAfterMs(hits, now, windowMs)
-        };
+  const currentResult = buildThrottleResult(hits, limit, now, windowMs);
+
+  if (!currentResult.allowed) {
+    return currentResult;
   }
 
   hits.push(now);
   throttleStore.set(storeKey, { hits });
 
-  return {
-    allowed: true,
-    remaining: Math.max(0, limit - hits.length),
-    retryAfterMs: 0
-  };
+  return buildThrottleResult(hits, limit, now, windowMs);
 }
 
 function isRetryableThrottleError(error: unknown) {
@@ -203,6 +228,57 @@ export async function takeThrottleHit({
   }
 
   return applyInMemoryThrottle({
+    key: normalizedKey,
+    limit,
+    namespace,
+    now,
+    windowMs
+  });
+}
+
+export async function peekThrottleState({
+  key,
+  limit,
+  namespace,
+  now = Date.now(),
+  windowMs
+}: ThrottleOptions): Promise<ThrottleResult> {
+  const normalizedKey = key.trim();
+
+  if (!normalizedKey) {
+    return {
+      allowed: true,
+      remaining: limit,
+      retryAfterMs: 0
+    };
+  }
+
+  for (let attempt = 0; attempt < MAX_DB_RETRIES; attempt += 1) {
+    try {
+      const [existing] = await prisma.$queryRaw<Array<{ hits: Prisma.JsonValue | null }>>`
+        SELECT "hits"
+        FROM "RequestThrottle"
+        WHERE "namespace" = ${namespace} AND "key" = ${normalizedKey}
+        LIMIT 1
+      `;
+
+      const cutoff = now - windowMs;
+      const hits = normalizeHits(existing?.hits, cutoff);
+      return buildThrottleResult(hits, limit, now, windowMs);
+    } catch (error) {
+      if (!isRetryableThrottleError(error) || attempt === MAX_DB_RETRIES - 1) {
+        return peekInMemoryThrottle({
+          key: normalizedKey,
+          limit,
+          namespace,
+          now,
+          windowMs
+        });
+      }
+    }
+  }
+
+  return peekInMemoryThrottle({
     key: normalizedKey,
     limit,
     namespace,

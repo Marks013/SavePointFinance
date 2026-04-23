@@ -36,6 +36,22 @@ type CaptureRequestErrorOptions = Omit<CaptureUnexpectedErrorOptions, "route" | 
 };
 
 const recentClientCaptures = new Map<string, number>();
+const SENSITIVE_SEARCH_PARAMS = ["password", "senha", "token"];
+
+export function sanitizeSearch(value: string | URLSearchParams | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const searchParams = value instanceof URLSearchParams ? new URLSearchParams(value) : new URLSearchParams(value);
+
+  for (const key of SENSITIVE_SEARCH_PARAMS) {
+    searchParams.delete(key);
+  }
+
+  const sanitized = searchParams.toString();
+  return sanitized ? `?${sanitized}` : null;
+}
 
 function buildClientLocation() {
   if (typeof window === "undefined") {
@@ -44,7 +60,7 @@ function buildClientLocation() {
 
   return {
     pathname: window.location.pathname,
-    search: window.location.search || null
+    search: sanitizeSearch(window.location.search)
   };
 }
 
@@ -186,7 +202,19 @@ export function captureRequestError(error: unknown, options: CaptureRequestError
     operation,
     requestId,
     extra: {
-      ...(options.request?.url ? { url: options.request.url } : {}),
+      ...(options.request?.url
+        ? {
+            url: (() => {
+              try {
+                const url = new URL(options.request.url);
+                url.search = sanitizeSearch(url.search) ?? "";
+                return url.toString();
+              } catch {
+                return options.request.url;
+              }
+            })()
+          }
+        : {}),
       ...(options.extra ?? {})
     }
   });

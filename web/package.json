@@ -21,14 +21,15 @@
     "audit:invitations": "tsx scripts/invitation-isolation-audit.ts",
     "audit:billing-webhook": "tsx scripts/billing-webhook-e2e-sim.ts",
     "audit:cards-smoke": "tsx scripts/card-statement-smoke-audit.ts",
-    "audit:server-smoke": "tsx scripts/server-smoke-audit.ts"
+    "audit:server-smoke": "tsx scripts/server-smoke-audit.ts",
+    "audit:encoding": "tsx scripts/encoding-audit.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "2.11.1",
     "@hookform/resolvers": "^5.2.2",
     "@mercadopago/sdk-react": "^1.0.7",
-    "@prisma/adapter-pg": "7.7.0",
-    "@prisma/client": "7.7.0",
+    "@prisma/adapter-pg": "7.8.0",
+    "@prisma/client": "7.8.0",
     "@radix-ui/react-label": "2.1.7",
     "@radix-ui/react-separator": "1.1.7",
     "@radix-ui/react-slot": "1.2.3",
@@ -42,7 +43,6 @@
     "date-fns": "4.1.0",
     "dotenv": "16.5.0",
     "lucide-react": "0.511.0",
-    "mercadopago": "^2.12.0",
     "next": "^16.2.3",
     "next-auth": "5.0.0-beta.30",
     "pg": "8.14.1",
@@ -63,7 +63,7 @@
     "@types/react-dom": "19.0.4",
     "eslint": "9.39.4",
     "eslint-config-next": "^16.2.3",
-    "prisma": "7.7.0",
+    "prisma": "7.8.0",
     "tailwindcss": "4.1.3",
     "tsx": "^4.21.0",
     "typescript": "^6.0.2"

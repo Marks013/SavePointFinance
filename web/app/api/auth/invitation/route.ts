@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma/client";
+import { hashInvitationToken } from "@/lib/security/invitation-token";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -10,9 +11,9 @@ export async function GET(request: Request) {
     return NextResponse.json({ message: "Token obrigatorio" }, { status: 400 });
   }
 
-  const invitation = await prisma.invitation.findUnique({
+  const invitation = await prisma.invitation.findFirst({
     where: {
-      token
+      OR: [{ token: hashInvitationToken(token) }, { token }]
     },
     include: {
       invitedBy: {

@@ -1,7 +1,5 @@
 import crypto from "node:crypto";
 
-import { MercadoPagoConfig, Payment, PaymentRefund, PreApproval } from "mercadopago";
-
 import { buildPublicUrl } from "@/lib/app-url";
 import { serverEnv } from "@/lib/env/server";
 
@@ -20,6 +18,14 @@ type SignatureFields = {
   ts: string | null;
   v1: string | null;
 };
+
+type MercadoPagoRequestOptions = {
+  idempotencyKey?: string;
+};
+
+const MERCADO_PAGO_API_BASE_URL = "https://api.mercadopago.com";
+const MERCADO_PAGO_API_TIMEOUT_MS = 10_000;
+const MERCADO_PAGO_API_RETRIES = 2;
 
 function parseSignatureHeader(value: string | null): SignatureFields {
   if (!value) {
@@ -70,30 +76,137 @@ export function assertMercadoPagoBillingConfigured() {
   }
 }
 
-function getMercadoPagoConfig() {
-  assertMercadoPagoBillingConfigured();
-
-  return new MercadoPagoConfig({
-    accessToken: serverEnv.MP_ACCESS_TOKEN!.trim()
-  });
-}
-
-export function getMercadoPagoClients() {
-  const config = getMercadoPagoConfig();
-
-  return {
-    preApproval: new PreApproval(config),
-    payment: new Payment(config),
-    refund: new PaymentRefund(config)
-  };
-}
-
 export function getMercadoPagoBillingPublicKey() {
   if (!isMercadoPagoBillingEnabled()) {
     return null;
   }
 
   return serverEnv.MP_PUBLIC_KEY?.trim() || null;
+}
+
+function getMercadoPagoAccessToken() {
+  assertMercadoPagoBillingConfigured();
+  return serverEnv.MP_ACCESS_TOKEN!.trim();
+}
+
+function getMercadoPagoErrorMessage(payload: unknown, status: number) {
+  if (payload && typeof payload === "object") {
+    const record = payload as Record<string, unknown>;
+    const message = record.message ?? record.error ?? record.cause;
+
+    if (typeof message === "string" && message.trim()) {
+      return message;
+    }
+  }
+
+  return `Mercado Pago API request failed with status ${status}`;
+}
+
+async function parseMercadoPagoResponse(response: Response) {
+  const text = await response.text();
+
+  if (!text.trim()) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(text) as unknown;
+  } catch {
+    return text;
+  }
+}
+
+async function mercadoPagoFetch<T>(endpoint: string, options: {
+  body?: unknown;
+  method?: "GET" | "POST" | "PUT";
+  requestOptions?: MercadoPagoRequestOptions;
+} = {}): Promise<T> {
+  const method = options.method ?? "GET";
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${getMercadoPagoAccessToken()}`,
+    "Content-Type": "application/json"
+  };
+
+  if (method !== "GET") {
+    headers["X-Idempotency-Key"] = options.requestOptions?.idempotencyKey ?? crypto.randomUUID();
+  }
+
+  for (let attempt = 0; attempt <= MERCADO_PAGO_API_RETRIES; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), MERCADO_PAGO_API_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(`${MERCADO_PAGO_API_BASE_URL}${endpoint}`, {
+        method,
+        headers,
+        body: options.body === undefined ? undefined : JSON.stringify(options.body),
+        signal: controller.signal
+      });
+      const payload = await parseMercadoPagoResponse(response);
+
+      if (response.ok) {
+        return payload as T;
+      }
+
+      if (response.status >= 500 && attempt < MERCADO_PAGO_API_RETRIES) {
+        await new Promise((resolve) => setTimeout(resolve, 1000 * 2 ** (attempt + 1)));
+        continue;
+      }
+
+      throw new BillingConfigurationError(getMercadoPagoErrorMessage(payload, response.status));
+    } catch (error) {
+      if (attempt < MERCADO_PAGO_API_RETRIES && error instanceof Error && error.name === "AbortError") {
+        await new Promise((resolve) => setTimeout(resolve, 1000 * 2 ** (attempt + 1)));
+        continue;
+      }
+
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  throw new BillingConfigurationError("Mercado Pago API request failed");
+}
+
+export function createMercadoPagoPreApproval<T>(input: { body: unknown; requestOptions?: MercadoPagoRequestOptions }) {
+  return mercadoPagoFetch<T>("/preapproval/", {
+    method: "POST",
+    body: input.body,
+    requestOptions: input.requestOptions
+  });
+}
+
+export function getMercadoPagoPreApproval<T>(id: string) {
+  return mercadoPagoFetch<T>(`/preapproval/${encodeURIComponent(id)}`);
+}
+
+export function updateMercadoPagoPreApproval<T>(input: {
+  id: string;
+  body: unknown;
+  requestOptions?: MercadoPagoRequestOptions;
+}) {
+  return mercadoPagoFetch<T>(`/preapproval/${encodeURIComponent(input.id)}`, {
+    method: "PUT",
+    body: input.body,
+    requestOptions: input.requestOptions
+  });
+}
+
+export function getMercadoPagoPayment<T>(id: string) {
+  return mercadoPagoFetch<T>(`/v1/payments/${encodeURIComponent(id)}`);
+}
+
+export function createMercadoPagoPaymentRefund<T>(input: {
+  paymentId: string;
+  body?: unknown;
+  requestOptions?: MercadoPagoRequestOptions;
+}) {
+  return mercadoPagoFetch<T>(`/v1/payments/${encodeURIComponent(input.paymentId)}/refunds`, {
+    method: "POST",
+    body: input.body ?? {},
+    requestOptions: input.requestOptions
+  });
 }
 
 export function getMercadoPagoBillingReason(planName: string) {

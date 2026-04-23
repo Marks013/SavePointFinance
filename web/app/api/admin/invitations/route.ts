@@ -11,6 +11,7 @@ import { applyPlanDefaultsToTenant, ensureDefaultPlans } from "@/lib/licensing/d
 import { deliverNotification } from "@/lib/notifications/delivery";
 import { buildInvitationMessage } from "@/lib/notifications/invitation";
 import { prisma } from "@/lib/prisma/client";
+import { buildInvitationPath, createInvitationToken } from "@/lib/security/invitation-token";
 import { assessUserReassignment, buildReassignmentBlockReason } from "@/lib/users/reassign-user";
 
 function slugify(value: string) {
@@ -88,7 +89,7 @@ export async function GET(request: Request) {
         name: invitation.name,
         role: invitation.kind === InvitationKind.shared_wallet ? "member" : "admin",
         kind: invitation.kind,
-        inviteUrl: `/accept-invitation?token=${invitation.token}`,
+        inviteUrl: null,
         expiresAt: invitation.expiresAt.toISOString(),
         acceptedAt: invitation.acceptedAt?.toISOString() ?? null,
         revokedAt: invitation.revokedAt?.toISOString() ?? null,
@@ -148,11 +149,38 @@ export async function POST(request: Request) {
         expiresAt: {
           gt: new Date()
         }
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        expiresAt: true
       }
     });
 
     if (activeInvitation) {
-      return NextResponse.json({ message: "Ja existe um convite ativo para este e-mail" }, { status: 409 });
+      const { rawToken, hashedToken } = createInvitationToken();
+
+      await prisma.invitation.update({
+        where: {
+          id: activeInvitation.id
+        },
+        data: {
+          token: hashedToken
+        }
+      });
+
+      return NextResponse.json({
+        id: activeInvitation.id,
+        email: activeInvitation.email,
+        name: activeInvitation.name,
+        role: activeInvitation.role,
+        inviteUrl: buildInvitationPath(rawToken),
+        expiresAt: activeInvitation.expiresAt.toISOString(),
+        reused: true,
+        message: "Ja existe um convite ativo para este e-mail"
+      });
     }
 
     const requestedPlanId = payload.planId?.trim();
@@ -185,7 +213,7 @@ export async function POST(request: Request) {
 
     await ensureTenantDefaultCategories(targetTenant.id);
 
-    const token = crypto.randomBytes(24).toString("hex");
+    const { rawToken, hashedToken } = createInvitationToken();
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
     const invitation = await prisma.invitation.create({
@@ -196,7 +224,7 @@ export async function POST(request: Request) {
         name: body.name,
         role: "admin",
         kind: InvitationKind.admin_isolated,
-        token,
+        token: hashedToken,
         expiresAt
       },
       include: {
@@ -209,7 +237,7 @@ export async function POST(request: Request) {
       }
     });
 
-    const invitationMessage = buildInvitationMessage(token, invitation.tenant.name, invitation.name);
+    const invitationMessage = buildInvitationMessage(rawToken, invitation.tenant.name, invitation.name, "admin_isolated");
     const delivery = await deliverNotification({
       tenantId: invitation.tenant.id,
       channel: NotificationChannel.email,
@@ -241,7 +269,7 @@ export async function POST(request: Request) {
         email: invitation.email,
         name: invitation.name,
         role: invitation.role,
-        inviteUrl: `/accept-invitation?token=${invitation.token}`,
+        inviteUrl: buildInvitationPath(rawToken),
         expiresAt: invitation.expiresAt.toISOString(),
         emailDelivery: {
           status: delivery.status,

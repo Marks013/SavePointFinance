@@ -1,41 +1,75 @@
 import { buildPublicUrl } from "@/lib/app-url";
 import { buildBrandedEmailTemplate } from "@/lib/notifications/email-template";
 
-export function buildInvitationMessage(token: string, tenantName: string, userName?: string | null) {
+type InvitationMessageKind = "shared_wallet" | "admin_isolated";
+
+export function buildInvitationMessage(
+  token: string,
+  tenantName: string,
+  userName?: string | null,
+  kind: InvitationMessageKind = "shared_wallet"
+) {
   const inviteUrl = buildPublicUrl(`/accept-invitation?token=${token}`);
   const greeting = userName?.trim() ? `Olá, ${userName.trim()}.` : "Olá.";
-  const intro = [
-    greeting,
-    "",
-    `Você recebeu um convite para acessar a conta ${tenantName} no Save Point Finança.`,
-    "Conclua o cadastro pelo link seguro abaixo para definir sua senha e entrar no painel."
-  ].join("\n");
-  const subject = `Convite para acessar ${tenantName}`;
+  const isIsolatedInvite = kind === "admin_isolated";
+
+  const subject = isIsolatedInvite
+    ? `Sua nova carteira no Save Point está pronta: ${tenantName}`
+    : `Convite para compartilhar a carteira ${tenantName}`;
+
+  const intro = isIsolatedInvite
+    ? [
+        greeting,
+        "",
+        `Sua nova carteira ${tenantName} já foi preparada no Save Point Finance.`,
+        "Conclua a ativação pelo link seguro abaixo para criar sua senha e entrar no painel."
+      ].join("\n")
+    : [
+        greeting,
+        "",
+        `Você recebeu um convite para participar da carteira ${tenantName} no Save Point Finance.`,
+        "Use o acesso seguro abaixo para criar sua senha e entrar no ambiente compartilhado."
+      ].join("\n");
+
+  const message = isIsolatedInvite
+    ? [
+        greeting,
+        "",
+        `Sua nova carteira ${tenantName} já foi preparada no Save Point Finance.`,
+        "Use o link abaixo para ativar o acesso e definir sua senha:",
+        inviteUrl,
+        "",
+        "Este convite expira em 7 dias.",
+        "Se você não esperava esta criação de conta, ignore esta mensagem."
+      ].join("\n")
+    : [
+        greeting,
+        "",
+        `Você recebeu um convite para compartilhar a carteira ${tenantName} no Save Point Finance.`,
+        "Use o link abaixo para concluir o cadastro e definir sua senha:",
+        inviteUrl,
+        "",
+        "Este convite expira em 7 dias.",
+        "Se você não esperava este convite, ignore esta mensagem."
+      ].join("\n");
 
   return {
     subject,
-    message: [
-      greeting,
-      "",
-      `Você recebeu um convite para acessar a conta ${tenantName} no Save Point Finança.`,
-      "Use o link abaixo para concluir o cadastro e definir sua senha:",
-      inviteUrl,
-      "",
-      "Este convite expira em 7 dias.",
-      "Se você não esperava este convite, ignore esta mensagem."
-    ].join("\n"),
+    message,
     html: buildBrandedEmailTemplate({
-      preheader: `Seu acesso para ${tenantName} está pronto para ativação.`,
-      eyebrow: "Acesso por convite",
-      title: "Seu convite para o Save Point chegou",
+      preheader: isIsolatedInvite
+        ? `Sua carteira ${tenantName} está pronta para ativação.`
+        : `Seu acesso compartilhado para ${tenantName} está pronto para ativação.`,
+      eyebrow: isIsolatedInvite ? "Nova carteira" : "Compartilhamento",
+      title: isIsolatedInvite ? "Ative sua nova carteira" : "Aceite o convite para compartilhar",
       intro,
       action: {
-        label: "Aceitar convite",
+        label: isIsolatedInvite ? "Ativar minha carteira" : "Aceitar convite",
         href: inviteUrl
       },
       details: [
         {
-          label: "Conta",
+          label: "Carteira",
           value: tenantName
         },
         {
@@ -43,8 +77,13 @@ export function buildInvitationMessage(token: string, tenantName: string, userNa
           value: "7 dias"
         }
       ],
-      note: "Se você não esperava este convite, ignore esta mensagem. Nenhum acesso será criado sem a sua confirmação.",
-      footer: "Este convite foi enviado pelo Save Point Finança para liberar acesso seguro ao painel."
+      note: isIsolatedInvite
+        ? "Se você não esperava esta conta, ignore esta mensagem. Nenhum acesso será ativado sem a sua confirmação."
+        : "Se você não esperava este convite, ignore esta mensagem. Nenhum acesso será criado sem a sua confirmação.",
+      footer: isIsolatedInvite
+        ? "Convite enviado para ativação de uma carteira dedicada no Save Point Finance."
+        : "Convite enviado para compartilhar uma carteira com segurança no Save Point Finance.",
+      theme: "invitation"
     })
   };
 }

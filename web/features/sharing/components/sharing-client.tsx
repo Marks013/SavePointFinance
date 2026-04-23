@@ -43,7 +43,7 @@ type SharingInvitation = {
   name: string;
   email: string;
   role: "admin" | "member";
-  inviteUrl: string;
+  inviteUrl: string | null;
   expiresAt: string;
   acceptedAt: string | null;
   revokedAt: string | null;
@@ -344,8 +344,6 @@ export function SharingClient() {
         <h2 className="text-2xl font-semibold tracking-[-0.03em]">Convite atual e histórico</h2>
         <div className="mt-6 space-y-3">
           {invitations.map((invitation) => {
-            const inviteUrl = toAbsoluteInviteUrl(invitation.inviteUrl);
-
             return (
               <article key={invitation.id} className="data-card p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -360,20 +358,12 @@ export function SharingClient() {
                     <p className="text-sm font-semibold text-[var(--color-foreground)]">
                       {invitationStatusLabel(invitation)}
                     </p>
+                    {!invitation.acceptedAt && !invitation.revokedAt ? (
+                      <p className="mt-2 max-w-xs text-xs text-[var(--color-muted-foreground)]">
+                        Por seguranca, o link fica disponivel apenas no momento da criacao do convite.
+                      </p>
+                    ) : null}
                     <div className="mt-2 flex flex-wrap justify-end gap-3 text-xs">
-                      <a className="font-medium text-[var(--color-primary)]" href={inviteUrl} rel="noreferrer" target="_blank">
-                        Abrir link
-                      </a>
-                      <button
-                        className="font-medium text-[var(--color-primary)]"
-                        onClick={async () => {
-                          await navigator.clipboard.writeText(inviteUrl);
-                          toast.success("Link copiado");
-                        }}
-                        type="button"
-                      >
-                        Copiar
-                      </button>
                       {!invitation.acceptedAt && !invitation.revokedAt && canManage ? (
                         <button
                           className="font-medium text-[var(--color-coral-500)]"

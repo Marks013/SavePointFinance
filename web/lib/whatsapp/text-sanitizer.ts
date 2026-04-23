@@ -22,7 +22,7 @@ export function sanitizeAssistantText(value: string) {
   let current = value;
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
-    if (!/(?:Ã.|Â.|â.|ð.|ï.)/.test(current)) {
+    if (!/(?:\u00c3\u0192.|\u00c3\u201a.|\u00c3\u00a2.|\u00c3\u00b0.|\u00c3\u00af.)/.test(current)) {
       break;
     }
 

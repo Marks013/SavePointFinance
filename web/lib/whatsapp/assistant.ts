@@ -60,24 +60,6 @@ type IncomingTextMessage = {
 
 const WHATSAPP_CONTEXT_WINDOW_MINUTES = 15;
 
-const assistantEncodingFixes: Array<[string, string]> = [
-  ["â˜€ï¸", "☀️"],
-  ["ðŸŒ¤ï¸", "🌤️"],
-  ["ðŸŒ™", "🌙"],
-  ["ðŸ¤”", "🤔"],
-  ["ðŸ”’", "🔒"],
-  ["âš ï¸", "⚠️"],
-  ["NÃ£o", "Não"],
-  ["nÃ£o", "não"],
-  ["nÃºmero", "número"],
-  ["estÃ¡", "está"],
-  ["vocÃª", "você"],
-  ["licenÃ§a", "licença"],
-  ["lanÃ§ar", "lançar"],
-  ["relatÃ³rio", "relatório"],
-  ["ConfiguraÃ§Ãµes", "Configurações"]
-];
-
 const regExpConstructor = RegExp as RegExpConstructor & {
   escape?: (value: string) => string;
 };
@@ -85,12 +67,6 @@ const regExpConstructor = RegExp as RegExpConstructor & {
 const escapeRegExp =
   regExpConstructor.escape ??
   ((value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-
-export function sanitizeAssistantText(value: string) {
-  return assistantEncodingFixes.reduce((current, [search, replacement]) => {
-    return current.split(search).join(replacement);
-  }, value);
-}
 
 function normalizeText(value: string) {
   return normalizeClassificationText(value);

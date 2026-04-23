@@ -87,7 +87,7 @@ export function PublicRegistrationForm({ initialPlan }: PublicRegistrationFormPr
               });
 
               if (!authResult?.ok || authResult.error) {
-                toast.success("Conta criada. Entre com seu e-mail e senha para continuar.");
+                toast.success("Verifique seu e-mail e senha para continuar.");
                 router.replace("/login");
                 router.refresh();
                 return;

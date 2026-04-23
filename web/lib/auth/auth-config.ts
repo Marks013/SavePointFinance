@@ -9,6 +9,50 @@ import { baseAuthConfig } from "@/lib/auth/base-config";
 import { normalizeEmail } from "@/lib/auth/normalize-email";
 import { resolveTenantLicenseState } from "@/lib/licensing/policy";
 import { prisma } from "@/lib/prisma/client";
+import { getClientIpAddress, peekThrottleState, takeThrottleHit } from "@/lib/security/request-throttle";
+
+const LOGIN_THROTTLE_LIMIT = 5;
+const LOGIN_THROTTLE_NAMESPACE = "credentials-login";
+const LOGIN_THROTTLE_WINDOW_MS = 15 * 60 * 1000;
+
+function buildLoginThrottleKeys(request: Request, email: string) {
+  const keys = [`email:${email}`];
+  const clientIp = getClientIpAddress(request);
+
+  if (clientIp) {
+    keys.push(`ip:${clientIp}`);
+  }
+
+  return keys;
+}
+
+async function isLoginThrottled(request: Request, email: string) {
+  for (const key of buildLoginThrottleKeys(request, email)) {
+    const result = await peekThrottleState({
+      key,
+      limit: LOGIN_THROTTLE_LIMIT,
+      namespace: LOGIN_THROTTLE_NAMESPACE,
+      windowMs: LOGIN_THROTTLE_WINDOW_MS
+    });
+
+    if (!result.allowed) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+async function registerFailedLoginAttempt(request: Request, email: string) {
+  for (const key of buildLoginThrottleKeys(request, email)) {
+    await takeThrottleHit({
+      key,
+      limit: LOGIN_THROTTLE_LIMIT,
+      namespace: LOGIN_THROTTLE_NAMESPACE,
+      windowMs: LOGIN_THROTTLE_WINDOW_MS
+    });
+  }
+}
 
 export const authConfig = {
   ...baseAuthConfig,
@@ -19,22 +63,26 @@ export const authConfig = {
   providers: [
     Credentials({
       name: "Credentials",
-      credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Senha", type: "password" }
-      },
-      async authorize(credentials) {
-        const parsed = loginSchema.safeParse(credentials);
+        credentials: {
+          email: { label: "Email", type: "email" },
+          password: { label: "Senha", type: "password" }
+        },
+        async authorize(credentials, request) {
+          const parsed = loginSchema.safeParse(credentials);
 
-        if (!parsed.success) {
-          return null;
-        }
+          if (!parsed.success) {
+            return null;
+          }
 
-        const normalizedEmail = normalizeEmail(parsed.data.email);
+          const normalizedEmail = normalizeEmail(parsed.data.email);
 
-        const user = await prisma.user.findFirst({
-          where: {
-            email: {
+          if (await isLoginThrottled(request, normalizedEmail)) {
+            return null;
+          }
+
+          const user = await prisma.user.findFirst({
+            where: {
+              email: {
               equals: normalizedEmail,
               mode: "insensitive"
             }
@@ -64,18 +112,20 @@ export const authConfig = {
               }
             }
           }
-        });
+          });
 
-        if (!user?.passwordHash || !user.tenant) {
-          return null;
-        }
+          if (!user?.passwordHash || !user.tenant) {
+            await registerFailedLoginAttempt(request, normalizedEmail);
+            return null;
+          }
 
-        const passwordMatches = await compare(parsed.data.password, user.passwordHash);
-        const license = resolveTenantLicenseState(user.tenant);
+          const passwordMatches = await compare(parsed.data.password, user.passwordHash);
+          const license = resolveTenantLicenseState(user.tenant);
 
-        if (!passwordMatches || !user.isActive || (!user.isPlatformAdmin && !license.canAccessApp)) {
-          return null;
-        }
+          if (!passwordMatches || !user.isActive || (!user.isPlatformAdmin && !license.canAccessApp)) {
+            await registerFailedLoginAttempt(request, normalizedEmail);
+            return null;
+          }
 
         const now = new Date();
 

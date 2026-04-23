@@ -12,9 +12,22 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { AdminInvitationCard } from "@/features/admin/components/admin-invitation-card";
+import { AdminPlanCard } from "@/features/admin/components/admin-plan-card";
+import {
+  type InvitationItem,
+  type PlanItem,
+  type TenantItem,
+  type UserItem,
+  formatBillingSubscriptionLabel,
+  formatPlanLabel
+} from "@/features/admin/components/admin-shared";
+import { AdminTenantCard } from "@/features/admin/components/admin-tenant-card";
+import { AdminUserCard } from "@/features/admin/components/admin-user-card";
+import { PopupCampaignManager } from "@/features/admin/components/popup-campaign-manager";
 import { invitationSchema, type InvitationValues } from "@/features/password/schemas/password-schema";
 import { formatDateDisplay, formatDateTimeDisplay, parseBrazilianDateToDateKey } from "@/lib/date";
-import { formatRoleFilterLabel, formatRoleLabel } from "@/lib/users/role-label";
+import { formatRoleFilterLabel } from "@/lib/users/role-label";
 
 type Stats = {
   totalTenants: number;
@@ -69,24 +82,6 @@ type RetentionRunResponse = {
   };
 };
 
-type TenantBillingSummary = {
-  subscriptionId: string | null;
-  subscriptionStatus: string | null;
-  preapprovalId: string | null;
-  nextBillingAt: string | null;
-  cancelRequestedAt: string | null;
-  lastSyncedAt: string | null;
-  latestPaymentStatus: string | null;
-  latestPaymentId: string | null;
-  queueDepth: number;
-  failedWebhooks: number;
-  lastFinancialRepair: {
-    action: string;
-    summary: string;
-    createdAt: string;
-  } | null;
-};
-
 type TenantBillingDetails = {
   tenant: {
     id: string;
@@ -131,49 +126,6 @@ type TenantBillingDetails = {
   }>;
 };
 
-type TenantItem = {
-  id: string;
-  name: string;
-  slug: string;
-  planId: string;
-  planName: string;
-  planSlug: string;
-  planTier: "free" | "pro";
-  isActive: boolean;
-  activeUsers: number;
-  trialStart: string | null;
-  trialDays: number;
-  trialExpiresAt: string | null;
-  expiresAt: string | null;
-  billing: TenantBillingSummary;
-};
-
-type UserItem = {
-  id: string;
-  name: string;
-  email: string;
-  role: "admin" | "member";
-  isPlatformAdmin?: boolean;
-  isActive: boolean;
-  tenant: {
-    id: string;
-    name: string;
-    slug: string;
-    accountAdminId: string | null;
-    accountAdminName: string | null;
-    accountAdminEmail: string | null;
-    planId: string;
-    planName: string;
-    planSlug: string;
-    planTier: "free" | "pro";
-    isActive: boolean;
-    trialExpiresAt: string | null;
-    expiresAt: string | null;
-  };
-  createdAt: string;
-  lastLogin: string | null;
-};
-
 type UserListResponse = {
   items: UserItem[];
   page: number;
@@ -182,19 +134,18 @@ type UserListResponse = {
   totalPages: number;
 };
 
-type InvitationItem = {
-  id: string;
-  tenantId?: string;
-  email: string;
-  name: string;
-  role: "admin" | "member";
+type InvitationCreateResponse = {
   inviteUrl: string;
-  expiresAt: string;
-  acceptedAt: string | null;
-  revokedAt: string | null;
+  reused?: boolean;
+  message?: string;
+  emailDelivery?: {
+    status: "pending" | "sent" | "failed" | "skipped";
+    errorMessage: string | null;
+    attemptedAt: string | null;
+  };
 };
 
-type InvitationCreateResponse = {
+type InvitationResendResponse = {
   inviteUrl: string;
   emailDelivery?: {
     status: "pending" | "sent" | "failed" | "skipped";
@@ -227,75 +178,6 @@ type AuditItem = {
     slug: string;
   } | null;
 };
-
-type PlanItem = {
-  id: string;
-  name: string;
-  slug: string;
-  tier: "free" | "pro";
-  description: string | null;
-  maxAccounts: number | null;
-  maxCards: number | null;
-  trialDays: number;
-  isDefault: boolean;
-  isActive: boolean;
-  sortOrder: number;
-  tenantsCount: number;
-  features: {
-    whatsappAssistant: boolean;
-    automation: boolean;
-    pdfExport: boolean;
-  };
-};
-
-function formatPlanLabel(plan: string) {
-  return plan === "pro" ? "Premium" : "Gratuito";
-}
-
-function formatLifecycleLabel(tenant: TenantItem) {
-  if (tenant.expiresAt) {
-    return `Expira em ${formatDateDisplay(tenant.expiresAt)}`;
-  }
-
-  if (tenant.planTier === "pro" && tenant.trialExpiresAt) {
-    return `Avaliação até ${formatDateDisplay(tenant.trialExpiresAt)}`;
-  }
-
-  return tenant.isActive ? "Sem vencimento configurado" : "Conta inativa";
-}
-
-function formatBillingSubscriptionLabel(status: string | null) {
-  switch (status) {
-    case "authorized":
-      return "Assinatura ativa";
-    case "payment_required":
-      return "Pagamento pendente";
-    case "paused":
-      return "Cobrança pausada";
-    case "pending":
-      return "Aguardando autorização";
-    case "canceled":
-      return "Assinatura cancelada";
-    case "expired":
-      return "Assinatura expirada";
-    case "rejected":
-      return "Assinatura recusada";
-    default:
-      return "Sem assinatura Mercado Pago";
-  }
-}
-
-function formatUserTenantPlanLabel(user: UserItem) {
-  if (user.tenant.expiresAt) {
-    return `${user.tenant.planName} • Expirado`;
-  }
-
-  if (user.tenant.planTier === "pro" && user.tenant.trialExpiresAt) {
-    return `${user.tenant.planName} • Em avaliação`;
-  }
-
-  return `${user.tenant.planName} • ${user.tenant.isActive ? "Ativo" : "Inativo"}`;
-}
 
 function toAbsoluteInviteUrl(inviteUrl: string) {
   if (typeof window === "undefined") {
@@ -1020,9 +902,20 @@ export function AdminClient({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
     onSuccess: async (payload) => {
       invitationForm.reset();
       setInvitePlanId("");
-      await queryClient.invalidateQueries({ queryKey: ["admin-invitations"] });
-      await queryClient.invalidateQueries({ queryKey: ["admin-audit"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin-invitations"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-tenants"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-stats"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-audit"] })
+      ]);
       const absoluteInviteUrl = toAbsoluteInviteUrl(payload.inviteUrl);
+      if (payload.reused) {
+        toast.warning("Ja existia um convite ativo para este e-mail", {
+          description: `Link atual: ${absoluteInviteUrl}`
+        });
+        return;
+      }
+
       if (payload.emailDelivery?.status === "sent") {
         toast.success("Convite criado e enviado por e-mail", {
           description: `Link do convite: ${absoluteInviteUrl}`
@@ -1061,6 +954,43 @@ export function AdminClient({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
       await queryClient.invalidateQueries({ queryKey: ["admin-invitations"] });
       await queryClient.invalidateQueries({ queryKey: ["admin-audit"] });
       toast.success("Convite revogado");
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    }
+  });
+
+  const resendInvitationMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await fetch(`/api/admin/invitations/${id}`, {
+        method: "POST"
+      });
+
+      const payload = (await response.json().catch(() => ({}))) as InvitationResendResponse & { message?: string };
+
+      if (!response.ok) {
+        throw new Error(payload.message ?? "Falha ao reenviar convite");
+      }
+
+      return payload;
+    },
+    onSuccess: async (payload) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin-invitations"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-audit"] })
+      ]);
+
+      const absoluteInviteUrl = toAbsoluteInviteUrl(payload.inviteUrl);
+      if (payload.emailDelivery?.status === "sent") {
+        toast.success("Convite reenviado por e-mail", {
+          description: `Link atual: ${absoluteInviteUrl}`
+        });
+        return;
+      }
+
+      toast.warning("Convite reenviado sem confirmação de entrega", {
+        description: payload.emailDelivery?.errorMessage ?? `Link atual: ${absoluteInviteUrl}`
+      });
     },
     onError: (error) => {
       toast.error(error.message);
@@ -1199,47 +1129,49 @@ export function AdminClient({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
   const adminIntroBanner = isPlatformAdmin
     ? "Superadmin ativo. Esta visão foi reduzida para operação da plataforma, sem misturar rotina financeira de usuário final."
     : "Planos são aplicados por conta. Pessoas convidadas herdam o plano, os limites e os recursos premium da conta à qual passam a ter acesso.";
-  const plansLayoutClassName = isPlatformAdmin ? "mt-6 space-y-4" : "mt-6 grid gap-4 xl:grid-cols-2";
-  const statsLayoutClassName = isPlatformAdmin
-    ? "grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
-    : "grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4";
+  const plansLayoutClassName = isPlatformAdmin ? "mt-6 grid gap-4 2xl:grid-cols-2" : "mt-6 grid gap-4 xl:grid-cols-2";
+  const statsLayoutClassName = isPlatformAdmin ? "metric-grid" : "grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4";
   const adminSectionsLayoutClassName = isPlatformAdmin ? "grid gap-6" : "grid gap-6 xl:grid-cols-[1fr_1fr]";
 
   return (
-    <div className="space-y-6">
-      <section className="surface content-section">
-        <div className="eyebrow">Administração</div>
-        <h1 className="mt-3 text-3xl font-semibold tracking-[-0.03em]">Painel administrativo</h1>
-        <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--color-muted-foreground)]">
-          {adminIntroCopy}
-        </p>
-        <div className="info-banner mt-5">
-          <strong>{isPlatformAdmin ? "Modo operação." : "Planos por conta."}</strong> {adminIntroBanner}
-        </div>
+    <div className="admin-shell">
+      <section className="surface-strong content-section admin-hero-section">
+        <div className="admin-hero-grid">
+          <div className="section-stack">
+            <div className="eyebrow">Administração</div>
+            <div className="page-intro">
+              <h1 className="page-title">Painel administrativo</h1>
+              <p className="page-copy">{adminIntroCopy}</p>
+            </div>
+            <div className="info-banner">
+              <strong>{isPlatformAdmin ? "Modo operação." : "Planos por conta."}</strong> {adminIntroBanner}
+            </div>
+          </div>
         {isPlatformAdmin ? (
-          <div className="mt-5 grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
-            <article className="rounded-[1.4rem] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-card)_90%,var(--color-muted))] p-4">
-              <p className="text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-[var(--color-muted-foreground)]">Contas ativas</p>
-              <p className="mt-3 text-2xl font-semibold tracking-[-0.04em]">{statsQuery.data?.activeTenants ?? 0}</p>
-                  <p className="mt-2 text-sm leading-6 text-[var(--color-muted-foreground)]">Operação estável nas contas ativas.</p>
+          <div className="admin-hero-rail">
+            <article className="metric-card">
+              <p className="metric-label">Contas ativas</p>
+              <p className="metric-value">{statsQuery.data?.activeTenants ?? 0}</p>
+              <p className="metric-footnote">Operação estável nas contas ativas.</p>
             </article>
-            <article className="rounded-[1.4rem] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-card)_90%,var(--color-muted))] p-4">
-              <p className="text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-[var(--color-muted-foreground)]">Billing alerta</p>
-              <p className="mt-3 text-2xl font-semibold tracking-[-0.04em]">{statsQuery.data?.billingAttentionSubscriptions ?? 0}</p>
-                  <p className="mt-2 text-sm leading-6 text-[var(--color-muted-foreground)]">Assinaturas que pedem atenção.</p>
+            <article className="metric-card">
+              <p className="metric-label">Billing alerta</p>
+              <p className="metric-value">{statsQuery.data?.billingAttentionSubscriptions ?? 0}</p>
+              <p className="metric-footnote">Assinaturas que pedem atenção.</p>
             </article>
-            <article className="rounded-[1.4rem] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-card)_90%,var(--color-muted))] p-4">
-              <p className="text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-[var(--color-muted-foreground)]">Fila webhook</p>
-              <p className="mt-3 text-2xl font-semibold tracking-[-0.04em]">{statsQuery.data?.billingWebhookQueueDepth ?? 0}</p>
-                  <p className="mt-2 text-sm leading-6 text-[var(--color-muted-foreground)]">Eventos pendentes na fila de billing.</p>
+            <article className="metric-card">
+              <p className="metric-label">Fila webhook</p>
+              <p className="metric-value">{statsQuery.data?.billingWebhookQueueDepth ?? 0}</p>
+              <p className="metric-footnote">Eventos pendentes na fila de billing.</p>
             </article>
-            <article className="rounded-[1.4rem] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-card)_90%,var(--color-muted))] p-4">
-              <p className="text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-[var(--color-muted-foreground)]">Usuários ativos</p>
-              <p className="mt-3 text-2xl font-semibold tracking-[-0.04em]">{statsQuery.data?.activeUsers ?? 0}</p>
-                  <p className="mt-2 text-sm leading-6 text-[var(--color-muted-foreground)]">Pessoas com acesso ativo hoje.</p>
+            <article className="metric-card">
+              <p className="metric-label">Usuários ativos</p>
+              <p className="metric-value">{statsQuery.data?.activeUsers ?? 0}</p>
+              <p className="metric-footnote">Pessoas com acesso ativo hoje.</p>
             </article>
           </div>
         ) : null}
+        </div>
         {isPlatformAdmin && statsQuery.data?.retention ? (
           <article className="mt-5 rounded-[1.6rem] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-card)_92%,var(--color-muted))] p-5">
             <div className="flex flex-wrap items-start justify-between gap-4">
@@ -1372,279 +1304,139 @@ export function AdminClient({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
           </article>
         </div>
         {isPlatformAdmin ? (
-          <div className="mt-6 rounded-[1.6rem] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-card)_88%,var(--color-muted))] p-4">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div className="min-w-0 flex-1">
-                <h3 className="text-lg font-semibold">Novo plano</h3>
-                <p className="mt-1 text-sm leading-7 text-[var(--color-muted-foreground)]">
-                  Crie planos personalizados com limites, período de avaliação e recursos premium próprios.
+          <details className="admin-disclosure mt-6">
+            <summary className="admin-disclosure-summary">
+              <div>
+                <p className="admin-disclosure-kicker">Cadastro</p>
+                <p className="admin-disclosure-title">Novo plano</p>
+              </div>
+              <p className="admin-disclosure-copy">Abra somente quando precisar criar um novo pacote comercial.</p>
+            </summary>
+            <div className="admin-disclosure-body">
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <Input onChange={(event) => setNewPlanName(event.target.value)} placeholder="Nome do plano" value={newPlanName} />
+                <Input onChange={(event) => setNewPlanSlug(event.target.value)} placeholder="Slug do plano" value={newPlanSlug} />
+                <Select onChange={(event) => setNewPlanTier(event.target.value as "free" | "pro")} value={newPlanTier}>
+                  <option value="free">Gratuito</option>
+                  <option value="pro">Premium</option>
+                </Select>
+                <Input
+                  onChange={(event) => setNewPlanTrialDays(event.target.value)}
+                  placeholder="Dias de avaliação"
+                  type="number"
+                  value={newPlanTrialDays}
+                />
+                <Input onChange={(event) => setNewPlanMaxAccounts(event.target.value)} placeholder="Limite de contas" value={newPlanMaxAccounts} />
+                <Input onChange={(event) => setNewPlanMaxCards(event.target.value)} placeholder="Limite de cartões" value={newPlanMaxCards} />
+                <Input
+                  onChange={(event) => setNewPlanDescription(event.target.value)}
+                  placeholder="Descrição do plano"
+                  value={newPlanDescription}
+                />
+              </div>
+              <div className="mt-4 grid gap-3 md:grid-cols-3">
+                <label className="muted-panel flex items-center gap-3 text-sm">
+                  <input checked={newPlanWhatsapp} className="app-checkbox" onChange={(event) => setNewPlanWhatsapp(event.target.checked)} type="checkbox" />
+                  WhatsApp liberado
+                </label>
+                <label className="muted-panel flex items-center gap-3 text-sm">
+                  <input checked={newPlanAutomation} className="app-checkbox" onChange={(event) => setNewPlanAutomation(event.target.checked)} type="checkbox" />
+                  Automações liberadas
+                </label>
+                <label className="muted-panel flex items-center gap-3 text-sm">
+                  <input checked={newPlanPdfExport} className="app-checkbox" onChange={(event) => setNewPlanPdfExport(event.target.checked)} type="checkbox" />
+                  PDF liberado
+                </label>
+              </div>
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                <p className="min-w-0 flex-1 break-words text-xs text-[var(--color-muted-foreground)]">
+                  Limites vazios deixam contas e cartões sem teto específico; pessoas não têm limite por plano.
                 </p>
+                <Button
+                  className="w-full sm:w-auto"
+                  disabled={createPlanMutation.isPending || !newPlanName.trim()}
+                  onClick={() => createPlanMutation.mutate()}
+                  type="button"
+                >
+                  {createPlanMutation.isPending ? "Criando plano..." : "Criar plano"}
+                </Button>
               </div>
             </div>
-            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              <Input onChange={(event) => setNewPlanName(event.target.value)} placeholder="Nome do plano" value={newPlanName} />
-              <Input onChange={(event) => setNewPlanSlug(event.target.value)} placeholder="Slug do plano" value={newPlanSlug} />
-              <Select onChange={(event) => setNewPlanTier(event.target.value as "free" | "pro")} value={newPlanTier}>
-                <option value="free">Gratuito</option>
-                <option value="pro">Premium</option>
-              </Select>
-              <Input
-                onChange={(event) => setNewPlanTrialDays(event.target.value)}
-                placeholder="Dias de avaliação"
-                type="number"
-                value={newPlanTrialDays}
-              />
-              <Input onChange={(event) => setNewPlanMaxAccounts(event.target.value)} placeholder="Limite de contas" value={newPlanMaxAccounts} />
-              <Input onChange={(event) => setNewPlanMaxCards(event.target.value)} placeholder="Limite de cartões" value={newPlanMaxCards} />
-              <Input
-                onChange={(event) => setNewPlanDescription(event.target.value)}
-                placeholder="Descrição do plano"
-                value={newPlanDescription}
-              />
-            </div>
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
-              <label className="muted-panel flex items-center gap-3 text-sm">
-                <input checked={newPlanWhatsapp} className="app-checkbox" onChange={(event) => setNewPlanWhatsapp(event.target.checked)} type="checkbox" />
-                WhatsApp liberado
-              </label>
-              <label className="muted-panel flex items-center gap-3 text-sm">
-                <input checked={newPlanAutomation} className="app-checkbox" onChange={(event) => setNewPlanAutomation(event.target.checked)} type="checkbox" />
-                Automações liberadas
-              </label>
-              <label className="muted-panel flex items-center gap-3 text-sm">
-                <input checked={newPlanPdfExport} className="app-checkbox" onChange={(event) => setNewPlanPdfExport(event.target.checked)} type="checkbox" />
-                PDF liberado
-              </label>
-            </div>
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-              <p className="min-w-0 flex-1 break-words text-xs text-[var(--color-muted-foreground)]">
-                Limites vazios deixam contas e cartões sem teto específico; pessoas não têm limite por plano.
-              </p>
-              <Button
-                className="w-full sm:w-auto"
-                disabled={createPlanMutation.isPending || !newPlanName.trim()}
-                onClick={() => createPlanMutation.mutate()}
-                type="button"
-              >
-                {createPlanMutation.isPending ? "Criando plano..." : "Criar plano"}
-              </Button>
-            </div>
-          </div>
+          </details>
         ) : null}
         <div className={plansLayoutClassName}>
           {plans.map((plan) => (
-            <article key={plan.id} className="data-card min-w-0 rounded-[1.6rem] p-5">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <h3 className="min-w-0 flex-1 break-words text-lg font-semibold">{plan.name}</h3>
-                <span className="shrink-0 rounded-full bg-[color-mix(in_srgb,var(--color-primary)_12%,transparent)] px-3 py-1 text-xs font-semibold text-[var(--color-primary)]">
-                  {plan.isDefault ? "Padrão" : "Customizado"}
-                </span>
-              </div>
-              <p className="mt-3 break-words text-sm leading-7 text-[var(--color-muted-foreground)]">
-                {plan.description || "Sem descrição cadastrada para este plano."}
-              </p>
-              <div className="mt-4 flex flex-wrap gap-2 text-xs text-[var(--color-muted-foreground)]">
-                <span className="rounded-full border border-[var(--color-border)] px-3 py-1">
-                  {formatPlanLabel(plan.tier)}
-                </span>
-                <span className="rounded-full border border-[var(--color-border)] px-3 py-1">
-                  {plan.trialDays > 0 ? `${plan.trialDays} dias de avaliação` : "Sem avaliação"}
-                </span>
-                <span className="rounded-full border border-[var(--color-border)] px-3 py-1">
-                  {plan.tenantsCount} conta{plan.tenantsCount === 1 ? "" : "s"}
-                </span>
-              </div>
-              <div className="mt-4 flex flex-wrap gap-2 text-xs text-[var(--color-muted-foreground)]">
-                <span className="rounded-full border border-[var(--color-border)] px-3 py-1">
-                  Contas {plan.maxAccounts === null ? "livres" : plan.maxAccounts}
-                </span>
-                <span className="rounded-full border border-[var(--color-border)] px-3 py-1">
-                  Cartões {plan.maxCards === null ? "livres" : plan.maxCards}
-                </span>
-                <span className="rounded-full border border-[var(--color-border)] px-3 py-1">
-                  {plan.features.whatsappAssistant ? "WhatsApp" : "Sem WhatsApp"}
-                </span>
-                <span className="rounded-full border border-[var(--color-border)] px-3 py-1">
-                  {plan.features.automation ? "Automação" : "Sem automação"}
-                </span>
-                <span className="rounded-full border border-[var(--color-border)] px-3 py-1">
-                  {plan.features.pdfExport ? "PDF" : "Sem PDF"}
-                </span>
-              </div>
-              {isPlatformAdmin ? (
-                <div className="mt-5 space-y-4 rounded-[1.3rem] border border-[var(--color-border)]/70 bg-[color-mix(in_srgb,var(--color-card)_92%,var(--color-muted))] p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">
-                      Operações do plano
-                    </p>
-                    <p className="text-xs text-[var(--color-muted-foreground)]">
-                      Edite campos e aplique apenas o ajuste necessário.
-                    </p>
-                  </div>
-                  <div className="grid gap-3 xl:grid-cols-2">
-                    <div className="min-w-0 space-y-2">
-                      <Label htmlFor={`plan-${plan.id}-name`}>Nome</Label>
-                      <div className="flex flex-col gap-2 sm:flex-row">
-                        <Input
-                          id={`plan-${plan.id}-name`}
-                          value={planNameDrafts[plan.id] ?? plan.name}
-                          onChange={(event) =>
-                            setPlanNameDrafts((current) => ({
-                              ...current,
-                              [plan.id]: event.target.value
-                            }))
-                          }
-                        />
-                        <Button type="button" variant="secondary" onClick={() => submitPlanName(plan)}>
-                          Aplicar
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="min-w-0 space-y-2">
-                      <Label htmlFor={`plan-${plan.id}-description`}>Descrição</Label>
-                      <div className="flex flex-col gap-2 sm:flex-row">
-                        <Input
-                          id={`plan-${plan.id}-description`}
-                          value={planDescriptionDrafts[plan.id] ?? plan.description ?? ""}
-                          onChange={(event) =>
-                            setPlanDescriptionDrafts((current) => ({
-                              ...current,
-                              [plan.id]: event.target.value
-                            }))
-                          }
-                        />
-                        <Button type="button" variant="ghost" onClick={() => submitPlanDescription(plan)}>
-                          Aplicar
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="grid gap-3 xl:grid-cols-3">
-                    <div className="min-w-0 space-y-2">
-                      <Label htmlFor={`plan-${plan.id}-max-accounts`}>Limite de contas</Label>
-                      <div className="flex flex-col gap-2 sm:flex-row">
-                        <Input
-                          id={`plan-${plan.id}-max-accounts`}
-                          inputMode="numeric"
-                          placeholder="Livre"
-                          value={planMaxAccountsDrafts[plan.id] ?? (plan.maxAccounts?.toString() ?? "")}
-                          onChange={(event) =>
-                            setPlanMaxAccountsDrafts((current) => ({
-                              ...current,
-                              [plan.id]: event.target.value
-                            }))
-                          }
-                        />
-                        <Button type="button" variant="ghost" onClick={() => submitPlanMaxAccounts(plan)}>
-                          Aplicar
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="min-w-0 space-y-2">
-                      <Label htmlFor={`plan-${plan.id}-max-cards`}>Limite de cartões</Label>
-                      <div className="flex flex-col gap-2 sm:flex-row">
-                        <Input
-                          id={`plan-${plan.id}-max-cards`}
-                          inputMode="numeric"
-                          placeholder="Livre"
-                          value={planMaxCardsDrafts[plan.id] ?? (plan.maxCards?.toString() ?? "")}
-                          onChange={(event) =>
-                            setPlanMaxCardsDrafts((current) => ({
-                              ...current,
-                              [plan.id]: event.target.value
-                            }))
-                          }
-                        />
-                        <Button type="button" variant="ghost" onClick={() => submitPlanMaxCards(plan)}>
-                          Aplicar
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="min-w-0 space-y-2">
-                      <Label htmlFor={`plan-${plan.id}-trial-days`}>Dias de avaliação</Label>
-                      <div className="flex flex-col gap-2 sm:flex-row">
-                        <Input
-                          id={`plan-${plan.id}-trial-days`}
-                          inputMode="numeric"
-                          value={planTrialDaysDrafts[plan.id] ?? String(plan.trialDays)}
-                          onChange={(event) =>
-                            setPlanTrialDaysDrafts((current) => ({
-                              ...current,
-                              [plan.id]: event.target.value
-                            }))
-                          }
-                        />
-                        <Button type="button" variant="ghost" onClick={() => submitPlanTrialDays(plan)}>
-                          Aplicar
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                    <Button
-                      onClick={() =>
-                        updatePlanMutation.mutate({
-                          id: plan.id,
-                          data: { whatsappAssistant: !plan.features.whatsappAssistant }
-                        })
-                      }
-                      type="button"
-                      variant="ghost"
-                    >
-                      {plan.features.whatsappAssistant ? "Bloquear WhatsApp" : "Liberar WhatsApp"}
-                    </Button>
-                    <Button
-                      onClick={() =>
-                        updatePlanMutation.mutate({
-                          id: plan.id,
-                          data: { automation: !plan.features.automation }
-                        })
-                      }
-                      type="button"
-                      variant="ghost"
-                    >
-                      {plan.features.automation ? "Bloquear automação" : "Liberar automação"}
-                    </Button>
-                    <Button
-                      onClick={() =>
-                        updatePlanMutation.mutate({
-                          id: plan.id,
-                          data: { pdfExport: !plan.features.pdfExport }
-                        })
-                      }
-                      type="button"
-                      variant="ghost"
-                    >
-                      {plan.features.pdfExport ? "Bloquear PDF" : "Liberar PDF"}
-                    </Button>
-                    {!plan.isDefault ? (
-                      <>
-                        <Button
-                          onClick={() =>
-                            updatePlanMutation.mutate({
-                              id: plan.id,
-                              data: { isActive: !plan.isActive }
-                            })
-                          }
-                          type="button"
-                          variant="ghost"
-                        >
-                          {plan.isActive ? "Desativar" : "Ativar"}
-                        </Button>
-                        <Button
-                          disabled={deletePlanMutation.isPending || plan.tenantsCount > 0}
-                          onClick={() => deletePlanMutation.mutate(plan.id)}
-                          type="button"
-                          variant="ghost"
-                        >
-                          Excluir
-                        </Button>
-                      </>
-                    ) : null}
-                  </div>
-                </div>
-              ) : null}
-            </article>
+            <AdminPlanCard
+              key={plan.id}
+              deleteDisabled={deletePlanMutation.isPending || plan.tenantsCount > 0}
+              isPlatformAdmin={isPlatformAdmin}
+              onDelete={() => deletePlanMutation.mutate(plan.id)}
+              onPlanDescriptionChange={(value) =>
+                setPlanDescriptionDrafts((current) => ({
+                  ...current,
+                  [plan.id]: value
+                }))
+              }
+              onPlanMaxAccountsChange={(value) =>
+                setPlanMaxAccountsDrafts((current) => ({
+                  ...current,
+                  [plan.id]: value
+                }))
+              }
+              onPlanMaxCardsChange={(value) =>
+                setPlanMaxCardsDrafts((current) => ({
+                  ...current,
+                  [plan.id]: value
+                }))
+              }
+              onPlanNameChange={(value) =>
+                setPlanNameDrafts((current) => ({
+                  ...current,
+                  [plan.id]: value
+                }))
+              }
+              onPlanTrialDaysChange={(value) =>
+                setPlanTrialDaysDrafts((current) => ({
+                  ...current,
+                  [plan.id]: value
+                }))
+              }
+              onSubmitPlanDescription={() => submitPlanDescription(plan)}
+              onSubmitPlanMaxAccounts={() => submitPlanMaxAccounts(plan)}
+              onSubmitPlanMaxCards={() => submitPlanMaxCards(plan)}
+              onSubmitPlanName={() => submitPlanName(plan)}
+              onSubmitPlanTrialDays={() => submitPlanTrialDays(plan)}
+              onToggleActive={() =>
+                updatePlanMutation.mutate({
+                  id: plan.id,
+                  data: { isActive: !plan.isActive }
+                })
+              }
+              onToggleAutomation={() =>
+                updatePlanMutation.mutate({
+                  id: plan.id,
+                  data: { automation: !plan.features.automation }
+                })
+              }
+              onTogglePdfExport={() =>
+                updatePlanMutation.mutate({
+                  id: plan.id,
+                  data: { pdfExport: !plan.features.pdfExport }
+                })
+              }
+              onToggleWhatsapp={() =>
+                updatePlanMutation.mutate({
+                  id: plan.id,
+                  data: { whatsappAssistant: !plan.features.whatsappAssistant }
+                })
+              }
+              plan={plan}
+              planDescriptionDraft={planDescriptionDrafts[plan.id] ?? plan.description ?? ''}
+              planMaxAccountsDraft={planMaxAccountsDrafts[plan.id] ?? (plan.maxAccounts?.toString() ?? '')}
+              planMaxCardsDraft={planMaxCardsDrafts[plan.id] ?? (plan.maxCards?.toString() ?? '')}
+              planNameDraft={planNameDrafts[plan.id] ?? plan.name}
+              planTrialDaysDraft={planTrialDaysDrafts[plan.id] ?? String(plan.trialDays)}
+            />
           ))}
         </div>
       </section>
@@ -1691,6 +1483,8 @@ export function AdminClient({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
         )}
       </div>
 
+      {isPlatformAdmin ? <PopupCampaignManager /> : null}
+
       <div className={adminSectionsLayoutClassName}>
         <section className="surface content-section">
           <div className="flex flex-wrap items-start justify-between gap-4">
@@ -1706,49 +1500,50 @@ export function AdminClient({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
             </article>
           </div>
           {isPlatformAdmin ? (
-            <div className="mt-6 rounded-[1.6rem] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-card)_88%,var(--color-muted))] p-4">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="min-w-0 flex-1">
-                  <h3 className="text-lg font-semibold">Nova conta</h3>
-                  <p className="mt-1 text-sm leading-7 text-[var(--color-muted-foreground)]">
-                    Crie uma nova conta já com plano inicial, identificador limpo e categorias padrão prontas para uso.
+            <details className="admin-disclosure mt-6">
+              <summary className="admin-disclosure-summary">
+                <div>
+                  <p className="admin-disclosure-kicker">Cadastro</p>
+                  <p className="admin-disclosure-title">Nova conta</p>
+                </div>
+                <p className="admin-disclosure-copy">Abra quando precisar provisionar uma conta nova com plano inicial.</p>
+              </summary>
+              <div className="admin-disclosure-body">
+                <div className="grid gap-3 md:grid-cols-3">
+                  <Input
+                    onChange={(event) => setNewTenantName(event.target.value)}
+                    placeholder="Nome da conta"
+                    value={newTenantName}
+                  />
+                  <Input
+                    onChange={(event) => setNewTenantSlug(event.target.value)}
+                    placeholder="Identificador da conta"
+                    value={newTenantSlug}
+                  />
+                  <Select onChange={(event) => setNewTenantPlanId(event.target.value)} value={newTenantPlanId}>
+                    <option value="">Escolher plano inicial</option>
+                    {plans.filter((item) => item.isActive).map((plan) => (
+                      <option key={plan.id} value={plan.id}>
+                        {plan.name} • {formatPlanLabel(plan.tier)}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                  <p className="min-w-0 flex-1 break-words text-xs text-[var(--color-muted-foreground)]">
+                    O plano é da conta. Depois, basta convidar colaboradores para compartilhar o mesmo espaço financeiro.
                   </p>
+                  <Button
+                    className="w-full sm:w-auto"
+                    disabled={createTenantMutation.isPending || !newTenantName.trim() || !newTenantPlanId}
+                    onClick={() => createTenantMutation.mutate()}
+                    type="button"
+                  >
+                    {createTenantMutation.isPending ? "Criando conta..." : "Criar conta"}
+                  </Button>
                 </div>
               </div>
-              <div className="mt-4 grid gap-3 md:grid-cols-3">
-                <Input
-                  onChange={(event) => setNewTenantName(event.target.value)}
-                  placeholder="Nome da conta"
-                  value={newTenantName}
-                />
-                <Input
-                  onChange={(event) => setNewTenantSlug(event.target.value)}
-                  placeholder="Identificador da conta"
-                  value={newTenantSlug}
-                />
-                <Select onChange={(event) => setNewTenantPlanId(event.target.value)} value={newTenantPlanId}>
-                  <option value="">Escolher plano inicial</option>
-                  {plans.filter((item) => item.isActive).map((plan) => (
-                    <option key={plan.id} value={plan.id}>
-                      {plan.name} • {formatPlanLabel(plan.tier)}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                <p className="min-w-0 flex-1 break-words text-xs text-[var(--color-muted-foreground)]">
-                  O plano é da conta. Depois, basta convidar colaboradores para compartilhar o mesmo espaço financeiro.
-                </p>
-                <Button
-                  className="w-full sm:w-auto"
-                  disabled={createTenantMutation.isPending || !newTenantName.trim() || !newTenantPlanId}
-                  onClick={() => createTenantMutation.mutate()}
-                  type="button"
-                >
-                  {createTenantMutation.isPending ? "Criando conta..." : "Criar conta"}
-                </Button>
-              </div>
-            </div>
+            </details>
           ) : null}
             <div className="mt-6 space-y-3">
             {isPlatformAdmin ? (
@@ -1785,374 +1580,177 @@ export function AdminClient({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
               </Select>
             </div>
             {tenants.map((tenant) => (
-              <article key={tenant.id} className="data-card rounded-[1.75rem] p-5 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="break-words font-semibold">{tenant.name}</p>
-                    <p className="break-words text-sm text-[var(--color-muted-foreground)]">
-                      Conta {tenant.slug} • Plano {tenant.planName}
-                    </p>
-                    <p className="break-words text-xs text-[var(--color-muted-foreground)]">
-                      {formatLifecycleLabel(tenant)}
-                    </p>
-                  </div>
-                  <div className="w-full shrink-0 sm:min-w-[128px] sm:w-auto sm:text-right">
-                    <p className="text-sm font-semibold">{tenant.activeUsers}</p>
-                    <p className="text-xs text-[var(--color-muted-foreground)]">pessoas ativas</p>
-                  </div>
-                </div>
-                <div className={`mt-5 grid gap-3 ${isPlatformAdmin ? "xl:grid-cols-2" : "lg:grid-cols-[1.15fr_0.85fr]"}`}>
-                  <div className="muted-panel rounded-[1.3rem] p-4">
-                    <p className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">Status de cobrança</p>
-                    <p className="mt-2 text-sm font-semibold">
-                      {formatBillingSubscriptionLabel(tenant.billing.subscriptionStatus)}
-                    </p>
-                    <div className="mt-3 space-y-1 text-xs text-[var(--color-muted-foreground)]">
-                      <p>
-                        Próxima cobrança:{" "}
-                        {tenant.billing.nextBillingAt ? formatDateTimeDisplay(tenant.billing.nextBillingAt) : "não exposta"}
-                      </p>
-                      <p>
-                        Última sincronização:{" "}
-                        {tenant.billing.lastSyncedAt ? formatDateTimeDisplay(tenant.billing.lastSyncedAt) : "nunca"}
-                      </p>
-                      <p>Fila pendente: {tenant.billing.queueDepth}</p>
-                      <p>Falhas de webhook: {tenant.billing.failedWebhooks}</p>
-                      <p>
-                        Último pagamento: {tenant.billing.latestPaymentStatus ?? "sem pagamento sincronizado"}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="muted-panel rounded-[1.3rem] p-4">
-                    <p className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">Suporte operacional</p>
-                    <div className="mt-2 space-y-1 text-xs text-[var(--color-muted-foreground)]">
-                              <p className="break-words">Preapproval: {tenant.billing.preapprovalId ?? "não vinculado"}</p>
-                      <p>
-                        Cancelamento agendado: {tenant.billing.cancelRequestedAt ? formatDateTimeDisplay(tenant.billing.cancelRequestedAt) : "não"}
-                      </p>
-                      <p>
-                        Último reparo financeiro:{" "}
-                        {tenant.billing.lastFinancialRepair
-                          ? formatDateTimeDisplay(tenant.billing.lastFinancialRepair.createdAt)
-                          : "nenhum reparo registrado"}
-                      </p>
-                      {tenant.billing.lastFinancialRepair ? (
-                        <p className="leading-5">{tenant.billing.lastFinancialRepair.summary}</p>
-                      ) : null}
-                      <p className="pt-1 leading-5">
-                        Ferramentas disponíveis: sincronizar billing, reprocessar fila, recalcular dízimo, sincronizar recorrências e conciliar parcelas.
-                      </p>
-                    </div>
-                    {isPlatformAdmin ? (
-                      <div className="mt-4 max-w-[220px] space-y-2">
-                        <Label htmlFor={`tenant-${tenant.id}-tithe-month-inline`}>Competência do dízimo</Label>
-                        <Input
-                          id={`tenant-${tenant.id}-tithe-month-inline`}
-                          placeholder="2026-05"
-                          value={tenantTitheDrafts[tenant.id] ?? new Date().toISOString().slice(0, 7)}
-                          onChange={(event) =>
-                            setTenantTitheDrafts((current) => ({
-                              ...current,
-                              [tenant.id]: event.target.value
-                            }))
-                          }
-                        />
+              <AdminTenantCard
+                key={tenant.id}
+                activeTenantBillingId={activeTenantBillingId}
+                billingActionDisabled={adminTenantBillingMutation.isPending}
+                billingDetailsPanel={
+                  activeTenantBillingId === tenant.id ? (
+                    <div className="mt-4 rounded-[1.4rem] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-card)_92%,var(--color-muted))] p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-4">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">
+                            Suporte financeiro e reparos
+                          </p>
+                          <p className="mt-2 text-sm text-[var(--color-muted-foreground)]">
+                            Use este painel para suporte operacional, reconciliação de cobrança e leitura rápida dos últimos eventos.
+                          </p>
+                        </div>
                       </div>
-                    ) : null}
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {isPlatformAdmin ? (
-                        <>
-                          <Button
-                            disabled={!tenant.billing.preapprovalId || adminTenantBillingMutation.isPending}
-                            onClick={() =>
-                              adminTenantBillingMutation.mutate({
-                                tenantId: tenant.id,
-                                action: "sync_subscription"
-                              })
-                            }
-                            type="button"
-                            variant="secondary"
-                          >
-                            Sincronizar billing
-                          </Button>
-                          <Button
-                            disabled={!tenant.billing.preapprovalId || adminTenantBillingMutation.isPending}
-                            onClick={() =>
-                              adminTenantBillingMutation.mutate({
-                                tenantId: tenant.id,
-                                action: "process_queue"
-                              })
-                            }
-                            type="button"
-                            variant="ghost"
-                          >
-                            Reprocessar fila
-                          </Button>
-                          <Button
-                            disabled={adminTenantBillingMutation.isPending}
-                            onClick={() => submitTenantTitheRecalculation(tenant)}
-                            type="button"
-                            variant="ghost"
-                          >
-                            Recalcular dízimo
-                          </Button>
-                          <Button
-                            disabled={adminTenantBillingMutation.isPending}
-                            onClick={() =>
-                              adminTenantBillingMutation.mutate({
-                                tenantId: tenant.id,
-                                action: "sync_due_subscriptions"
-                              })
-                            }
-                            type="button"
-                            variant="ghost"
-                          >
-                            Sincronizar recorrências
-                          </Button>
-                          <Button
-                            disabled={adminTenantBillingMutation.isPending}
-                            onClick={() =>
-                              adminTenantBillingMutation.mutate({
-                                tenantId: tenant.id,
-                                action: "reconcile_due_installments"
-                              })
-                            }
-                            type="button"
-                            variant="ghost"
-                          >
-                            Conciliar parcelas vencidas
-                          </Button>
-                        </>
-                      ) : null}
-                      <Button
-                        onClick={() =>
-                          setExpandedTenantBillingId(tenant.id)
-                        }
-                        type="button"
-                        variant="secondary"
-                      >
-                        {activeTenantBillingId === tenant.id ? "Detalhes financeiros abertos" : "Ver pagamentos e webhooks"}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-                {activeTenantBillingId === tenant.id ? (
-                  <div className="mt-4 rounded-[1.4rem] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-card)_92%,var(--color-muted))] p-4">
-                    <div className="flex flex-wrap items-start justify-between gap-4">
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">
-                          Suporte financeiro e reparos
+                      {tenantBillingDetailsQuery.isLoading ? (
+                        <p className="mt-4 text-sm text-[var(--color-muted-foreground)]">Carregando detalhes financeiros...</p>
+                      ) : tenantBillingDetailsQuery.isError ? (
+                        <p className="mt-4 text-sm text-[var(--color-destructive)]">
+                          Não foi possível carregar os detalhes financeiros desta conta.
                         </p>
-                        <p className="mt-2 text-sm text-[var(--color-muted-foreground)]">
-                          Use este painel para suporte operacional, reconciliação de cobrança e leitura rápida dos últimos eventos.
-                        </p>
-                      </div>
-                    </div>
-                    {tenantBillingDetailsQuery.isLoading ? (
-                      <p className="mt-4 text-sm text-[var(--color-muted-foreground)]">Carregando detalhes financeiros...</p>
-                    ) : tenantBillingDetailsQuery.isError ? (
-                      <p className="mt-4 text-sm text-[var(--color-destructive)]">
-                        Não foi possível carregar os detalhes financeiros desta conta.
-                      </p>
-                    ) : tenantBillingDetailsQuery.data ? (
-                      <div className="mt-4 space-y-4">
-                        <div className={`grid gap-3 ${isPlatformAdmin ? "xl:grid-cols-2" : "lg:grid-cols-3"}`}>
-                          <div className="muted-panel rounded-[1.2rem] p-4">
-                            <p className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">Assinatura</p>
-                            <div className="mt-2 space-y-1 text-xs text-[var(--color-muted-foreground)]">
-                              <p>Status: {formatBillingSubscriptionLabel(tenantBillingDetailsQuery.data.subscription?.status ?? null)}</p>
-                              <p className="break-words">Preapproval: {tenantBillingDetailsQuery.data.subscription?.mercadoPagoPreapprovalId ?? "não vinculado"}</p>
-                              <p className="break-words">Pagador: {tenantBillingDetailsQuery.data.subscription?.payerEmail || "não informado"}</p>
-                              <p>
-                                Próxima cobrança:{" "}
-                                {tenantBillingDetailsQuery.data.subscription?.nextBillingAt
-                                  ? formatDateTimeDisplay(tenantBillingDetailsQuery.data.subscription.nextBillingAt)
-                                  : "não exposta"}
+                      ) : tenantBillingDetailsQuery.data ? (
+                        <div className="mt-4 space-y-4">
+                          <div className={`grid gap-3 ${isPlatformAdmin ? "xl:grid-cols-2" : "lg:grid-cols-3"}`}>
+                            <div className="muted-panel rounded-[1.2rem] p-4">
+                              <p className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">Assinatura</p>
+                              <div className="mt-2 space-y-1 text-xs text-[var(--color-muted-foreground)]">
+                                <p>Status: {formatBillingSubscriptionLabel(tenantBillingDetailsQuery.data.subscription?.status ?? null)}</p>
+                                <p className="break-words">Preapproval: {tenantBillingDetailsQuery.data.subscription?.mercadoPagoPreapprovalId ?? "não vinculado"}</p>
+                                <p className="break-words">Pagador: {tenantBillingDetailsQuery.data.subscription?.payerEmail || "não informado"}</p>
+                                <p>
+                                  Próxima cobrança:{" "}
+                                  {tenantBillingDetailsQuery.data.subscription?.nextBillingAt
+                                    ? formatDateTimeDisplay(tenantBillingDetailsQuery.data.subscription.nextBillingAt)
+                                    : "não exposta"}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="muted-panel rounded-[1.2rem] p-4">
+                              <p className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">Pagamentos recentes</p>
+                              <div className="mt-2 space-y-2 text-xs text-[var(--color-muted-foreground)]">
+                                {tenantBillingDetailsQuery.data.subscription?.payments.length ? (
+                                  tenantBillingDetailsQuery.data.subscription.payments.map((payment) => (
+                                    <div key={payment.id} className="rounded-2xl border border-[var(--color-border)] px-3 py-2">
+                                      <p className="break-words font-medium text-[var(--color-foreground)]">
+                                        {payment.providerPaymentId}
+                                      </p>
+                                      <p>
+                                        {payment.status} • R$ {payment.amount.toFixed(2)}
+                                      </p>
+                                      <p>{payment.createdAt ? formatDateTimeDisplay(payment.createdAt) : "sem data"}</p>
+                                    </div>
+                                  ))
+                                ) : (
+                                  <p>Nenhum pagamento sincronizado.</p>
+                                )}
+                              </div>
+                            </div>
+                            <div className="muted-panel rounded-[1.2rem] p-4">
+                              <p className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">Webhooks recentes</p>
+                              <div className="mt-2 space-y-2 text-xs text-[var(--color-muted-foreground)]">
+                                {tenantBillingDetailsQuery.data.webhookEvents.length ? (
+                                  tenantBillingDetailsQuery.data.webhookEvents.slice(0, 5).map((event) => (
+                                    <div key={event.id} className="rounded-2xl border border-[var(--color-border)] px-3 py-2">
+                                      <p className="font-medium text-[var(--color-foreground)]">{event.topic}</p>
+                                      <p>{event.status} • tentativas {event.attempts}</p>
+                                      <p>{formatDateTimeDisplay(event.createdAt)}</p>
+                                      {event.error ? (
+                                        <p className="break-words text-[var(--color-destructive)]">{event.error}</p>
+                                      ) : null}
+                                    </div>
+                                  ))
+                                ) : (
+                                  <p>Nenhum webhook recente.</p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          {isPlatformAdmin ? (
+                            <div className="rounded-[1.2rem] border border-[var(--color-border)] bg-[var(--color-panel)] p-4">
+                              <p className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">
+                                Reparo de dízimo disponível no card
+                              </p>
+                              <p className="mt-2 text-sm leading-6 text-[var(--color-muted-foreground)]">
+                                O campo de competência e o botão de recálculo ficam sempre visíveis no suporte operacional acima.
                               </p>
                             </div>
-                          </div>
-                          <div className="muted-panel rounded-[1.2rem] p-4">
-                            <p className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">Pagamentos recentes</p>
-                            <div className="mt-2 space-y-2 text-xs text-[var(--color-muted-foreground)]">
-                              {tenantBillingDetailsQuery.data.subscription?.payments.length ? (
-                                tenantBillingDetailsQuery.data.subscription.payments.map((payment) => (
-                                  <div key={payment.id} className="rounded-2xl border border-[var(--color-border)] px-3 py-2">
-                                    <p className="break-words font-medium text-[var(--color-foreground)]">
-                                      {payment.providerPaymentId}
-                                    </p>
-                                    <p>
-                                      {payment.status} • R$ {payment.amount.toFixed(2)}
-                                    </p>
-                                    <p>{payment.createdAt ? formatDateTimeDisplay(payment.createdAt) : "sem data"}</p>
-                                  </div>
-                                ))
-                              ) : (
-                                <p>Nenhum pagamento sincronizado.</p>
-                              )}
-                            </div>
-                          </div>
-                          <div className="muted-panel rounded-[1.2rem] p-4">
-                            <p className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">Webhooks recentes</p>
-                            <div className="mt-2 space-y-2 text-xs text-[var(--color-muted-foreground)]">
-                              {tenantBillingDetailsQuery.data.webhookEvents.length ? (
-                                tenantBillingDetailsQuery.data.webhookEvents.slice(0, 5).map((event) => (
-                                  <div key={event.id} className="rounded-2xl border border-[var(--color-border)] px-3 py-2">
-                                    <p className="font-medium text-[var(--color-foreground)]">{event.topic}</p>
-                                    <p>{event.status} • tentativas {event.attempts}</p>
-                                    <p>{formatDateTimeDisplay(event.createdAt)}</p>
-                                    {event.error ? (
-                                      <p className="break-words text-[var(--color-destructive)]">{event.error}</p>
-                                    ) : null}
-                                  </div>
-                                ))
-                              ) : (
-                                <p>Nenhum webhook recente.</p>
-                              )}
-                            </div>
-                          </div>
+                          ) : null}
                         </div>
-                        {isPlatformAdmin ? (
-                          <div className="rounded-[1.2rem] border border-[var(--color-border)] bg-[var(--color-panel)] p-4">
-                            <p className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">
-                              Reparo de dízimo disponível no card
-                            </p>
-                            <p className="mt-2 text-sm leading-6 text-[var(--color-muted-foreground)]">
-                              O campo de competência e o botão de recálculo ficam sempre visíveis no suporte operacional acima.
-                            </p>
-                          </div>
-                        ) : null}
-                      </div>
-                    ) : null}
-                  </div>
-                ) : null}
-                <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
-                  <Select
-                    onChange={(event) =>
-                      setTenantPlanDrafts((current) => ({
-                        ...current,
-                        [tenant.id]: event.target.value
-                      }))
-                    }
-                    value={tenantPlanDrafts[tenant.id] ?? tenant.planId}
-                  >
-                    {plans.filter((item) => item.isActive).map((plan) => (
-                      <option key={plan.id} value={plan.id}>
-                        {plan.name} • {formatPlanLabel(plan.tier)}
-                      </option>
-                    ))}
-                  </Select>
-                  <Button
-                    disabled={(tenantPlanDrafts[tenant.id] ?? tenant.planId) === tenant.planId}
-                    onClick={() =>
-                      updateTenantMutation.mutate({
-                        id: tenant.id,
-                        planId: tenantPlanDrafts[tenant.id] ?? tenant.planId
-                      })
-                    }
-                    type="button"
-                    variant="secondary"
-                  >
-                    Aplicar plano
-                  </Button>
-                </div>
-                <div className="mt-4 grid gap-4 xl:grid-cols-2">
-                  <div className="rounded-[1.2rem] border border-[var(--color-border)]/70 bg-[color-mix(in_srgb,var(--color-card)_92%,var(--color-muted))] p-4">
-                    <div className="min-w-0 space-y-2">
-                      <Label htmlFor={`tenant-${tenant.id}-trial-days`}>Dias de avaliação</Label>
-                      <Input
-                        id={`tenant-${tenant.id}-trial-days`}
-                        inputMode="numeric"
-                        value={tenantTrialDrafts[tenant.id] ?? String(tenant.trialDays)}
-                        onChange={(event) =>
-                          setTenantTrialDrafts((current) => ({
-                            ...current,
-                            [tenant.id]: event.target.value
-                          }))
-                        }
-                      />
-                      <Button
-                        className="mt-2 w-full sm:w-auto"
-                        onClick={() => submitTenantTrialDays(tenant)}
-                        type="button"
-                        variant="ghost"
-                      >
-                        Aplicar avaliação
-                      </Button>
+                      ) : null}
                     </div>
-                  </div>
-                  <div className="rounded-[1.2rem] border border-[var(--color-border)]/70 bg-[color-mix(in_srgb,var(--color-card)_92%,var(--color-muted))] p-4">
-                    <div className="min-w-0 space-y-2">
-                      <Label htmlFor={`tenant-${tenant.id}-expires-at`}>Expiração</Label>
-                      <Input
-                        id={`tenant-${tenant.id}-expires-at`}
-                        placeholder="DD/MM/AAAA"
-                        value={tenantExpiryDrafts[tenant.id] ?? (tenant.expiresAt ? formatDateDisplay(tenant.expiresAt) : "")}
-                        onChange={(event) =>
-                          setTenantExpiryDrafts((current) => ({
-                            ...current,
-                            [tenant.id]: event.target.value
-                          }))
-                        }
-                      />
-                      <div className="flex flex-wrap gap-2 pt-1">
-                        <Button
-                          className="w-full sm:w-auto"
-                          onClick={() => submitTenantExpiryDate(tenant)}
-                          type="button"
-                          variant="ghost"
-                        >
-                          Aplicar expiração
-                        </Button>
-                        <Button
-                          onClick={() => updateTenantMutation.mutate({ id: tenant.id, isActive: !tenant.isActive })}
-                          type="button"
-                          variant="ghost"
-                        >
-                          {tenant.isActive ? "Desativar conta" : "Ativar conta"}
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                {isPlatformAdmin ? (
-                  <div className="danger-panel mt-4">
-                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                      <div className="min-w-0">
-                        <p className="danger-kicker">Ação crítica</p>
-                        <p className="danger-copy">
-                          Exclui a conta <strong>{tenant.slug}</strong> com pessoas, convites, cartões, contas
-                          financeiras, transações e demais registros relacionados.
-                        </p>
-                      </div>
-                      <div className="w-full space-y-2 lg:w-auto">
-                        <Label htmlFor={`tenant-${tenant.id}-delete-confirm`}>Confirme digitando o slug</Label>
-                        <div className="flex flex-col gap-2 lg:flex-row">
-                          <Input
-                            id={`tenant-${tenant.id}-delete-confirm`}
-                            placeholder={tenant.slug}
-                            value={tenantDeleteConfirmDrafts[tenant.id] ?? ""}
-                            onChange={(event) =>
-                              setTenantDeleteConfirmDrafts((current) => ({
-                                ...current,
-                                [tenant.id]: event.target.value
-                              }))
-                            }
-                          />
-                          <Button
-                            className="w-full border-[var(--color-destructive)] bg-[color-mix(in_srgb,var(--color-destructive)_8%,transparent)] text-[var(--color-destructive)] hover:bg-[color-mix(in_srgb,var(--color-destructive)_14%,transparent)] lg:w-auto"
-                            disabled={deleteTenantMutation.isPending}
-                            onClick={() => submitTenantDeletion(tenant)}
-                            type="button"
-                            variant="ghost"
-                          >
-                            Excluir conta e dados
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
-              </article>
+                  ) : null
+                }
+                deleteTenantDisabled={deleteTenantMutation.isPending}
+                isPlatformAdmin={isPlatformAdmin}
+                onApplyExpiryDate={() => submitTenantExpiryDate(tenant)}
+                onApplyPlan={() =>
+                  updateTenantMutation.mutate({
+                    id: tenant.id,
+                    planId: tenantPlanDrafts[tenant.id] ?? tenant.planId
+                  })
+                }
+                onApplyTrialDays={() => submitTenantTrialDays(tenant)}
+                onDeleteTenant={() => submitTenantDeletion(tenant)}
+                onOpenBillingDetails={() => setExpandedTenantBillingId(tenant.id)}
+                onProcessQueue={() =>
+                  adminTenantBillingMutation.mutate({
+                    tenantId: tenant.id,
+                    action: "process_queue"
+                  })
+                }
+                onRecalculateTithe={() => submitTenantTitheRecalculation(tenant)}
+                onReconcileInstallments={() =>
+                  adminTenantBillingMutation.mutate({
+                    tenantId: tenant.id,
+                    action: "reconcile_due_installments"
+                  })
+                }
+                onSyncDueSubscriptions={() =>
+                  adminTenantBillingMutation.mutate({
+                    tenantId: tenant.id,
+                    action: "sync_due_subscriptions"
+                  })
+                }
+                onSyncSubscription={() =>
+                  adminTenantBillingMutation.mutate({
+                    tenantId: tenant.id,
+                    action: "sync_subscription"
+                  })
+                }
+                onTenantDeleteConfirmChange={(value) =>
+                  setTenantDeleteConfirmDrafts((current) => ({
+                    ...current,
+                    [tenant.id]: value
+                  }))
+                }
+                onTenantExpiryChange={(value) =>
+                  setTenantExpiryDrafts((current) => ({
+                    ...current,
+                    [tenant.id]: value
+                  }))
+                }
+                onTenantPlanChange={(value) =>
+                  setTenantPlanDrafts((current) => ({
+                    ...current,
+                    [tenant.id]: value
+                  }))
+                }
+                onTenantTitheChange={(value) =>
+                  setTenantTitheDrafts((current) => ({
+                    ...current,
+                    [tenant.id]: value
+                  }))
+                }
+                onTenantTrialChange={(value) =>
+                  setTenantTrialDrafts((current) => ({
+                    ...current,
+                    [tenant.id]: value
+                  }))
+                }
+                onToggleActive={() => updateTenantMutation.mutate({ id: tenant.id, isActive: !tenant.isActive })}
+                plans={plans}
+                tenant={tenant}
+                tenantDeleteConfirmDraft={tenantDeleteConfirmDrafts[tenant.id] ?? ""}
+                tenantExpiryDraft={tenantExpiryDrafts[tenant.id] ?? (tenant.expiresAt ? formatDateDisplay(tenant.expiresAt) : "")}
+                tenantPlanDraft={tenantPlanDrafts[tenant.id] ?? tenant.planId}
+                tenantTitheDraft={tenantTitheDrafts[tenant.id] ?? new Date().toISOString().slice(0, 7)}
+                tenantTrialDraft={tenantTrialDrafts[tenant.id] ?? String(tenant.trialDays)}
+              />
             ))}
           </div>
         </section>
@@ -2265,175 +1863,51 @@ export function AdminClient({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
             </div>
             <div className="space-y-3">
                 {users.map((user) => (
-                  <article key={user.id} className="data-card p-4">
-                    <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_minmax(320px,auto)] 2xl:items-start">
-                      <div className="min-w-0 space-y-1">
-                        <p className="break-words font-semibold">{user.name}</p>
-                        <p className="break-words text-sm leading-6 text-[var(--color-muted-foreground)]">
-                          {user.email} • {user.tenant.name}
-                          {user.isPlatformAdmin ? " • Superadmin" : ""}
-                        </p>
-                        <p className="break-words text-xs leading-5 text-[var(--color-muted-foreground)]">
-                          Perfil:{" "}
-                          {formatRoleLabel({
-                            role: user.role,
-                            isPlatformAdmin: user.isPlatformAdmin,
-                            accountAdminName: user.tenant.accountAdminName
-                          })}
-                        </p>
-                        {user.role === "member" ? (
-                          <p className="break-words text-xs leading-5 text-[var(--color-muted-foreground)]">
-                            Vinculado a:{" "}
-                            {user.tenant.accountAdminName ? (
-                              <>
-                                <strong>{user.tenant.accountAdminName}</strong>
-                                {user.tenant.accountAdminEmail ? ` • ${user.tenant.accountAdminEmail}` : ""}
-                              </>
-                            ) : (
-                              "Titular da conta não identificado"
-                            )}
-                          </p>
-                        ) : null}
-                        <p className="break-words text-xs leading-5 text-[var(--color-muted-foreground)]">
-                          Conta {user.tenant.slug} • {formatUserTenantPlanLabel(user)}
-                        </p>
-                        <div className="pt-1">
-                          <p className="inline-flex max-w-full items-center rounded-full border border-[var(--color-border)] bg-[var(--color-panel)] px-3 py-1 text-xs leading-5 text-[var(--color-muted-foreground)]">
-                            Último login: {user.lastLogin ? formatDateTimeDisplay(user.lastLogin) : "Nunca acessou"}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap gap-2 xl:justify-end">
-                        {isPlatformAdmin ? (
-                          <Button
-                            onClick={() => toggleRoleMutation.mutate({ id: user.id, role: user.role === "admin" ? "member" : "admin" })}
-                            type="button"
-                            variant="secondary"
-                          >
-                            Tornar {user.role === "admin" ? "familiar" : "admin de conta"}
-                          </Button>
-                        ) : null}
-                        {isPlatformAdmin ? (
-                          <div className="min-w-[15rem] flex-1 space-y-2 xl:max-w-sm">
-                            <Label>Redefinição segura</Label>
-                            <p className="rounded-[1rem] border border-[var(--color-border)] bg-[var(--color-panel)] px-3 py-2 text-xs leading-5 text-[var(--color-muted-foreground)]">
-                              O suporte apenas dispara o link. A nova senha é definida pelo próprio usuário no fluxo autenticado por token.
-                            </p>
-                          </div>
-                        ) : (
-                          <div className="min-w-[14rem] flex-1 space-y-2 xl:max-w-xs">
-                            <Label htmlFor={`user-${user.id}-password`}>Definir nova senha</Label>
-                            <Input
-                              id={`user-${user.id}-password`}
-                              autoComplete="new-password"
-                              placeholder="Senha temporária, mínimo 8 caracteres"
-                              type="password"
-                              value={userPasswordDrafts[user.id] ?? ""}
-                              onChange={(event) =>
-                                setUserPasswordDrafts((current) => ({
-                                  ...current,
-                                  [user.id]: event.target.value
-                                }))
-                              }
-                            />
-                            <p className="text-xs leading-5 text-[var(--color-muted-foreground)]">
-                              Este painel não envia link: ele grava a nova senha informada pelo suporte.
-                            </p>
-                          </div>
-                        )}
-                        <Button
-                          className="self-end"
-                          disabled={
-                            isPlatformAdmin
-                              ? sendPasswordResetMutation.isPending
-                              : (userPasswordDrafts[user.id] ?? "").length < 8 || setPasswordMutation.isPending
-                          }
-                          onClick={() => submitUserPasswordReset(user)}
-                          type="button"
-                          variant="secondary"
-                        >
-                          {isPlatformAdmin ? "Enviar link de redefinição" : "Salvar nova senha"}
-                        </Button>
-                        <Button
-                          onClick={() => toggleActiveMutation.mutate({ id: user.id, isActive: !user.isActive })}
-                          type="button"
-                          variant="ghost"
-                        >
-                          {user.isActive ? "Desativar" : "Ativar"}
-                        </Button>
-                      </div>
-                    </div>
-                    {isPlatformAdmin && !user.isPlatformAdmin ? (
-                      <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
-                        <Select
-                          onChange={(event) =>
-                            setUserTenantDrafts((current) => ({
-                              ...current,
-                              [user.id]: event.target.value
-                            }))
-                          }
-                          value={userTenantDrafts[user.id] ?? user.tenant.id}
-                        >
-                          {tenants.map((tenant) => (
-                            <option key={tenant.id} value={tenant.id}>
-                              {getTenantLabel(tenant)}
-                            </option>
-                          ))}
-                        </Select>
-                        <Button
-                          disabled={(userTenantDrafts[user.id] ?? user.tenant.id) === user.tenant.id || moveUserTenantMutation.isPending}
-                          onClick={() =>
-                            moveUserTenantMutation.mutate({
-                              id: user.id,
-                              tenantId: userTenantDrafts[user.id] ?? user.tenant.id
-                            })
-                          }
-                          type="button"
-                          variant="ghost"
-                        >
-                          Alterar conta
-                        </Button>
-                      </div>
-                    ) : null}
-                    {!user.isPlatformAdmin ? (
-                      <div className="danger-panel mt-4">
-                        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                          <div className="min-w-0">
-                            <p className="danger-kicker">Ação crítica</p>
-                            <p className="danger-copy">
-                              Remove <strong>{user.name}</strong> e os dados financeiros vinculados ao perfil. A ação
-                              respeita as travas de segurança para não desmontar a administração principal da conta.
-                            </p>
-                          </div>
-                          <div className="w-full space-y-2 lg:w-auto">
-                            <Label htmlFor={`user-${user.id}-delete-confirm`}>Confirme digitando o e-mail</Label>
-                            <div className="flex flex-col gap-2 lg:flex-row">
-                              <Input
-                                id={`user-${user.id}-delete-confirm`}
-                                placeholder={user.email}
-                                value={userDeleteConfirmDrafts[user.id] ?? ""}
-                                onChange={(event) =>
-                                  setUserDeleteConfirmDrafts((current) => ({
-                                    ...current,
-                                    [user.id]: event.target.value
-                                  }))
-                                }
-                              />
-                              <Button
-                                className="w-full border-[var(--color-destructive)] bg-[color-mix(in_srgb,var(--color-destructive)_8%,transparent)] text-[var(--color-destructive)] hover:bg-[color-mix(in_srgb,var(--color-destructive)_14%,transparent)] lg:w-auto"
-                                disabled={deleteUserMutation.isPending}
-                                onClick={() => submitUserDeletion(user)}
-                                type="button"
-                                variant="ghost"
-                              >
-                                Excluir pessoa e dados
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ) : null}
-                  </article>
+                  <AdminUserCard
+                    key={user.id}
+                    deleteUserDisabled={deleteUserMutation.isPending}
+                    getTenantLabel={getTenantLabel}
+                    isPlatformAdmin={isPlatformAdmin}
+                    moveTenantDisabled={(userTenantDrafts[user.id] ?? user.tenant.id) === user.tenant.id || moveUserTenantMutation.isPending}
+                    onDeleteUser={() => submitUserDeletion(user)}
+                    onMoveTenant={() =>
+                      moveUserTenantMutation.mutate({
+                        id: user.id,
+                        tenantId: userTenantDrafts[user.id] ?? user.tenant.id
+                      })
+                    }
+                    onSubmitPasswordReset={() => submitUserPasswordReset(user)}
+                    onToggleActive={() => toggleActiveMutation.mutate({ id: user.id, isActive: !user.isActive })}
+                    onToggleRole={() => toggleRoleMutation.mutate({ id: user.id, role: user.role === 'admin' ? 'member' : 'admin' })}
+                    onUserDeleteConfirmChange={(value) =>
+                      setUserDeleteConfirmDrafts((current) => ({
+                        ...current,
+                        [user.id]: value
+                      }))
+                    }
+                    onUserPasswordChange={(value) =>
+                      setUserPasswordDrafts((current) => ({
+                        ...current,
+                        [user.id]: value
+                      }))
+                    }
+                    onUserTenantChange={(value) =>
+                      setUserTenantDrafts((current) => ({
+                        ...current,
+                        [user.id]: value
+                      }))
+                    }
+                    passwordActionDisabled={
+                      isPlatformAdmin
+                        ? sendPasswordResetMutation.isPending
+                        : (userPasswordDrafts[user.id] ?? '').length < 8 || setPasswordMutation.isPending
+                    }
+                    tenants={tenants}
+                    user={user}
+                    userDeleteConfirmDraft={userDeleteConfirmDrafts[user.id] ?? ''}
+                    userPasswordDraft={userPasswordDrafts[user.id] ?? ''}
+                    userTenantDraft={userTenantDrafts[user.id] ?? user.tenant.id}
+                  />
                 ))}
                 <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
                   <p className="text-sm text-[var(--color-muted-foreground)]">
@@ -2584,50 +2058,14 @@ export function AdminClient({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
                 </Select>
               </div>
               {invitations.map((invitation) => (
-                <article key={invitation.id} className="data-card p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0 space-y-1">
-                      <p className="font-semibold">{invitation.name}</p>
-                      <p className="break-words text-sm text-[var(--color-muted-foreground)]">
-                        {invitation.email} • {formatRoleLabel({ role: invitation.role })}
-                      </p>
-                      <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--color-muted-foreground)]">
-                        <a
-                          className="font-medium text-[var(--color-primary)]"
-                          href={toAbsoluteInviteUrl(invitation.inviteUrl)}
-                          rel="noreferrer"
-                          target="_blank"
-                        >
-                          Abrir link do convite
-                        </a>
-                        <button
-                          className="font-medium text-[var(--color-primary)]"
-                          onClick={async () => {
-                            await navigator.clipboard.writeText(toAbsoluteInviteUrl(invitation.inviteUrl));
-                            toast.success("Link copiado");
-                          }}
-                          type="button"
-                        >
-                          Copiar link
-                        </button>
-                      </div>
-                      <p className="text-xs text-[var(--color-muted-foreground)]">
-                        Status: {invitation.acceptedAt ? "aceito" : invitation.revokedAt ? "revogado" : "pendente"}
-                      </p>
-                    </div>
-                    {!invitation.acceptedAt && !invitation.revokedAt ? (
-                      <Button
-                        className="w-full sm:w-auto"
-                        disabled={revokeInvitationMutation.isPending}
-                        onClick={() => revokeInvitationMutation.mutate(invitation.id)}
-                        type="button"
-                        variant="ghost"
-                      >
-                        Revogar
-                      </Button>
-                    ) : null}
-                  </div>
-                </article>
+                <AdminInvitationCard
+                  key={invitation.id}
+                  invitation={invitation}
+                  onResend={() => resendInvitationMutation.mutate(invitation.id)}
+                  onRevoke={() => revokeInvitationMutation.mutate(invitation.id)}
+                  resendDisabled={resendInvitationMutation.isPending}
+                  revokeDisabled={revokeInvitationMutation.isPending}
+                />
               ))}
             </div>
           </section>
@@ -2700,6 +2138,7 @@ export function AdminClient({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
               <option value="plan.updated">Planos atualizados</option>
               <option value="plan.deleted">Planos excluídos</option>
               <option value="invitation.created">Convites criados</option>
+              <option value="invitation.resent">Convites reenviados</option>
               <option value="invitation.revoked">Convites revogados</option>
               <option value="billing.subscription.synced">Billing sincronizado</option>
               <option value="billing.queue.reprocessed">Fila de billing reprocessada</option>

@@ -6,10 +6,11 @@ import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from "@ta
 import type { Session } from "next-auth";
 import { SessionProvider, useSession } from "next-auth/react";
 import { useEffect, useState, type ReactNode } from "react";
-import { toast, Toaster } from "sonner";
+import { Toaster } from "sonner";
 
-import { captureUnexpectedError, syncSentryAccessScope } from "@/lib/observability/sentry";
+import { LoginPopupAnnouncer } from "@/components/providers/login-popup-announcer";
 import { ThemeProvider } from "@/components/providers/theme-provider";
+import { captureUnexpectedError, syncSentryAccessScope } from "@/lib/observability/sentry";
 
 const QueryDevtools =
   process.env.NODE_ENV === "development"
@@ -26,9 +27,6 @@ type AppProvidersProps = {
   initialTheme?: "light" | "dark";
   initialSession?: Session | null;
 };
-
-const INACTIVITY_NOTICE_DAYS = 30;
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 function serializeKey(value: unknown) {
   try {
@@ -82,66 +80,6 @@ function PlatformAdminRouteIsolation() {
   return null;
 }
 
-function WelcomeBackInactivityNotice() {
-  const { data: session, status } = useSession();
-
-  useEffect(() => {
-    if (
-      status !== "authenticated" ||
-      !session?.user?.id ||
-      !session.user.previousLastLogin ||
-      session.user.isPlatformAdmin
-    ) {
-      return;
-    }
-
-    const previousLoginAt = new Date(session.user.previousLastLogin);
-
-    if (Number.isNaN(previousLoginAt.getTime())) {
-      return;
-    }
-
-    const inactiveDays = Math.floor((Date.now() - previousLoginAt.getTime()) / DAY_MS);
-
-    if (inactiveDays < INACTIVITY_NOTICE_DAYS) {
-      return;
-    }
-
-    const storageKey = `savepoint:welcome-back:${session.user.id}:${previousLoginAt.toISOString().slice(0, 10)}`;
-
-    if (window.localStorage.getItem(storageKey)) {
-      return;
-    }
-
-    window.localStorage.setItem(storageKey, "shown");
-
-    toast.custom(
-      (id) => (
-        <div className="max-w-sm rounded-[1.4rem] border border-[var(--color-border)] bg-[var(--color-card)] p-4 text-[var(--color-foreground)] shadow-[0_22px_60px_rgba(15,23,42,0.22)]">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">
-            Bem-vindo de volta
-          </p>
-          <p className="mt-2 text-base font-semibold">Sentimos sua falta por aqui.</p>
-          <p className="mt-2 text-sm leading-6 text-[var(--color-muted-foreground)]">
-            Foram {inactiveDays} dias sem login. Sua conta continua segura, mas depois de 90 dias sem atividade ela
-            entra na rotina de encerramento automático.
-          </p>
-          <button
-            className="mt-3 rounded-full bg-[var(--color-primary)] px-4 py-2 text-xs font-semibold text-[var(--color-primary-foreground)]"
-            onClick={() => toast.dismiss(id)}
-            type="button"
-          >
-            Bora organizar
-          </button>
-        </div>
-      ),
-      { duration: 12000 }
-    );
-  }, [session, status]);
-
-  return null;
-}
-
 export function AppProviders({ children, initialTheme, initialSession }: AppProvidersProps) {
   const [queryClient] = useState(
     () =>
@@ -191,7 +129,7 @@ export function AppProviders({ children, initialTheme, initialSession }: AppProv
         <QueryClientProvider client={queryClient}>
           <SentryAccessScope />
           <PlatformAdminRouteIsolation />
-          <WelcomeBackInactivityNotice />
+          <LoginPopupAnnouncer />
           {children}
           <Toaster richColors position="top-right" />
           <QueryDevtools initialIsOpen={false} />

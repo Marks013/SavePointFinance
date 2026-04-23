@@ -16,12 +16,16 @@ import {
   buildBillingCheckoutUrl,
   buildBillingManageUrl,
   buildMercadoPagoExternalReference,
+  createMercadoPagoPaymentRefund,
+  createMercadoPagoPreApproval,
   getMercadoPagoBillingFrequencyConfig,
   getMercadoPagoBillingPublicKey,
   getMercadoPagoBillingReason,
-  getMercadoPagoClients,
+  getMercadoPagoPayment,
+  getMercadoPagoPreApproval,
   isMercadoPagoBillingEnabled,
-  parseMercadoPagoExternalReference
+  parseMercadoPagoExternalReference,
+  updateMercadoPagoPreApproval
 } from "./mercadopago";
 import { BillingPlanError, getFallbackFreePlan, resolveBillablePlan } from "./plans";
 
@@ -322,10 +326,7 @@ export async function syncMercadoPagoSubscriptionById(preapprovalId: string) {
     return null;
   }
 
-  const { preApproval } = getMercadoPagoClients();
-  const resource = (await preApproval.get({
-    id: preapprovalId
-  })) as MercadoPagoSubscriptionResource;
+  const resource = await getMercadoPagoPreApproval<MercadoPagoSubscriptionResource>(preapprovalId);
 
   return upsertBillingSubscriptionFromResource(prisma, {
     resource,
@@ -335,10 +336,7 @@ export async function syncMercadoPagoSubscriptionById(preapprovalId: string) {
 }
 
 export async function syncMercadoPagoPaymentById(paymentId: string) {
-  const { payment } = getMercadoPagoClients();
-  const resource = (await payment.get({
-    id: paymentId
-  })) as MercadoPagoPaymentResource;
+  const resource = await getMercadoPagoPayment<MercadoPagoPaymentResource>(paymentId);
   const parsedReference = parseMercadoPagoExternalReference(resource.external_reference);
 
   if (!parsedReference) {
@@ -545,14 +543,13 @@ export async function createRecurringBillingSubscriptionForSession(input: Checko
     throw new BillingError("A conta já possui uma assinatura ativa ou pendente de regularização", 409);
   }
 
-  const { preApproval } = getMercadoPagoClients();
   const billingConfig = getMercadoPagoBillingFrequencyConfig();
   const payerEmail = input.payer?.email?.trim() || access.email.trim();
   const externalReference = buildMercadoPagoExternalReference({
     tenantId: access.tenantId,
     planId: plan.id
   });
-  const resource = (await preApproval.create({
+  const resource = await createMercadoPagoPreApproval<MercadoPagoSubscriptionResource>({
     body: {
       auto_recurring: {
         frequency: billingConfig.frequency,
@@ -570,7 +567,7 @@ export async function createRecurringBillingSubscriptionForSession(input: Checko
     requestOptions: {
       idempotencyKey: randomUUID()
     }
-  })) as MercadoPagoSubscriptionResource;
+  });
 
   if (!resource.id) {
     throw new BillingError("Mercado Pago não retornou uma assinatura válida", 502);
@@ -660,10 +657,8 @@ export async function cancelBillingSubscriptionForSession() {
       ? await getLatestRefundablePayment(prisma, subscription.id)
       : null;
 
-  const { preApproval, refund } = getMercadoPagoClients();
-
   if (subscription.mercadoPagoPreapprovalId) {
-    await preApproval.update({
+    await updateMercadoPagoPreApproval({
       id: subscription.mercadoPagoPreapprovalId,
       body: {
         status: "cancelled"
@@ -675,8 +670,8 @@ export async function cancelBillingSubscriptionForSession() {
   }
 
   if (refundablePayment) {
-    await refund.create({
-      payment_id: refundablePayment.providerPaymentId,
+    await createMercadoPagoPaymentRefund({
+      paymentId: refundablePayment.providerPaymentId,
       body: {},
       requestOptions: {
         idempotencyKey: randomUUID()

@@ -36,7 +36,7 @@ export const accountColorPresets: PresetOption[] = [
   },
   {
     value: "#B45309",
-    label: "Âmbar",
+    label: "\u00c2mbar",
     shortLabel: "AM",
     color: "#B45309",
     background: "rgba(180,83,9,0.14)"
@@ -413,7 +413,7 @@ export const categoryColorPresets: PresetOption[] = [
   },
   {
     value: "#B45309",
-    label: "Âmbar",
+    label: "\u00c2mbar",
     shortLabel: "A",
     color: "#B45309",
     background: "rgba(180,83,9,0.14)"

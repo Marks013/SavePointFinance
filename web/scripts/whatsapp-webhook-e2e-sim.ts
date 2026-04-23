@@ -165,7 +165,7 @@ async function main() {
                     image: {
                       id: "media-image-123",
                       mime_type: "image/jpeg",
-                      caption: "farmácia no cartão PicPay 3x"
+                      caption: "farm\u00e1cia no cart\u00e3o PicPay 3x"
                     }
                   }
                 ]
@@ -211,7 +211,7 @@ async function main() {
     assert.equal(parsedImage.length, 1);
     assert.equal(parsedImage[0]?.type, "image");
     assert.equal(parsedImage[0]?.mediaId, "media-image-123");
-    assert.equal(parsedImage[0]?.caption, "farmácia no cartão PicPay 3x");
+    assert.equal(parsedImage[0]?.caption, "farm\u00e1cia no cart\u00e3o PicPay 3x");
 
     assert.equal(parsedAudio.length, 1);
     assert.equal(parsedAudio[0]?.type, "audio");
@@ -238,9 +238,10 @@ async function main() {
     assert.equal(audioCommand.ok, true);
     assert.match(audioCommand.ok ? audioCommand.command : "", /gastei 42,50/i);
 
-    const sanitized = sanitizeAssistantText("âš ï¸ NÃ£o foi possÃ­vel lanÃ§ar o relatÃ³rio.");
-    assert.equal(sanitized, "⚠️ Não foi possível lançar o relatório.");
-
+    const sanitized = sanitizeAssistantText(
+      "\u00e2\u0161\u00a0\u00ef\u00b8\u008f N\u00c3\u00a3o foi poss\u00c3\u00advel lan\u00c3\u00a7ar o relat\u00c3\u00b3rio."
+    );
+    assert.equal(sanitized, "\u26a0\ufe0f N\u00e3o foi poss\u00edvel lan\u00e7ar o relat\u00f3rio.");
     console.log("WHATSAPP_WEBHOOK_E2E_SIM_OK");
     console.log(
       JSON.stringify(

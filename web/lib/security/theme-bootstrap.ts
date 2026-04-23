@@ -1,0 +1,1 @@
+export const themeBootstrapScript = `(function(){try{var key="savepoint-theme";var stored=window.localStorage.getItem(key);var theme=stored==="light"?"light":"dark";document.documentElement.dataset.theme=theme;document.documentElement.style.colorScheme=theme;}catch(error){document.documentElement.dataset.theme="dark";document.documentElement.style.colorScheme="dark";}})();`;

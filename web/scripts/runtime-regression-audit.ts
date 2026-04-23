@@ -206,6 +206,7 @@ async function createUser(data: {
 async function run() {
   const { prisma } = await import("@/lib/prisma/client");
   const { ensureDefaultPlans, getDefaultPlanBySlug } = await import("@/lib/licensing/default-plans");
+  const { hashInvitationToken } = await import("@/lib/security/invitation-token");
   assertCondition(adminEmail, "ADMIN_EMAIL não definido");
   assertCondition(adminPassword, "ADMIN_PASSWORD não definido");
 
@@ -433,7 +434,7 @@ async function run() {
     });
     assertCondition(validAccept.status === 200, `Aceite válido do convite respondeu ${validAccept.status}`);
     const acceptedInvitation = await prisma.invitation.findUniqueOrThrow({
-      where: { token: token! },
+      where: { token: hashInvitationToken(token!) },
       select: { kind: true, tenantId: true }
     });
     createdTenantIds.push(acceptedInvitation.tenantId);

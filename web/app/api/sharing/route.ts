@@ -1,4 +1,3 @@
-import crypto from "node:crypto";
 import { InvitationKind, NotificationChannel } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -11,6 +10,7 @@ import { deliverNotification } from "@/lib/notifications/delivery";
 import { buildInvitationMessage } from "@/lib/notifications/invitation";
 import { captureRequestError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
+import { buildInvitationPath, createInvitationToken } from "@/lib/security/invitation-token";
 import { getSharingAuthority } from "@/lib/sharing/access";
 
 const sharingInviteSchema = z.object({
@@ -39,8 +39,7 @@ async function getFamilySharingInvitations(ownerUserId: string | undefined, tena
       role: true,
       expiresAt: true,
       acceptedAt: true,
-      revokedAt: true,
-      token: true
+      revokedAt: true
     }
   });
 }
@@ -94,7 +93,7 @@ export async function GET(request: Request) {
         name: invitation.name,
         email: invitation.email,
         role: invitation.role,
-        inviteUrl: `/accept-invitation?token=${invitation.token}`,
+        inviteUrl: null,
         expiresAt: invitation.expiresAt.toISOString(),
         acceptedAt: invitation.acceptedAt?.toISOString() ?? null,
         revokedAt: invitation.revokedAt?.toISOString() ?? null
@@ -170,7 +169,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "Esta pessoa ja faz parte desta carteira" }, { status: 409 });
     }
 
-    const token = crypto.randomBytes(24).toString("hex");
+    const { rawToken, hashedToken } = createInvitationToken();
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
     const invitation = await prisma.invitation.create({
@@ -181,12 +180,12 @@ export async function POST(request: Request) {
         name: body.name,
         role: "member",
         kind: InvitationKind.shared_wallet,
-        token,
+        token: hashedToken,
         expiresAt
       }
     });
 
-    const invitationMessage = buildInvitationMessage(token, user.tenant.name, body.name);
+    const invitationMessage = buildInvitationMessage(rawToken, user.tenant.name, body.name, "shared_wallet");
     const delivery = await deliverNotification({
       tenantId: user.tenantId,
       channel: NotificationChannel.email,
@@ -212,7 +211,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         id: invitation.id,
-        inviteUrl: `/accept-invitation?token=${invitation.token}`,
+        inviteUrl: buildInvitationPath(rawToken),
         emailDelivery: {
           status: delivery.status,
           errorMessage: delivery.errorMessage,

@@ -103,6 +103,26 @@ enum NotificationStatus {
   skipped
 }
 
+enum PopupCampaignStatus {
+  draft
+  active
+  paused
+  archived
+}
+
+enum PopupCampaignKind {
+  announcement
+  update
+  welcome
+}
+
+enum PopupCampaignTone {
+  calm
+  success
+  spotlight
+  warning
+}
+
 enum BillingSubscriptionStatus {
   pending
   authorized
@@ -228,6 +248,7 @@ model User {
   whatsappMessages  WhatsAppMessage[]
   adminAuditLogs    AdminAuditLog[] @relation("AuditActorUser")
   auditTargets      AdminAuditLog[] @relation("AuditTargetUser")
+  popupCampaignViews PopupCampaignView[]
 
   @@index([tenantId])
   @@index([resetToken])
@@ -700,6 +721,58 @@ model PlatformSetting {
   value     Json
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model PopupCampaign {
+  id                     String              @id @default(cuid())
+  name                   String
+  status                 PopupCampaignStatus @default(draft)
+  kind                   PopupCampaignKind   @default(announcement)
+  tone                   PopupCampaignTone   @default(calm)
+  eyebrow                String?
+  title                  String
+  body                   String
+  ctaLabel               String?
+  ctaUrl                 String?
+  dismissLabel           String              @default("Agora nao")
+  startsAt               DateTime?
+  endsAt                 DateTime?
+  priority               Int                 @default(100)
+  delayMs                Int                 @default(1200)
+  autoHideMs             Int?
+  dismissible            Boolean             @default(true)
+  oncePerUser            Boolean             @default(true)
+  maxViews               Int?
+  showToNewUsers         Boolean             @default(true)
+  showToReturningUsers   Boolean             @default(true)
+  showToPlatformAdmins   Boolean             @default(false)
+  showToTenantAdmins     Boolean             @default(true)
+  showToMembers          Boolean             @default(true)
+  createdByUserId        String?
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
+  views                  PopupCampaignView[]
+
+  @@index([status, startsAt, endsAt, priority])
+  @@index([kind, status])
+}
+
+model PopupCampaignView {
+  id          String       @id @default(cuid())
+  campaignId  String
+  userId      String
+  viewCount   Int          @default(0)
+  firstSeenAt DateTime?
+  lastSeenAt  DateTime?
+  dismissedAt DateTime?
+  clickedAt   DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  campaign    PopupCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, userId])
+  @@index([userId, updatedAt])
 }
 
 model RequestThrottle {
