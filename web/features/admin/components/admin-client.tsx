@@ -1068,30 +1068,39 @@ export function AdminClient() {
     updatePlanMutation.mutate({ id: plan.id, data: { trialDays: parsed } });
   }
 
+  const adminIntroCopy = isPlatformAdmin
+    ? "Central de operação da plataforma para suporte, cobrança, contas e governança."
+    : "Gerencie contas, colaboradores, convites e limites operacionais do produto.";
+  const adminIntroBanner = isPlatformAdmin
+    ? "Superadmin ativo. Esta visão foi reduzida para operação da plataforma, sem misturar rotina financeira de usuário final."
+    : "Planos são aplicados por conta. Pessoas convidadas herdam o plano, os limites e os recursos premium da conta à qual passam a ter acesso.";
+  const plansLayoutClassName = isPlatformAdmin ? "mt-6 space-y-4" : "mt-6 grid gap-4 xl:grid-cols-2";
+  const statsLayoutClassName = isPlatformAdmin
+    ? "grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
+    : "grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4";
+  const adminSectionsLayoutClassName = isPlatformAdmin ? "grid gap-6" : "grid gap-6 xl:grid-cols-[1fr_1fr]";
+
   return (
     <div className="space-y-6">
       <section className="surface content-section">
         <div className="eyebrow">Administração</div>
         <h1 className="mt-3 text-3xl font-semibold tracking-[-0.03em]">Painel administrativo</h1>
         <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--color-muted-foreground)]">
-          Gerencie contas, colaboradores, convites e limites operacionais do produto.
+          {adminIntroCopy}
         </p>
         <div className="info-banner mt-5">
-          <strong>Planos são aplicados por conta.</strong> Pessoas convidadas herdam o plano, os limites e os recursos premium da conta à qual passam a ter acesso.
+          <strong>{isPlatformAdmin ? "Modo operação." : "Planos por conta."}</strong> {adminIntroBanner}
         </div>
-        {isPlatformAdmin ? (
-          <div className="info-banner mt-5">
-            <strong>Superadmin ativo.</strong> A conta principal possui acesso global, recursos Premium e bypass de licença.
+        {isPlatformAdmin ? null : (
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-[1.4rem] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-card)_88%,var(--color-muted))] px-4 py-4">
+            <p className="min-w-0 flex-1 break-words text-sm leading-7 text-[var(--color-muted-foreground)]">
+              Para compartilhar a mesma carteira com cônjuge ou familiar, use a área dedicada de compartilhamento.
+            </p>
+            <Button asChild className="w-full sm:w-auto" variant="secondary">
+              <Link href="/dashboard/sharing">Abrir convites</Link>
+            </Button>
           </div>
-        ) : null}
-        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-[1.4rem] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-card)_88%,var(--color-muted))] px-4 py-4">
-          <p className="min-w-0 flex-1 break-words text-sm leading-7 text-[var(--color-muted-foreground)]">
-            Para compartilhar a mesma carteira com cônjuge ou familiar, use a área dedicada de compartilhamento.
-          </p>
-          <Button asChild className="w-full sm:w-auto" variant="secondary">
-            <Link href="/dashboard/sharing">Abrir convites</Link>
-          </Button>
-        </div>
+        )}
       </section>
 
       <section className="surface content-section">
@@ -1167,9 +1176,9 @@ export function AdminClient() {
             </div>
           </div>
         ) : null}
-        <div className="mt-6 grid gap-4 lg:grid-cols-3">
+        <div className={plansLayoutClassName}>
           {plans.map((plan) => (
-            <article key={plan.id} className="data-card p-5">
+            <article key={plan.id} className="data-card min-w-0 rounded-[1.6rem] p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <h3 className="min-w-0 flex-1 break-words text-lg font-semibold">{plan.name}</h3>
                 <span className="shrink-0 rounded-full bg-[color-mix(in_srgb,var(--color-primary)_12%,transparent)] px-3 py-1 text-xs font-semibold text-[var(--color-primary)]">
@@ -1208,11 +1217,19 @@ export function AdminClient() {
                 </span>
               </div>
               {isPlatformAdmin ? (
-                <div className="mt-4 space-y-3">
-                  <div className="grid gap-3 lg:grid-cols-2">
-                    <div className="space-y-2">
+                <div className="mt-5 space-y-4 rounded-[1.3rem] border border-[var(--color-border)]/70 bg-[color-mix(in_srgb,var(--color-card)_92%,var(--color-muted))] p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">
+                      Operações do plano
+                    </p>
+                    <p className="text-xs text-[var(--color-muted-foreground)]">
+                      Edite campos e aplique apenas o ajuste necessário.
+                    </p>
+                  </div>
+                  <div className="grid gap-3 xl:grid-cols-2">
+                    <div className="min-w-0 space-y-2">
                       <Label htmlFor={`plan-${plan.id}-name`}>Nome</Label>
-                      <div className="flex gap-2">
+                      <div className="flex flex-col gap-2 sm:flex-row">
                         <Input
                           id={`plan-${plan.id}-name`}
                           value={planNameDrafts[plan.id] ?? plan.name}
@@ -1228,9 +1245,9 @@ export function AdminClient() {
                         </Button>
                       </div>
                     </div>
-                    <div className="space-y-2">
+                    <div className="min-w-0 space-y-2">
                       <Label htmlFor={`plan-${plan.id}-description`}>Descrição</Label>
-                      <div className="flex gap-2">
+                      <div className="flex flex-col gap-2 sm:flex-row">
                         <Input
                           id={`plan-${plan.id}-description`}
                           value={planDescriptionDrafts[plan.id] ?? plan.description ?? ""}
@@ -1247,10 +1264,10 @@ export function AdminClient() {
                       </div>
                     </div>
                   </div>
-                  <div className="grid gap-3 lg:grid-cols-3">
-                    <div className="space-y-2">
+                  <div className="grid gap-3 xl:grid-cols-3">
+                    <div className="min-w-0 space-y-2">
                       <Label htmlFor={`plan-${plan.id}-max-accounts`}>Limite de contas</Label>
-                      <div className="flex gap-2">
+                      <div className="flex flex-col gap-2 sm:flex-row">
                         <Input
                           id={`plan-${plan.id}-max-accounts`}
                           inputMode="numeric"
@@ -1268,9 +1285,9 @@ export function AdminClient() {
                         </Button>
                       </div>
                     </div>
-                    <div className="space-y-2">
+                    <div className="min-w-0 space-y-2">
                       <Label htmlFor={`plan-${plan.id}-max-cards`}>Limite de cartões</Label>
-                      <div className="flex gap-2">
+                      <div className="flex flex-col gap-2 sm:flex-row">
                         <Input
                           id={`plan-${plan.id}-max-cards`}
                           inputMode="numeric"
@@ -1288,9 +1305,9 @@ export function AdminClient() {
                         </Button>
                       </div>
                     </div>
-                    <div className="space-y-2">
+                    <div className="min-w-0 space-y-2">
                       <Label htmlFor={`plan-${plan.id}-trial-days`}>Dias de avaliação</Label>
-                      <div className="flex gap-2">
+                      <div className="flex flex-col gap-2 sm:flex-row">
                         <Input
                           id={`plan-${plan.id}-trial-days`}
                           inputMode="numeric"
@@ -1308,68 +1325,68 @@ export function AdminClient() {
                       </div>
                     </div>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                  <Button
-                    onClick={() =>
-                      updatePlanMutation.mutate({
-                        id: plan.id,
-                        data: { whatsappAssistant: !plan.features.whatsappAssistant }
-                      })
-                    }
-                    type="button"
-                    variant="ghost"
-                  >
-                    {plan.features.whatsappAssistant ? "Bloquear WhatsApp" : "Liberar WhatsApp"}
-                  </Button>
-                  <Button
-                    onClick={() =>
-                      updatePlanMutation.mutate({
-                        id: plan.id,
-                        data: { automation: !plan.features.automation }
-                      })
-                    }
-                    type="button"
-                    variant="ghost"
-                  >
-                    {plan.features.automation ? "Bloquear automação" : "Liberar automação"}
-                  </Button>
-                  <Button
-                    onClick={() =>
-                      updatePlanMutation.mutate({
-                        id: plan.id,
-                        data: { pdfExport: !plan.features.pdfExport }
-                      })
-                    }
-                    type="button"
-                    variant="ghost"
-                  >
-                    {plan.features.pdfExport ? "Bloquear PDF" : "Liberar PDF"}
-                  </Button>
-                  {!plan.isDefault ? (
-                    <>
-                      <Button
-                        onClick={() =>
-                          updatePlanMutation.mutate({
-                            id: plan.id,
-                            data: { isActive: !plan.isActive }
-                          })
-                        }
-                        type="button"
-                        variant="ghost"
-                      >
-                        {plan.isActive ? "Desativar" : "Ativar"}
-                      </Button>
-                      <Button
-                        disabled={deletePlanMutation.isPending || plan.tenantsCount > 0}
-                        onClick={() => deletePlanMutation.mutate(plan.id)}
-                        type="button"
-                        variant="ghost"
-                      >
-                        Excluir
-                      </Button>
-                    </>
-                  ) : null}
-                </div>
+                  <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                    <Button
+                      onClick={() =>
+                        updatePlanMutation.mutate({
+                          id: plan.id,
+                          data: { whatsappAssistant: !plan.features.whatsappAssistant }
+                        })
+                      }
+                      type="button"
+                      variant="ghost"
+                    >
+                      {plan.features.whatsappAssistant ? "Bloquear WhatsApp" : "Liberar WhatsApp"}
+                    </Button>
+                    <Button
+                      onClick={() =>
+                        updatePlanMutation.mutate({
+                          id: plan.id,
+                          data: { automation: !plan.features.automation }
+                        })
+                      }
+                      type="button"
+                      variant="ghost"
+                    >
+                      {plan.features.automation ? "Bloquear automação" : "Liberar automação"}
+                    </Button>
+                    <Button
+                      onClick={() =>
+                        updatePlanMutation.mutate({
+                          id: plan.id,
+                          data: { pdfExport: !plan.features.pdfExport }
+                        })
+                      }
+                      type="button"
+                      variant="ghost"
+                    >
+                      {plan.features.pdfExport ? "Bloquear PDF" : "Liberar PDF"}
+                    </Button>
+                    {!plan.isDefault ? (
+                      <>
+                        <Button
+                          onClick={() =>
+                            updatePlanMutation.mutate({
+                              id: plan.id,
+                              data: { isActive: !plan.isActive }
+                            })
+                          }
+                          type="button"
+                          variant="ghost"
+                        >
+                          {plan.isActive ? "Desativar" : "Ativar"}
+                        </Button>
+                        <Button
+                          disabled={deletePlanMutation.isPending || plan.tenantsCount > 0}
+                          onClick={() => deletePlanMutation.mutate(plan.id)}
+                          type="button"
+                          variant="ghost"
+                        >
+                          Excluir
+                        </Button>
+                      </>
+                    ) : null}
+                  </div>
                 </div>
               ) : null}
             </article>
@@ -1377,51 +1394,45 @@ export function AdminClient() {
         </div>
       </section>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
+      <div className={statsLayoutClassName}>
         <article className="metric-card min-w-0"><p className="metric-label">Contas</p><p className="metric-value">{statsQuery.data?.totalTenants ?? 0}</p></article>
         <article className="metric-card min-w-0"><p className="metric-label">Ativos</p><p className="metric-value">{statsQuery.data?.activeTenants ?? 0}</p></article>
         <article className="metric-card min-w-0"><p className="metric-label">Em avaliação</p><p className="metric-value">{statsQuery.data?.trialTenants ?? 0}</p></article>
         <article className="metric-card min-w-0"><p className="metric-label">Expirados</p><p className="metric-value">{statsQuery.data?.expiredTenants ?? 0}</p></article>
         <article className="metric-card min-w-0">
-          <p className="metric-label">{isPlatformAdmin ? "Pessoas da plataforma" : "Pessoas da conta"}</p>
+          <p className="metric-label">{isPlatformAdmin ? "Usuários plataforma" : "Pessoas da conta"}</p>
           <p className="metric-value">{statsQuery.data?.totalUsers ?? 0}</p>
         </article>
         <article className="metric-card min-w-0">
-          <p className="metric-label">{isPlatformAdmin ? "Pessoas ativas da plataforma" : "Pessoas ativas"}</p>
+          <p className="metric-label">{isPlatformAdmin ? "Ativos plataforma" : "Pessoas ativas"}</p>
           <p className="metric-value">{statsQuery.data?.activeUsers ?? 0}</p>
         </article>
         {isPlatformAdmin ? (
           <>
             <article className="metric-card min-w-0">
-              <p className="metric-label">Pessoas nesta conta</p>
-              <p className="metric-value">{statsQuery.data?.currentTenantUsers ?? 0}</p>
-            </article>
-            <article className="metric-card min-w-0">
-              <p className="metric-label">Pessoas ativas nesta conta</p>
-              <p className="metric-value">{statsQuery.data?.currentTenantActiveUsers ?? 0}</p>
-            </article>
-            <article className="metric-card min-w-0">
-              <p className="metric-label">Assinaturas ativas</p>
+              <p className="metric-label">Assinaturas MP</p>
               <p className="metric-value">{statsQuery.data?.billingActiveSubscriptions ?? 0}</p>
             </article>
             <article className="metric-card min-w-0">
-              <p className="metric-label">Billing com atenção</p>
+              <p className="metric-label">Billing alerta</p>
               <p className="metric-value">{statsQuery.data?.billingAttentionSubscriptions ?? 0}</p>
             </article>
             <article className="metric-card min-w-0">
-              <p className="metric-label">Fila de webhooks</p>
+              <p className="metric-label">Fila webhooks</p>
               <p className="metric-value">{statsQuery.data?.billingWebhookQueueDepth ?? 0}</p>
             </article>
             <article className="metric-card min-w-0">
-              <p className="metric-label">Falhas críticas</p>
+              <p className="metric-label">Falhas webhook</p>
               <p className="metric-value">{statsQuery.data?.billingWebhookFailures ?? 0}</p>
             </article>
           </>
         ) : null}
-        <article className="metric-card min-w-0"><p className="metric-label">Transações</p><p className="metric-value">{statsQuery.data?.totalTransactions ?? 0}</p></article>
+        {isPlatformAdmin ? null : (
+          <article className="metric-card min-w-0"><p className="metric-label">Transações</p><p className="metric-value">{statsQuery.data?.totalTransactions ?? 0}</p></article>
+        )}
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
+      <div className={adminSectionsLayoutClassName}>
         <section className="surface content-section">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0 flex-1">
@@ -1515,7 +1526,7 @@ export function AdminClient() {
               </Select>
             </div>
             {tenants.map((tenant) => (
-              <article key={tenant.id} className="data-card p-4">
+              <article key={tenant.id} className="data-card rounded-[1.6rem] p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <p className="break-words font-semibold">{tenant.name}</p>
@@ -1531,7 +1542,7 @@ export function AdminClient() {
                     <p className="text-xs text-[var(--color-muted-foreground)]">pessoas ativas</p>
                   </div>
                 </div>
-                <div className="mt-4 grid gap-3 lg:grid-cols-[1.15fr_0.85fr]">
+                <div className={`mt-4 grid gap-3 ${isPlatformAdmin ? "xl:grid-cols-2" : "lg:grid-cols-[1.15fr_0.85fr]"}`}>
                   <div className="muted-panel">
                     <p className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">Billing</p>
                     <p className="mt-2 text-sm font-semibold">
@@ -1569,6 +1580,9 @@ export function AdminClient() {
                       {tenant.billing.lastFinancialRepair ? (
                         <p className="leading-5">{tenant.billing.lastFinancialRepair.summary}</p>
                       ) : null}
+                      <p className="pt-1 leading-5">
+                        Ferramentas disponíveis: sincronizar billing, reprocessar fila, recalcular dízimo, sincronizar recorrências e conciliar parcelas.
+                      </p>
                     </div>
                     <div className="mt-4 flex flex-wrap gap-2">
                       <Button
@@ -1578,7 +1592,7 @@ export function AdminClient() {
                         type="button"
                         variant="secondary"
                       >
-                        {expandedTenantBillingId === tenant.id ? "Ocultar detalhes" : "Ver detalhes financeiros"}
+                        {expandedTenantBillingId === tenant.id ? "Ocultar suporte financeiro" : "Abrir suporte financeiro"}
                       </Button>
                     </div>
                   </div>
@@ -1588,7 +1602,7 @@ export function AdminClient() {
                     <div className="flex flex-wrap items-start justify-between gap-4">
                       <div className="min-w-0 flex-1">
                         <p className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">
-                          Drill-down financeiro
+                          Suporte financeiro e reparos
                         </p>
                         <p className="mt-2 text-sm text-[var(--color-muted-foreground)]">
                           Use este painel para suporte operacional, reconciliação de cobrança e leitura rápida dos últimos eventos.
@@ -1603,7 +1617,7 @@ export function AdminClient() {
                       </p>
                     ) : tenantBillingDetailsQuery.data ? (
                       <div className="mt-4 space-y-4">
-                        <div className="grid gap-3 lg:grid-cols-3">
+                        <div className={`grid gap-3 ${isPlatformAdmin ? "xl:grid-cols-2" : "lg:grid-cols-3"}`}>
                           <div className="muted-panel">
                             <p className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">Assinatura</p>
                             <div className="mt-2 space-y-1 text-xs text-[var(--color-muted-foreground)]">
@@ -1661,7 +1675,7 @@ export function AdminClient() {
                             <p className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">
                               Operações financeiras
                             </p>
-                            <div className="mt-3 flex flex-wrap gap-2">
+                            <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                               <Button
                                 disabled={!tenant.billing.preapprovalId || adminTenantBillingMutation.isPending}
                                 onClick={() =>
@@ -1723,7 +1737,7 @@ export function AdminClient() {
                                 Conciliar parcelas vencidas
                               </Button>
                             </div>
-                            <div className="mt-4 grid gap-2 lg:grid-cols-[minmax(0,180px)_auto]">
+                            <div className="mt-4 grid gap-2 lg:grid-cols-[minmax(0,220px)_auto]">
                               <div className="space-y-2">
                                 <Label htmlFor={`tenant-${tenant.id}-tithe-month`}>Competência do reparo</Label>
                                 <Input
@@ -1784,8 +1798,8 @@ export function AdminClient() {
                     Aplicar plano
                   </Button>
                 </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <div className="min-w-[12rem] flex-1 space-y-2">
+                <div className="mt-4 grid gap-3 xl:grid-cols-2">
+                  <div className="min-w-0 space-y-2">
                     <Label htmlFor={`tenant-${tenant.id}-trial-days`}>Dias de avaliação</Label>
                     <Input
                       id={`tenant-${tenant.id}-trial-days`}
@@ -1799,15 +1813,16 @@ export function AdminClient() {
                       }
                     />
                   </div>
-                  <Button
-                    className="self-end"
-                    onClick={() => submitTenantTrialDays(tenant)}
-                    type="button"
-                    variant="ghost"
-                  >
-                    Avaliação
-                  </Button>
-                  <div className="min-w-[14rem] flex-1 space-y-2">
+                    <Button
+                      className="w-full sm:w-auto"
+                      onClick={() => submitTenantTrialDays(tenant)}
+                      type="button"
+                      variant="ghost"
+                    >
+                      Aplicar avaliação
+                    </Button>
+                  </div>
+                  <div className="min-w-0 space-y-2">
                     <Label htmlFor={`tenant-${tenant.id}-expires-at`}>Expiração</Label>
                     <Input
                       id={`tenant-${tenant.id}-expires-at`}
@@ -1821,21 +1836,24 @@ export function AdminClient() {
                       }
                     />
                   </div>
-                  <Button
-                    className="self-end"
-                    onClick={() => submitTenantExpiryDate(tenant)}
-                    type="button"
-                    variant="ghost"
-                  >
-                    Expiração
-                  </Button>
-                  <Button
-                    onClick={() => updateTenantMutation.mutate({ id: tenant.id, isActive: !tenant.isActive })}
-                    type="button"
-                    variant="ghost"
-                  >
-                    {tenant.isActive ? "Desativar" : "Ativar"}
-                  </Button>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        className="w-full sm:w-auto"
+                        onClick={() => submitTenantExpiryDate(tenant)}
+                        type="button"
+                        variant="ghost"
+                      >
+                        Aplicar expiração
+                      </Button>
+                      <Button
+                        onClick={() => updateTenantMutation.mutate({ id: tenant.id, isActive: !tenant.isActive })}
+                        type="button"
+                        variant="ghost"
+                      >
+                        {tenant.isActive ? "Desativar conta" : "Ativar conta"}
+                      </Button>
+                    </div>
+                  </div>
                 </div>
                 {isPlatformAdmin ? (
                   <div className="danger-panel mt-4">
@@ -2345,9 +2363,11 @@ export function AdminClient() {
                 com o perfil <strong>Familiar</strong>, respeitando as limitações da carteira compartilhada.
               </p>
             </div>
-            <Button asChild className="w-full sm:w-auto">
-              <Link href="/dashboard/sharing">Abrir compartilhamento</Link>
-            </Button>
+            {isPlatformAdmin ? null : (
+              <Button asChild className="w-full sm:w-auto">
+                <Link href="/dashboard/sharing">Abrir compartilhamento</Link>
+              </Button>
+            )}
           </div>
         </section>
       )}

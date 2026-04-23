@@ -195,7 +195,7 @@ export function DashboardSidebarNav({ canManageSharing, isPlatformAdmin }: Dashb
                 "group flex items-center gap-3 rounded-[1.15rem] border border-transparent px-3.5 py-3 text-sm font-medium text-[var(--color-foreground)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[rgba(19,111,79,0.14)] hover:bg-[color-mix(in_srgb,var(--color-card)_82%,var(--color-muted))]",
                 isActive && "border-[rgba(19,111,79,0.18)] bg-[color-mix(in_srgb,var(--color-card)_82%,var(--color-muted))]"
               )}
-              href={`${item.href}?month=${month}`}
+              href={isPlatformAdmin ? item.href : (`${item.href}?month=${month}` as Route)}
             >
               <span
                 className={cn(

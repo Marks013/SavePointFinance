@@ -88,7 +88,7 @@ export async function DashboardShell({ children }: DashboardShellProps) {
             </div>
           </div>
           <p className="mt-3 text-sm leading-6 text-[var(--color-muted-foreground)]">
-            Navegação principal do ambiente financeiro.
+            {isPlatformAdmin ? "Navegação principal da administração da plataforma." : "Navegação principal do ambiente financeiro."}
           </p>
         </div>
 
