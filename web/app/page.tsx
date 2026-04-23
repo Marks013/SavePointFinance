@@ -141,7 +141,7 @@ export default function HomePage() {
                 </Link>
               </Button>
               <Button asChild variant="secondary">
-                <Link href="/billing">Assinar Premium</Link>
+                <Link href="/cadastro?plan=pro">Assinar Premium</Link>
               </Button>
             </div>
           </div>

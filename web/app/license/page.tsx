@@ -60,14 +60,26 @@ export default async function LicensePage() {
         </div>
 
         <div className="mt-8 rounded-[28px] border border-[var(--color-border)] bg-[var(--color-panel)]/82 p-5 text-sm leading-7 text-[var(--color-muted-foreground)]">
-          <p>
-            Se você for o administrador, abra a área administrativa da conta e revise a ativação, o plano e a data
-            de expiração. Se não for o administrador, entre em contato com o titular da conta.
-          </p>
+          {access.role === "admin" && !access.isPlatformAdmin ? (
+            <p>
+              Sua avaliação terminou ou a licença precisa de regularização. Para voltar a usar as funções premium,
+              assine o plano pelo checkout autenticado da própria conta.
+            </p>
+          ) : (
+            <p>
+              A conta precisa de regularização pelo administrador titular. Entre em contato com o Admin de Conta para
+              renovar a assinatura.
+            </p>
+          )}
         </div>
 
         <div className="mt-8 flex flex-wrap gap-3">
-          <Button asChild>
+          {access.role === "admin" && !access.isPlatformAdmin ? (
+            <Button asChild>
+              <Link href="/billing">Assinar Premium</Link>
+            </Button>
+          ) : null}
+          <Button asChild variant="secondary">
             <Link href="/login">Voltar ao login</Link>
           </Button>
         </div>

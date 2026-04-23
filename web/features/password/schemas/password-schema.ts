@@ -67,7 +67,32 @@ export const acceptInvitationSchema = z
     message: "Voce precisa aceitar a Politica de Privacidade"
   });
 
+export const publicRegistrationSchema = z
+  .object({
+    plan: z.enum(["free", "trial", "pro"]),
+    name: z.string().min(2, "Informe seu nome"),
+    organizationName: z.string().min(2, "Informe o nome da conta"),
+    email: z.string().trim().email("Informe um e-mail valido"),
+    password: z.string().min(8, "Minimo de 8 caracteres"),
+    confirmPassword: z.string().min(8, "Confirme a senha"),
+    acceptTermsOfUse: z.boolean(),
+    acceptPrivacyPolicy: z.boolean()
+  })
+  .refine((value) => value.password === value.confirmPassword, {
+    path: ["confirmPassword"],
+    message: "As senhas nao conferem"
+  })
+  .refine((value) => value.acceptTermsOfUse, {
+    path: ["acceptTermsOfUse"],
+    message: "Voce precisa aceitar os Termos de Uso"
+  })
+  .refine((value) => value.acceptPrivacyPolicy, {
+    path: ["acceptPrivacyPolicy"],
+    message: "Voce precisa aceitar a Politica de Privacidade"
+  });
+
 export type ForgotPasswordValues = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordValues = z.infer<typeof resetPasswordSchema>;
 export type InvitationValues = z.infer<typeof invitationSchema>;
 export type AcceptInvitationValues = z.infer<typeof acceptInvitationSchema>;
+export type PublicRegistrationValues = z.infer<typeof publicRegistrationSchema>;

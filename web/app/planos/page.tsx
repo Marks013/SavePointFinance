@@ -12,8 +12,8 @@ const planCards = [
     price: "R$ 0",
     cadence: "sem cobrança",
     tone: "muted",
-    href: "/login" as Route,
-    cta: "Entrar no plano gratuito",
+    href: "/cadastro?plan=free" as Route,
+    cta: "Criar conta gratuita",
     features: [
       { label: "1 conta financeira", enabled: true },
       { label: "1 cartão cadastrado", enabled: true },
@@ -30,8 +30,8 @@ const planCards = [
     price: "Assinatura",
     cadence: "via Mercado Pago",
     tone: "strong",
-    href: "/billing" as Route,
-    cta: "Entrar e assinar",
+    href: "/cadastro?plan=pro" as Route,
+    cta: "Criar conta e assinar",
     features: [
       { label: "Contas financeiras ilimitadas", enabled: true },
       { label: "Cartões ilimitados", enabled: true },
@@ -46,10 +46,10 @@ const planCards = [
     name: "Avaliação Premium",
     label: "Para testar recursos premium antes da assinatura",
     price: "14 dias",
-    cadence: "quando liberado para a conta",
+    cadence: "sem cobrança inicial",
     tone: "accent",
-    href: "/login" as Route,
-    cta: "Acessar avaliação",
+    href: "/cadastro?plan=trial" as Route,
+    cta: "Criar avaliação",
     features: [
       { label: "Recursos premium liberados", enabled: true },
       { label: "WhatsApp financeiro", enabled: true },
@@ -86,7 +86,7 @@ export default function PlansPage() {
             </p>
             <div className="flex flex-wrap gap-3">
               <Button asChild>
-                <Link href="/billing">
+                <Link href="/cadastro?plan=pro">
                   Assinar Premium
                   <ArrowRight className="size-4" />
                 </Link>
@@ -176,7 +176,7 @@ export default function PlansPage() {
             <h2 className="mt-3 text-2xl font-semibold tracking-[-0.04em]">Permissões e limites por plano</h2>
           </div>
           <Button asChild variant="secondary">
-            <Link href="/billing">Ir para checkout</Link>
+            <Link href="/cadastro?plan=pro">Criar conta e ir para checkout</Link>
           </Button>
         </div>
 
@@ -209,7 +209,7 @@ export default function PlansPage() {
           <LockKeyhole className="size-5 text-[var(--color-primary)]" />
           <h3 className="mt-4 text-lg font-semibold tracking-[-0.03em]">Conta necessária</h3>
           <p className="mt-2 text-sm leading-7 text-[var(--color-muted-foreground)]">
-            O checkout premium exige login para vincular a assinatura à conta correta.
+            O checkout premium cria a conta antes do pagamento para vincular a assinatura ao titular correto.
           </p>
         </article>
         <article className="muted-panel">

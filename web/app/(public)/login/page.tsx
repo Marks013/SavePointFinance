@@ -76,7 +76,7 @@ export default async function LoginPage() {
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3 text-center text-sm text-[var(--color-muted-foreground)]">
             <a href="/forgot-password">Esqueci minha senha</a>
             <span aria-hidden="true">•</span>
-            <Link href="/billing">Assinar Premium</Link>
+            <Link href="/cadastro?plan=pro">Assinar Premium</Link>
           </div>
         </div>
       </section>

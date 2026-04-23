@@ -336,10 +336,10 @@ async function getInvitations(filters: { search?: string; tenantId?: string }) {
   return (await response.json()) as { items: InvitationItem[] };
 }
 
-async function getAudit(filters: { search?: string; tenantId?: string; action?: string }) {
+async function getAudit(filters: { search?: string; tenantId?: string; action?: string; limit?: string }) {
   const response = await fetch(`/api/admin/audit${buildQuery(filters)}`, { cache: "no-store" });
   if (!response.ok) throw new Error("Falha ao carregar auditoria");
-  return (await response.json()) as { items: AuditItem[] };
+  return (await response.json()) as { items: AuditItem[]; limit: number };
 }
 
 export function AdminClient({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
@@ -381,6 +381,7 @@ export function AdminClient({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
   const [auditSearch, setAuditSearch] = useState("");
   const [auditTenantFilter, setAuditTenantFilter] = useState("");
   const [auditActionFilter, setAuditActionFilter] = useState("");
+  const [auditLimit, setAuditLimit] = useState("30");
   const [tenantTitheDrafts, setTenantTitheDrafts] = useState<Record<string, string>>({});
   const [tenantTrialDrafts, setTenantTrialDrafts] = useState<Record<string, string>>({});
   const [tenantExpiryDrafts, setTenantExpiryDrafts] = useState<Record<string, string>>({});
@@ -409,10 +410,12 @@ export function AdminClient({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
         status: tenantStatusFilter || undefined
       })
   });
+  const tenants = tenantsQuery.data?.items ?? [];
+  const activeTenantBillingId = expandedTenantBillingId ?? (isPlatformAdmin ? tenants[0]?.id : null);
   const tenantBillingDetailsQuery = useQuery({
-    queryKey: ["admin-tenant-billing", expandedTenantBillingId],
-    queryFn: () => getTenantBillingDetails(expandedTenantBillingId!),
-    enabled: Boolean(expandedTenantBillingId)
+    queryKey: ["admin-tenant-billing", activeTenantBillingId],
+    queryFn: () => getTenantBillingDetails(activeTenantBillingId!),
+    enabled: Boolean(activeTenantBillingId)
   });
   const usersQuery = useQuery({
     queryKey: [
@@ -446,16 +449,16 @@ export function AdminClient({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
       })
   });
   const auditQuery = useQuery({
-    queryKey: ["admin-audit", auditSearch, auditTenantFilter, auditActionFilter],
+    queryKey: ["admin-audit", auditSearch, auditTenantFilter, auditActionFilter, auditLimit],
     queryFn: () =>
       getAudit({
         search: auditSearch || undefined,
         tenantId: auditTenantFilter || undefined,
-        action: auditActionFilter || undefined
+        action: auditActionFilter || undefined,
+        limit: auditLimit
       })
   });
   const plans = plansQuery.data?.items ?? [];
-  const tenants = tenantsQuery.data?.items ?? [];
   const users = usersQuery.data?.items ?? [];
   const usersMeta = usersQuery.data;
   const invitations = invitationsQuery.data?.items ?? [];
@@ -1596,20 +1599,100 @@ export function AdminClient({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
                         Ferramentas disponíveis: sincronizar billing, reprocessar fila, recalcular dízimo, sincronizar recorrências e conciliar parcelas.
                       </p>
                     </div>
+                    {isPlatformAdmin ? (
+                      <div className="mt-4 max-w-[220px] space-y-2">
+                        <Label htmlFor={`tenant-${tenant.id}-tithe-month-inline`}>Competência do dízimo</Label>
+                        <Input
+                          id={`tenant-${tenant.id}-tithe-month-inline`}
+                          placeholder="2026-05"
+                          value={tenantTitheDrafts[tenant.id] ?? new Date().toISOString().slice(0, 7)}
+                          onChange={(event) =>
+                            setTenantTitheDrafts((current) => ({
+                              ...current,
+                              [tenant.id]: event.target.value
+                            }))
+                          }
+                        />
+                      </div>
+                    ) : null}
                     <div className="mt-4 flex flex-wrap gap-2">
+                      {isPlatformAdmin ? (
+                        <>
+                          <Button
+                            disabled={!tenant.billing.preapprovalId || adminTenantBillingMutation.isPending}
+                            onClick={() =>
+                              adminTenantBillingMutation.mutate({
+                                tenantId: tenant.id,
+                                action: "sync_subscription"
+                              })
+                            }
+                            type="button"
+                            variant="secondary"
+                          >
+                            Sincronizar billing
+                          </Button>
+                          <Button
+                            disabled={!tenant.billing.preapprovalId || adminTenantBillingMutation.isPending}
+                            onClick={() =>
+                              adminTenantBillingMutation.mutate({
+                                tenantId: tenant.id,
+                                action: "process_queue"
+                              })
+                            }
+                            type="button"
+                            variant="ghost"
+                          >
+                            Reprocessar fila
+                          </Button>
+                          <Button
+                            disabled={adminTenantBillingMutation.isPending}
+                            onClick={() => submitTenantTitheRecalculation(tenant)}
+                            type="button"
+                            variant="ghost"
+                          >
+                            Recalcular dízimo
+                          </Button>
+                          <Button
+                            disabled={adminTenantBillingMutation.isPending}
+                            onClick={() =>
+                              adminTenantBillingMutation.mutate({
+                                tenantId: tenant.id,
+                                action: "sync_due_subscriptions"
+                              })
+                            }
+                            type="button"
+                            variant="ghost"
+                          >
+                            Sincronizar recorrências
+                          </Button>
+                          <Button
+                            disabled={adminTenantBillingMutation.isPending}
+                            onClick={() =>
+                              adminTenantBillingMutation.mutate({
+                                tenantId: tenant.id,
+                                action: "reconcile_due_installments"
+                              })
+                            }
+                            type="button"
+                            variant="ghost"
+                          >
+                            Conciliar parcelas vencidas
+                          </Button>
+                        </>
+                      ) : null}
                       <Button
                         onClick={() =>
-                          setExpandedTenantBillingId((current) => (current === tenant.id ? null : tenant.id))
+                          setExpandedTenantBillingId(tenant.id)
                         }
                         type="button"
                         variant="secondary"
                       >
-                        {expandedTenantBillingId === tenant.id ? "Ocultar suporte financeiro" : "Abrir suporte financeiro"}
+                        {activeTenantBillingId === tenant.id ? "Detalhes financeiros abertos" : "Ver pagamentos e webhooks"}
                       </Button>
                     </div>
                   </div>
                 </div>
-                {expandedTenantBillingId === tenant.id ? (
+                {activeTenantBillingId === tenant.id ? (
                   <div className="mt-4 rounded-[1.4rem] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-card)_92%,var(--color-muted))] p-4">
                     <div className="flex flex-wrap items-start justify-between gap-4">
                       <div className="min-w-0 flex-1">
@@ -1685,95 +1768,11 @@ export function AdminClient({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
                         {isPlatformAdmin ? (
                           <div className="rounded-[1.2rem] border border-[var(--color-border)] bg-[var(--color-panel)] p-4">
                             <p className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">
-                              Operações financeiras
+                              Reparo de dízimo disponível no card
                             </p>
-                            <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                              <Button
-                                disabled={!tenant.billing.preapprovalId || adminTenantBillingMutation.isPending}
-                                onClick={() =>
-                                  adminTenantBillingMutation.mutate({
-                                    tenantId: tenant.id,
-                                    action: "sync_subscription"
-                                  })
-                                }
-                                type="button"
-                                variant="secondary"
-                              >
-                                Sincronizar billing
-                              </Button>
-                              <Button
-                                disabled={!tenant.billing.preapprovalId || adminTenantBillingMutation.isPending}
-                                onClick={() =>
-                                  adminTenantBillingMutation.mutate({
-                                    tenantId: tenant.id,
-                                    action: "process_queue"
-                                  })
-                                }
-                                type="button"
-                                variant="ghost"
-                              >
-                                Reprocessar fila
-                              </Button>
-                              <Button
-                                disabled={adminTenantBillingMutation.isPending}
-                                onClick={() => submitTenantTitheRecalculation(tenant)}
-                                type="button"
-                                variant="ghost"
-                              >
-                                Recalcular dízimo
-                              </Button>
-                              <Button
-                                disabled={adminTenantBillingMutation.isPending}
-                                onClick={() =>
-                                  adminTenantBillingMutation.mutate({
-                                    tenantId: tenant.id,
-                                    action: "sync_due_subscriptions"
-                                  })
-                                }
-                                type="button"
-                                variant="ghost"
-                              >
-                                Sincronizar recorrências
-                              </Button>
-                              <Button
-                                disabled={adminTenantBillingMutation.isPending}
-                                onClick={() =>
-                                  adminTenantBillingMutation.mutate({
-                                    tenantId: tenant.id,
-                                    action: "reconcile_due_installments"
-                                  })
-                                }
-                                type="button"
-                                variant="ghost"
-                              >
-                                Conciliar parcelas vencidas
-                              </Button>
-                            </div>
-                            <div className="mt-4 grid gap-2 lg:grid-cols-[minmax(0,220px)_auto]">
-                              <div className="space-y-2">
-                                <Label htmlFor={`tenant-${tenant.id}-tithe-month`}>Competência do reparo</Label>
-                                <Input
-                                  id={`tenant-${tenant.id}-tithe-month`}
-                                  placeholder="2026-05"
-                                  value={tenantTitheDrafts[tenant.id] ?? new Date().toISOString().slice(0, 7)}
-                                  onChange={(event) =>
-                                    setTenantTitheDrafts((current) => ({
-                                      ...current,
-                                      [tenant.id]: event.target.value
-                                    }))
-                                  }
-                                />
-                              </div>
-                              <Button
-                                className="lg:self-end"
-                                disabled={adminTenantBillingMutation.isPending}
-                                onClick={() => submitTenantTitheRecalculation(tenant)}
-                                type="button"
-                                variant="secondary"
-                              >
-                                Aplicar reparo
-                              </Button>
-                            </div>
+                            <p className="mt-2 text-sm leading-6 text-[var(--color-muted-foreground)]">
+                              O campo de competência e o botão de recálculo ficam sempre visíveis no suporte operacional acima.
+                            </p>
                           </div>
                         ) : null}
                       </div>
@@ -2067,10 +2066,11 @@ export function AdminClient({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
                           </Button>
                         ) : null}
                         <div className="min-w-[14rem] flex-1 space-y-2 xl:max-w-xs">
-                          <Label htmlFor={`user-${user.id}-password`}>Nova senha</Label>
+                          <Label htmlFor={`user-${user.id}-password`}>Definir nova senha</Label>
                           <Input
                             id={`user-${user.id}-password`}
-                            placeholder="Ao menos 8 caracteres"
+                            autoComplete="new-password"
+                            placeholder="Senha temporária, mínimo 8 caracteres"
                             type="password"
                             value={userPasswordDrafts[user.id] ?? ""}
                             onChange={(event) =>
@@ -2080,14 +2080,18 @@ export function AdminClient({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
                               }))
                             }
                           />
+                          <p className="text-xs leading-5 text-[var(--color-muted-foreground)]">
+                            Este painel não envia link: ele grava a nova senha informada pelo suporte.
+                          </p>
                         </div>
                         <Button
                           className="self-end"
+                          disabled={(userPasswordDrafts[user.id] ?? "").length < 8 || resetPasswordMutation.isPending}
                           onClick={() => submitUserPasswordReset(user)}
                           type="button"
                           variant="secondary"
                         >
-                          Resetar senha
+                          Salvar nova senha
                         </Button>
                         <Button
                           onClick={() => toggleActiveMutation.mutate({ id: user.id, isActive: !user.isActive })}
@@ -2397,6 +2401,7 @@ export function AdminClient({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
           <article className="metric-card w-full sm:w-auto">
             <p className="metric-label">No recorte</p>
             <p className="metric-value">{auditItems.length}</p>
+            <p className="text-xs text-[var(--color-muted-foreground)]">máx. {auditLimit} linhas</p>
           </article>
         </div>
         <div className="mt-6 space-y-3">
@@ -2406,7 +2411,7 @@ export function AdminClient({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
               Filtre eventos por conta ou ação para ler decisões sensíveis com mais contexto e menos ruído.
             </p>
           </div>
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="grid gap-3 md:grid-cols-4">
             <Input
               onChange={(event) => setAuditSearch(event.target.value)}
               placeholder="Encontre eventos, pessoas ou contas"
@@ -2440,6 +2445,11 @@ export function AdminClient({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
               <option value="finance.tithe.recalculated">Dízimo recalculado</option>
               <option value="finance.subscriptions.synced">Recorrências sincronizadas</option>
               <option value="finance.installments.reconciled">Parcelas conciliadas</option>
+            </Select>
+            <Select onChange={(event) => setAuditLimit(event.target.value)} value={auditLimit}>
+              <option value="30">30 linhas</option>
+              <option value="60">60 linhas</option>
+              <option value="100">100 linhas</option>
             </Select>
           </div>
           {auditItems.map((item) => (

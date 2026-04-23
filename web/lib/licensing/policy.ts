@@ -44,10 +44,11 @@ export type TenantLicenseState = {
 
 export function resolveTenantLicenseState(tenant: TenantLicenseTarget, now = new Date()): TenantLicenseState {
   const tier = tenant.planConfig.tier;
-  const isExpired = Boolean(tenant.expiresAt && tenant.expiresAt < now);
+  const isTrialPlan = tier === "pro" && tenant.planConfig.trialDays > 0;
+  const isTrialExpired = Boolean(isTrialPlan && tenant.trialExpiresAt && tenant.trialExpiresAt < now && !tenant.expiresAt);
+  const isExpired = Boolean((tenant.expiresAt && tenant.expiresAt < now) || isTrialExpired);
   const isTrial =
-    tier === "pro" &&
-    tenant.planConfig.trialDays > 0 &&
+    isTrialPlan &&
     Boolean(tenant.trialExpiresAt && tenant.trialExpiresAt >= now && !tenant.expiresAt);
 
   let status: TenantLicenseStatus = tier === "pro" ? "premium" : "free";
@@ -58,7 +59,7 @@ export function resolveTenantLicenseState(tenant: TenantLicenseTarget, now = new
     statusLabel = !tenant.planConfig.isActive ? "Plano inativo" : "Organização inativa";
   } else if (isExpired) {
     status = "expired";
-    statusLabel = "Licença expirada";
+    statusLabel = isTrialExpired ? "Avaliação expirada" : "Licença expirada";
   } else if (isTrial) {
     status = "trial";
     statusLabel = "Avaliação Premium";

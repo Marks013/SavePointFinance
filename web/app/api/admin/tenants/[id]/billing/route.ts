@@ -206,6 +206,38 @@ export async function POST(request: Request, context: Params) {
         );
       }
 
+      const incomeTransactions = await prisma.transaction.findMany({
+        where: {
+          tenantId: id,
+          type: "income",
+          competence: body.monthKey
+        },
+        select: {
+          id: true,
+          amount: true,
+          titheAmount: true,
+          user: {
+            select: {
+              name: true,
+              email: true
+            }
+          }
+        }
+      });
+      const eligibleIncomeTransactions = incomeTransactions.filter((transaction) => Number(transaction.titheAmount ?? 0) > 0);
+      const usersWithIncome = Array.from(
+        new Set(
+          incomeTransactions.map((transaction) => transaction.user?.name || transaction.user?.email || "usuário sem vínculo").filter(Boolean)
+        )
+      );
+      const usersWithEligibleTithe = Array.from(
+        new Set(
+          eligibleIncomeTransactions
+            .map((transaction) => transaction.user?.name || transaction.user?.email || "usuário sem vínculo")
+            .filter(Boolean)
+        )
+      );
+
       await syncTitheForMonthKeys({
         tenantId: id,
         userId: tenantUser.id,
@@ -237,15 +269,25 @@ export async function POST(request: Request, context: Params) {
           monthKey: body.monthKey,
           autoTitheTransactionId: autoTitheTransaction?.id ?? null,
           autoTitheAmount: autoTitheTransaction ? Number(autoTitheTransaction.amount) : 0,
+          incomeCount: incomeTransactions.length,
+          eligibleIncomeCount: eligibleIncomeTransactions.length,
+          usersWithIncome,
+          usersWithEligibleTithe,
           executedWithUserEmail: tenantUser.email
         }
       });
 
+      const userSample = usersWithIncome.slice(0, 4).join(", ");
+      const remainingUsers = Math.max(usersWithIncome.length - 4, 0);
+      const userSummary = userSample ? `${userSample}${remainingUsers > 0 ? ` e mais ${remainingUsers}` : ""}` : "nenhum usuário";
+
       return NextResponse.json({
         success: true,
         message: autoTitheTransaction
-          ? `Dízimo de ${body.monthKey} recalculado com sucesso`
-          : `Não havia receita com dízimo em ${body.monthKey}; o lançamento automático foi removido`
+          ? `Dízimo de ${body.monthKey} recalculado com sucesso a partir de ${eligibleIncomeTransactions.length} receita(s) marcada(s). Usuários identificados: ${userSummary}`
+          : incomeTransactions.length > 0
+            ? `Encontramos ${incomeTransactions.length} receita(s) em ${body.monthKey}, mas nenhuma estava marcada para dízimo. Usuários identificados: ${userSummary}. O lançamento automático antigo foi removido.`
+            : `Não havia receita em ${body.monthKey}; o lançamento automático foi removido`
       });
     }
 

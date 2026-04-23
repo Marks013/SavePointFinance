@@ -11,6 +11,8 @@ export async function GET(request: Request) {
     const tenantId = searchParams.get("tenantId")?.trim();
     const action = searchParams.get("action")?.trim();
     const search = searchParams.get("search")?.trim();
+    const requestedLimit = Number(searchParams.get("limit") ?? 30);
+    const take = [30, 60, 100].includes(requestedLimit) ? requestedLimit : 30;
     const filters: Prisma.AdminAuditLogWhereInput[] = [];
 
     if (admin.isPlatformAdmin) {
@@ -70,10 +72,11 @@ export async function GET(request: Request) {
       orderBy: {
         createdAt: "desc"
       },
-      take: 100
+      take
     });
 
     return NextResponse.json({
+      limit: take,
       items: items.map((item) => ({
         id: item.id,
         action: item.action,
