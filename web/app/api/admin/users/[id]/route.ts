@@ -47,8 +47,6 @@ export async function PATCH(request: Request, context: Params) {
       data.role = body.role;
     }
 
-    if (body.newPassword) data.passwordHash = await hash(body.newPassword, 10);
-
     if (admin.id === id && body.isActive === false) {
       return NextResponse.json({ message: "Voce nao pode desativar sua propria conta" }, { status: 400 });
     }
@@ -72,6 +70,17 @@ export async function PATCH(request: Request, context: Params) {
 
     if (target.isPlatformAdmin && admin.id !== target.id) {
       return NextResponse.json({ message: "Somente o superadmin pode alterar esta conta" }, { status: 403 });
+    }
+
+    if (body.newPassword) {
+      if (admin.isPlatformAdmin) {
+        return NextResponse.json(
+          { message: "O superadmin deve usar o fluxo de link de redefinição, sem definir senhas manualmente" },
+          { status: 403 }
+        );
+      }
+
+      data.passwordHash = await hash(body.newPassword, 10);
     }
 
     if (body.tenantId) {

@@ -77,18 +77,22 @@ export async function GET() {
           isActive: true
         }
       }),
-      prisma.billingWebhookEvent.count({
-        where: {
-          status: {
-            in: ["pending", "processing", "failed"]
-          }
-        }
-      }),
-      prisma.billingWebhookEvent.count({
-        where: {
-          status: "dead_letter"
-        }
-      }),
+      admin.isPlatformAdmin
+        ? prisma.billingWebhookEvent.count({
+            where: {
+              status: {
+                in: ["pending", "processing", "failed"]
+              }
+            }
+          })
+        : Promise.resolve(0),
+      admin.isPlatformAdmin
+        ? prisma.billingWebhookEvent.count({
+            where: {
+              status: "dead_letter"
+            }
+          })
+        : Promise.resolve(0),
       admin.isPlatformAdmin ? getRetentionStats(now) : Promise.resolve(null),
       prisma.user.count({ where: currentTenantUserScope }),
       prisma.user.count({ where: { ...currentTenantUserScope, isActive: true } })

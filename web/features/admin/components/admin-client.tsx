@@ -1217,26 +1217,26 @@ export function AdminClient({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
           <strong>{isPlatformAdmin ? "Modo operação." : "Planos por conta."}</strong> {adminIntroBanner}
         </div>
         {isPlatformAdmin ? (
-          <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-5 grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
             <article className="rounded-[1.4rem] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-card)_90%,var(--color-muted))] p-4">
               <p className="text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-[var(--color-muted-foreground)]">Contas ativas</p>
               <p className="mt-3 text-2xl font-semibold tracking-[-0.04em]">{statsQuery.data?.activeTenants ?? 0}</p>
-              <p className="mt-2 text-sm leading-6 text-[var(--color-muted-foreground)]">Tenants operando normalmente.</p>
+                  <p className="mt-2 text-sm leading-6 text-[var(--color-muted-foreground)]">Operação estável nas contas ativas.</p>
             </article>
             <article className="rounded-[1.4rem] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-card)_90%,var(--color-muted))] p-4">
               <p className="text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-[var(--color-muted-foreground)]">Billing alerta</p>
               <p className="mt-3 text-2xl font-semibold tracking-[-0.04em]">{statsQuery.data?.billingAttentionSubscriptions ?? 0}</p>
-              <p className="mt-2 text-sm leading-6 text-[var(--color-muted-foreground)]">Assinaturas que pedem ação.</p>
+                  <p className="mt-2 text-sm leading-6 text-[var(--color-muted-foreground)]">Assinaturas que pedem atenção.</p>
             </article>
             <article className="rounded-[1.4rem] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-card)_90%,var(--color-muted))] p-4">
               <p className="text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-[var(--color-muted-foreground)]">Fila webhook</p>
               <p className="mt-3 text-2xl font-semibold tracking-[-0.04em]">{statsQuery.data?.billingWebhookQueueDepth ?? 0}</p>
-              <p className="mt-2 text-sm leading-6 text-[var(--color-muted-foreground)]">Eventos aguardando processamento.</p>
+                  <p className="mt-2 text-sm leading-6 text-[var(--color-muted-foreground)]">Eventos pendentes na fila de billing.</p>
             </article>
             <article className="rounded-[1.4rem] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-card)_90%,var(--color-muted))] p-4">
               <p className="text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-[var(--color-muted-foreground)]">Usuários ativos</p>
               <p className="mt-3 text-2xl font-semibold tracking-[-0.04em]">{statsQuery.data?.activeUsers ?? 0}</p>
-              <p className="mt-2 text-sm leading-6 text-[var(--color-muted-foreground)]">Acesso ativo na plataforma.</p>
+                  <p className="mt-2 text-sm leading-6 text-[var(--color-muted-foreground)]">Pessoas com acesso ativo hoje.</p>
             </article>
           </div>
         ) : null}
@@ -1826,7 +1826,7 @@ export function AdminClient({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
                   <div className="muted-panel rounded-[1.3rem] p-4">
                     <p className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">Suporte operacional</p>
                     <div className="mt-2 space-y-1 text-xs text-[var(--color-muted-foreground)]">
-                      <p className="break-all">Preapproval: {tenant.billing.preapprovalId ?? "não vinculado"}</p>
+                              <p className="break-words">Preapproval: {tenant.billing.preapprovalId ?? "não vinculado"}</p>
                       <p>
                         Cancelamento agendado: {tenant.billing.cancelRequestedAt ? formatDateTimeDisplay(tenant.billing.cancelRequestedAt) : "não"}
                       </p>
@@ -1961,8 +1961,8 @@ export function AdminClient({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
                             <p className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">Assinatura</p>
                             <div className="mt-2 space-y-1 text-xs text-[var(--color-muted-foreground)]">
                               <p>Status: {formatBillingSubscriptionLabel(tenantBillingDetailsQuery.data.subscription?.status ?? null)}</p>
-                              <p className="break-all">Preapproval: {tenantBillingDetailsQuery.data.subscription?.mercadoPagoPreapprovalId ?? "não vinculado"}</p>
-                              <p className="break-all">Pagador: {tenantBillingDetailsQuery.data.subscription?.payerEmail || "não informado"}</p>
+                              <p className="break-words">Preapproval: {tenantBillingDetailsQuery.data.subscription?.mercadoPagoPreapprovalId ?? "não vinculado"}</p>
+                              <p className="break-words">Pagador: {tenantBillingDetailsQuery.data.subscription?.payerEmail || "não informado"}</p>
                               <p>
                                 Próxima cobrança:{" "}
                                 {tenantBillingDetailsQuery.data.subscription?.nextBillingAt
@@ -1977,7 +1977,7 @@ export function AdminClient({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
                               {tenantBillingDetailsQuery.data.subscription?.payments.length ? (
                                 tenantBillingDetailsQuery.data.subscription.payments.map((payment) => (
                                   <div key={payment.id} className="rounded-2xl border border-[var(--color-border)] px-3 py-2">
-                                    <p className="break-all font-medium text-[var(--color-foreground)]">
+                                    <p className="break-words font-medium text-[var(--color-foreground)]">
                                       {payment.providerPaymentId}
                                     </p>
                                     <p>
@@ -2000,7 +2000,9 @@ export function AdminClient({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
                                     <p className="font-medium text-[var(--color-foreground)]">{event.topic}</p>
                                     <p>{event.status} • tentativas {event.attempts}</p>
                                     <p>{formatDateTimeDisplay(event.createdAt)}</p>
-                                    {event.error ? <p className="line-clamp-2 text-[var(--color-destructive)]">{event.error}</p> : null}
+                                    {event.error ? (
+                                      <p className="break-words text-[var(--color-destructive)]">{event.error}</p>
+                                    ) : null}
                                   </div>
                                 ))
                               ) : (
@@ -2264,10 +2266,10 @@ export function AdminClient({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
             <div className="space-y-3">
                 {users.map((user) => (
                   <article key={user.id} className="data-card p-4">
-                    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(280px,auto)] xl:items-start">
+                    <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_minmax(320px,auto)] 2xl:items-start">
                       <div className="min-w-0 space-y-1">
                         <p className="break-words font-semibold">{user.name}</p>
-                        <p className="break-all text-sm leading-6 text-[var(--color-muted-foreground)]">
+                        <p className="break-words text-sm leading-6 text-[var(--color-muted-foreground)]">
                           {user.email} • {user.tenant.name}
                           {user.isPlatformAdmin ? " • Superadmin" : ""}
                         </p>
@@ -2715,8 +2717,8 @@ export function AdminClient({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
             <article key={item.id} className="data-card p-4">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-semibold">{item.summary}</p>
-                  <p className="text-sm text-[var(--color-muted-foreground)] break-all">
+                  <p className="break-words font-semibold leading-6">{item.summary}</p>
+                  <p className="break-words text-sm text-[var(--color-muted-foreground)]">
                     {item.actorUser.name} • {item.actorUser.email}
                     {item.targetTenant ? ` • ${item.targetTenant.name}` : ""}
                     {item.targetUser ? ` • ${item.targetUser.email}` : ""}
