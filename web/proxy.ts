@@ -33,8 +33,12 @@ function createNonce() {
   return btoa(value);
 }
 
-function buildContentSecurityPolicy(nonce: string) {
-  const mercadoPagoSources = "https://sdk.mercadopago.com https://*.mercadopago.com https://*.mercadopago.com.br https://*.mercadolibre.com";
+function buildContentSecurityPolicy(nonce: string, options: { allowMercadoPagoCheckout?: boolean } = {}) {
+  const mercadoPagoSources =
+    "https://sdk.mercadopago.com https://*.mercadopago.com https://*.mercadopago.com.br https://*.mercadolibre.com https://*.mlstatic.com";
+  const scriptElementPolicy = options.allowMercadoPagoCheckout
+    ? `script-src-elem 'self' 'unsafe-inline' 'nonce-${nonce}' ${mercadoPagoSources}`
+    : `script-src-elem 'self' 'nonce-${nonce}'`;
 
   return [
     "default-src 'self'",
@@ -46,7 +50,7 @@ function buildContentSecurityPolicy(nonce: string) {
     "font-src 'self' data:",
     isProduction ? `connect-src 'self' ${mercadoPagoSources}` : "connect-src 'self' ws: wss: http: https:",
     `script-src 'self' 'nonce-${nonce}' 'unsafe-eval'`,
-    `script-src-elem 'self' 'nonce-${nonce}' ${mercadoPagoSources}`,
+    scriptElementPolicy,
     "script-src-attr 'none'",
     "style-src 'self' 'unsafe-inline'",
     `frame-src 'self' ${mercadoPagoSources}`,
@@ -81,7 +85,9 @@ export function proxy(request: NextRequest) {
   const sanitizedSearch = sanitizeSearchParams(request.nextUrl.searchParams);
   const token = request.nextUrl.searchParams.get("token")?.trim();
   const nonce = createNonce();
-  const contentSecurityPolicy = buildContentSecurityPolicy(nonce);
+  const contentSecurityPolicy = buildContentSecurityPolicy(nonce, {
+    allowMercadoPagoCheckout: pathname === "/billing"
+  });
 
   requestHeaders.set("x-nonce", nonce);
   requestHeaders.set("Content-Security-Policy", contentSecurityPolicy);
