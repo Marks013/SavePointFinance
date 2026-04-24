@@ -80,11 +80,17 @@ export function getDefaultBillingSettings(): BillingSettings {
 }
 
 export async function getBillingSettings() {
-  const setting = await prisma.platformSetting.findUnique({
-    where: {
-      key: BILLING_SETTINGS_KEY
-    }
-  });
+  let setting: Awaited<ReturnType<typeof prisma.platformSetting.findUnique>>;
+
+  try {
+    setting = await prisma.platformSetting.findUnique({
+      where: {
+        key: BILLING_SETTINGS_KEY
+      }
+    });
+  } catch {
+    return getDefaultBillingSettings();
+  }
 
   if (!setting) {
     return getDefaultBillingSettings();
