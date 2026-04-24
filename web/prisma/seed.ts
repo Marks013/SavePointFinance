@@ -22,7 +22,15 @@ const prisma = new PrismaClient({
 });
 
 async function main() {
-  const passwordHash = await hash("changeme123", 10);
+  const adminEmail = process.env.ADMIN_EMAIL?.trim() || "admin@savepoint.local";
+  const adminPassword = process.env.ADMIN_PASSWORD?.trim() || "changeme123";
+  const ownerEmail = process.env.LOCAL_OWNER_EMAIL?.trim() || "owner@savepoint.local";
+  const ownerPassword = process.env.LOCAL_OWNER_PASSWORD?.trim() || adminPassword;
+  const familyEmail = process.env.FAMILY_USER_EMAIL?.trim();
+  const familyPassword = process.env.FAMILY_USER_PASSWORD?.trim();
+  const passwordHash = await hash(adminPassword, 10);
+  const ownerPasswordHash = await hash(ownerPassword, 10);
+  const familyPasswordHash = familyPassword ? await hash(familyPassword, 10) : null;
   await ensureDefaultPlans(prisma);
   const bootstrapPlan = await getPreferredBootstrapPlan(prisma);
 
@@ -54,7 +62,7 @@ async function main() {
 
   const user = await prisma.user.upsert({
     where: {
-      email: "admin@savepoint.local"
+      email: adminEmail
     },
     update: {
       passwordHash,
@@ -64,7 +72,7 @@ async function main() {
     },
     create: {
       tenantId: tenant.id,
-      email: "admin@savepoint.local",
+      email: adminEmail,
       name: "Administrador SavePoint",
       passwordHash,
       role: UserRole.admin,
@@ -72,15 +80,71 @@ async function main() {
     }
   });
 
-  await prisma.userPreference.upsert({
+  const owner = await prisma.user.upsert({
     where: {
-      userId: user.id
+      email: ownerEmail
     },
-    update: {},
+    update: {
+      tenantId: tenant.id,
+      passwordHash: ownerPasswordHash,
+      role: UserRole.admin,
+      isPlatformAdmin: false,
+      isActive: true
+    },
     create: {
-      userId: user.id
+      tenantId: tenant.id,
+      email: ownerEmail,
+      name: "Titular SavePoint",
+      passwordHash: ownerPasswordHash,
+      role: UserRole.admin,
+      isPlatformAdmin: false
     }
   });
+
+  for (const seededUser of [user, owner]) {
+    await prisma.userPreference.upsert({
+      where: {
+        userId: seededUser.id
+      },
+      update: {},
+      create: {
+        userId: seededUser.id
+      }
+    });
+  }
+
+  if (familyEmail && familyPasswordHash) {
+    const family = await prisma.user.upsert({
+      where: {
+        email: familyEmail
+      },
+      update: {
+        tenantId: tenant.id,
+        passwordHash: familyPasswordHash,
+        role: UserRole.member,
+        isPlatformAdmin: false,
+        isActive: true
+      },
+      create: {
+        tenantId: tenant.id,
+        email: familyEmail,
+        name: "Familiar SavePoint",
+        passwordHash: familyPasswordHash,
+        role: UserRole.member,
+        isPlatformAdmin: false
+      }
+    });
+
+    await prisma.userPreference.upsert({
+      where: {
+        userId: family.id
+      },
+      update: {},
+      create: {
+        userId: family.id
+      }
+    });
+  }
 
   await prisma.financialAccount.upsert({
     where: {

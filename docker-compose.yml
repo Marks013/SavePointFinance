@@ -222,6 +222,8 @@ services:
                -c 'maintenance_work_mem=512MB'
     volumes:
       - savepoint_postgres:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
     networks:
       - savepoint
 

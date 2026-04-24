@@ -1,6 +1,8 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -17,6 +19,7 @@ type ResetPasswordFormProps = {
 };
 
 export function ResetPasswordForm({ initialToken = "" }: ResetPasswordFormProps) {
+  const router = useRouter();
   const form = useForm<z.input<typeof resetPasswordSchema>, unknown, ResetPasswordValues>({
     resolver: zodResolver(resetPasswordSchema),
     defaultValues: {
@@ -25,6 +28,12 @@ export function ResetPasswordForm({ initialToken = "" }: ResetPasswordFormProps)
       confirmPassword: ""
     }
   });
+
+  useEffect(() => {
+    if (initialToken && window.location.search.includes("token=")) {
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  }, [initialToken]);
 
   return (
     <form
@@ -45,6 +54,7 @@ export function ResetPasswordForm({ initialToken = "" }: ResetPasswordFormProps)
             });
 
             toast.success("Senha redefinida");
+            router.replace("/login");
           } catch (error) {
             captureUnexpectedError(error, {
               surface: "client-form",

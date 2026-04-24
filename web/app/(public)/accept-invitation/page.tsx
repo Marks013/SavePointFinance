@@ -1,5 +1,6 @@
 import { AcceptInvitationForm } from "@/features/invitations/components/accept-invitation-form";
 import { BrandMark } from "@/components/layout/brand-mark";
+import { cookies } from "next/headers";
 
 type AcceptInvitationPageProps = {
   searchParams: Promise<{
@@ -9,6 +10,8 @@ type AcceptInvitationPageProps = {
 
 export default async function AcceptInvitationPage({ searchParams }: AcceptInvitationPageProps) {
   const params = await searchParams;
+  const cookieStore = await cookies();
+  const token = params.token ?? cookieStore.get("savepoint-invitation-token")?.value ?? "";
 
   return (
     <main id="main-content" className="page-shell grid min-h-screen items-center py-8">
@@ -32,7 +35,7 @@ export default async function AcceptInvitationPage({ searchParams }: AcceptInvit
             </p>
           </div>
           <div className="mt-8">
-            <AcceptInvitationForm initialToken={params.token ?? ""} />
+            <AcceptInvitationForm initialToken={token} />
           </div>
         </section>
       </section>

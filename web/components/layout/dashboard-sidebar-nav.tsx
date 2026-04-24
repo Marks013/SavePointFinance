@@ -55,7 +55,8 @@ export function DashboardSidebarNav({ canManageSharing, isPlatformAdmin }: Dashb
   const router = useRouter();
   const searchParams = useSearchParams();
   const month = normalizeMonthKey(searchParams.get("month"));
-  const [draftMonth, setDraftMonth] = useState(month);
+  const [draftMonthState, setDraftMonthState] = useState({ sourceMonth: month, value: month });
+  const draftMonth = draftMonthState.sourceMonth === month ? draftMonthState.value : month;
   const [isPending, startTransition] = useTransition();
   const items = isPlatformAdmin
     ? platformAdminNavigation
@@ -78,12 +79,12 @@ export function DashboardSidebarNav({ canManageSharing, isPlatformAdmin }: Dashb
   const commitMonth = useCallback(
     (nextMonth: string) => {
       if (!isValidMonthKey(nextMonth)) {
-        setDraftMonth(month);
+        setDraftMonthState({ sourceMonth: month, value: month });
         return;
       }
 
       const normalizedMonth = normalizeMonthKey(nextMonth);
-      setDraftMonth(normalizedMonth);
+      setDraftMonthState({ sourceMonth: normalizedMonth, value: normalizedMonth });
 
       startTransition(() => {
         router.replace(buildMonthRoute(normalizedMonth), { scroll: false });
@@ -101,12 +102,8 @@ export function DashboardSidebarNav({ canManageSharing, isPlatformAdmin }: Dashb
       return;
     }
 
-    commitMonth(getCurrentMonthKey());
-  }, [commitMonth, isPlatformAdmin, searchParams]);
-
-  useEffect(() => {
-    setDraftMonth(month);
-  }, [month]);
+    router.replace(buildMonthRoute(getCurrentMonthKey()), { scroll: false });
+  }, [buildMonthRoute, isPlatformAdmin, router, searchParams]);
 
   return (
     <>
@@ -135,12 +132,12 @@ export function DashboardSidebarNav({ canManageSharing, isPlatformAdmin }: Dashb
               value={draftMonth}
               onBlur={() => {
                 if (!isValidMonthKey(draftMonth)) {
-                  setDraftMonth(month);
+                  setDraftMonthState({ sourceMonth: month, value: month });
                 }
               }}
               onChange={(event) => {
                 const nextMonth = event.target.value;
-                setDraftMonth(nextMonth);
+                setDraftMonthState({ sourceMonth: month, value: nextMonth });
 
                 if (isValidMonthKey(nextMonth)) {
                   commitMonth(nextMonth);

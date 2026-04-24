@@ -139,7 +139,9 @@ async function acceptInvitation(token: string, name: string, password: string) {
       token,
       name,
       password,
-      confirmPassword: password
+      confirmPassword: password,
+      acceptTermsOfUse: true,
+      acceptPrivacyPolicy: true
     })
   });
 
@@ -230,7 +232,10 @@ async function run() {
     const adminInvitedJar = await signIn(adminInviteEmail, adminInvitedPassword);
     const isolatedAccounts = await getJson<{ items: Array<{ id: string }> }>(adminInvitedJar, "/api/accounts");
     const isolatedCards = await getJson<{ items: Array<{ id: string }> }>(adminInvitedJar, "/api/cards");
-    const isolatedTransactions = await getJson<{ items: Array<{ id: string }> }>(adminInvitedJar, "/api/transactions?limit=20");
+    const isolatedTransactions = await getJson<{ items: Array<{ id: string }> }>(
+      adminInvitedJar,
+      "/api/transactions?month=2026-04&limit=20"
+    );
     assertCondition(isolatedAccounts.status === 200 && isolatedAccounts.payload.items.length === 0, "Convite Admin recebeu contas indevidas");
     assertCondition(isolatedCards.status === 200 && isolatedCards.payload.items.length === 0, "Convite Admin recebeu cartoes indevidos");
     assertCondition(
@@ -288,6 +293,7 @@ async function run() {
         userId: owner.id,
         accountId: sharedAccount.id,
         date: new Date("2026-04-07T12:00:00Z"),
+        competence: "2026-04",
         amount: 123.45,
         description: "Lancamento compartilhado auditoria",
         type: "expense",
@@ -328,7 +334,7 @@ async function run() {
     const familyAccounts = await getJson<{ items: Array<{ id: string; name: string }> }>(familyJar, "/api/accounts");
     const familyTransactions = await getJson<{ items: Array<{ id: string; description: string }> }>(
       familyJar,
-      "/api/transactions?limit=20"
+      "/api/transactions?month=2026-04&limit=20"
     );
 
     assertCondition(

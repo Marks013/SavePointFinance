@@ -415,7 +415,9 @@ async function run() {
         token,
         name: "Pessoa Convidada",
         password: "Senha123!",
-        confirmPassword: "Senha987!"
+        confirmPassword: "Senha987!",
+        acceptTermsOfUse: true,
+        acceptPrivacyPolicy: true
       })
     });
     const mismatchPayload = (await mismatchAccept.json()) as { message?: string };
@@ -429,7 +431,9 @@ async function run() {
         token,
         name: "Pessoa Convidada",
         password: "Senha123!",
-        confirmPassword: "Senha123!"
+        confirmPassword: "Senha123!",
+        acceptTermsOfUse: true,
+        acceptPrivacyPolicy: true
       })
     });
     assertCondition(validAccept.status === 200, `Aceite válido do convite respondeu ${validAccept.status}`);
@@ -481,7 +485,9 @@ async function run() {
         token: existingToken,
         name: "Pessoa Existente",
         password: "NovaSenha123!",
-        confirmPassword: "NovaSenha123!"
+        confirmPassword: "NovaSenha123!",
+        acceptTermsOfUse: true,
+        acceptPrivacyPolicy: true
       })
     });
     const existingAcceptPayload = (await existingAccept.json()) as {

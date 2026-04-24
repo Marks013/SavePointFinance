@@ -1,5 +1,6 @@
 import { ResetPasswordForm } from "@/features/password/components/reset-password-form";
 import { BrandMark } from "@/components/layout/brand-mark";
+import { cookies } from "next/headers";
 
 type ResetPasswordPageProps = {
   searchParams: Promise<{
@@ -9,6 +10,8 @@ type ResetPasswordPageProps = {
 
 export default async function ResetPasswordPage({ searchParams }: ResetPasswordPageProps) {
   const params = await searchParams;
+  const cookieStore = await cookies();
+  const token = params.token ?? cookieStore.get("savepoint-reset-token")?.value ?? "";
 
   return (
     <main id="main-content" className="page-shell grid min-h-screen items-center py-8">
@@ -32,7 +35,7 @@ export default async function ResetPasswordPage({ searchParams }: ResetPasswordP
             </p>
           </div>
           <div className="mt-8">
-            <ResetPasswordForm initialToken={params.token ?? ""} />
+            <ResetPasswordForm initialToken={token} />
           </div>
         </section>
       </section>

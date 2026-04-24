@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
+import { hasSensitiveSearchParams, sanitizeSearchParams } from "@/lib/security/sensitive-url";
+
 const MAINTENANCE_PATH = "/manutencao";
 const ALLOWED_API_PREFIXES = ["/api/health", "/api/integrations"];
-const SENSITIVE_SEARCH_PARAMS = ["password", "senha", "token"];
+const INVITATION_TOKEN_COOKIE = "savepoint-invitation-token";
+const RESET_TOKEN_COOKIE = "savepoint-reset-token";
 
 function isAllowedDuringMaintenance(pathname: string) {
   if (pathname === MAINTENANCE_PATH) {
@@ -13,19 +16,8 @@ function isAllowedDuringMaintenance(pathname: string) {
   return ALLOWED_API_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }
 
-function sanitizeSearchParams(searchParams: URLSearchParams) {
-  const sanitized = new URLSearchParams(searchParams);
-
-  for (const key of SENSITIVE_SEARCH_PARAMS) {
-    sanitized.delete(key);
-  }
-
-  const value = sanitized.toString();
-  return value ? `?${value}` : "";
-}
-
-function hasSensitiveSearchParams(searchParams: URLSearchParams) {
-  return SENSITIVE_SEARCH_PARAMS.some((key) => searchParams.has(key));
+function isSecureRequest(request: NextRequest) {
+  return request.nextUrl.protocol === "https:" || request.headers.get("x-forwarded-proto") === "https";
 }
 
 export function proxy(request: NextRequest) {
@@ -33,6 +25,23 @@ export function proxy(request: NextRequest) {
   const isMaintenanceModeEnabled = process.env.MAINTENANCE_MODE === "true";
   const requestHeaders = new Headers(request.headers);
   const sanitizedSearch = sanitizeSearchParams(request.nextUrl.searchParams);
+  const token = request.nextUrl.searchParams.get("token")?.trim();
+
+  if ((pathname === "/accept-invitation" || pathname === "/reset-password") && token) {
+    const safeUrl = request.nextUrl.clone();
+    safeUrl.search = sanitizedSearch;
+    const response = NextResponse.redirect(safeUrl);
+
+    response.cookies.set(pathname === "/accept-invitation" ? INVITATION_TOKEN_COOKIE : RESET_TOKEN_COOKIE, token, {
+      httpOnly: true,
+      maxAge: 10 * 60,
+      path: pathname,
+      sameSite: "lax",
+      secure: isSecureRequest(request)
+    });
+
+    return response;
+  }
 
   if (pathname === "/login" && hasSensitiveSearchParams(request.nextUrl.searchParams)) {
     const safeUrl = request.nextUrl.clone();

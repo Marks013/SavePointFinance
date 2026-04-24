@@ -15,7 +15,13 @@ const {
   ADMIN_PASSWORD,
   ADMIN_NAME = "Administrador SavePoint",
   ADMIN_TENANT_NAME = "SavePoint",
-  ADMIN_TENANT_SLUG = "savepoint"
+  ADMIN_TENANT_SLUG = "savepoint",
+  LOCAL_OWNER_EMAIL = "owner@savepoint.local",
+  LOCAL_OWNER_PASSWORD,
+  LOCAL_OWNER_NAME = "Titular SavePoint",
+  FAMILY_USER_EMAIL,
+  FAMILY_USER_PASSWORD,
+  FAMILY_USER_NAME = "Familiar SavePoint"
 } = process.env;
 
 const DEFAULT_PLANS = [
@@ -170,6 +176,10 @@ async function ensurePlans(client) {
 
 async function ensureAdmin(client) {
   const passwordHash = await bcrypt.hash(ADMIN_PASSWORD, 10);
+  const ownerPasswordHash = await bcrypt.hash(LOCAL_OWNER_PASSWORD || ADMIN_PASSWORD, 10);
+  const familyPasswordHash = FAMILY_USER_EMAIL && FAMILY_USER_PASSWORD
+    ? await bcrypt.hash(FAMILY_USER_PASSWORD, 10)
+    : null;
   await ensurePlans(client);
   const bootstrapPlanResult = await client.query(
     'SELECT "id" FROM "Plan" WHERE "slug" = $1 LIMIT 1',
@@ -239,6 +249,78 @@ async function ensureAdmin(client) {
 
   await client.query(
     `
+      INSERT INTO "User" (
+        "id", "tenantId", "email", "name", "passwordHash", "role", "isPlatformAdmin", "isActive", "loginCount", "createdAt", "updatedAt"
+      )
+      VALUES ('user-bootstrap-owner', $1, $2, $3, $4, 'admin', false, true, 0, NOW(), NOW())
+      ON CONFLICT ("email")
+      DO UPDATE SET
+        "tenantId" = EXCLUDED."tenantId",
+        "name" = EXCLUDED."name",
+        "passwordHash" = EXCLUDED."passwordHash",
+        "role" = 'admin',
+        "isPlatformAdmin" = false,
+        "isActive" = true,
+        "updatedAt" = NOW()
+    `,
+    [tenantId, LOCAL_OWNER_EMAIL, LOCAL_OWNER_NAME, ownerPasswordHash]
+  );
+
+  const ownerResult = await client.query('SELECT "id" FROM "User" WHERE "email" = $1 LIMIT 1', [LOCAL_OWNER_EMAIL]);
+  const ownerId = ownerResult.rows[0]?.id;
+
+  if (!ownerId) {
+    throw new Error("Unable to resolve local owner user.");
+  }
+
+  await client.query(
+    `
+      INSERT INTO "UserPreference" ("id", "userId", "autoTithe", "createdAt", "updatedAt")
+      VALUES ('pref-bootstrap-owner', $1, false, NOW(), NOW())
+      ON CONFLICT ("userId") DO NOTHING
+    `,
+    [ownerId]
+  );
+
+  if (FAMILY_USER_EMAIL && familyPasswordHash) {
+    await client.query(
+      `
+        INSERT INTO "User" (
+          "id", "tenantId", "email", "name", "passwordHash", "role", "isPlatformAdmin", "isActive", "loginCount", "createdAt", "updatedAt"
+        )
+        VALUES ('user-bootstrap-family', $1, $2, $3, $4, 'member', false, true, 0, NOW(), NOW())
+        ON CONFLICT ("email")
+        DO UPDATE SET
+          "tenantId" = EXCLUDED."tenantId",
+          "name" = EXCLUDED."name",
+          "passwordHash" = EXCLUDED."passwordHash",
+          "role" = 'member',
+          "isPlatformAdmin" = false,
+          "isActive" = true,
+          "updatedAt" = NOW()
+      `,
+      [tenantId, FAMILY_USER_EMAIL, FAMILY_USER_NAME, familyPasswordHash]
+    );
+
+    const familyResult = await client.query('SELECT "id" FROM "User" WHERE "email" = $1 LIMIT 1', [FAMILY_USER_EMAIL]);
+    const familyId = familyResult.rows[0]?.id;
+
+    if (!familyId) {
+      throw new Error("Unable to resolve local family user.");
+    }
+
+    await client.query(
+      `
+        INSERT INTO "UserPreference" ("id", "userId", "autoTithe", "createdAt", "updatedAt")
+        VALUES ('pref-bootstrap-family', $1, false, NOW(), NOW())
+        ON CONFLICT ("userId") DO NOTHING
+      `,
+      [familyId]
+    );
+  }
+
+  await client.query(
+    `
       INSERT INTO "FinancialAccount" (
         "id", "tenantId", "ownerUserId", "name", "type", "balance", "currency", "color", "isActive", "createdAt", "updatedAt"
       )
@@ -257,8 +339,9 @@ async function ensureAdmin(client) {
       FROM "User"
       WHERE "email" = $2
       LIMIT 1
-      ON CONFLICT ("id")
+      ON CONFLICT ("tenantId", "name")
       DO UPDATE SET
+        "id" = EXCLUDED."id",
         "tenantId" = EXCLUDED."tenantId",
         "ownerUserId" = EXCLUDED."ownerUserId",
         "name" = EXCLUDED."name",

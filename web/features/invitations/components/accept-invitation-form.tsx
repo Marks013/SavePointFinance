@@ -64,6 +64,12 @@ export function AcceptInvitationForm({ initialToken = "" }: AcceptInvitationForm
   });
 
   useEffect(() => {
+    if (normalizedToken && window.location.search.includes("token=")) {
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  }, [normalizedToken]);
+
+  useEffect(() => {
     if (!normalizedToken) {
       return;
     }

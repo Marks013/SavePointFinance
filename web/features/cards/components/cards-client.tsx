@@ -190,7 +190,8 @@ export function CardsClient() {
   const formSectionRef = useRef<HTMLElement | null>(null);
   const statementSectionRef = useRef<HTMLElement | null>(null);
   const [selectedStatementCardId, setSelectedStatementCardId] = useState<string>("");
-  const [statementMonth, setStatementMonth] = useState(month);
+  const [statementMonthState, setStatementMonthState] = useState({ sourceMonth: month, value: month });
+  const statementMonth = statementMonthState.sourceMonth === month ? statementMonthState.value : month;
   const [statementPaymentAccountId, setStatementPaymentAccountId] = useState<string>("");
   const [statementItemsLimit, setStatementItemsLimit] = useState<string>("50");
   const cardsQuery = useQuery({
@@ -233,11 +234,11 @@ export function CardsClient() {
   });
   const payStatementMutation = useMutation({
     mutationFn: async () => {
-      if (!selectedStatementCardId || !statementPaymentAccountId) {
+      if (!selectedStatementCardId || !selectedStatementPaymentAccountId) {
         throw new Error("Selecione a conta de pagamento");
       }
 
-      return payStatement(selectedStatementCardId, statementMonth, statementPaymentAccountId);
+      return payStatement(selectedStatementCardId, statementMonth, selectedStatementPaymentAccountId);
     },
     onSuccess: async () => {
       toast.success("Fatura paga com sucesso");
@@ -380,14 +381,14 @@ export function CardsClient() {
   const resetStatementWorkspace = () => {
     setSelectedStatementCardId("");
     setStatementPaymentAccountId("");
-    setStatementMonth(month);
+    setStatementMonthState({ sourceMonth: month, value: month });
     setStatementItemsLimit("50");
   };
 
   const applyStatementSelection = (card: CardItem, monthOverride?: string, options?: { scroll?: boolean }) => {
     setSelectedStatementCardId(card.id);
     setStatementPaymentAccountId("");
-    setStatementMonth(monthOverride ?? getDefaultStatementMonth(card));
+    setStatementMonthState({ sourceMonth: month, value: monthOverride ?? getDefaultStatementMonth(card) });
     setStatementItemsLimit("50");
     if (options?.scroll) {
       scrollToStatementWorkspace();
@@ -398,17 +399,9 @@ export function CardsClient() {
     applyStatementSelection(card, monthOverride, { scroll: true });
   };
 
-  useEffect(() => {
-    setStatementMonth(month);
-  }, [month]);
-
-  useEffect(() => {
-    if (!statementQuery.data || statementIsPaid || statementPaymentAccountId || accounts.length !== 1) {
-      return;
-    }
-
-    setStatementPaymentAccountId(accounts[0]!.id);
-  }, [accounts, statementIsPaid, statementPaymentAccountId, statementQuery.data]);
+  const defaultStatementPaymentAccountId =
+    statementQuery.data && !statementIsPaid && accounts.length === 1 ? accounts[0]!.id : "";
+  const selectedStatementPaymentAccountId = statementPaymentAccountId || defaultStatementPaymentAccountId;
 
   useEffect(() => {
     if (!editingId) {
@@ -909,7 +902,7 @@ export function CardsClient() {
                     </Label>
                     <Select
                       id="statement-payment-account"
-                      value={statementPaymentAccountId}
+                      value={selectedStatementPaymentAccountId}
                       onChange={(event) => setStatementPaymentAccountId(event.target.value)}
                     >
                       <option value="">Selecione a conta pagadora</option>
@@ -925,7 +918,7 @@ export function CardsClient() {
                   </div>
                   <div className="flex items-end">
                     <Button
-                      disabled={payStatementMutation.isPending || !statementPaymentAccountId}
+                      disabled={payStatementMutation.isPending || !selectedStatementPaymentAccountId}
                       onClick={() => payStatementMutation.mutate()}
                       type="button"
                     >
@@ -977,7 +970,7 @@ export function CardsClient() {
             <Label htmlFor="statement-month">Ciclo</Label>
             <DatePickerInput
               id="statement-month"
-              onChange={(event) => setStatementMonth(event.target.value)}
+              onChange={(event) => setStatementMonthState({ sourceMonth: month, value: event.target.value })}
               type="month"
               value={statementMonth}
             />
@@ -999,7 +992,7 @@ export function CardsClient() {
             onClick={() => {
               setSelectedStatementCardId("");
               setStatementPaymentAccountId("");
-              setStatementMonth(month);
+              setStatementMonthState({ sourceMonth: month, value: month });
               setStatementItemsLimit("50");
             }}
             type="button"
@@ -1117,7 +1110,7 @@ export function CardsClient() {
                 {!statementIsPaid && statementQuery.data.summary.totalAmount > 0 ? (
                   <div className="grid w-full gap-3 lg:max-w-[420px] lg:grid-cols-[1fr_auto]">
                     <Select
-                      value={statementPaymentAccountId}
+                      value={selectedStatementPaymentAccountId}
                       onChange={(event) => setStatementPaymentAccountId(event.target.value)}
                     >
                       <option value="">Selecione a conta pagadora</option>
@@ -1128,7 +1121,7 @@ export function CardsClient() {
                       ))}
                     </Select>
                     <Button
-                      disabled={payStatementMutation.isPending || !statementPaymentAccountId}
+                      disabled={payStatementMutation.isPending || !selectedStatementPaymentAccountId}
                       onClick={() => payStatementMutation.mutate()}
                       type="button"
                     >

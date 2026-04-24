@@ -8,6 +8,7 @@ import { getCurrentTenantAccess } from "@/lib/auth/session";
 import { syncDueSubscriptionTransactions } from "@/lib/automation/subscriptions";
 import { isAuthError } from "@/lib/observability/errors";
 import { captureUnexpectedError } from "@/lib/observability/sentry";
+import { sanitizeSearch } from "@/lib/security/sensitive-url";
 
 type ProtectedLayoutProps = {
   children: ReactNode;
@@ -21,7 +22,7 @@ export default async function ProtectedLayout({ children }: ProtectedLayoutProps
   try {
     const requestHeaders = await headers();
     const pathname = requestHeaders.get("x-savepoint-pathname");
-    const search = requestHeaders.get("x-savepoint-search") ?? "";
+    const search = sanitizeSearch(requestHeaders.get("x-savepoint-search")) ?? "";
     const access = await getCurrentTenantAccess({
       allowBlocked: true
     });
