@@ -58,6 +58,7 @@ export function CheckoutClient({ amount, currencyId, planName, publicKey }: Chec
   const queryClient = useQueryClient();
   const [isBrickReady, setIsBrickReady] = useState(false);
   const [brickError, setBrickError] = useState<string | null>(null);
+  const [brickDiagnostic, setBrickDiagnostic] = useState<string | null>(null);
   const createSubscriptionMutation = useMutation({
     mutationFn: createSubscription,
     onSuccess: async (payload) => {
@@ -81,10 +82,32 @@ export function CheckoutClient({ amount, currencyId, planName, publicKey }: Chec
 
     setIsBrickReady(false);
     setBrickError(null);
+    setBrickDiagnostic(null);
     initMercadoPago(publicKey, {
       locale: "pt-BR"
     });
   }, [publicKey]);
+
+  useEffect(() => {
+    if (!publicKey || typeof amount !== "number" || amount <= 0 || isBrickReady) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      const container = document.getElementById("savepoint-card-payment-brick");
+      const childCount = container?.childElementCount ?? 0;
+
+      if (childCount > 0) {
+        setIsBrickReady(true);
+        setBrickDiagnostic(null);
+        return;
+      }
+
+      setBrickDiagnostic("O SDK do Mercado Pago carregou, mas ainda nao inseriu os campos no container.");
+    }, 6000);
+
+    return () => window.clearTimeout(timer);
+  }, [amount, isBrickReady, publicKey]);
 
   const cardPaymentInitialization = useMemo(
     () => ({
@@ -171,15 +194,21 @@ export function CheckoutClient({ amount, currencyId, planName, publicKey }: Chec
         </article>
       </div>
 
-      <div className="data-card relative mt-6 min-h-[520px] p-5">
+      <div className="data-card mt-6 p-5">
         {!isBrickReady ? (
-          <div className="absolute inset-x-5 top-5 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-sm text-[var(--color-muted-foreground)]">
+          <div className="mb-4 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-sm text-[var(--color-muted-foreground)]">
             Carregando campos seguros do Mercado Pago...
           </div>
         ) : null}
         {brickError ? (
           <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">{brickError}</div>
         ) : null}
+        {brickDiagnostic ? (
+          <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+            {brickDiagnostic}
+          </div>
+        ) : null}
+        <div className="min-h-[520px]">
         <CardPayment
           id="savepoint-card-payment-brick"
           initialization={cardPaymentInitialization}
@@ -188,6 +217,7 @@ export function CheckoutClient({ amount, currencyId, planName, publicKey }: Chec
           onReady={handleBrickReady}
           onSubmit={handleSubmit}
         />
+        </div>
       </div>
 
       {createSubscriptionMutation.isPending ? (
