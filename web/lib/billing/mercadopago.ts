@@ -71,9 +71,6 @@ export function assertMercadoPagoBillingConfigured() {
     throw new BillingConfigurationError("MP_PUBLIC_KEY is not configured");
   }
 
-  if (typeof serverEnv.MP_BILLING_AMOUNT !== "number") {
-    throw new BillingConfigurationError("MP_BILLING_AMOUNT is not configured");
-  }
 }
 
 export function getMercadoPagoBillingPublicKey() {

@@ -23,7 +23,8 @@ const createBillingCheckoutSchema = z.object({
     })
     .nullable()
     .optional(),
-  metadata: z.record(z.string(), z.unknown()).optional()
+  metadata: z.record(z.string(), z.unknown()).optional(),
+  couponCode: z.string().trim().max(64).nullable().optional()
 });
 
 export async function POST(request: Request) {
@@ -36,7 +37,8 @@ export async function POST(request: Request) {
       issuerId: body.issuerId ?? null,
       installments: body.installments ?? null,
       payer: body.payer ?? null,
-      metadata: body.metadata
+      metadata: body.metadata,
+      couponCode: body.couponCode ?? null
     });
 
     return NextResponse.json(result, { status: 201 });

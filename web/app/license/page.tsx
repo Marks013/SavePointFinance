@@ -28,6 +28,10 @@ export default async function LicensePage() {
     redirect("/login");
   }
 
+  if (access.isPlatformAdmin) {
+    redirect("/dashboard/admin");
+  }
+
   if (access.license.canAccessApp) {
     redirect("/dashboard");
   }

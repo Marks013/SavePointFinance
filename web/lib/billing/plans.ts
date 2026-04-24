@@ -1,5 +1,6 @@
-import { serverEnv } from "@/lib/env/server";
 import { prisma } from "@/lib/prisma/client";
+import { serverEnv } from "@/lib/env/server";
+import { getBillingSettings } from "./settings";
 
 export class BillingPlanError extends Error {
   readonly statusCode: number;
@@ -9,33 +10,6 @@ export class BillingPlanError extends Error {
     this.name = "BillingPlanError";
     this.statusCode = statusCode;
   }
-}
-
-function parseConfiguredBillingAmount() {
-  const rawValue = typeof serverEnv.MP_BILLING_AMOUNT === "number" ? String(serverEnv.MP_BILLING_AMOUNT) : undefined;
-
-  if (!rawValue) {
-    return null;
-  }
-
-  return Number(serverEnv.MP_BILLING_AMOUNT!.toFixed(2));
-}
-
-export function getConfiguredBillingAmount() {
-  return parseConfiguredBillingAmount();
-}
-
-export function getConfiguredAnnualBillingAmount() {
-  if (typeof serverEnv.MP_BILLING_ANNUAL_AMOUNT === "number") {
-    return Number(serverEnv.MP_BILLING_ANNUAL_AMOUNT.toFixed(2));
-  }
-
-  const monthlyAmount = getConfiguredBillingAmount();
-  return monthlyAmount === null ? null : Number((monthlyAmount * 10).toFixed(2));
-}
-
-export function getConfiguredBillingCurrency() {
-  return serverEnv.MP_BILLING_CURRENCY.trim().toUpperCase();
 }
 
 export async function listBillablePlans() {
@@ -48,8 +22,9 @@ export async function listBillablePlans() {
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }]
   });
 
-  const amount = getConfiguredBillingAmount();
-  const currencyId = getConfiguredBillingCurrency();
+  const billingSettings = await getBillingSettings();
+  const amount = billingSettings.monthlyAmount;
+  const currencyId = billingSettings.currencyId;
 
   return plans.map((plan) => ({
     id: plan.id,
@@ -63,14 +38,9 @@ export async function listBillablePlans() {
 
 export async function resolveBillablePlan(planId?: string | null) {
   const plans = await listBillablePlans();
-  const amount = getConfiguredBillingAmount();
 
   if (!plans.length) {
     throw new BillingPlanError("Nenhum plano pago ativo foi encontrado para billing", 404);
-  }
-
-  if (amount === null) {
-    throw new BillingPlanError("MP_BILLING_AMOUNT is not configured", 500);
   }
 
   if (planId) {

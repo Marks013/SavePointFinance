@@ -15,8 +15,13 @@ export const PlanCheckoutLink = forwardRef<HTMLAnchorElement, PlanCheckoutLinkPr
   { hrefWhenLoggedOut = "/cadastro?plan=pro", hrefWhenLoggedIn = "/billing?intent=checkout", children, ...props },
   ref
 ) {
-  const { status } = useSession();
-  const href = status === "authenticated" ? hrefWhenLoggedIn : hrefWhenLoggedOut;
+  const { data: session, status } = useSession();
+  const href =
+    status === "authenticated"
+      ? session?.user?.isPlatformAdmin
+        ? "/dashboard/admin"
+        : hrefWhenLoggedIn
+      : hrefWhenLoggedOut;
 
   return (
     <Link ref={ref} href={href as Route} {...props}>

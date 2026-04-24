@@ -25,6 +25,7 @@ import {
 } from "@/features/admin/components/admin-shared";
 import { AdminTenantCard } from "@/features/admin/components/admin-tenant-card";
 import { AdminUserCard } from "@/features/admin/components/admin-user-card";
+import { BillingSettingsCard } from "@/features/admin/components/billing-settings-card";
 import { PopupCampaignManager } from "@/features/admin/components/popup-campaign-manager";
 import { invitationSchema, type InvitationValues } from "@/features/password/schemas/password-schema";
 import { formatDateDisplay, formatDateTimeDisplay, parseBrazilianDateToDateKey } from "@/lib/date";
@@ -1491,6 +1492,7 @@ export function AdminClient({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
       </div>
 
       {isPlatformAdmin ? <PopupCampaignManager /> : null}
+      {isPlatformAdmin ? <BillingSettingsCard /> : null}
 
       <div className={adminSectionsLayoutClassName}>
         <section className="surface content-section">

@@ -102,12 +102,7 @@ const serverEnvSchema = z
     }
 
     if (value.MP_BILLING_ENABLED === "true") {
-      for (const key of [
-        "MP_ACCESS_TOKEN",
-        "MP_PUBLIC_KEY",
-        "MP_WEBHOOK_SECRET",
-        "MP_BILLING_AMOUNT"
-      ] as const) {
+      for (const key of ["MP_ACCESS_TOKEN", "MP_PUBLIC_KEY", "MP_WEBHOOK_SECRET"] as const) {
         if (!value[key]) {
           context.addIssue({
             code: z.ZodIssueCode.custom,

@@ -18,7 +18,7 @@ export default async function BillingPage() {
     }
 
     if (isPermissionError(error)) {
-      redirect("/license");
+      redirect("/dashboard/admin");
     }
 
     redirect("/login");
@@ -70,6 +70,7 @@ export default async function BillingPage() {
           annualMaxInstallments={pageData.annualMaxInstallments}
           currencyId={pageData.currencyId}
           planName={pageData.planName}
+          promotions={pageData.promotions}
           publicKey={pageData.publicKey}
         />
       </div>

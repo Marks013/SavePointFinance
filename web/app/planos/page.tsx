@@ -5,6 +5,7 @@ import { ArrowRight, Check, CircleDollarSign, LockKeyhole, MessageCircleMore, Sh
 import { BrandMark } from "@/components/layout/brand-mark";
 import { Button } from "@/components/ui/button";
 import { PlanCheckoutLink } from "@/features/billing/components/plan-checkout-link";
+import { getBillingSettings } from "@/lib/billing/settings";
 
 const planCards = [
   {
@@ -72,7 +73,18 @@ const comparisonRows = [
   ["Checkout", "Não necessário", "Mercado Pago", "Após upgrade"]
 ];
 
-export default function PlansPage() {
+function formatMoney(amount: number, currencyId: string) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: currencyId
+  }).format(amount);
+}
+
+export default async function PlansPage() {
+  const billingSettings = await getBillingSettings();
+  const premiumMonthlyPrice = formatMoney(billingSettings.monthlyAmount, billingSettings.currencyId);
+  const premiumAnnualPrice = formatMoney(billingSettings.annualAmount, billingSettings.currencyId);
+
   return (
     <main id="main-content" className="page-shell py-6 md:py-10">
       <section className="surface-strong overflow-hidden rounded-[42px] px-7 py-8 md:px-12 md:py-12">
@@ -146,8 +158,12 @@ export default function PlansPage() {
               </div>
 
               <div className="mt-6">
-                <p className="text-[clamp(2rem,4vw,3.2rem)] font-semibold tracking-[-0.07em]">{plan.price}</p>
-                <p className={isStrong ? "text-sm text-white/72" : "text-sm text-[var(--color-muted-foreground)]"}>{plan.cadence}</p>
+                <p className="text-[clamp(2rem,4vw,3.2rem)] font-semibold tracking-[-0.07em]">
+                  {isStrong ? premiumMonthlyPrice : plan.price}
+                </p>
+                <p className={isStrong ? "text-sm text-white/72" : "text-sm text-[var(--color-muted-foreground)]"}>
+                  {isStrong ? `mensal ou ${premiumAnnualPrice} anual` : plan.cadence}
+                </p>
               </div>
 
               <div className="mt-6 space-y-3">

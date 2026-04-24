@@ -5,7 +5,6 @@ import type { Prisma } from "@prisma/client";
 import type { BillingOverview } from "@/features/billing/types";
 import { PermissionError, isAuthError, isPermissionError } from "@/lib/observability/errors";
 import { prisma } from "@/lib/prisma/client";
-import { serverEnv } from "@/lib/env/server";
 
 import { getBillingSessionAccess } from "./access";
 import { logBillingAdminAudit } from "./audit";
@@ -30,7 +29,12 @@ import {
   parseMercadoPagoExternalReference,
   updateMercadoPagoPreApproval
 } from "./mercadopago";
-import { BillingPlanError, getConfiguredAnnualBillingAmount, getFallbackFreePlan, resolveBillablePlan } from "./plans";
+import { BillingPlanError, getFallbackFreePlan, resolveBillablePlan } from "./plans";
+import {
+  calculateBillingCheckoutPricing,
+  getActiveBillingPromotions,
+  getBillingSettings
+} from "./settings";
 
 type BillingAccess = Awaited<ReturnType<typeof getBillingSessionAccess>>;
 type BillingDbClient = typeof prisma | Prisma.TransactionClient;
@@ -49,6 +53,7 @@ type CheckoutSubscriptionInput = {
     } | null;
   } | null;
   metadata?: Record<string, unknown>;
+  couponCode?: string | null;
 };
 
 type MercadoPagoSubscriptionResource = {
@@ -594,6 +599,12 @@ export async function createRecurringBillingSubscriptionForSession(input: Checko
   }
 
   const billingConfig = getMercadoPagoBillingFrequencyConfig();
+  const billingSettings = await getBillingSettings();
+  const pricing = calculateBillingCheckoutPricing({
+    settings: billingSettings,
+    cycle: "monthly",
+    couponCode: input.couponCode
+  });
   const payerEmail = input.payer?.email?.trim() || access.email.trim();
   const externalReference = buildMercadoPagoExternalReference({
     tenantId: access.tenantId,
@@ -604,8 +615,8 @@ export async function createRecurringBillingSubscriptionForSession(input: Checko
       auto_recurring: {
         frequency: billingConfig.frequency,
         frequency_type: billingConfig.frequencyType,
-        transaction_amount: plan.amount!,
-        currency_id: plan.currencyId
+        transaction_amount: pricing.finalAmount,
+        currency_id: pricing.currencyId
       },
       back_url: buildBillingManageUrl(),
       card_token_id: input.cardToken,
@@ -630,8 +641,8 @@ export async function createRecurringBillingSubscriptionForSession(input: Checko
       payer_email: resource.payer_email ?? payerEmail,
       reason: resource.reason ?? getMercadoPagoBillingReason(plan.name),
       auto_recurring: resource.auto_recurring ?? {
-        transaction_amount: plan.amount!,
-        currency_id: plan.currencyId,
+        transaction_amount: pricing.finalAmount,
+        currency_id: pricing.currencyId,
         frequency: billingConfig.frequency,
         frequency_type: billingConfig.frequencyType
       }
@@ -650,7 +661,9 @@ export async function createRecurringBillingSubscriptionForSession(input: Checko
         paymentMethodId: input.paymentMethodId,
         issuerId: input.issuerId ?? null,
         installments: input.installments ?? null,
-        checkoutMetadata: (input.metadata ?? null) as Prisma.InputJsonValue
+        checkoutMetadata: (input.metadata ?? null) as Prisma.InputJsonValue,
+        couponCode: input.couponCode?.trim() || null,
+        pricing
       }
     }
   });
@@ -664,8 +677,10 @@ export async function createRecurringBillingSubscriptionForSession(input: Checko
       provider: MERCADO_PAGO_PROVIDER,
       planId: plan.id,
       planSlug: plan.slug,
-      amount: plan.amount,
-      currencyId: plan.currencyId,
+      amount: pricing.finalAmount,
+      currencyId: pricing.currencyId,
+      couponCode: input.couponCode?.trim() || null,
+      promotionId: pricing.promotion?.id ?? null,
       mercadoPagoPreapprovalId: subscription.mercadoPagoPreapprovalId
     }
   });
@@ -677,7 +692,7 @@ export async function createRecurringBillingSubscriptionForSession(input: Checko
   };
 }
 
-export async function createAnnualBillingPaymentForSession() {
+export async function createAnnualBillingPaymentForSession(input: { couponCode?: string | null } = {}) {
   const access = await getBillingSessionAccess({
     requireManager: true
   });
@@ -691,11 +706,13 @@ export async function createAnnualBillingPaymentForSession() {
   }
 
   const plan = await resolveBillablePlan();
-  const amount = getConfiguredAnnualBillingAmount();
-
-  if (amount === null) {
-    throw new BillingError("MP_BILLING_ANNUAL_AMOUNT ou MP_BILLING_AMOUNT precisa estar configurado", 500);
-  }
+  const billingSettings = await getBillingSettings();
+  const pricing = calculateBillingCheckoutPricing({
+    settings: billingSettings,
+    cycle: "annual",
+    couponCode: input.couponCode
+  });
+  const amount = pricing.finalAmount;
 
   const existingSubscription = await prisma.billingSubscription.findFirst({
     where: {
@@ -725,12 +742,14 @@ export async function createAnnualBillingPaymentForSession() {
       status: "pending",
       reason: `${getMercadoPagoBillingReason(plan.name)} anual`,
       amount,
-      currencyId: plan.currencyId,
+      currencyId: pricing.currencyId,
       frequency: 1,
       frequencyType: "years",
       metadata: {
         billingMode: "annual_one_time",
-        checkoutKind: "checkout_pro"
+        checkoutKind: "checkout_pro",
+        couponCode: input.couponCode?.trim() || null,
+        pricing
       }
     }
   });
@@ -743,7 +762,7 @@ export async function createAnnualBillingPaymentForSession() {
           title: `${plan.name} anual`,
           description: "Acesso premium por 12 meses, sem renovação automática",
           quantity: 1,
-          currency_id: plan.currencyId,
+          currency_id: pricing.currencyId,
           unit_price: amount
         }
       ],
@@ -759,13 +778,14 @@ export async function createAnnualBillingPaymentForSession() {
       },
       auto_return: "approved",
       payment_methods: {
-        installments: serverEnv.MP_BILLING_ANNUAL_MAX_INSTALLMENTS
+        installments: billingSettings.annualMaxInstallments
       },
       metadata: {
         tenant_id: access.tenantId,
         plan_id: plan.id,
         billing_mode: "annual_one_time",
-        billing_subscription_id: subscription.id
+        billing_subscription_id: subscription.id,
+        coupon_code: input.couponCode?.trim() || null
       }
     },
     requestOptions: {
@@ -787,7 +807,9 @@ export async function createAnnualBillingPaymentForSession() {
       metadata: {
         ...((subscription.metadata ?? {}) as Prisma.JsonObject),
         preferenceId: preference.id ?? null,
-        checkoutUrl
+        checkoutUrl,
+        couponCode: input.couponCode?.trim() || null,
+        pricing
       }
     }
   });
@@ -802,7 +824,9 @@ export async function createAnnualBillingPaymentForSession() {
       planId: plan.id,
       planSlug: plan.slug,
       amount,
-      currencyId: plan.currencyId,
+      currencyId: pricing.currencyId,
+      couponCode: input.couponCode?.trim() || null,
+      promotionId: pricing.promotion?.id ?? null,
       preferenceId: preference.id ?? null
     }
   });
@@ -931,16 +955,32 @@ export async function getBillingCheckoutPageData() {
   const access = await getBillingSessionAccess({
     requireManager: true
   });
+
+  if (access.isPlatformAdmin) {
+    throw new PermissionError("Superadmin não pode iniciar checkout de assinatura");
+  }
+
   const plan = await resolveBillablePlan();
+  const billingSettings = await getBillingSettings();
+  const activePromotions = getActiveBillingPromotions(billingSettings);
 
   return {
     access,
     publicKey: getMercadoPagoBillingPublicKey(),
-    amount: plan.amount,
-    annualAmount: getConfiguredAnnualBillingAmount(),
-    annualMaxInstallments: serverEnv.MP_BILLING_ANNUAL_MAX_INSTALLMENTS,
-    currencyId: plan.currencyId,
-    planName: plan.name
+    amount: billingSettings.monthlyAmount,
+    annualAmount: billingSettings.annualAmount,
+    annualMaxInstallments: billingSettings.annualMaxInstallments,
+    currencyId: billingSettings.currencyId,
+    planName: plan.name,
+    promotions: activePromotions.map((promotion) => ({
+      id: promotion.id,
+      title: promotion.title,
+      badge: promotion.badge,
+      description: promotion.description,
+      couponCode: promotion.couponCode,
+      discountPercent: promotion.discountPercent,
+      appliesTo: promotion.appliesTo
+    }))
   };
 }
 

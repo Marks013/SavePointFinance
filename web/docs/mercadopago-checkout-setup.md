@@ -4,7 +4,9 @@ Este guia descreve como deixar o checkout Mercado Pago funcional no projeto atua
 
 ## Arquivos envolvidos
 
-- `web/features/billing/components/checkout-client.tsx`: renderiza o Card Payment Brick mensal e o CTA anual.
+- `web/features/billing/components/checkout-client.tsx`: renderiza o Card Payment Brick mensal, cupom e o CTA anual.
+- `web/features/admin/components/billing-settings-card.tsx`: permite ao superadmin ajustar preços, cupons e promoções.
+- `web/app/api/admin/billing-settings/route.ts`: persiste configurações comerciais em `PlatformSetting`.
 - `web/app/api/billing/checkout/route.ts`: entrega dados de checkout para a tela.
 - `web/app/api/billing/checkout/create-subscription/route.ts`: cria a assinatura/preapproval.
 - `web/app/api/billing/checkout/create-annual-payment/route.ts`: cria a preferência Checkout Pro anual.
@@ -54,7 +56,7 @@ Quando `MP_BILLING_ENABLED=true`, o schema do servidor exige:
 - `MP_WEBHOOK_SECRET`
 - `MP_BILLING_AMOUNT`
 
-`MP_BILLING_ANNUAL_AMOUNT` é opcional. Se não for definido, o checkout anual usa 10 vezes o valor mensal.
+Os valores comerciais também podem ser configurados pelo superadmin em **Billing comercial**. Quando há configuração salva no banco, ela prevalece sobre `MP_BILLING_AMOUNT`, `MP_BILLING_ANNUAL_AMOUNT`, `MP_BILLING_ANNUAL_MAX_INSTALLMENTS` e `MP_BILLING_CURRENCY`. As variáveis seguem como fallback técnico.
 
 ## 3. Cadastrar webhook
 
@@ -82,6 +84,18 @@ O endpoint responde rapidamente e deixa o processamento pesado para a fila local
 6. O webhook recebe eventos de pagamento/assinatura.
 7. `service.ts` atualiza assinatura, pagamentos e licença da conta. Pagamento anual aprovado libera 12 meses, sem renovação automática.
 8. O superadmin pode consultar e sincronizar billing por conta.
+
+## 4.1 Cupons e promoções
+
+O superadmin configura:
+
+- valor mensal recorrente;
+- valor anual à vista/parcelado;
+- limite máximo de parcelas do anual;
+- cards promocionais opcionais, como Black Friday;
+- cupom, percentual de desconto e ciclo aplicável.
+
+O frontend exibe promoções ativas no checkout, mas o backend recalcula o desconto antes de criar assinatura ou preferência anual.
 
 ## 5. Testes locais
 
