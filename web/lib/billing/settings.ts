@@ -80,6 +80,10 @@ export function getDefaultBillingSettings(): BillingSettings {
 }
 
 export async function getBillingSettings() {
+  if (process.env.NEXT_PHASE === "phase-production-build") {
+    return getDefaultBillingSettings();
+  }
+
   let setting: Awaited<ReturnType<typeof prisma.platformSetting.findUnique>>;
 
   try {
