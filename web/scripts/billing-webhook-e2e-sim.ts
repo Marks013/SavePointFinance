@@ -1,5 +1,32 @@
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
+
+import { config as loadEnv } from "dotenv";
+
+for (const envFile of [".env", ".env.local"]) {
+  const envPath = resolve(process.cwd(), envFile);
+
+  if (existsSync(envPath)) {
+    loadEnv({
+      path: envPath,
+      override: envFile === ".env.local"
+    });
+  }
+}
+
+function setDefaultEnv(key: string, value: string) {
+  if (!process.env[key]?.trim()) {
+    process.env[key] = value;
+  }
+}
+
+process.env.MP_BILLING_ENABLED = "true";
+setDefaultEnv("MP_ACCESS_TOKEN", "TEST-access-token");
+setDefaultEnv("MP_PUBLIC_KEY", "TEST-public-key");
+setDefaultEnv("MP_WEBHOOK_SECRET", "test-webhook-secret");
+setDefaultEnv("MP_BILLING_AMOUNT", "49.90");
 
 async function main() {
 
@@ -18,11 +45,20 @@ async function main() {
     tenantId: "tenant_123",
     planId: "plan_456"
   });
+  const annualExternalReference = buildMercadoPagoExternalReference({
+    tenantId: "tenant_annual",
+    planId: "plan_premium"
+  });
   const parsedReference = parseMercadoPagoExternalReference(externalReference);
+  const parsedAnnualReference = parseMercadoPagoExternalReference(annualExternalReference);
 
   assert.deepEqual(parsedReference, {
     tenantId: "tenant_123",
     planId: "plan_456"
+  });
+  assert.deepEqual(parsedAnnualReference, {
+    tenantId: "tenant_annual",
+    planId: "plan_premium"
   });
 
   const rawBody = JSON.stringify({
@@ -42,6 +78,12 @@ async function main() {
     .createHmac("sha256", process.env.MP_WEBHOOK_SECRET!)
     .update(manifest)
     .digest("hex");
+  const annualPaymentId = "998877";
+  const annualPaymentManifest = `id:${annualPaymentId};request-id:${requestId};ts:${ts};`;
+  const validAnnualPaymentSignature = crypto
+    .createHmac("sha256", process.env.MP_WEBHOOK_SECRET!)
+    .update(annualPaymentManifest)
+    .digest("hex");
 
   const verified = verifyMercadoPagoWebhookSignature({
     resourceId: "preapp_001",
@@ -53,8 +95,14 @@ async function main() {
     xRequestId: requestId,
     xSignature: `ts=${ts},v1=deadbeef`
   });
+  const verifiedAnnualPayment = verifyMercadoPagoWebhookSignature({
+    resourceId: annualPaymentId,
+    xRequestId: requestId,
+    xSignature: `ts=${ts},v1=${validAnnualPaymentSignature}`
+  });
 
   assert.equal(verified.isValid, true);
+  assert.equal(verifiedAnnualPayment.isValid, true);
   assert.equal(invalid.isValid, false);
 
   const subscriptionEnvelope = extractMercadoPagoWebhookEnvelope({
@@ -65,7 +113,17 @@ async function main() {
     payload: {
       topic: "payment",
       data: {
-        id: 998877
+        id: Number(annualPaymentId)
+      }
+    },
+    searchParams: new URLSearchParams()
+  });
+  const checkoutProPaymentEnvelope = extractMercadoPagoWebhookEnvelope({
+    payload: {
+      type: "payment",
+      action: "payment.updated",
+      data: {
+        id: annualPaymentId
       }
     },
     searchParams: new URLSearchParams()
@@ -74,7 +132,10 @@ async function main() {
   assert.equal(subscriptionEnvelope.topic, "subscription_preapproval");
   assert.equal(subscriptionEnvelope.resourceId, "preapp_001");
   assert.equal(paymentEnvelope.topic, "payment");
-  assert.equal(paymentEnvelope.resourceId, "998877");
+  assert.equal(paymentEnvelope.resourceId, annualPaymentId);
+  assert.equal(checkoutProPaymentEnvelope.topic, "payment");
+  assert.equal(checkoutProPaymentEnvelope.resourceId, annualPaymentId);
+  assert.equal(checkoutProPaymentEnvelope.action, "payment.updated");
 
   assert.equal(getBillingWebhookRetryDelayMs(1), 60_000);
   assert.equal(getBillingWebhookRetryDelayMs(2), 120_000);
@@ -85,10 +146,17 @@ async function main() {
     JSON.stringify(
       {
         externalReference,
+        annualExternalReference,
         dedupeKey,
         verified,
+        verifiedAnnualPayment,
         subscriptionEnvelope,
         paymentEnvelope,
+        checkoutProPaymentEnvelope,
+        annualCheckoutConfig: {
+          amount: process.env.MP_BILLING_ANNUAL_AMOUNT ?? "fallback:monthly_x10",
+          maxInstallments: process.env.MP_BILLING_ANNUAL_MAX_INSTALLMENTS ?? "12"
+        },
         retryDelaysMs: [1, 2, 3].map(getBillingWebhookRetryDelayMs)
       },
       null,

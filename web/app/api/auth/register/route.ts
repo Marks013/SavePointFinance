@@ -17,13 +17,15 @@ import { getClientIpAddress, takeThrottleHit } from "@/lib/security/request-thro
 const planSlugByIntent = {
   free: "gratuito-essencial",
   trial: "avaliacao-premium-14-dias",
-  pro: "gratuito-essencial"
+  pro: "gratuito-essencial",
+  pro_annual: "gratuito-essencial"
 } as const;
 
 const nextPathByIntent = {
   free: "/dashboard",
   trial: "/dashboard",
-  pro: "/billing?intent=checkout"
+  pro: "/billing?intent=checkout",
+  pro_annual: "/billing?intent=checkout&cycle=annual"
 } as const;
 
 function slugify(value: string) {

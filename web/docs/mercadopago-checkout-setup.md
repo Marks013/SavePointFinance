@@ -4,9 +4,10 @@ Este guia descreve como deixar o checkout Mercado Pago funcional no projeto atua
 
 ## Arquivos envolvidos
 
-- `web/features/billing/components/checkout-client.tsx`: renderiza o Card Payment Brick.
+- `web/features/billing/components/checkout-client.tsx`: renderiza o Card Payment Brick mensal e o CTA anual.
 - `web/app/api/billing/checkout/route.ts`: entrega dados de checkout para a tela.
 - `web/app/api/billing/checkout/create-subscription/route.ts`: cria a assinatura/preapproval.
+- `web/app/api/billing/checkout/create-annual-payment/route.ts`: cria a preferência Checkout Pro anual.
 - `web/app/api/integrations/mercadopago/webhook/route.ts`: recebe notificações.
 - `web/lib/billing/mercadopago.ts`: cliente HTTP Mercado Pago.
 - `web/lib/billing/service.ts`: sincroniza assinatura, pagamento e licença.
@@ -37,6 +38,8 @@ MP_WEBHOOK_SECRET=...
 MP_BILLING_PLAN_SLUG=premium-completo
 MP_BILLING_REASON=Save Point Financa Premium
 MP_BILLING_AMOUNT=49.90
+MP_BILLING_ANNUAL_AMOUNT=499.00
+MP_BILLING_ANNUAL_MAX_INSTALLMENTS=12
 MP_BILLING_CURRENCY=BRL
 MP_BILLING_FREQUENCY=1
 MP_BILLING_FREQUENCY_TYPE=months
@@ -50,6 +53,8 @@ Quando `MP_BILLING_ENABLED=true`, o schema do servidor exige:
 - `MP_PUBLIC_KEY`
 - `MP_WEBHOOK_SECRET`
 - `MP_BILLING_AMOUNT`
+
+`MP_BILLING_ANNUAL_AMOUNT` é opcional. Se não for definido, o checkout anual usa 10 vezes o valor mensal.
 
 ## 3. Cadastrar webhook
 
@@ -72,10 +77,10 @@ O endpoint responde rapidamente e deixa o processamento pesado para a fila local
 1. Usuário escolhe Premium em `/planos` ou no cadastro.
 2. Cadastro/login cria sessão e leva para `/billing?intent=checkout`.
 3. `checkout-client.tsx` inicializa o Mercado Pago com `MP_PUBLIC_KEY`.
-4. O Card Payment Brick coleta os dados do cartão e devolve `formData` tokenizado.
-5. `create-subscription/route.ts` envia a criação da assinatura para o Mercado Pago usando `MP_ACCESS_TOKEN`.
+4. No mensal, o Card Payment Brick coleta os dados do cartão e `create-subscription/route.ts` cria a assinatura.
+5. No anual, `create-annual-payment/route.ts` cria uma preferência Checkout Pro para pagamento único.
 6. O webhook recebe eventos de pagamento/assinatura.
-7. `service.ts` atualiza assinatura, pagamentos e licença da conta.
+7. `service.ts` atualiza assinatura, pagamentos e licença da conta. Pagamento anual aprovado libera 12 meses, sem renovação automática.
 8. O superadmin pode consultar e sincronizar billing por conta.
 
 ## 5. Testes locais

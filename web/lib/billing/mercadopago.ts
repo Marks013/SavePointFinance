@@ -177,6 +177,14 @@ export function createMercadoPagoPreApproval<T>(input: { body: unknown; requestO
   });
 }
 
+export function createMercadoPagoPreference<T>(input: { body: unknown; requestOptions?: MercadoPagoRequestOptions }) {
+  return mercadoPagoFetch<T>("/checkout/preferences", {
+    method: "POST",
+    body: input.body,
+    requestOptions: input.requestOptions
+  });
+}
+
 export function getMercadoPagoPreApproval<T>(id: string) {
   return mercadoPagoFetch<T>(`/preapproval/${encodeURIComponent(id)}`);
 }

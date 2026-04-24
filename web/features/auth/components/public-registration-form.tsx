@@ -36,7 +36,8 @@ type RegistrationResponse = {
 const planCopy: Record<RegistrationPlan, string> = {
   free: "Cria uma conta gratuita imediatamente, sem checkout.",
   trial: "Cria sua avaliação Pro com 14 dias de recursos premium.",
-  pro: "Cria sua conta e abre o checkout do Mercado Pago em seguida."
+  pro: "Cria sua conta e abre o checkout mensal recorrente do Mercado Pago.",
+  pro_annual: "Cria sua conta e abre o checkout anual sem renovação automática."
 };
 
 export function PublicRegistrationForm({ initialPlan }: PublicRegistrationFormProps) {
@@ -93,8 +94,9 @@ export function PublicRegistrationForm({ initialPlan }: PublicRegistrationFormPr
                 return;
               }
 
-              toast.success(values.plan === "pro" ? "Conta criada. Abrindo checkout." : "Conta criada com sucesso.");
-              const nextPath = payload.nextPath ?? ((values.plan === "pro" ? "/billing?intent=checkout" : "/dashboard") as Route);
+              const hasCheckout = values.plan === "pro" || values.plan === "pro_annual";
+              toast.success(hasCheckout ? "Conta criada. Abrindo checkout." : "Conta criada com sucesso.");
+              const nextPath = payload.nextPath ?? ((hasCheckout ? "/billing?intent=checkout" : "/dashboard") as Route);
 
               router.replace(nextPath);
               router.refresh();
@@ -121,7 +123,8 @@ export function PublicRegistrationForm({ initialPlan }: PublicRegistrationFormPr
         <Select id="registration-plan" {...form.register("plan")}>
           <option value="free">Gratuito Essencial</option>
           <option value="trial">Avaliação Premium 14 dias</option>
-          <option value="pro">Assinar Premium Completo</option>
+          <option value="pro">Premium mensal recorrente</option>
+          <option value="pro_annual">Premium anual à vista ou parcelado</option>
         </Select>
         <p className="text-sm leading-6 text-[var(--color-muted-foreground)]">{planCopy[selectedPlan]}</p>
       </div>
@@ -217,7 +220,7 @@ export function PublicRegistrationForm({ initialPlan }: PublicRegistrationFormPr
       </div>
 
       <Button className="w-full" disabled={isPending} type="submit">
-        {isPending ? "Criando conta..." : selectedPlan === "pro" ? "Criar conta e abrir checkout" : "Criar minha conta"}
+        {isPending ? "Criando conta..." : selectedPlan === "pro" || selectedPlan === "pro_annual" ? "Criar conta e abrir checkout" : "Criar minha conta"}
       </Button>
 
       <p className="text-sm text-[var(--color-muted-foreground)]">

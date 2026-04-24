@@ -5,6 +5,7 @@ import type { Prisma } from "@prisma/client";
 import type { BillingOverview } from "@/features/billing/types";
 import { PermissionError, isAuthError, isPermissionError } from "@/lib/observability/errors";
 import { prisma } from "@/lib/prisma/client";
+import { serverEnv } from "@/lib/env/server";
 
 import { getBillingSessionAccess } from "./access";
 import { logBillingAdminAudit } from "./audit";
@@ -16,8 +17,10 @@ import {
   buildBillingCheckoutUrl,
   buildBillingManageUrl,
   buildMercadoPagoExternalReference,
+  buildMercadoPagoWebhookUrl,
   createMercadoPagoPaymentRefund,
   createMercadoPagoPreApproval,
+  createMercadoPagoPreference,
   getMercadoPagoBillingFrequencyConfig,
   getMercadoPagoBillingPublicKey,
   getMercadoPagoBillingReason,
@@ -27,7 +30,7 @@ import {
   parseMercadoPagoExternalReference,
   updateMercadoPagoPreApproval
 } from "./mercadopago";
-import { BillingPlanError, getFallbackFreePlan, resolveBillablePlan } from "./plans";
+import { BillingPlanError, getConfiguredAnnualBillingAmount, getFallbackFreePlan, resolveBillablePlan } from "./plans";
 
 type BillingAccess = Awaited<ReturnType<typeof getBillingSessionAccess>>;
 type BillingDbClient = typeof prisma | Prisma.TransactionClient;
@@ -84,6 +87,12 @@ type MercadoPagoPaymentResource = {
     status?: string;
     date_created?: string | null;
   }>;
+};
+
+type MercadoPagoPreferenceResource = {
+  id?: string;
+  init_point?: string;
+  sandbox_init_point?: string;
 };
 
 export class BillingError extends Error {
@@ -231,6 +240,12 @@ async function applyTenantLicenseFromSubscription(db: BillingDbClient, input: {
       isActive: true
     }
   });
+}
+
+function addYears(date: Date, years: number) {
+  const nextDate = new Date(date);
+  nextDate.setFullYear(nextDate.getFullYear() + years);
+  return nextDate;
 }
 
 async function upsertBillingSubscriptionFromResource(
@@ -404,6 +419,41 @@ export async function syncMercadoPagoPaymentById(paymentId: string) {
 
   if (subscription.mercadoPagoPreapprovalId) {
     await syncMercadoPagoSubscriptionById(subscription.mercadoPagoPreapprovalId);
+  } else if (((subscription.metadata ?? {}) as Prisma.JsonObject).billingMode === "annual_one_time") {
+    const approvedAt = parseMercadoPagoDate(resource.date_approved) ?? new Date();
+    const nextBillingAt = status === "approved" || status === "authorized" ? addYears(approvedAt, 1) : null;
+    const subscriptionStatus =
+      status === "approved" || status === "authorized"
+        ? "authorized"
+        : status === "rejected"
+          ? "rejected"
+          : status === "canceled" || status === "refunded"
+            ? "canceled"
+          : "pending";
+
+    const updatedSubscription = await prisma.billingSubscription.update({
+      where: {
+        id: subscription.id
+      },
+      data: {
+        status: subscriptionStatus,
+        startedAt: subscriptionStatus === "authorized" ? approvedAt : subscription.startedAt,
+        nextBillingAt,
+        lastSyncedAt: new Date(),
+        metadata: {
+          ...((subscription.metadata ?? {}) as Prisma.JsonObject),
+          lastPaymentStatus: status,
+          annualAccessUntil: nextBillingAt?.toISOString() ?? null
+        }
+      }
+    });
+
+    await applyTenantLicenseFromSubscription(prisma, {
+      tenantId: updatedSubscription.tenantId,
+      planId: updatedSubscription.planId,
+      status: updatedSubscription.status,
+      nextBillingAt: updatedSubscription.nextBillingAt
+    });
   }
 
   return paymentRecord;
@@ -627,6 +677,142 @@ export async function createRecurringBillingSubscriptionForSession(input: Checko
   };
 }
 
+export async function createAnnualBillingPaymentForSession() {
+  const access = await getBillingSessionAccess({
+    requireManager: true
+  });
+
+  if (access.isPlatformAdmin) {
+    throw new BillingError("O superadmin não deve contratar assinatura por este fluxo", 403);
+  }
+
+  if (!isMercadoPagoBillingEnabled()) {
+    throw new BillingError("Billing do Mercado Pago está desabilitado no ambiente", 409);
+  }
+
+  const plan = await resolveBillablePlan();
+  const amount = getConfiguredAnnualBillingAmount();
+
+  if (amount === null) {
+    throw new BillingError("MP_BILLING_ANNUAL_AMOUNT ou MP_BILLING_AMOUNT precisa estar configurado", 500);
+  }
+
+  const existingSubscription = await prisma.billingSubscription.findFirst({
+    where: {
+      tenantId: access.tenantId,
+      status: {
+        in: ["authorized", "paused", "payment_required"]
+      }
+    },
+    orderBy: [{ createdAt: "desc" }]
+  });
+
+  if (existingSubscription) {
+    throw new BillingError("A conta já possui uma assinatura ativa ou pendente de regularização", 409);
+  }
+
+  const externalReference = buildMercadoPagoExternalReference({
+    tenantId: access.tenantId,
+    planId: plan.id
+  });
+  const subscription = await prisma.billingSubscription.create({
+    data: {
+      tenantId: access.tenantId,
+      planId: plan.id,
+      provider: MERCADO_PAGO_PROVIDER,
+      externalReference,
+      payerEmail: access.email.trim(),
+      status: "pending",
+      reason: `${getMercadoPagoBillingReason(plan.name)} anual`,
+      amount,
+      currencyId: plan.currencyId,
+      frequency: 1,
+      frequencyType: "years",
+      metadata: {
+        billingMode: "annual_one_time",
+        checkoutKind: "checkout_pro"
+      }
+    }
+  });
+
+  const preference = await createMercadoPagoPreference<MercadoPagoPreferenceResource>({
+    body: {
+      items: [
+        {
+          id: plan.slug,
+          title: `${plan.name} anual`,
+          description: "Acesso premium por 12 meses, sem renovação automática",
+          quantity: 1,
+          currency_id: plan.currencyId,
+          unit_price: amount
+        }
+      ],
+      payer: {
+        email: access.email.trim()
+      },
+      external_reference: externalReference,
+      notification_url: buildMercadoPagoWebhookUrl(),
+      back_urls: {
+        success: buildBillingManageUrl(),
+        pending: buildBillingManageUrl(),
+        failure: buildBillingCheckoutUrl()
+      },
+      auto_return: "approved",
+      payment_methods: {
+        installments: serverEnv.MP_BILLING_ANNUAL_MAX_INSTALLMENTS
+      },
+      metadata: {
+        tenant_id: access.tenantId,
+        plan_id: plan.id,
+        billing_mode: "annual_one_time",
+        billing_subscription_id: subscription.id
+      }
+    },
+    requestOptions: {
+      idempotencyKey: randomUUID()
+    }
+  });
+
+  const checkoutUrl = preference.init_point ?? preference.sandbox_init_point ?? null;
+
+  if (!checkoutUrl) {
+    throw new BillingError("Mercado Pago não retornou uma URL de checkout anual", 502);
+  }
+
+  await prisma.billingSubscription.update({
+    where: {
+      id: subscription.id
+    },
+    data: {
+      metadata: {
+        ...((subscription.metadata ?? {}) as Prisma.JsonObject),
+        preferenceId: preference.id ?? null,
+        checkoutUrl
+      }
+    }
+  });
+
+  await logBillingAdminAudit({
+    actor: access,
+    action: "billing.annual_checkout.created",
+    entityId: subscription.id,
+    summary: `Checkout anual criado para a conta ${access.tenant.name}`,
+    metadata: {
+      provider: MERCADO_PAGO_PROVIDER,
+      planId: plan.id,
+      planSlug: plan.slug,
+      amount,
+      currencyId: plan.currencyId,
+      preferenceId: preference.id ?? null
+    }
+  });
+
+  return {
+    url: checkoutUrl,
+    message: "Checkout anual iniciado"
+  };
+}
+
 export async function cancelBillingSubscriptionForSession() {
   const access = await getBillingSessionAccess({
     requireManager: true
@@ -751,6 +937,8 @@ export async function getBillingCheckoutPageData() {
     access,
     publicKey: getMercadoPagoBillingPublicKey(),
     amount: plan.amount,
+    annualAmount: getConfiguredAnnualBillingAmount(),
+    annualMaxInstallments: serverEnv.MP_BILLING_ANNUAL_MAX_INSTALLMENTS,
     currencyId: plan.currencyId,
     planName: plan.name
   };

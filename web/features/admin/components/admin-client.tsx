@@ -19,6 +19,7 @@ import {
   type PlanItem,
   type TenantItem,
   type UserItem,
+  formatBillingModeLabel,
   formatBillingSubscriptionLabel,
   formatPlanLabel
 } from "@/features/admin/components/admin-shared";
@@ -95,8 +96,14 @@ type TenantBillingDetails = {
     id: string;
     status: string;
     reason: string;
+    externalReference: string;
     mercadoPagoPreapprovalId: string | null;
     payerEmail: string;
+    billingMode: string;
+    amount: number;
+    currencyId: string;
+    frequency: number;
+    frequencyType: string;
     nextBillingAt: string | null;
     cancelRequestedAt: string | null;
     canceledAt: string | null;
@@ -1610,7 +1617,21 @@ export function AdminClient({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
                               <p className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">Assinatura</p>
                               <div className="mt-2 space-y-1 text-xs text-[var(--color-muted-foreground)]">
                                 <p>Status: {formatBillingSubscriptionLabel(tenantBillingDetailsQuery.data.subscription?.status ?? null)}</p>
+                                <p>Modalidade: {formatBillingModeLabel(tenantBillingDetailsQuery.data.subscription?.billingMode ?? null)}</p>
+                                <p>
+                                  Valor:{" "}
+                                  {tenantBillingDetailsQuery.data.subscription
+                                    ? `${tenantBillingDetailsQuery.data.subscription.currencyId} ${tenantBillingDetailsQuery.data.subscription.amount.toFixed(2)}`
+                                    : "não informado"}
+                                </p>
+                                <p>
+                                  Frequência:{" "}
+                                  {tenantBillingDetailsQuery.data.subscription
+                                    ? `${tenantBillingDetailsQuery.data.subscription.frequency} ${tenantBillingDetailsQuery.data.subscription.frequencyType}`
+                                    : "não informada"}
+                                </p>
                                 <p className="break-words">Preapproval: {tenantBillingDetailsQuery.data.subscription?.mercadoPagoPreapprovalId ?? "não vinculado"}</p>
+                                <p className="break-words">Referência externa: {tenantBillingDetailsQuery.data.subscription?.externalReference ?? "não vinculada"}</p>
                                 <p className="break-words">Pagador: {tenantBillingDetailsQuery.data.subscription?.payerEmail || "não informado"}</p>
                                 <p>
                                   Próxima cobrança:{" "}

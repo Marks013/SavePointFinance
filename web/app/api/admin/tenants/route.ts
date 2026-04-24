@@ -15,6 +15,15 @@ function slugify(value: string) {
     .replace(/-{2,}/g, "-");
 }
 
+function getBillingMode(metadata: unknown) {
+  if (metadata && typeof metadata === "object" && !Array.isArray(metadata)) {
+    const mode = (metadata as Record<string, unknown>).billingMode;
+    return typeof mode === "string" ? mode : "monthly_recurring";
+  }
+
+  return "monthly_recurring";
+}
+
 export async function GET(request: Request) {
   try {
     const admin = await requireAdminUser();
@@ -99,6 +108,8 @@ export async function GET(request: Request) {
             id: true,
             status: true,
             mercadoPagoPreapprovalId: true,
+            externalReference: true,
+            metadata: true,
             nextBillingAt: true,
             cancelRequestedAt: true,
             lastSyncedAt: true,
@@ -128,9 +139,13 @@ export async function GET(request: Request) {
     );
     const resourceIds = Array.from(
       new Set(
-        tenants
-          .map((tenant) => tenant.billingSubscriptions[0]?.mercadoPagoPreapprovalId ?? null)
-          .filter((value): value is string => Boolean(value))
+        tenants.flatMap((tenant) => {
+          const subscription = tenant.billingSubscriptions[0];
+          return [
+            subscription?.mercadoPagoPreapprovalId ?? null,
+            subscription?.payments[0]?.providerPaymentId ?? null
+          ].filter((value): value is string => Boolean(value));
+        })
       )
     );
     const webhookEvents = resourceIds.length
@@ -214,22 +229,40 @@ export async function GET(request: Request) {
       items: tenants.map((tenant) => ({
         billing: (() => {
           const subscription = latestSubscriptionByTenant.get(tenant.id);
-          const webhookSummary =
-            subscription?.mercadoPagoPreapprovalId
-              ? webhookSummaryByResourceId[subscription.mercadoPagoPreapprovalId]
-              : undefined;
+          const webhookSummary = [
+            subscription?.mercadoPagoPreapprovalId ?? null,
+            subscription?.payments[0]?.providerPaymentId ?? null
+          ]
+            .filter((value): value is string => Boolean(value))
+            .reduce(
+              (summary, resourceId) => {
+                const resourceSummary = webhookSummaryByResourceId[resourceId];
+
+                if (!resourceSummary) {
+                  return summary;
+                }
+
+                return {
+                  queueDepth: summary.queueDepth + resourceSummary.queueDepth,
+                  failed: summary.failed + resourceSummary.failed
+                };
+              },
+              { queueDepth: 0, failed: 0 }
+            );
 
           return {
             subscriptionId: subscription?.id ?? null,
             subscriptionStatus: subscription?.status ?? null,
             preapprovalId: subscription?.mercadoPagoPreapprovalId ?? null,
+            externalReference: subscription?.externalReference ?? null,
+            billingMode: subscription ? getBillingMode(subscription.metadata) : null,
             nextBillingAt: subscription?.nextBillingAt?.toISOString() ?? null,
             cancelRequestedAt: subscription?.cancelRequestedAt?.toISOString() ?? null,
             lastSyncedAt: subscription?.lastSyncedAt?.toISOString() ?? null,
             latestPaymentStatus: subscription?.payments[0]?.status ?? null,
             latestPaymentId: subscription?.payments[0]?.providerPaymentId ?? null,
-            queueDepth: webhookSummary?.queueDepth ?? 0,
-            failedWebhooks: webhookSummary?.failed ?? 0,
+            queueDepth: webhookSummary.queueDepth,
+            failedWebhooks: webhookSummary.failed,
             lastFinancialRepair: latestRepairByTenantId[tenant.id] ?? null
           };
         })(),

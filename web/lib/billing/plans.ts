@@ -25,6 +25,15 @@ export function getConfiguredBillingAmount() {
   return parseConfiguredBillingAmount();
 }
 
+export function getConfiguredAnnualBillingAmount() {
+  if (typeof serverEnv.MP_BILLING_ANNUAL_AMOUNT === "number") {
+    return Number(serverEnv.MP_BILLING_ANNUAL_AMOUNT.toFixed(2));
+  }
+
+  const monthlyAmount = getConfiguredBillingAmount();
+  return monthlyAmount === null ? null : Number((monthlyAmount * 10).toFixed(2));
+}
+
 export function getConfiguredBillingCurrency() {
   return serverEnv.MP_BILLING_CURRENCY.trim().toUpperCase();
 }

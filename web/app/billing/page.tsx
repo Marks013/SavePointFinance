@@ -66,6 +66,8 @@ export default async function BillingPage() {
 
         <CheckoutClient
           amount={pageData.amount}
+          annualAmount={pageData.annualAmount}
+          annualMaxInstallments={pageData.annualMaxInstallments}
           currencyId={pageData.currencyId}
           planName={pageData.planName}
           publicKey={pageData.publicKey}

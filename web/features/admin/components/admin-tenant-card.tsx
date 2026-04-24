@@ -7,6 +7,7 @@ import { Select } from "@/components/ui/select";
 import {
   type PlanItem,
   type TenantItem,
+  formatBillingModeLabel,
   formatBillingSubscriptionLabel,
   formatLifecycleLabel,
   formatPlanLabel
@@ -102,7 +103,7 @@ export function AdminTenantCard({
             </span>
           </div>
           <p className="break-words text-xs leading-5 text-[var(--color-muted-foreground)]">
-            Billing: {formatBillingSubscriptionLabel(tenant.billing.subscriptionStatus)} • Próxima cobrança: {getNextBillingLabel(tenant)}
+            Billing: {formatBillingSubscriptionLabel(tenant.billing.subscriptionStatus)} • {formatBillingModeLabel(tenant.billing.billingMode)} • Próxima cobrança: {getNextBillingLabel(tenant)}
           </p>
           <p className="break-words text-xs leading-5 text-[var(--color-muted-foreground)]">Última sincronização: {getLastSyncLabel(tenant)}</p>
         </div>
@@ -208,7 +209,9 @@ export function AdminTenantCard({
                   <p>Fila pendente: {tenant.billing.queueDepth}</p>
                   <p>Falhas de webhook: {tenant.billing.failedWebhooks}</p>
                   <p>Último pagamento: {tenant.billing.latestPaymentStatus ?? "sem pagamento sincronizado"}</p>
+                  <p>Modalidade: {formatBillingModeLabel(tenant.billing.billingMode)}</p>
                   <p className="break-words">Preapproval: {tenant.billing.preapprovalId ?? "não vinculado"}</p>
+                  <p className="break-words">Referência externa: {tenant.billing.externalReference ?? "não vinculada"}</p>
                   <p>Cancelamento agendado: {tenant.billing.cancelRequestedAt ?? "não"}</p>
                   <p>
                     Último reparo financeiro:{" "}
@@ -234,10 +237,10 @@ export function AdminTenantCard({
                 <div className="mt-4 flex flex-wrap gap-2">
                   {isPlatformAdmin ? (
                     <>
-                      <Button disabled={!tenant.billing.preapprovalId || billingActionDisabled} onClick={onSyncSubscription} type="button" variant="secondary">
+                      <Button disabled={!tenant.billing.subscriptionId || billingActionDisabled} onClick={onSyncSubscription} type="button" variant="secondary">
                         Sincronizar billing
                       </Button>
-                      <Button disabled={!tenant.billing.preapprovalId || billingActionDisabled} onClick={onProcessQueue} type="button" variant="ghost">
+                      <Button disabled={!tenant.billing.subscriptionId || billingActionDisabled} onClick={onProcessQueue} type="button" variant="ghost">
                         Reprocessar fila
                       </Button>
                       <Button disabled={billingActionDisabled} onClick={onRecalculateTithe} type="button" variant="ghost">

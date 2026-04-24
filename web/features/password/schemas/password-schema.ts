@@ -69,7 +69,7 @@ export const acceptInvitationSchema = z
 
 export const publicRegistrationSchema = z
   .object({
-    plan: z.enum(["free", "trial", "pro"]),
+    plan: z.enum(["free", "trial", "pro", "pro_annual"]),
     name: z.string().min(2, "Informe seu nome"),
     organizationName: z.string().min(2, "Informe o nome da conta"),
     email: z.string().trim().email("Informe um e-mail valido"),

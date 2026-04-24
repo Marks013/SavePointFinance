@@ -32,7 +32,9 @@ const planCards = [
     cadence: "via Mercado Pago",
     tone: "strong",
     href: "/cadastro?plan=pro" as Route,
-    cta: "Criar conta e assinar",
+    cta: "Assinar mensal",
+    annualHref: "/cadastro?plan=pro_annual" as Route,
+    annualCta: "Pagar anual com desconto",
     features: [
       { label: "Contas financeiras ilimitadas", enabled: true },
       { label: "Cartões ilimitados", enabled: true },
@@ -88,7 +90,16 @@ export default function PlansPage() {
             <div className="flex flex-wrap gap-3">
               <Button asChild>
                 <PlanCheckoutLink>
-                  Assinar Premium
+                  Assinar mensal
+                  <ArrowRight className="size-4" />
+                </PlanCheckoutLink>
+              </Button>
+              <Button asChild variant="secondary">
+                <PlanCheckoutLink
+                  hrefWhenLoggedIn="/billing?intent=checkout&cycle=annual"
+                  hrefWhenLoggedOut="/cadastro?plan=pro_annual"
+                >
+                  Plano anual
                   <ArrowRight className="size-4" />
                 </PlanCheckoutLink>
               </Button>
@@ -172,6 +183,17 @@ export default function PlansPage() {
                   </Link>
                 )}
               </Button>
+              {plan.name === "Premium Completo" && "annualCta" in plan ? (
+                <Button asChild className="mt-3 w-full" variant="secondary">
+                  <PlanCheckoutLink
+                    hrefWhenLoggedIn="/billing?intent=checkout&cycle=annual"
+                    hrefWhenLoggedOut={plan.annualHref}
+                  >
+                    {plan.annualCta}
+                    <ArrowRight className="size-4" />
+                  </PlanCheckoutLink>
+                </Button>
+              ) : null}
             </article>
           );
         })}
@@ -184,7 +206,7 @@ export default function PlansPage() {
             <h2 className="mt-3 text-2xl font-semibold tracking-[-0.04em]">Permissões e limites por plano</h2>
           </div>
           <Button asChild variant="secondary">
-            <PlanCheckoutLink>Criar conta e ir para checkout</PlanCheckoutLink>
+            <PlanCheckoutLink>Criar conta e assinar mensal</PlanCheckoutLink>
           </Button>
         </div>
 

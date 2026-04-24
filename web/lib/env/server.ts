@@ -77,6 +77,8 @@ const serverEnvSchema = z
     MP_BILLING_PLAN_SLUG: z.string().default("premium-completo"),
     MP_BILLING_REASON: z.string().default("Save Point Financa Premium"),
     MP_BILLING_AMOUNT: optionalPositiveNumber,
+    MP_BILLING_ANNUAL_AMOUNT: optionalPositiveNumber,
+    MP_BILLING_ANNUAL_MAX_INSTALLMENTS: z.coerce.number().int().positive().default(12),
     MP_BILLING_CURRENCY: z.string().default("BRL"),
     MP_BILLING_FREQUENCY: z.coerce.number().int().positive().default(1),
     MP_BILLING_FREQUENCY_TYPE: z.string().default("months")
@@ -148,6 +150,8 @@ export const serverEnv = serverEnvSchema.parse({
   MP_BILLING_PLAN_SLUG: process.env.MP_BILLING_PLAN_SLUG,
   MP_BILLING_REASON: process.env.MP_BILLING_REASON,
   MP_BILLING_AMOUNT: process.env.MP_BILLING_AMOUNT,
+  MP_BILLING_ANNUAL_AMOUNT: process.env.MP_BILLING_ANNUAL_AMOUNT,
+  MP_BILLING_ANNUAL_MAX_INSTALLMENTS: process.env.MP_BILLING_ANNUAL_MAX_INSTALLMENTS,
   MP_BILLING_CURRENCY: process.env.MP_BILLING_CURRENCY,
   MP_BILLING_FREQUENCY: process.env.MP_BILLING_FREQUENCY,
   MP_BILLING_FREQUENCY_TYPE: process.env.MP_BILLING_FREQUENCY_TYPE

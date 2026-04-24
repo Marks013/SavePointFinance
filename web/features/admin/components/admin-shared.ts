@@ -4,6 +4,8 @@ export type TenantBillingSummary = {
   subscriptionId: string | null;
   subscriptionStatus: string | null;
   preapprovalId: string | null;
+  externalReference: string | null;
+  billingMode: string | null;
   nextBillingAt: string | null;
   cancelRequestedAt: string | null;
   lastSyncedAt: string | null;
@@ -127,6 +129,17 @@ export function formatBillingSubscriptionLabel(status: string | null) {
       return "Assinatura recusada";
     default:
       return "Sem assinatura Mercado Pago";
+  }
+}
+
+export function formatBillingModeLabel(mode: string | null) {
+  switch (mode) {
+    case "annual_one_time":
+      return "Anual sem renovação";
+    case "monthly_recurring":
+      return "Mensal recorrente";
+    default:
+      return "Billing não identificado";
   }
 }
 

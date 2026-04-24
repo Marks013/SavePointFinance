@@ -5,6 +5,7 @@ import { logAdminAudit } from "@/lib/admin/audit";
 import { requireAdminUser } from "@/lib/auth/admin";
 import { processQueuedMercadoPagoWebhookEvents } from "@/lib/billing/async-processor";
 import {
+  syncMercadoPagoPaymentById,
   syncMercadoPagoSubscriptionById,
   toBillingRouteStatus
 } from "@/lib/billing/service";
@@ -46,6 +47,15 @@ function ensurePlatformAdmin(admin: Awaited<ReturnType<typeof requireAdminUser>>
   if (!admin.isPlatformAdmin) {
     throw new Error("Forbidden");
   }
+}
+
+function getBillingMode(metadata: unknown) {
+  if (metadata && typeof metadata === "object" && !Array.isArray(metadata)) {
+    const mode = (metadata as Record<string, unknown>).billingMode;
+    return typeof mode === "string" ? mode : "monthly_recurring";
+  }
+
+  return "monthly_recurring";
 }
 
 async function getTenantRepairUser(tenantId: string) {
@@ -103,12 +113,18 @@ export async function GET(_request: Request, context: Params) {
             id: true,
             status: true,
             reason: true,
+            externalReference: true,
             mercadoPagoPreapprovalId: true,
             payerEmail: true,
+            amount: true,
+            currencyId: true,
+            frequency: true,
+            frequencyType: true,
             nextBillingAt: true,
             cancelRequestedAt: true,
             canceledAt: true,
             lastSyncedAt: true,
+            metadata: true,
             createdAt: true,
             updatedAt: true,
             payments: {
@@ -137,10 +153,18 @@ export async function GET(_request: Request, context: Params) {
     }
 
     const currentSubscription = tenant.billingSubscriptions[0] ?? null;
-    const webhookEvents = currentSubscription?.mercadoPagoPreapprovalId
+    const webhookResourceIds = currentSubscription
+      ? [
+          currentSubscription.mercadoPagoPreapprovalId,
+          ...currentSubscription.payments.map((payment) => payment.providerPaymentId)
+        ].filter((value): value is string => Boolean(value))
+      : [];
+    const webhookEvents = webhookResourceIds.length
       ? await prisma.billingWebhookEvent.findMany({
           where: {
-            resourceId: currentSubscription.mercadoPagoPreapprovalId
+            resourceId: {
+              in: webhookResourceIds
+            }
           },
           orderBy: {
             createdAt: "desc"
@@ -171,6 +195,9 @@ export async function GET(_request: Request, context: Params) {
       subscription: currentSubscription
         ? {
             ...currentSubscription,
+            amount: Number(currentSubscription.amount),
+            billingMode: getBillingMode(currentSubscription.metadata),
+            metadata: currentSubscription.metadata,
             nextBillingAt: currentSubscription.nextBillingAt?.toISOString() ?? null,
             cancelRequestedAt: currentSubscription.cancelRequestedAt?.toISOString() ?? null,
             canceledAt: currentSubscription.canceledAt?.toISOString() ?? null,
@@ -395,19 +422,33 @@ export async function POST(request: Request, context: Params) {
       },
       select: {
         id: true,
-        mercadoPagoPreapprovalId: true
+        mercadoPagoPreapprovalId: true,
+        payments: {
+          orderBy: {
+            createdAt: "desc"
+          },
+          take: 5,
+          select: {
+            providerPaymentId: true
+          }
+        }
       }
     });
 
-    if (!latestSubscription?.mercadoPagoPreapprovalId) {
-      return NextResponse.json({ message: "Não existe assinatura do Mercado Pago vinculada a esta conta" }, { status: 404 });
-    }
-
     if (body.action === "sync_subscription") {
-      const synced = await syncMercadoPagoSubscriptionById(latestSubscription.mercadoPagoPreapprovalId);
+      if (!latestSubscription) {
+        return NextResponse.json({ message: "Não existe billing do Mercado Pago vinculado a esta conta" }, { status: 404 });
+      }
+
+      const latestPaymentId = latestSubscription.payments[0]?.providerPaymentId ?? null;
+      const synced = latestSubscription.mercadoPagoPreapprovalId
+        ? await syncMercadoPagoSubscriptionById(latestSubscription.mercadoPagoPreapprovalId)
+        : latestPaymentId
+          ? await syncMercadoPagoPaymentById(latestPaymentId)
+          : null;
 
       if (!synced) {
-        return NextResponse.json({ message: "Assinatura local não encontrada para sincronização" }, { status: 404 });
+        return NextResponse.json({ message: "Billing local não encontrado para sincronização" }, { status: 404 });
       }
 
       await logAdminAudit({
@@ -416,11 +457,13 @@ export async function POST(request: Request, context: Params) {
         targetTenantId: id,
         action: "billing.subscription.synced",
         entityType: "billing",
-        entityId: synced.id,
+        entityId: latestSubscription.id,
         summary: `Sincronização manual da assinatura executada para a conta ${id}`,
         metadata: {
-          mercadoPagoPreapprovalId: synced.mercadoPagoPreapprovalId,
-          status: synced.status
+          mercadoPagoPreapprovalId:
+            "mercadoPagoPreapprovalId" in synced ? synced.mercadoPagoPreapprovalId : latestSubscription.mercadoPagoPreapprovalId,
+          latestPaymentId,
+          status: "status" in synced ? synced.status : undefined
         }
       });
 
@@ -430,9 +473,24 @@ export async function POST(request: Request, context: Params) {
       });
     }
 
+    if (!latestSubscription) {
+      return NextResponse.json({ message: "Não existe billing do Mercado Pago vinculado a esta conta" }, { status: 404 });
+    }
+
+    const resourceIds = [
+      latestSubscription.mercadoPagoPreapprovalId,
+      ...latestSubscription.payments.map((payment) => payment.providerPaymentId)
+    ].filter((value): value is string => Boolean(value));
+
+    if (!resourceIds.length) {
+      return NextResponse.json({ message: "Não há recurso do Mercado Pago para reprocessar nesta conta" }, { status: 404 });
+    }
+
     const queuedEvents = await prisma.billingWebhookEvent.findMany({
       where: {
-        resourceId: latestSubscription.mercadoPagoPreapprovalId,
+        resourceId: {
+          in: resourceIds
+        },
         status: {
           in: ["pending", "processing", "failed"]
         }

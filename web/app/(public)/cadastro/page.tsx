@@ -11,7 +11,7 @@ type CadastroPageProps = {
 };
 
 function normalizePlan(value: string | undefined): PublicRegistrationValues["plan"] {
-  if (value === "trial" || value === "pro") {
+  if (value === "trial" || value === "pro" || value === "pro_annual") {
     return value;
   }
 
