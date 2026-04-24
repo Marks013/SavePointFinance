@@ -10,8 +10,8 @@ services:
     restart: unless-stopped
     # Puxa TODAS as variáveis do .env automaticamente
     env_file:
-      - .env
       - ./.deploy/runtime.env
+      - .env
     environment:
       # Mantemos apenas o que é exclusivo do Docker ou montado dinamicamente
       NODE_ENV: production
