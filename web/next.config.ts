@@ -1,37 +1,9 @@
-import { createHash } from "node:crypto";
 import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
 
-import { themeBootstrapScript } from "@/lib/security/theme-bootstrap";
-
 const isProduction = process.env.NODE_ENV === "production";
-const themeBootstrapHash = createHash("sha256").update(themeBootstrapScript).digest("base64");
-
-const contentSecurityPolicy = [
-  "default-src 'self'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "frame-ancestors 'none'",
-  "object-src 'none'",
-  "img-src 'self' data: blob:",
-  "font-src 'self' data:",
-  isProduction ? "connect-src 'self'" : "connect-src 'self' ws: wss: http: https:",
-  isProduction
-    ? `script-src 'self' 'sha256-${themeBootstrapHash}'`
-    : `script-src 'self' 'sha256-${themeBootstrapHash}' 'unsafe-eval'`,
-  "style-src 'self' 'unsafe-inline'",
-  "worker-src 'self' blob:",
-  "manifest-src 'self'",
-  isProduction ? "upgrade-insecure-requests" : ""
-]
-  .filter(Boolean)
-  .join("; ");
 
 const securityHeaders = [
-  {
-    key: "Content-Security-Policy",
-    value: contentSecurityPolicy
-  },
   {
     key: "Referrer-Policy",
     value: "no-referrer"

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { type ReactNode } from "react";
 
 import { auth } from "@/auth";
@@ -20,8 +20,9 @@ type RootLayoutProps = {
 };
 
 export default async function RootLayout({ children }: RootLayoutProps) {
-  const cookieStore = await cookies();
+  const [cookieStore, headerStore] = await Promise.all([cookies(), headers()]);
   const storedTheme = cookieStore.get("savepoint-theme")?.value;
+  const nonce = headerStore.get("x-nonce") ?? undefined;
   const initialTheme = storedTheme === "light" ? "light" : "dark";
   const initialSession = await auth().catch((error) => {
     captureUnexpectedError(error, {
@@ -39,7 +40,7 @@ export default async function RootLayout({ children }: RootLayoutProps) {
         <a className="skip-link" href="#main-content">
           Pular para o conteúdo principal
         </a>
-        <script dangerouslySetInnerHTML={{ __html: themeBootstrapScript }} />
+        <script dangerouslySetInnerHTML={{ __html: themeBootstrapScript }} nonce={nonce} />
         <AppProviders initialSession={initialSession} initialTheme={initialTheme}>
           <div className="grain" />
           <GlobalThemeToggle />

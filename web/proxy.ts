@@ -7,6 +7,7 @@ const MAINTENANCE_PATH = "/manutencao";
 const ALLOWED_API_PREFIXES = ["/api/health", "/api/integrations"];
 const INVITATION_TOKEN_COOKIE = "savepoint-invitation-token";
 const RESET_TOKEN_COOKIE = "savepoint-reset-token";
+const isProduction = process.env.NODE_ENV === "production";
 
 function isAllowedDuringMaintenance(pathname: string) {
   if (pathname === MAINTENANCE_PATH) {
@@ -20,12 +21,67 @@ function isSecureRequest(request: NextRequest) {
   return request.nextUrl.protocol === "https:" || request.headers.get("x-forwarded-proto") === "https";
 }
 
+function createNonce() {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  let value = "";
+
+  for (const byte of bytes) {
+    value += String.fromCharCode(byte);
+  }
+
+  return btoa(value);
+}
+
+function buildContentSecurityPolicy(nonce: string) {
+  return [
+    "default-src 'self'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+    "object-src 'none'",
+    "img-src 'self' data: blob:",
+    "font-src 'self' data:",
+    isProduction ? "connect-src 'self'" : "connect-src 'self' ws: wss: http: https:",
+    `script-src 'self' 'nonce-${nonce}'${isProduction ? "" : " 'unsafe-eval'"}`,
+    `script-src-elem 'self' 'nonce-${nonce}'${isProduction ? "" : " 'unsafe-eval'"}`,
+    "script-src-attr 'none'",
+    "style-src 'self' 'unsafe-inline'",
+    "worker-src 'self' blob:",
+    "manifest-src 'self'",
+    isProduction ? "upgrade-insecure-requests" : ""
+  ]
+    .filter(Boolean)
+    .join("; ");
+}
+
+function applySecurityHeaders(response: NextResponse, contentSecurityPolicy: string, request: NextRequest) {
+  response.headers.set("Content-Security-Policy", contentSecurityPolicy);
+  response.headers.set("Referrer-Policy", "no-referrer");
+  response.headers.set("X-Content-Type-Options", "nosniff");
+  response.headers.set("X-Frame-Options", "DENY");
+  response.headers.set("Permissions-Policy", "camera=(), geolocation=(), microphone=(), payment=(), usb=()");
+  response.headers.set("Cross-Origin-Opener-Policy", "same-origin");
+  response.headers.set("Cross-Origin-Resource-Policy", "same-site");
+
+  if (isSecureRequest(request)) {
+    response.headers.set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
+  }
+
+  return response;
+}
+
 export function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const isMaintenanceModeEnabled = process.env.MAINTENANCE_MODE === "true";
   const requestHeaders = new Headers(request.headers);
   const sanitizedSearch = sanitizeSearchParams(request.nextUrl.searchParams);
   const token = request.nextUrl.searchParams.get("token")?.trim();
+  const nonce = createNonce();
+  const contentSecurityPolicy = buildContentSecurityPolicy(nonce);
+
+  requestHeaders.set("x-nonce", nonce);
+  requestHeaders.set("Content-Security-Policy", contentSecurityPolicy);
 
   if ((pathname === "/accept-invitation" || pathname === "/reset-password") && token) {
     const safeUrl = request.nextUrl.clone();
@@ -40,13 +96,13 @@ export function proxy(request: NextRequest) {
       secure: isSecureRequest(request)
     });
 
-    return response;
+    return applySecurityHeaders(response, contentSecurityPolicy, request);
   }
 
   if (pathname === "/login" && hasSensitiveSearchParams(request.nextUrl.searchParams)) {
     const safeUrl = request.nextUrl.clone();
     safeUrl.search = sanitizedSearch;
-    return NextResponse.redirect(safeUrl);
+    return applySecurityHeaders(NextResponse.redirect(safeUrl), contentSecurityPolicy, request);
   }
 
   requestHeaders.set("x-savepoint-pathname", pathname);
@@ -54,27 +110,35 @@ export function proxy(request: NextRequest) {
 
   if (isMaintenanceModeEnabled && !isAllowedDuringMaintenance(pathname)) {
     if (pathname.startsWith("/api/")) {
-      return NextResponse.json(
-        {
-          error: "maintenance_mode",
-          message: "A aplicação está temporariamente em manutenção."
-        },
-        { status: 503 }
+      return applySecurityHeaders(
+        NextResponse.json(
+          {
+            error: "maintenance_mode",
+            message: "A aplicação está temporariamente em manutenção."
+          },
+          { status: 503 }
+        ),
+        contentSecurityPolicy,
+        request
       );
     }
 
-    return NextResponse.redirect(new URL(MAINTENANCE_PATH, request.url));
+    return applySecurityHeaders(NextResponse.redirect(new URL(MAINTENANCE_PATH, request.url)), contentSecurityPolicy, request);
   }
 
   if (!isMaintenanceModeEnabled && pathname === MAINTENANCE_PATH) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    return applySecurityHeaders(NextResponse.redirect(new URL("/dashboard", request.url)), contentSecurityPolicy, request);
   }
 
-  return NextResponse.next({
-    request: {
-      headers: requestHeaders
-    }
-  });
+  return applySecurityHeaders(
+    NextResponse.next({
+      request: {
+        headers: requestHeaders
+      }
+    }),
+    contentSecurityPolicy,
+    request
+  );
 }
 
 export const config = {
