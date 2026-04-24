@@ -35,7 +35,7 @@ function createNonce() {
 
 function buildContentSecurityPolicy(nonce: string, options: { allowMercadoPagoCheckout?: boolean } = {}) {
   const mercadoPagoSources =
-    "https://sdk.mercadopago.com https://*.mercadopago.com https://*.mercadopago.com.br https://*.mercadolibre.com https://*.mlstatic.com";
+    "https://sdk.mercadopago.com https://*.mercadopago.com https://*.mercadopago.com.br https://*.mercadolibre.com https://*.mercadolivre.com https://*.mlstatic.com";
   const scriptElementPolicy = options.allowMercadoPagoCheckout
     ? `script-src-elem 'self' 'unsafe-inline' ${mercadoPagoSources}`
     : `script-src-elem 'self' 'nonce-${nonce}'`;
