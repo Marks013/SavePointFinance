@@ -35,7 +35,7 @@ function createNonce() {
 
 function buildContentSecurityPolicy(nonce: string, options: { allowMercadoPagoCheckout?: boolean } = {}) {
   const mercadoPagoSources =
-    "https://sdk.mercadopago.com https://*.mercadopago.com https://*.mercadopago.com.br https://*.mercadolibre.com https://*.mercadolivre.com https://*.mlstatic.com";
+    "https://sdk.mercadopago.com https://secure-fields.mercadopago.com https://api-static.mercadopago.com https://*.mercadopago.com https://*.mercadopago.com.br https://*.mercadolibre.com https://*.mercadolivre.com https://*.mlstatic.com";
   const scriptElementPolicy = options.allowMercadoPagoCheckout
     ? `script-src-elem 'self' 'unsafe-inline' ${mercadoPagoSources}`
     : `script-src-elem 'self' 'nonce-${nonce}'`;
@@ -67,7 +67,7 @@ function applySecurityHeaders(response: NextResponse, contentSecurityPolicy: str
   response.headers.set("Referrer-Policy", "no-referrer");
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("X-Frame-Options", "DENY");
-  response.headers.set("Permissions-Policy", "camera=(), geolocation=(), microphone=(), payment=(), usb=()");
+  response.headers.set("Permissions-Policy", "camera=(), geolocation=(), microphone=(), usb=()");
   response.headers.set("Cross-Origin-Opener-Policy", "same-origin");
   response.headers.set("Cross-Origin-Resource-Policy", "same-site");
 
