@@ -1291,14 +1291,14 @@ export function AdminClient({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
       </section>
 
       <section className="surface content-section">
-        <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="admin-section-header">
           <div className="min-w-0 flex-1">
             <h2 className="text-2xl font-semibold tracking-[-0.03em]">Catálogo de planos</h2>
             <p className="mt-2 max-w-3xl text-sm leading-7 text-[var(--color-muted-foreground)]">
               Os planos agora são registros reais. Você pode criar, editar, ativar, desativar e excluir planos customizados sem depender de presets fixos.
             </p>
           </div>
-          <article className="metric-card w-full sm:w-auto">
+          <article className="metric-card admin-section-metric">
             <p className="metric-label">Planos ativos</p>
             <p className="metric-value">{plans.filter((item) => item.isActive).length}</p>
           </article>
@@ -1487,14 +1487,14 @@ export function AdminClient({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
 
       <div className={adminSectionsLayoutClassName}>
         <section className="surface content-section">
-          <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="admin-section-header">
             <div className="min-w-0 flex-1">
               <h2 className="text-2xl font-semibold tracking-[-0.03em]">Contas</h2>
               <p className="mt-2 text-sm leading-7 text-[var(--color-muted-foreground)]">
                 Ajuste plano, avaliação, capacidade e status operacional de cada conta.
               </p>
             </div>
-            <article className="metric-card w-full sm:w-auto">
+            <article className="metric-card admin-section-metric">
               <p className="metric-label">No recorte</p>
               <p className="metric-value">{tenants.length}</p>
             </article>
@@ -1756,14 +1756,14 @@ export function AdminClient({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
         </section>
 
         <section className="surface content-section">
-          <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="admin-section-header">
             <div className="min-w-0 flex-1">
               <h2 className="text-2xl font-semibold tracking-[-0.03em]">Colaboradores</h2>
               <p className="mt-2 text-sm leading-7 text-[var(--color-muted-foreground)]">
                 Controle perfis, acesso e redefinição de senha das pessoas com acesso à conta.
               </p>
             </div>
-            <article className="metric-card w-full sm:w-auto">
+            <article className="metric-card admin-section-metric">
               <p className="metric-label">No recorte</p>
               <p className="metric-value">{users.length}</p>
             </article>
@@ -2023,14 +2023,14 @@ export function AdminClient({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
           </section>
 
           <section className="surface content-section">
-            <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="admin-section-header">
               <div className="min-w-0 flex-1">
                 <h2 className="text-2xl font-semibold tracking-[-0.03em]">Convites ativos e histórico</h2>
                 <p className="mt-2 text-sm leading-7 text-[var(--color-muted-foreground)]">
                   Acompanhe convites pendentes, aceitos e revogados sem perder o link de acesso.
                 </p>
               </div>
-              <article className="metric-card w-full sm:w-auto">
+              <article className="metric-card admin-section-metric">
                 <p className="metric-label">No recorte</p>
                 <p className="metric-value">{invitations.length}</p>
               </article>

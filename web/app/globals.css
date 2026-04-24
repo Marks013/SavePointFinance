@@ -541,6 +541,35 @@ button {
   grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
 }
 
+.admin-section-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.admin-section-metric {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 5.25rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.admin-section-metric .metric-label {
+  max-width: 9rem;
+  text-wrap: balance;
+}
+
+.admin-section-metric .metric-value {
+  margin-top: 0;
+  flex: 0 0 auto;
+  font-size: clamp(1.25rem, 2.4vw, 1.7rem);
+}
+
 .admin-disclosure {
   border-radius: 1.55rem;
   border: 1px solid color-mix(in srgb, var(--color-border) 88%, rgba(255, 255, 255, 0.08));
@@ -624,6 +653,16 @@ button {
 @media (min-width: 1080px) {
   .admin-hero-grid {
     grid-template-columns: minmax(0, 1.35fr) minmax(18rem, 0.95fr);
+  }
+}
+
+@media (min-width: 760px) {
+  .admin-section-header {
+    grid-template-columns: minmax(0, 1fr) minmax(11rem, 12.5rem);
+  }
+
+  .admin-section-metric {
+    justify-self: end;
   }
 }
 
