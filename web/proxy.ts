@@ -34,19 +34,22 @@ function createNonce() {
 }
 
 function buildContentSecurityPolicy(nonce: string) {
+  const mercadoPagoSources = "https://sdk.mercadopago.com https://*.mercadopago.com https://*.mercadopago.com.br https://*.mercadolibre.com";
+
   return [
     "default-src 'self'",
     "base-uri 'self'",
     "form-action 'self'",
     "frame-ancestors 'none'",
     "object-src 'none'",
-    "img-src 'self' data: blob:",
+    `img-src 'self' data: blob: ${mercadoPagoSources}`,
     "font-src 'self' data:",
-    isProduction ? "connect-src 'self'" : "connect-src 'self' ws: wss: http: https:",
+    isProduction ? `connect-src 'self' ${mercadoPagoSources}` : "connect-src 'self' ws: wss: http: https:",
     `script-src 'self' 'nonce-${nonce}' 'unsafe-eval'`,
-    `script-src-elem 'self' 'nonce-${nonce}'`,
+    `script-src-elem 'self' 'nonce-${nonce}' ${mercadoPagoSources}`,
     "script-src-attr 'none'",
     "style-src 'self' 'unsafe-inline'",
+    `frame-src 'self' ${mercadoPagoSources}`,
     "worker-src 'self' blob:",
     "manifest-src 'self'",
     isProduction ? "upgrade-insecure-requests" : ""
