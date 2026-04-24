@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { CardPayment, initMercadoPago } from "@mercadopago/sdk-react";
@@ -19,6 +19,21 @@ type CheckoutClientProps = {
 type CreateSubscriptionPayload = {
   url?: string | null;
   message?: string;
+};
+
+type CardPaymentFormData = {
+  token?: string;
+  payment_method_id?: string;
+  issuer_id?: string;
+  installments?: number | null;
+  payer?: unknown;
+};
+
+type CardPaymentAdditionalData = {
+  bin?: string;
+  lastFourDigits?: string;
+  cardholderName?: string;
+  paymentTypeId?: string;
 };
 
 async function createSubscription(body: Record<string, unknown>) {
@@ -41,6 +56,8 @@ async function createSubscription(body: Record<string, unknown>) {
 
 export function CheckoutClient({ amount, currencyId, planName, publicKey }: CheckoutClientProps) {
   const queryClient = useQueryClient();
+  const [isBrickReady, setIsBrickReady] = useState(false);
+  const [brickError, setBrickError] = useState<string | null>(null);
   const createSubscriptionMutation = useMutation({
     mutationFn: createSubscription,
     onSuccess: async (payload) => {
@@ -62,10 +79,49 @@ export function CheckoutClient({ amount, currencyId, planName, publicKey }: Chec
       return;
     }
 
+    setIsBrickReady(false);
+    setBrickError(null);
     initMercadoPago(publicKey, {
       locale: "pt-BR"
     });
   }, [publicKey]);
+
+  const cardPaymentInitialization = useMemo(
+    () => ({
+      amount: amount ?? 0
+    }),
+    [amount]
+  );
+
+  const handleBrickReady = useCallback(() => {
+    setIsBrickReady(true);
+    setBrickError(null);
+  }, []);
+
+  const handleBrickError = useCallback((error: unknown) => {
+    const message = error instanceof Error ? error.message : "Falha ao carregar o checkout do Mercado Pago";
+    setBrickError(message);
+    toast.error(message);
+  }, []);
+
+  const handleSubmit = useCallback(
+    async (formData: CardPaymentFormData, additionalData?: CardPaymentAdditionalData) => {
+      await createSubscriptionMutation.mutateAsync({
+        cardToken: formData.token,
+        paymentMethodId: formData.payment_method_id,
+        issuerId: formData.issuer_id || null,
+        installments: formData.installments ?? null,
+        payer: formData.payer ?? null,
+        metadata: {
+          bin: additionalData?.bin ?? null,
+          lastFourDigits: additionalData?.lastFourDigits ?? null,
+          cardholderName: additionalData?.cardholderName ?? null,
+          paymentTypeId: additionalData?.paymentTypeId ?? null
+        }
+      });
+    },
+    [createSubscriptionMutation.mutateAsync]
+  );
 
   if (!publicKey || typeof amount !== "number" || amount <= 0) {
     return (
@@ -115,30 +171,22 @@ export function CheckoutClient({ amount, currencyId, planName, publicKey }: Chec
         </article>
       </div>
 
-      <div className="data-card mt-6 p-5">
+      <div className="data-card relative mt-6 min-h-[520px] p-5">
+        {!isBrickReady ? (
+          <div className="absolute inset-x-5 top-5 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-sm text-[var(--color-muted-foreground)]">
+            Carregando campos seguros do Mercado Pago...
+          </div>
+        ) : null}
+        {brickError ? (
+          <div className="mb-4 rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">{brickError}</div>
+        ) : null}
         <CardPayment
-          initialization={{
-            amount
-          }}
+          id="savepoint-card-payment-brick"
+          initialization={cardPaymentInitialization}
           locale="pt-BR"
-          onError={(error) => {
-            toast.error(error.message ?? "Falha ao carregar o checkout do Mercado Pago");
-          }}
-          onSubmit={async (formData, additionalData) => {
-            await createSubscriptionMutation.mutateAsync({
-              cardToken: formData.token,
-              paymentMethodId: formData.payment_method_id,
-              issuerId: formData.issuer_id || null,
-              installments: formData.installments ?? null,
-              payer: formData.payer ?? null,
-              metadata: {
-                bin: additionalData?.bin ?? null,
-                lastFourDigits: additionalData?.lastFourDigits ?? null,
-                cardholderName: additionalData?.cardholderName ?? null,
-                paymentTypeId: additionalData?.paymentTypeId ?? null
-              }
-            });
-          }}
+          onError={handleBrickError}
+          onReady={handleBrickReady}
+          onSubmit={handleSubmit}
         />
       </div>
 
