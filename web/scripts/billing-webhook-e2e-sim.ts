@@ -2,14 +2,6 @@ import assert from "node:assert/strict";
 import crypto from "node:crypto";
 
 async function main() {
-  process.env.DATABASE_URL ??= "postgresql://savepoint:savepoint@127.0.0.1:5432/savepoint";
-  process.env.AUTH_SECRET ??= "test-auth-secret";
-  process.env.AUTOMATION_CRON_SECRET ??= "test-automation-secret";
-  process.env.MP_BILLING_ENABLED = "true";
-  process.env.MP_ACCESS_TOKEN = "test-mp-access-token";
-  process.env.MP_PUBLIC_KEY = "test-mp-public-key";
-  process.env.MP_WEBHOOK_SECRET = "test-mp-webhook-secret";
-  process.env.MP_BILLING_AMOUNT = "49.90";
 
   const {
     buildMercadoPagoExternalReference,

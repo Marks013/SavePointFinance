@@ -1,110 +1,118 @@
 # Guia de configuração do Mercado Pago no SavePointFinance
 
-Este projeto já usa `mercadopago`, `@mercadopago/sdk-react`, Bricks no frontend e webhook assíncrono no backend.
+Este guia descreve como deixar o checkout Mercado Pago funcional no projeto atual. A aplicação já possui Checkout Bricks no frontend, rotas de billing no backend, webhook assíncrono e auditoria de simulação.
 
-## 1. Criar a aplicação no Mercado Pago
+## Arquivos envolvidos
 
-1. Acesse o painel de desenvolvedores do Mercado Pago.
-2. Crie uma aplicação para o ambiente de testes e outra para produção.
-3. Guarde:
-   - `Public Key`
-   - `Access Token`
-   - `Webhook Secret`
+- `web/features/billing/components/checkout-client.tsx`: renderiza o Card Payment Brick.
+- `web/app/api/billing/checkout/route.ts`: entrega dados de checkout para a tela.
+- `web/app/api/billing/checkout/create-subscription/route.ts`: cria a assinatura/preapproval.
+- `web/app/api/integrations/mercadopago/webhook/route.ts`: recebe notificações.
+- `web/lib/billing/mercadopago.ts`: cliente HTTP Mercado Pago.
+- `web/lib/billing/service.ts`: sincroniza assinatura, pagamento e licença.
+- `web/lib/billing/async-processor.ts`: processa fila de webhooks.
+- `web/scripts/billing-webhook-e2e-sim.ts`: simulação local.
 
-Referências oficiais:
-- [Prerequisites](https://www.mercadopago.com.br/developers/en/docs/checkout-bricks/prerequisites)
-- [Common initialization](https://www.mercadopago.com.br/developers/en/docs/checkout-bricks/common-initialization)
-- [Notifications / Webhooks](https://www.mercadopago.com.br/developers/es/docs/checkout-pro/additional-content/notifications)
+## 1. Criar aplicação no Mercado Pago
 
-## 2. Configurar variáveis de ambiente no `web/.env`
+No painel de desenvolvedores do Mercado Pago:
 
-Preencha no ambiente do `web/`:
+1. Crie uma aplicação para o SavePointFinance.
+2. Copie a Public Key.
+3. Copie o Access Token.
+4. Configure um segredo de webhook.
+5. Use credenciais de teste enquanto estiver em homologação.
+
+O Access Token deve existir apenas no servidor. O frontend usa somente a Public Key.
+
+## 2. Configurar variáveis
+
+Em `web/.env.local` para desenvolvimento, ou no provedor de produção:
 
 ```env
 MP_BILLING_ENABLED=true
 MP_ACCESS_TOKEN=APP_USR-...
 MP_PUBLIC_KEY=APP_USR-...
 MP_WEBHOOK_SECRET=...
+MP_BILLING_PLAN_SLUG=premium-completo
+MP_BILLING_REASON=Save Point Financa Premium
+MP_BILLING_AMOUNT=49.90
+MP_BILLING_CURRENCY=BRL
+MP_BILLING_FREQUENCY=1
+MP_BILLING_FREQUENCY_TYPE=months
 NEXT_PUBLIC_APP_URL=https://seu-dominio.com
 AUTOMATION_CRON_SECRET=uma-chave-forte
 ```
 
-Opcional, mas recomendado para comunicação com clientes:
+Quando `MP_BILLING_ENABLED=true`, o schema do servidor exige:
 
-```env
-EMAIL_PROVIDER=resend
-EMAIL_FROM=contato@seu-dominio.com
-RESEND_API_KEY=...
-```
+- `MP_ACCESS_TOKEN`
+- `MP_PUBLIC_KEY`
+- `MP_WEBHOOK_SECRET`
+- `MP_BILLING_AMOUNT`
 
-## 3. URL correta do webhook
+## 3. Cadastrar webhook
 
-Cadastre no Mercado Pago:
+URL:
 
 ```text
 https://seu-dominio.com/api/integrations/mercadopago/webhook
 ```
 
-No SavePoint, essa rota:
-- valida e enfileira o evento;
-- deduplica notificações repetidas;
-- processa o webhook de forma assíncrona;
-- sincroniza assinatura e pagamentos com a licença da conta.
+Tópicos recomendados:
 
-Arquivo principal:
+- `payment`
+- `subscription_preapproval`
+- `subscription_authorized_payment`
 
-[`web/app/api/integrations/mercadopago/webhook/route.ts`](/C:/Users/samue/Desktop/SavePointFinance/web/app/api/integrations/mercadopago/webhook/route.ts)
+O endpoint responde rapidamente e deixa o processamento pesado para a fila local. Isso é importante porque o Mercado Pago espera confirmação HTTP `200` ou `201`; sem essa confirmação, ele tenta reenviar a notificação.
 
-## 4. Fluxo esperado no sistema
+## 4. Fluxo funcional
 
-1. O usuário escolhe o plano em `/planos`.
-2. Se já estiver autenticado e clicar no Premium, vai para `/billing?intent=checkout`.
-3. Se ainda não tiver conta, vai para `/cadastro?plan=pro`.
-4. O cadastro cria a conta e redireciona para o checkout autenticado.
-5. O Brick envia os dados do cartão com tokenização do Mercado Pago.
-6. O backend cria a assinatura recorrente.
-7. O webhook confirma o pagamento e libera a licença.
+1. Usuário escolhe Premium em `/planos` ou no cadastro.
+2. Cadastro/login cria sessão e leva para `/billing?intent=checkout`.
+3. `checkout-client.tsx` inicializa o Mercado Pago com `MP_PUBLIC_KEY`.
+4. O Card Payment Brick coleta os dados do cartão e devolve `formData` tokenizado.
+5. `create-subscription/route.ts` envia a criação da assinatura para o Mercado Pago usando `MP_ACCESS_TOKEN`.
+6. O webhook recebe eventos de pagamento/assinatura.
+7. `service.ts` atualiza assinatura, pagamentos e licença da conta.
+8. O superadmin pode consultar e sincronizar billing por conta.
 
-Arquivos-chave:
-
-- [`web/app/planos/page.tsx`](/C:/Users/samue/Desktop/SavePointFinance/web/app/planos/page.tsx)
-- [`web/features/auth/components/public-registration-form.tsx`](/C:/Users/samue/Desktop/SavePointFinance/web/features/auth/components/public-registration-form.tsx)
-- [`web/app/billing/page.tsx`](/C:/Users/samue/Desktop/SavePointFinance/web/app/billing/page.tsx)
-- [`web/features/billing/components/checkout-client.tsx`](/C:/Users/samue/Desktop/SavePointFinance/web/features/billing/components/checkout-client.tsx)
-- [`web/lib/billing/service.ts`](/C:/Users/samue/Desktop/SavePointFinance/web/lib/billing/service.ts)
-
-## 5. Testes recomendados
-
-Antes de subir:
+## 5. Testes locais
 
 ```bash
-npm run db:generate
+cd web
 npm run typecheck
 npm run lint
+npm run audit:billing-webhook
 npm run build
 ```
 
-Se estiver usando Docker:
-
-```bash
-docker compose build web
-```
+Para testar webhook externo localmente, exponha `localhost:3000` com um túnel HTTPS e use a URL pública no painel do Mercado Pago.
 
 ## 6. Checklist de produção
 
-- `MP_BILLING_ENABLED=true`
-- `NEXT_PUBLIC_APP_URL` apontando para o domínio final
-- webhook cadastrado com HTTPS
-- `MP_WEBHOOK_SECRET` igual ao configurado no Mercado Pago
-- conta Premium redirecionando para `/billing?intent=checkout`
-- trial vencido bloqueando acesso e mandando para `/billing`
-- webhook chegando e atualizando assinatura sem depender do frontend
+- `NEXT_PUBLIC_APP_URL` usa o domínio HTTPS final.
+- Webhook cadastrado com a rota `/api/integrations/mercadopago/webhook`.
+- `MP_WEBHOOK_SECRET` é idêntico ao segredo configurado no painel.
+- `MP_ACCESS_TOKEN` não aparece em bundle, HTML ou logs do navegador.
+- Plano `premium-completo` existe no catálogo do superadmin ou `MP_BILLING_PLAN_SLUG` aponta para o slug correto.
+- `npm run audit:billing-webhook` passa.
+- Um pagamento de teste percorre: checkout, assinatura, webhook, licença ativa.
 
-## 7. Erros comuns
+## 7. Problemas comuns
 
 - `MP_BILLING_ENABLED=false`: o checkout não abre.
-- `MP_PUBLIC_KEY` errada: o Brick não inicializa.
-- `MP_ACCESS_TOKEN` errado: a assinatura não é criada.
-- `MP_WEBHOOK_SECRET` errado: os eventos podem ser rejeitados.
-- `NEXT_PUBLIC_APP_URL` incorreta: links de retorno e integração ficam inconsistentes.
-- webhook não publicado em produção: pagamento aprovado não libera a licença.
+- `MP_PUBLIC_KEY` incorreta: o Brick não inicializa.
+- `MP_ACCESS_TOKEN` incorreto: a assinatura não é criada.
+- `MP_WEBHOOK_SECRET` diferente: eventos podem ser rejeitados.
+- `NEXT_PUBLIC_APP_URL` incorreta: callbacks e links de retorno ficam inconsistentes.
+- Webhook sem HTTPS em produção: o Mercado Pago não entrega corretamente.
+- Testes com credenciais de teste podem exigir envio pelo painel de integrações para validar recepção de webhook.
+
+## Referências oficiais
+
+- [Checkout Bricks - Common initialization](https://www.mercadopago.com.br/developers/en/docs/checkout-bricks/common-initialization)
+- [Card Payment Brick](https://www.mercadopago.com.br/developers/en/docs/checkout-bricks/card-payment-brick/introduction)
+- [Card Payment Brick - Default rendering](https://www.mercadopago.com.br/developers/en/docs/checkout-bricks/card-payment-brick/default-rendering)
+- [Webhooks](https://www.mercadopago.com.co/developers/en/docs/checkout-bricks/additional-content/your-integrations/notifications/webhooks)

@@ -80,6 +80,7 @@ npm run bootstrap:server
 docker compose up -d postgres
 docker compose run --rm migrate
 docker compose run --rm bootstrap-admin
+docker compose run --rm web npx tsx scripts/billing-webhook-e2e-sim.ts
 docker compose up -d web
 ```
 

@@ -111,6 +111,20 @@ services:
     networks:
       - savepoint
 
+  audit-billing-webhook:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+      target: tools
+    profiles: ["ops"]
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    command: ["npm", "run", "audit:billing-webhook"]
+    networks:
+      - savepoint
+
   backup:
     build:
       context: ./ops/backup

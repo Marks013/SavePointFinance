@@ -7,6 +7,7 @@
     "bootstrap:docker:up": "node scripts/bootstrap.mjs docker-local --up",
     "bootstrap:server": "node scripts/bootstrap.mjs server",
     "bootstrap:server:up": "node scripts/bootstrap.mjs server --up",
-    "verify:server-smoke": "docker compose --profile ops run --rm audit-server-smoke"
+    "verify:server-smoke": "docker compose --profile ops run --rm audit-server-smoke",
+    "audit:billing-webhook": "docker compose --profile ops run --rm audit-billing-webhook"
   }
 }
