@@ -122,7 +122,7 @@ export function AdminTenantCard({
             <p className="admin-disclosure-title">Abrir operações e ajustes</p>
           </div>
           <p className="admin-disclosure-copy">
-            Plano, ciclo, suporte financeiro e demais opera\u00e7\u00f5es ficam sob demanda para a leitura inicial ficar mais limpa.
+              Plano, ciclo, suporte financeiro e demais operações ficam sob demanda para a leitura inicial ficar mais limpa.
           </p>
         </summary>
         <div className="admin-disclosure-body space-y-4">
