@@ -77,6 +77,20 @@ export type UserItem = {
   };
   createdAt: string;
   lastLogin: string | null;
+  supportTickets: Array<{
+    id: string;
+    topicLabel: string;
+    priorityLabel: string;
+    subject: string;
+    messagePreview: string;
+    status: string;
+    deliveryStatus: string;
+    deliveryAttempts: number;
+    lastDeliveryAttemptAt: string | null;
+    providerError: string | null;
+    expectedResponseAt: string | null;
+    createdAt: string;
+  }>;
 };
 
 export type PlanItem = {

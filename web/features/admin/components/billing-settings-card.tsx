@@ -126,7 +126,7 @@ export function BillingSettingsCard() {
           <div className="eyebrow">Billing comercial</div>
           <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em]">Preços, cupons e promoções</h2>
           <p className="mt-2 text-sm leading-7 text-[var(--color-muted-foreground)]">
-            Ajuste valores, cupons visÃ­veis e cupons secretos que funcionam somente quando o cliente digita o cÃ³digo.
+            Ajuste valores, cupons visiveis e cupons secretos que funcionam somente quando o cliente digita o codigo.
           </p>
         </div>
         <article className="metric-card admin-section-metric">

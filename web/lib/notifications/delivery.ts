@@ -22,6 +22,7 @@ type DeliveryResult = {
   skipped: boolean;
   status: number;
   error: string | null;
+  providerMessageId?: string | null;
 };
 
 const EMAIL_DELIVERY_TIMEOUT_MS = 8_000;
@@ -76,7 +77,7 @@ async function fetchWithTimeout(
   }
 }
 
-async function sendWithResend(input: NotificationInput) {
+async function sendWithResend(input: NotificationInput): Promise<DeliveryResult> {
   const from = resolveEmailSender();
 
   if (!serverEnv.RESEND_API_KEY || !from) {
@@ -111,25 +112,30 @@ async function sendWithResend(input: NotificationInput) {
 
   const payloadText = await response.text().catch(() => "");
   let providerError: string | null = null;
+  let providerMessageId: string | null = null;
 
-  if (!response.ok) {
-    try {
-      const payload = JSON.parse(payloadText) as { message?: string; error?: { message?: string } };
+  try {
+    const payload = JSON.parse(payloadText) as { id?: string; message?: string; error?: { message?: string } };
+
+    if (response.ok) {
+      providerMessageId = payload.id ?? null;
+    } else {
       providerError = payload.error?.message ?? payload.message ?? null;
-    } catch {
-      providerError = payloadText.trim() || null;
     }
+  } catch {
+    providerError = response.ok ? null : payloadText.trim() || null;
   }
 
   return {
     ok: response.ok,
     skipped: false,
     status: response.status,
-    error: response.ok ? null : providerError ? `Resend respondeu ${response.status}: ${providerError}` : `Resend respondeu ${response.status}`
+    error: response.ok ? null : providerError ? `Resend respondeu ${response.status}: ${providerError}` : `Resend respondeu ${response.status}`,
+    providerMessageId
   } satisfies DeliveryResult;
 }
 
-async function sendWithBrevo(input: NotificationInput) {
+async function sendWithBrevo(input: NotificationInput): Promise<DeliveryResult> {
   const fromEmail = serverEnv.EMAIL_FROM;
 
   if (!serverEnv.BREVO_API_KEY || !fromEmail) {
@@ -173,7 +179,7 @@ async function sendWithBrevo(input: NotificationInput) {
   } satisfies DeliveryResult;
 }
 
-async function sendViaWebhook(input: NotificationInput, attemptedAt: Date) {
+async function sendViaWebhook(input: NotificationInput, attemptedAt: Date): Promise<DeliveryResult> {
   const webhookUrl = webhookForChannel(input.channel);
 
   if (!webhookUrl) {
@@ -216,7 +222,7 @@ async function sendViaWebhook(input: NotificationInput, attemptedAt: Date) {
   } satisfies DeliveryResult;
 }
 
-async function sendWithWhatsAppCloud(input: NotificationInput) {
+async function sendWithWhatsAppCloud(input: NotificationInput): Promise<DeliveryResult> {
   if (
     serverEnv.WHATSAPP_ASSISTANT_ENABLED !== "true" ||
     !serverEnv.WHATSAPP_ACCESS_TOKEN ||
@@ -268,6 +274,9 @@ export async function deliverNotification(input: NotificationInput) {
         subject: input.subject,
         message: input.message,
         responseCode: delivery.status || null,
+        providerMessageId: delivery.providerMessageId ?? null,
+        providerEventStatus: delivery.ok ? "email.sent" : null,
+        providerEventAt: delivery.ok ? attemptedAt : null,
         attemptedAt,
         deliveredAt: delivery.ok ? new Date() : null,
         errorMessage: delivery.ok ? null : delivery.error

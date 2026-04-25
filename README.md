@@ -297,6 +297,7 @@ Variaveis:
 - `EMAIL_REPLY_TO`
 - `SUPPORT_EMAIL_TO`
 - `RESEND_API_KEY`
+- `RESEND_WEBHOOK_SECRET`
 - `BREVO_API_KEY`
 - `NOTIFICATION_EMAIL_WEBHOOK_URL`
 
@@ -304,6 +305,13 @@ Recomendacao para producao:
 
 - Oracle Cloud com dominio proprio: `EMAIL_PROVIDER=resend`
 - se voce ja tiver uma automacao externa: `EMAIL_PROVIDER=webhook`
+
+Webhook Resend:
+
+- Endpoint de producao: `https://SEU_DOMINIO/api/webhooks/resend`
+- Eventos recomendados: `email.sent`, `email.delivered`, `email.delivery_delayed`, `email.bounced`, `email.complained`
+- Copie o signing secret do webhook no painel do Resend para `RESEND_WEBHOOK_SECRET`
+- O endpoint valida os headers `svix-id`, `svix-timestamp` e `svix-signature`, grava idempotencia em `WebhookEvent` e atualiza chamados de suporte/notificacoes pelo `email_id`
 
 Sem provedor configurado, o sistema registra a tentativa e marca como `skipped`.
 

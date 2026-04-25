@@ -56,6 +56,7 @@ Arquivo: [`.env`](/C:/Users/samue/Desktop/SavePoint/SavePoint/.env)
 - `EMAIL_REPLY_TO`
 - `SUPPORT_EMAIL_TO`
 - `RESEND_API_KEY`
+- `RESEND_WEBHOOK_SECRET`
 - `BREVO_API_KEY`
 - `NOTIFICATION_EMAIL_WEBHOOK_URL`
 - `NOTIFICATION_WHATSAPP_WEBHOOK_URL`
@@ -64,6 +65,15 @@ Arquivo: [`.env`](/C:/Users/samue/Desktop/SavePoint/SavePoint/.env)
 - `BACKUP_RUN_ON_STARTUP`
 - `BACKUP_LOCAL_RETENTION_DAYS`
 - `BACKUP_CRITICAL_PATHS`
+
+## Webhook Resend
+
+Configure no painel do Resend um webhook apontando para:
+
+`https://SEU_DOMINIO/api/webhooks/resend`
+
+Selecione os eventos `email.sent`, `email.delivered`, `email.delivery_delayed`, `email.bounced` e `email.complained`.
+Depois copie o signing secret exibido pelo Resend para `RESEND_WEBHOOK_SECRET` no ambiente de producao e reinicie a aplicacao.
 - `BACKUP_ENCRYPTION_PASSPHRASE`
 - `BACKUP_ALERT_EMAIL_ENABLED`
 - `BACKUP_ALERT_EMAIL_TO`

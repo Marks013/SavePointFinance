@@ -116,7 +116,7 @@ async function getCategories() {
 }
 
 async function getTransactions(month: string) {
-  const response = await fetch(`/api/transactions?month=${month}&limit=100`, { cache: "no-store" });
+  const response = await fetch(`/api/transactions?month=${month}&accountUsage=benefit_food&limit=100`, { cache: "no-store" });
   await ensureApiResponse(response, { fallbackMessage: "Falha ao carregar transações", method: "GET", path: "/api/transactions" });
   const payload = (await response.json()) as { items: TransactionItem[] };
   return payload.items.filter((item) => item.account?.usage === "benefit_food");

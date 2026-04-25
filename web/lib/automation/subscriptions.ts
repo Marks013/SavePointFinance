@@ -229,40 +229,80 @@ export async function generateSubscriptionTransaction(subscriptionId: string, te
         client: prisma
       })
     : null;
-  const transaction = await prisma.transaction.create({
-    data: {
-      tenantId,
-      userId: subscription.userId ?? userId,
-      subscriptionId: subscription.id,
-      date: nextBillingDate,
-      competence: cardSnapshot?.competence ?? format(nextBillingDate, "yyyy-MM"),
-      amount: subscription.amount,
-      description: `Assinatura: ${subscription.name}`,
-      type: subscription.type === "income" ? TransactionType.income : TransactionType.expense,
-      paymentMethod: subscription.cardId ? PaymentMethod.credit_card : PaymentMethod.money,
-      categoryId: classification.categoryId,
-      accountId: subscription.accountId,
-      cardId: subscription.cardId,
-      statementCloseDate: cardSnapshot?.closeDate ?? null,
-      statementDueDate: cardSnapshot?.dueDate ?? null,
-      source: TransactionSource.manual,
-      notes: "Gerado via assinatura recorrente",
-      classificationSource: classification.classificationSource,
-      classificationKeyword: classification.classificationKeyword,
-      classificationReason: classification.reason,
-      classificationVersion: 2,
-      aiClassified: classification.aiClassified,
-      aiConfidence:
-        classification.confidence !== null
-          ? new Prisma.Decimal(classification.confidence.toFixed(2))
-          : null,
-      titheAmount:
-        subscription.type === "income" && subscription.autoTithe
-          ? Number(subscription.amount) * 0.1
-          : null,
-      titheCategoryId
+  let transaction;
+
+  try {
+    transaction = await prisma.transaction.create({
+      data: {
+        tenantId,
+        userId: subscription.userId ?? userId,
+        subscriptionId: subscription.id,
+        date: nextBillingDate,
+        competence: cardSnapshot?.competence ?? format(nextBillingDate, "yyyy-MM"),
+        amount: subscription.amount,
+        description: `Assinatura: ${subscription.name}`,
+        type: subscription.type === "income" ? TransactionType.income : TransactionType.expense,
+        paymentMethod: subscription.cardId ? PaymentMethod.credit_card : PaymentMethod.money,
+        categoryId: classification.categoryId,
+        accountId: subscription.accountId,
+        cardId: subscription.cardId,
+        statementCloseDate: cardSnapshot?.closeDate ?? null,
+        statementDueDate: cardSnapshot?.dueDate ?? null,
+        source: TransactionSource.manual,
+        notes: "Gerado via assinatura recorrente",
+        classificationSource: classification.classificationSource,
+        classificationKeyword: classification.classificationKeyword,
+        classificationReason: classification.reason,
+        classificationVersion: 2,
+        aiClassified: classification.aiClassified,
+        aiConfidence:
+          classification.confidence !== null
+            ? new Prisma.Decimal(classification.confidence.toFixed(2))
+            : null,
+        titheAmount:
+          subscription.type === "income" && subscription.autoTithe
+            ? Number(subscription.amount) * 0.1
+            : null,
+        titheCategoryId
+      }
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      const duplicatedTransaction = await prisma.transaction.findFirst({
+        where: {
+          tenantId,
+          subscriptionId: subscription.id,
+          date: nextBillingDate
+        },
+        select: {
+          id: true
+        }
+      });
+
+      if (!duplicatedTransaction) {
+        throw error;
+      }
+
+      const updated = await prisma.subscription.update({
+        where: {
+          id: subscription.id,
+          tenantId
+        },
+        data: {
+          nextBillingDate: followingBillingDate
+        }
+      });
+      revalidateFinanceReports(tenantId);
+
+      return {
+        transactionId: duplicatedTransaction.id,
+        duplicated: true,
+        nextBillingDate: updated.nextBillingDate.toISOString()
+      };
     }
-  });
+
+    throw error;
+  }
 
   const updated = await prisma.subscription.update({
     where: {

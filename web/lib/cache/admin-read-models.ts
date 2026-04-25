@@ -33,6 +33,10 @@ export function getAdminUsersTag(scope = "all") {
   return `admin-users:${scope}`;
 }
 
+function serializeNullableDate(value: unknown) {
+  return value instanceof Date ? value.toISOString() : null;
+}
+
 export async function getCachedAdminUsers(input: AdminUsersQueryInput) {
   const search = input.search?.trim();
   const tenantId = input.tenantId?.trim();
@@ -42,6 +46,17 @@ export async function getCachedAdminUsers(input: AdminUsersQueryInput) {
   const sort = input.sort ?? "created_desc";
   const page = Math.max(1, input.page ?? 1);
   const pageSize = Math.min(50, Math.max(1, input.pageSize ?? 12));
+
+  if (!input.isPlatformAdmin && !tenantId) {
+    return {
+      page,
+      pageSize,
+      total: 0,
+      totalPages: 1,
+      items: []
+    };
+  }
+
   const cacheKey = serializeAdminUsersFilters({
     tenantId,
     role,
@@ -93,6 +108,26 @@ export async function getCachedAdminUsers(input: AdminUsersQueryInput) {
         prisma.user.findMany({
           where,
           include: {
+            supportTickets: {
+              orderBy: {
+                createdAt: "desc"
+              },
+              take: 5,
+              select: {
+                id: true,
+                topicLabel: true,
+                priorityLabel: true,
+                subject: true,
+                message: true,
+                status: true,
+                deliveryStatus: true,
+                deliveryAttempts: true,
+                lastDeliveryAttemptAt: true,
+                providerError: true,
+                expectedResponseAt: true,
+                createdAt: true
+              }
+            },
             tenant: {
               select: {
                 id: true,
@@ -231,7 +266,21 @@ export async function getCachedAdminUsers(input: AdminUsersQueryInput) {
               expiresAt: user.tenant.expiresAt?.toISOString() ?? null
             },
             createdAt: user.createdAt.toISOString(),
-            lastLogin: user.lastLogin?.toISOString() ?? null
+            lastLogin: user.lastLogin?.toISOString() ?? null,
+            supportTickets: user.supportTickets.map((ticket) => ({
+              id: ticket.id,
+              topicLabel: ticket.topicLabel,
+              priorityLabel: ticket.priorityLabel,
+              subject: ticket.subject,
+              messagePreview: ticket.message.length > 140 ? `${ticket.message.slice(0, 137)}...` : ticket.message,
+              status: ticket.status,
+              deliveryStatus: ticket.deliveryStatus,
+              deliveryAttempts: ticket.deliveryAttempts,
+              lastDeliveryAttemptAt: serializeNullableDate(ticket.lastDeliveryAttemptAt),
+              providerError: ticket.providerError,
+              expectedResponseAt: ticket.expectedResponseAt?.toISOString() ?? null,
+              createdAt: ticket.createdAt.toISOString()
+            }))
           };
         })
       };

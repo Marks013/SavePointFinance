@@ -353,6 +353,7 @@ export function AdminClient({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
   const [tenantDeleteConfirmDrafts, setTenantDeleteConfirmDrafts] = useState<Record<string, string>>({});
   const [userPasswordDrafts, setUserPasswordDrafts] = useState<Record<string, string>>({});
   const [userDeleteConfirmDrafts, setUserDeleteConfirmDrafts] = useState<Record<string, string>>({});
+  const [retrySupportTicketId, setRetrySupportTicketId] = useState<string | null>(null);
   const invitationForm = useForm<z.input<typeof invitationSchema>, unknown, InvitationValues>({
     resolver: zodResolver(invitationSchema),
     defaultValues: {
@@ -486,6 +487,37 @@ export function AdminClient({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
         queryClient.invalidateQueries({ queryKey: ["admin-audit"] })
       ]);
       toast.success("Usuário atualizado");
+    }
+  });
+
+  const retrySupportTicketMutation = useMutation({
+    mutationFn: async ({ ticketId }: { ticketId: string }) => {
+      setRetrySupportTicketId(ticketId);
+      const response = await fetch(`/api/admin/support/${ticketId}/resend`, {
+        method: "POST"
+      });
+      const payload = (await response.json().catch(() => ({}))) as { message?: string; error?: string };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? payload.message ?? "Falha ao reenviar chamado");
+      }
+
+      return payload;
+    },
+    onSuccess: async (payload) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin-users"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-audit"] })
+      ]);
+      toast.success(payload.message ?? "Chamado reenviado ao suporte");
+    },
+    onError: (error) => {
+      toast.error("Reenvio não concluído", {
+        description: error.message
+      });
+    },
+    onSettled: () => {
+      setRetrySupportTicketId(null);
     }
   });
 
@@ -1917,6 +1949,7 @@ export function AdminClient({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
                         tenantId: userTenantDrafts[user.id] ?? user.tenant.id
                       })
                     }
+                    onRetrySupportTicket={(ticketId) => retrySupportTicketMutation.mutate({ ticketId })}
                     onSubmitPasswordReset={() => submitUserPasswordReset(user)}
                     onToggleActive={() => toggleActiveMutation.mutate({ id: user.id, isActive: !user.isActive })}
                     onToggleRole={() => toggleRoleMutation.mutate({ id: user.id, role: user.role === 'admin' ? 'member' : 'admin' })}
@@ -1943,6 +1976,7 @@ export function AdminClient({ isPlatformAdmin }: { isPlatformAdmin: boolean }) {
                         ? sendPasswordResetMutation.isPending
                         : (userPasswordDrafts[user.id] ?? '').length < 8 || setPasswordMutation.isPending
                     }
+                    retrySupportTicketId={retrySupportTicketId}
                     tenants={tenants}
                     user={user}
                     userDeleteConfirmDraft={userDeleteConfirmDrafts[user.id] ?? ''}

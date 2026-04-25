@@ -10,7 +10,7 @@ import { assertTenantTransactionReferences, TenantReferenceError } from "@/lib/f
 import { getMonthRange, normalizeMonthKey } from "@/lib/month";
 import { captureRequestError, captureUnexpectedError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
-import { getSubscriptionBillingDate } from "@/lib/subscriptions/recurrence";
+import { getSubscriptionBillingDate, isBeforeCurrentSubscriptionMonth } from "@/lib/subscriptions/recurrence";
 
 function readAccountUsage(account: unknown) {
   return (account as { usage?: "standard" | "benefit_food" }).usage ?? "standard";
@@ -126,6 +126,14 @@ export async function POST(request: Request) {
   try {
     const user = await requireSessionUser();
     const body = subscriptionFormSchema.parse(await request.json());
+    const nextBillingDate = new Date(`${body.nextBillingDate}T12:00:00`);
+
+    if (isBeforeCurrentSubscriptionMonth(nextBillingDate)) {
+      return NextResponse.json(
+        { message: "Assinaturas retroativas só podem começar no mês atual. Use uma transação manual para meses anteriores." },
+        { status: 400 }
+      );
+    }
 
     await assertTenantTransactionReferences({
       tenantId: user.tenantId,
@@ -161,7 +169,7 @@ export async function POST(request: Request) {
         categoryId: classification.categoryId,
         accountId: body.accountId || null,
         cardId: body.cardId || null,
-        nextBillingDate: new Date(`${body.nextBillingDate}T12:00:00`),
+        nextBillingDate,
         type: body.type,
         isActive: body.isActive,
         autoTithe: body.autoTithe && body.type === "income"

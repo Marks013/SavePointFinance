@@ -1,8 +1,8 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { AlertCircle, CheckCircle2, Clock3, MailCheck, SendHorizonal } from "lucide-react";
-import { useMutation } from "@tanstack/react-query";
+import { AlertCircle, CheckCircle2, Clock3, History, MailCheck, SendHorizonal } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -19,6 +19,7 @@ import {
   supportTopicValues,
   type SupportRequestValues
 } from "@/features/support/schemas/support-schema";
+import { formatDateTimeDisplay } from "@/lib/date";
 import { ensureApiResponse } from "@/lib/observability/http";
 
 type SupportClientProps = {
@@ -28,8 +29,60 @@ type SupportClientProps = {
 
 type SupportResponse = {
   id?: string;
+  expectedResponseAt?: string;
+  responseWindow?: string;
   message?: string;
 };
+
+type SupportTicketItem = {
+  id: string;
+  topicLabel: string;
+  priorityLabel: string;
+  subject: string;
+  messagePreview: string;
+  status: string;
+  deliveryStatus: string;
+  expectedResponseAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type SupportHistoryResponse = {
+  responseWindow: string;
+  items: SupportTicketItem[];
+};
+
+function formatTicketStatus(status: string) {
+  switch (status) {
+    case "answered":
+      return "Respondido";
+    case "closed":
+      return "Encerrado";
+    default:
+      return "Aberto";
+  }
+}
+
+function formatDeliveryStatus(status: string) {
+  switch (status) {
+    case "delivered":
+      return "Entregue";
+    case "bounced":
+      return "E-mail retornou";
+    case "complained":
+      return "Marcado como spam";
+    case "delayed":
+      return "Entrega atrasada";
+    case "sent":
+      return "Enviado";
+    case "failed":
+      return "Falha no envio";
+    case "not_configured":
+      return "E-mail pendente";
+    default:
+      return "Registrado";
+  }
+}
 
 async function submitSupportRequest(values: SupportRequestValues) {
   const response = await fetch("/api/support", {
@@ -54,7 +107,19 @@ async function submitSupportRequest(values: SupportRequestValues) {
   return payload;
 }
 
+async function getSupportHistory() {
+  const response = await fetch("/api/support?limit=5", { cache: "no-store" });
+  await ensureApiResponse(response, {
+    fallbackMessage: "Falha ao carregar histórico de suporte",
+    method: "GET",
+    path: "/api/support"
+  });
+
+  return (await response.json()) as SupportHistoryResponse;
+}
+
 export function SupportClient({ initialEmail, initialName }: SupportClientProps) {
+  const queryClient = useQueryClient();
   const form = useForm<z.input<typeof supportRequestSchema>, unknown, SupportRequestValues>({
     resolver: zodResolver(supportRequestSchema),
     defaultValues: {
@@ -70,8 +135,11 @@ export function SupportClient({ initialEmail, initialName }: SupportClientProps)
 
   const mutation = useMutation({
     mutationFn: submitSupportRequest,
-    onSuccess: () => {
-      toast.success("Mensagem enviada ao suporte");
+    onSuccess: (payload) => {
+      toast.success("Mensagem enviada ao suporte", {
+        description: payload.responseWindow ?? "Resposta em até 24 horas em dias úteis."
+      });
+      queryClient.invalidateQueries({ queryKey: ["support-history"] });
       form.reset({
         topic: "technical",
         priority: "normal",
@@ -88,6 +156,13 @@ export function SupportClient({ initialEmail, initialName }: SupportClientProps)
       });
     }
   });
+  const historyQuery = useQuery({
+    queryKey: ["support-history"],
+    queryFn: getSupportHistory
+  });
+  const responseWindow =
+    historyQuery.data?.responseWindow ??
+    "Respondemos em até 24 horas em dias úteis. Mensagens abertas em domingos ou feriados entram no próximo dia útil.";
 
   return (
     <div className="grid gap-6 2xl:grid-cols-[0.95fr_1.05fr]">
@@ -98,6 +173,9 @@ export function SupportClient({ initialEmail, initialName }: SupportClientProps)
           Envie uma solicitação com o contexto certo para acelerar a triagem. O formulário encaminha sua mensagem por
           e-mail transacional via Resend.
         </p>
+        <div className="mt-5 rounded-[1.15rem] border border-[var(--color-border)] bg-[var(--color-panel)] px-4 py-3 text-sm leading-6 text-[var(--color-muted-foreground)]">
+          {responseWindow}
+        </div>
 
         <form className="mt-8 space-y-5" onSubmit={form.handleSubmit((values) => mutation.mutate(values))}>
           <div className="grid gap-4 md:grid-cols-2">
@@ -202,9 +280,9 @@ export function SupportClient({ initialEmail, initialName }: SupportClientProps)
               <div className="flex items-start gap-3">
                 <Clock3 className="mt-1 size-5 text-[var(--color-primary)]" />
                 <div>
-                  <p className="font-semibold">Triagem por prioridade</p>
+                  <p className="font-semibold">Prazo de retorno</p>
                   <p className="mt-1 text-sm leading-6 text-[var(--color-muted-foreground)]">
-                    A prioridade e o assunto ajudam a separar financeiro, técnico e uso do produto.
+                    Até 24 horas em dias úteis; domingos e feriados ficam para o próximo dia útil.
                   </p>
                 </div>
               </div>
@@ -230,6 +308,58 @@ export function SupportClient({ initialEmail, initialName }: SupportClientProps)
               </div>
             </div>
           ) : null}
+        </div>
+      </section>
+
+      <section className="surface content-section 2xl:col-span-2">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="eyebrow">Histórico</div>
+            <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em]">Últimas solicitações</h2>
+          </div>
+          <span className="inline-flex items-center rounded-full border border-[var(--color-border)] bg-[var(--color-panel)] px-3 py-1 text-xs text-[var(--color-muted-foreground)]">
+            Máximo de 5 registros
+          </span>
+        </div>
+
+        <div className="mt-5 grid gap-3">
+          {historyQuery.isLoading ? (
+            <div className="muted-panel text-sm text-[var(--color-muted-foreground)]">Carregando histórico...</div>
+          ) : historyQuery.data?.items.length ? (
+            historyQuery.data.items.map((ticket) => (
+              <article key={ticket.id} className="metric-card">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap gap-2">
+                      <span className="inline-flex items-center rounded-full border border-[var(--color-border)] bg-[var(--color-panel)] px-3 py-1 text-xs text-[var(--color-muted-foreground)]">
+                        {ticket.topicLabel}
+                      </span>
+                      <span className="inline-flex items-center rounded-full border border-[var(--color-border)] bg-[var(--color-panel)] px-3 py-1 text-xs text-[var(--color-muted-foreground)]">
+                        {ticket.priorityLabel}
+                      </span>
+                      <span className="inline-flex items-center rounded-full border border-[var(--color-border)] bg-[var(--color-panel)] px-3 py-1 text-xs text-[var(--color-muted-foreground)]">
+                        {formatTicketStatus(ticket.status)}
+                      </span>
+                    </div>
+                    <p className="mt-3 break-words font-semibold">{ticket.subject}</p>
+                    <p className="mt-2 break-words text-sm leading-6 text-[var(--color-muted-foreground)]">
+                      {ticket.messagePreview}
+                    </p>
+                  </div>
+                  <div className="min-w-48 text-sm leading-6 text-[var(--color-muted-foreground)]">
+                    <p>{formatDateTimeDisplay(ticket.createdAt)}</p>
+                    <p>{formatDeliveryStatus(ticket.deliveryStatus)}</p>
+                    {ticket.expectedResponseAt ? <p>Previsão: {formatDateTimeDisplay(ticket.expectedResponseAt)}</p> : null}
+                  </div>
+                </div>
+              </article>
+            ))
+          ) : (
+            <div className="muted-panel flex items-start gap-3 text-sm leading-6 text-[var(--color-muted-foreground)]">
+              <History className="mt-0.5 size-4 text-[var(--color-primary)]" />
+              <p>Nenhuma solicitação registrada ainda. Quando você enviar uma mensagem, ela aparecerá aqui.</p>
+            </div>
+          )}
         </div>
       </section>
     </div>

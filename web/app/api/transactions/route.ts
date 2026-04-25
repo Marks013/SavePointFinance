@@ -36,7 +36,8 @@ export async function GET(request: Request) {
       type: searchParams.get("type"),
       categoryId: searchParams.get("categoryId"),
       accountId: searchParams.get("accountId"),
-      cardId: searchParams.get("cardId")
+      cardId: searchParams.get("cardId"),
+      accountUsage: searchParams.get("accountUsage")
     });
 
     if (!filters.month) {
@@ -53,6 +54,14 @@ export async function GET(request: Request) {
 
     if (filters.accountId) {
       where.OR = [{ accountId: filters.accountId }, { destinationAccountId: filters.accountId }];
+    }
+
+    if (filters.accountUsage) {
+      const usageFilter = [
+        { financialAccount: { is: { usage: filters.accountUsage } } },
+        { destinationAccount: { is: { usage: filters.accountUsage } } }
+      ];
+      where.AND = [...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []), { OR: usageFilter }];
     }
 
     const [transactions, totalsByType, totalCount] = await Promise.all([

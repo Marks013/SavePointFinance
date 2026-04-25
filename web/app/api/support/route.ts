@@ -6,207 +6,177 @@ import {
   supportTopicLabels
 } from "@/features/support/schemas/support-schema";
 import { requireSessionUser } from "@/lib/auth/session";
-import { serverEnv } from "@/lib/env/server";
+import { revalidateAdminUsers } from "@/lib/cache/admin-read-models";
 import { captureRequestError } from "@/lib/observability/sentry";
+import { prisma } from "@/lib/prisma/client";
+import { SUPPORT_RESPONSE_COPY, sendSupportEmail } from "@/lib/support/email";
 
-const SUPPORT_EMAIL_TIMEOUT_MS = 8_000;
+const SUPPORT_HISTORY_LIMIT = 5;
 
-function resolveEmailSender() {
-  if (!serverEnv.EMAIL_FROM) {
-    return null;
+function resolveExpectedResponseAt(now = new Date()) {
+  const expected = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  const day = expected.getDay();
+
+  if (day === 0) {
+    expected.setDate(expected.getDate() + 1);
+    expected.setHours(9, 0, 0, 0);
   }
 
-  if (serverEnv.EMAIL_FROM_NAME) {
-    return `${serverEnv.EMAIL_FROM_NAME} <${serverEnv.EMAIL_FROM}>`;
+  if (day === 6) {
+    expected.setDate(expected.getDate() + 2);
+    expected.setHours(9, 0, 0, 0);
   }
 
-  return serverEnv.EMAIL_FROM;
+  return expected;
 }
 
-function escapeHtml(value: string) {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
-
-function formatMultiline(value: string) {
-  return escapeHtml(value).replace(/\n/g, "<br />");
-}
-
-async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit, timeoutMs: number) {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort("support email timed out"), timeoutMs);
-
-  try {
-    return await fetch(input, {
-      ...init,
-      signal: controller.signal
-    });
-  } finally {
-    clearTimeout(timeoutId);
-  }
-}
-
-function buildSupportHtml(input: {
-  contactName: string;
-  contactEmail: string;
-  topic: string;
-  priority: string;
+function serializeTicket(ticket: {
+  id: string;
+  topicLabel: string;
+  priorityLabel: string;
   subject: string;
   message: string;
-  context: Array<[string, string]>;
+  status: string;
+  deliveryStatus: string;
+  expectedResponseAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
 }) {
-  const contextRows = input.context
-    .map(
-      ([label, value]) => `
-        <tr>
-          <td style="padding:8px 12px;color:#667085;border-bottom:1px solid #EAECF0;">${escapeHtml(label)}</td>
-          <td style="padding:8px 12px;color:#101828;border-bottom:1px solid #EAECF0;">${escapeHtml(value)}</td>
-        </tr>`
-    )
-    .join("");
+  return {
+    id: ticket.id,
+    topicLabel: ticket.topicLabel,
+    priorityLabel: ticket.priorityLabel,
+    subject: ticket.subject,
+    messagePreview: ticket.message.length > 180 ? `${ticket.message.slice(0, 177)}...` : ticket.message,
+    status: ticket.status,
+    deliveryStatus: ticket.deliveryStatus,
+    expectedResponseAt: ticket.expectedResponseAt?.toISOString() ?? null,
+    createdAt: ticket.createdAt.toISOString(),
+    updatedAt: ticket.updatedAt.toISOString()
+  };
+}
 
-  return `
-    <div style="font-family:Inter,Arial,sans-serif;background:#F6F4EF;padding:28px;color:#101828;">
-      <div style="max-width:680px;margin:0 auto;background:#FFFFFF;border:1px solid #E4DED4;border-radius:20px;overflow:hidden;">
-        <div style="background:#123D35;color:#FFFFFF;padding:24px 28px;">
-          <p style="margin:0 0 8px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#CDE8DD;">Save Point Finance</p>
-          <h1 style="margin:0;font-size:24px;line-height:1.25;">Nova solicitação de suporte</h1>
-        </div>
-        <div style="padding:26px 28px;">
-          <p style="margin:0 0 16px;color:#475467;">${escapeHtml(input.contactName)} enviou uma mensagem pelo módulo de suporte.</p>
-          <table style="width:100%;border-collapse:collapse;margin:0 0 22px;border:1px solid #EAECF0;border-radius:12px;overflow:hidden;">
-            <tbody>
-              <tr>
-                <td style="padding:8px 12px;color:#667085;border-bottom:1px solid #EAECF0;">Assunto</td>
-                <td style="padding:8px 12px;color:#101828;border-bottom:1px solid #EAECF0;">${escapeHtml(input.subject)}</td>
-              </tr>
-              <tr>
-                <td style="padding:8px 12px;color:#667085;border-bottom:1px solid #EAECF0;">Categoria</td>
-                <td style="padding:8px 12px;color:#101828;border-bottom:1px solid #EAECF0;">${escapeHtml(input.topic)}</td>
-              </tr>
-              <tr>
-                <td style="padding:8px 12px;color:#667085;border-bottom:1px solid #EAECF0;">Prioridade</td>
-                <td style="padding:8px 12px;color:#101828;border-bottom:1px solid #EAECF0;">${escapeHtml(input.priority)}</td>
-              </tr>
-              <tr>
-                <td style="padding:8px 12px;color:#667085;">Contato</td>
-                <td style="padding:8px 12px;color:#101828;">${escapeHtml(input.contactEmail)}</td>
-              </tr>
-            </tbody>
-          </table>
-          <div style="padding:18px 20px;background:#F9FAFB;border:1px solid #EAECF0;border-radius:14px;line-height:1.7;">
-            ${formatMultiline(input.message)}
-          </div>
-          ${
-            contextRows
-              ? `<h2 style="margin:24px 0 10px;font-size:16px;">Contexto</h2>
-                 <table style="width:100%;border-collapse:collapse;border:1px solid #EAECF0;border-radius:12px;overflow:hidden;"><tbody>${contextRows}</tbody></table>`
-              : ""
-          }
-        </div>
-      </div>
-    </div>`;
+async function pruneSupportHistory(tenantId: string, userId: string) {
+  const ticketsToPrune = await prisma.supportTicket.findMany({
+    where: {
+      tenantId,
+      userId
+    },
+    orderBy: {
+      createdAt: "desc"
+    },
+    skip: SUPPORT_HISTORY_LIMIT,
+    select: {
+      id: true
+    }
+  });
+
+  if (!ticketsToPrune.length) {
+    return;
+  }
+
+  await prisma.supportTicket.deleteMany({
+    where: {
+      id: {
+        in: ticketsToPrune.map((item) => item.id)
+      }
+    }
+  });
 }
 
 export async function POST(request: Request) {
   try {
     const user = await requireSessionUser();
     const body = supportRequestSchema.parse(await request.json());
-    const from = resolveEmailSender();
-    const target = serverEnv.SUPPORT_EMAIL_TO ?? serverEnv.EMAIL_REPLY_TO;
-
-    if (!serverEnv.RESEND_API_KEY || !from || !target) {
-      return NextResponse.json(
-        {
-          message:
-            "Suporte por e-mail ainda não está configurado. Defina RESEND_API_KEY, EMAIL_FROM e SUPPORT_EMAIL_TO."
-        },
-        { status: 503 }
-      );
-    }
-
     const topicLabel = supportTopicLabels[body.topic];
     const priorityLabel = supportPriorityLabels[body.priority];
+    const expectedResponseAt = resolveExpectedResponseAt();
+    const ticket = await prisma.supportTicket.create({
+      data: {
+        tenantId: user.tenantId,
+        userId: user.id,
+        topic: body.topic,
+        topicLabel,
+        priority: body.priority,
+        priorityLabel,
+        subject: body.subject,
+        message: body.message,
+        contactName: body.contactName,
+        contactEmail: body.contactEmail,
+        allowAccountContext: body.allowAccountContext,
+        expectedResponseAt
+      }
+    });
     const context: Array<[string, string]> = body.allowAccountContext
       ? [
+          ["Chamado", ticket.id],
           ["Usuário", `${user.name ?? "Sem nome"} <${user.email ?? "sem e-mail"}>`],
           ["Conta", user.tenant?.name ?? user.tenantId],
           ["Papel", user.role],
           ["Plano", user.license.planLabel],
-          ["Origem", request.headers.get("referer") ?? "/dashboard/support"]
+          ["Origem", request.headers.get("referer") ?? "/dashboard/support"],
+          ["Prazo informado", SUPPORT_RESPONSE_COPY]
         ]
       : [];
-    const subject = `[${priorityLabel}] ${topicLabel}: ${body.subject}`;
-    const text = [
-      `Nova solicitação de suporte`,
-      ``,
-      `Assunto: ${body.subject}`,
-      `Categoria: ${topicLabel}`,
-      `Prioridade: ${priorityLabel}`,
-      `Contato: ${body.contactName} <${body.contactEmail}>`,
-      ``,
-      body.message,
-      ``,
-      ...context.map(([label, value]) => `${label}: ${value}`)
-    ].join("\n");
-    const response = await fetchWithTimeout(
-      "https://api.resend.com/emails",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${serverEnv.RESEND_API_KEY}`
-        },
-        body: JSON.stringify({
-          from,
-          to: [target],
-          subject,
-          text,
-          html: buildSupportHtml({
-            contactName: body.contactName,
-            contactEmail: body.contactEmail,
-            topic: topicLabel,
-            priority: priorityLabel,
-            subject: body.subject,
-            message: body.message,
-            context
-          }),
-          reply_to: body.contactEmail
-        })
-      },
-      SUPPORT_EMAIL_TIMEOUT_MS
-    );
-    const payloadText = await response.text().catch(() => "");
+    const attemptAt = new Date();
+    const result = await sendSupportEmail({
+      id: ticket.id,
+      contactName: body.contactName,
+      contactEmail: body.contactEmail,
+      topicLabel,
+      priorityLabel,
+      subject: body.subject,
+      message: body.message,
+      context
+    });
 
-    if (!response.ok) {
-      let providerMessage = payloadText.trim();
-
-      try {
-        const payload = JSON.parse(payloadText) as { message?: string; error?: { message?: string } };
-        providerMessage = payload.error?.message ?? payload.message ?? providerMessage;
-      } catch {
-        // Keep providerMessage as the plain response body.
-      }
+    if (!result.ok) {
+      await prisma.supportTicket.update({
+        where: { id: ticket.id },
+        data: {
+          deliveryStatus: result.error.includes("ausente") ? "not_configured" : "failed",
+          deliveryAttempts: { increment: 1 },
+          lastDeliveryAttemptAt: attemptAt,
+          providerError: result.error
+        }
+      });
+      await pruneSupportHistory(user.tenantId, user.id);
+      revalidateAdminUsers(user.tenantId);
 
       return NextResponse.json(
-        { message: providerMessage ? `Resend respondeu ${response.status}: ${providerMessage}` : "Falha ao enviar via Resend" },
-        { status: 502 }
+        {
+          id: ticket.id,
+          expectedResponseAt: expectedResponseAt.toISOString(),
+          responseWindow: SUPPORT_RESPONSE_COPY,
+          message:
+            result.error.includes("ausente")
+              ? "Chamado registrado, mas o suporte por e-mail ainda não está configurado. O superadmin verá a falha para reenviar."
+              : "Chamado registrado, mas houve falha ao enviar o e-mail. O superadmin verá a falha para reenviar."
+        },
+        { status: result.error.includes("ausente") ? 503 : 502 }
       );
     }
 
-    let id: string | undefined;
+    await prisma.supportTicket.update({
+      where: { id: ticket.id },
+      data: {
+        deliveryStatus: "sent",
+        deliveryAttempts: { increment: 1 },
+        lastDeliveryAttemptAt: attemptAt,
+        providerMessageId: result.providerMessageId,
+        providerError: null
+      }
+    });
+    await pruneSupportHistory(user.tenantId, user.id);
+    revalidateAdminUsers(user.tenantId);
 
-    try {
-      id = (JSON.parse(payloadText) as { id?: string }).id;
-    } catch {
-      id = undefined;
-    }
-
-    return NextResponse.json({ id, message: "Mensagem enviada ao suporte" });
+    return NextResponse.json({
+      id: ticket.id,
+      providerMessageId: result.providerMessageId,
+      expectedResponseAt: expectedResponseAt.toISOString(),
+      responseWindow: SUPPORT_RESPONSE_COPY,
+      message: "Mensagem enviada ao suporte"
+    });
   } catch (error) {
     if (error instanceof Error && error.message === "Unauthorized") {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
@@ -214,5 +184,36 @@ export async function POST(request: Request) {
 
     captureRequestError(error, { request, feature: "support" });
     return NextResponse.json({ message: "Failed to send support request" }, { status: 400 });
+  }
+}
+
+export async function GET(request: Request) {
+  try {
+    const user = await requireSessionUser();
+    const { searchParams } = new URL(request.url);
+    const requestedLimit = Number(searchParams.get("limit") ?? SUPPORT_HISTORY_LIMIT) || SUPPORT_HISTORY_LIMIT;
+    const limit = Math.min(SUPPORT_HISTORY_LIMIT, Math.max(1, requestedLimit));
+    const tickets = await prisma.supportTicket.findMany({
+      where: {
+        tenantId: user.tenantId,
+        userId: user.id
+      },
+      orderBy: {
+        createdAt: "desc"
+      },
+      take: limit
+    });
+
+    return NextResponse.json({
+      responseWindow: SUPPORT_RESPONSE_COPY,
+      items: tickets.map(serializeTicket)
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    }
+
+    captureRequestError(error, { request, feature: "support-history" });
+    return NextResponse.json({ message: "Failed to load support history" }, { status: 400 });
   }
 }

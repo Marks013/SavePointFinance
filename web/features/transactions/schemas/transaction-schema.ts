@@ -123,7 +123,8 @@ export const transactionFiltersSchema = z.object({
   type: z.enum(transactionTypeValues).optional().nullable(),
   categoryId: z.string().optional().nullable(),
   accountId: z.string().optional().nullable(),
-  cardId: z.string().optional().nullable()
+  cardId: z.string().optional().nullable(),
+  accountUsage: z.enum(["standard", "benefit_food"]).optional().nullable()
 });
 
 export const transactionUpdateSchema = transactionFormSchema.extend({

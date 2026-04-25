@@ -11,3 +11,8 @@ export function advanceSubscriptionBillingDate(referenceDate: Date, billingDay: 
   const targetMonth = new Date(referenceDate.getFullYear(), referenceDate.getMonth() + monthOffset, 1, 12, 0, 0, 0);
   return getSubscriptionBillingDate(targetMonth.getFullYear(), targetMonth.getMonth(), billingDay);
 }
+
+export function isBeforeCurrentSubscriptionMonth(value: Date, now = new Date()) {
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+  return value < monthStart;
+}

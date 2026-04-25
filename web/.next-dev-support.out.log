@@ -9,4 +9,10 @@
 - Experiments (use with caution):
   · clientTraceMetadata
 
- GET 
+ GET /dashboard/support?month=2026-04 307 in 1158ms (next.js: 291ms, proxy.ts: 177ms, application-code: 691ms)
+ POST /api/support 401 in 2.2s (next.js: 2.1s, proxy.ts: 7ms, application-code: 33ms)
+✓ Compiled in 241ms
+✓ Compiled in 115ms
+✓ Compiled in 86ms
+✓ Compiled in 227ms
+✓ Compiled in 116ms
