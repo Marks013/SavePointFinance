@@ -5,6 +5,7 @@ import { hasSensitiveSearchParams, sanitizeSearchParams } from "@/lib/security/s
 
 const MAINTENANCE_PATH = "/manutencao";
 const ALLOWED_API_PREFIXES = ["/api/health", "/api/integrations"];
+const MAINTENANCE_BYPASS_HEADER = "x-savepoint-maintenance-bypass";
 const INVITATION_TOKEN_COOKIE = "savepoint-invitation-token";
 const RESET_TOKEN_COOKIE = "savepoint-reset-token";
 const isProduction = process.env.NODE_ENV === "production";
@@ -15,6 +16,16 @@ function isAllowedDuringMaintenance(pathname: string) {
   }
 
   return ALLOWED_API_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+}
+
+function hasMaintenanceBypass(request: NextRequest) {
+  const expectedToken = process.env.MAINTENANCE_BYPASS_TOKEN?.trim();
+
+  if (!expectedToken) {
+    return false;
+  }
+
+  return request.headers.get(MAINTENANCE_BYPASS_HEADER)?.trim() === expectedToken;
 }
 
 function isSecureRequest(request: NextRequest) {
@@ -117,7 +128,7 @@ export function proxy(request: NextRequest) {
   requestHeaders.set("x-savepoint-pathname", pathname);
   requestHeaders.set("x-savepoint-search", sanitizedSearch);
 
-  if (isMaintenanceModeEnabled && !isAllowedDuringMaintenance(pathname)) {
+  if (isMaintenanceModeEnabled && !isAllowedDuringMaintenance(pathname) && !hasMaintenanceBypass(request)) {
     if (pathname.startsWith("/api/")) {
       return applySecurityHeaders(
         NextResponse.json(

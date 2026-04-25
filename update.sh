@@ -12,10 +12,12 @@ HEALTH_TIMEOUT_SECONDS="${HEALTH_TIMEOUT_SECONDS:-90}"
 HEALTH_INTERVAL_SECONDS="${HEALTH_INTERVAL_SECONDS:-3}"
 RELEASE_RETENTION_COUNT="${RELEASE_RETENTION_COUNT:-5}"
 ROLLBACK_IMAGE_RETENTION_COUNT="${ROLLBACK_IMAGE_RETENTION_COUNT:-2}"
-RUN_DB_MIGRATIONS="${RUN_DB_MIGRATIONS:-false}"
+RUN_DB_MIGRATIONS="${RUN_DB_MIGRATIONS:-true}"
 RUN_BACKUP_ON_DEPLOY="${RUN_BACKUP_ON_DEPLOY:-false}"
 SMOKE_REQUIRED="${SMOKE_REQUIRED:-true}"
 KEEP_MAINTENANCE_ON_FAILURE="${KEEP_MAINTENANCE_ON_FAILURE:-true}"
+KEEP_MAINTENANCE_AFTER_DEPLOY="${KEEP_MAINTENANCE_AFTER_DEPLOY:-false}"
+UPDATE_VERBOSE="${UPDATE_VERBOSE:-false}"
 MAINTENANCE_WAS_ENABLED="false"
 MAINTENANCE_IS_ENABLED="false"
 DEPLOY_SUCCEEDED="false"
@@ -24,9 +26,12 @@ DEPLOY_STARTED_AT_EPOCH="$(date +%s)"
 RELEASE_TIMESTAMP="$(date '+%Y%m%d-%H%M%S')"
 RELEASE_DIR="${RELEASES_DIR}/${RELEASE_TIMESTAMP}"
 RELEASE_MANIFEST="${RELEASE_DIR}/release.env"
+STEP_INDEX=0
+CURRENT_STEP=""
+CURRENT_STEP_STARTED_AT=0
 
 log() {
-  printf '[deploy] %s\n' "$*"
+  printf '[%s][deploy] %s\n' "$(date '+%H:%M:%S')" "$*"
 }
 
 format_duration() {
@@ -56,6 +61,93 @@ print_prefixed_block() {
     [[ -n "$line" ]] || continue
     printf '%s %s\n' "$prefix" "$line"
   done <<< "$content"
+}
+
+print_log_tail() {
+  local log_file="$1"
+  local lines="${2:-40}"
+
+  if [[ -f "$log_file" ]]; then
+    log "Ultimas linhas de ${log_file}:"
+    tail -n "$lines" "$log_file" | sed 's/^/[log] /'
+  fi
+}
+
+step_start() {
+  STEP_INDEX=$((STEP_INDEX + 1))
+  CURRENT_STEP="$1"
+  CURRENT_STEP_STARTED_AT="$SECONDS"
+  log "PASSO ${STEP_INDEX}: ${CURRENT_STEP}"
+}
+
+step_ok() {
+  local elapsed=$((SECONDS - CURRENT_STEP_STARTED_AT))
+  log "OK PASSO ${STEP_INDEX}: ${CURRENT_STEP} ($(format_duration "$elapsed"))"
+  CURRENT_STEP=""
+}
+
+step_fail() {
+  local exit_code="$1"
+  local log_file="${2:-}"
+  local elapsed=$((SECONDS - CURRENT_STEP_STARTED_AT))
+
+  log "ERRO PASSO ${STEP_INDEX}: ${CURRENT_STEP} falhou com codigo ${exit_code} ($(format_duration "$elapsed"))"
+
+  if [[ -n "$log_file" && "$log_file" != "-" ]]; then
+    print_log_tail "$log_file"
+  fi
+}
+
+run_step() {
+  local title="$1"
+  local log_file="$2"
+  shift 2
+
+  step_start "$title"
+
+  set +e
+  if [[ "$log_file" == "-" || "$UPDATE_VERBOSE" == "true" ]]; then
+    "$@"
+  else
+    "$@" > "$log_file" 2>&1
+  fi
+
+  local exit_code=$?
+  set -e
+
+  if (( exit_code == 0 )); then
+    step_ok
+    return 0
+  fi
+
+  step_fail "$exit_code" "$log_file"
+  return "$exit_code"
+}
+
+run_compose_step() {
+  local title="$1"
+  local log_file="$2"
+  shift 2
+
+  step_start "$title"
+
+  set +e
+  if [[ "$log_file" == "-" || "$UPDATE_VERBOSE" == "true" ]]; then
+    $COMPOSE_CMD "$@"
+  else
+    $COMPOSE_CMD "$@" > "$log_file" 2>&1
+  fi
+
+  local exit_code=$?
+  set -e
+
+  if (( exit_code == 0 )); then
+    step_ok
+    return 0
+  fi
+
+  step_fail "$exit_code" "$log_file"
+  return "$exit_code"
 }
 
 detect_compose_cmd() {
@@ -101,6 +193,47 @@ read_env_value() {
   raw_value="${raw_value#\"}"
   raw_value="${raw_value%\"}"
   printf '%s' "$raw_value"
+}
+
+write_env_value() {
+  local file_path="$1"
+  local key="$2"
+  local value="$3"
+  local tmp_file
+
+  mkdir -p "$(dirname "$file_path")"
+  touch "$file_path"
+  tmp_file="$(mktemp)"
+
+  if grep -q "^${key}=" "$file_path"; then
+    awk -v key="$key" -v value="$value" '
+      $0 ~ "^" key "=" {
+        print key "=" value
+        next
+      }
+      { print }
+    ' "$file_path" > "$tmp_file"
+  else
+    cat "$file_path" > "$tmp_file"
+    printf '\n%s=%s\n' "$key" "$value" >> "$tmp_file"
+  fi
+
+  mv "$tmp_file" "$file_path"
+}
+
+sync_maintenance_bypass_token() {
+  local token
+  token="$(read_env_value "$RUNTIME_ENV_FILE" MAINTENANCE_BYPASS_TOKEN || true)"
+
+  if [[ -z "$token" ]]; then
+    return 0
+  fi
+
+  export MAINTENANCE_BYPASS_TOKEN="$token"
+
+  if [[ -z "${AUDIT_MAINTENANCE_BYPASS_TOKEN:-}" ]]; then
+    export AUDIT_MAINTENANCE_BYPASS_TOKEN="$token"
+  fi
 }
 
 inspect_service_state() {
@@ -156,17 +289,32 @@ set_maintenance_mode() {
   local target_mode="$1"
 
   if [[ "$target_mode" == "on" && "$MAINTENANCE_IS_ENABLED" == "true" ]]; then
-    return 0
+    sync_maintenance_bypass_token
+
+    if [[ -n "${AUDIT_MAINTENANCE_BYPASS_TOKEN:-}" ]]; then
+      return 0
+    fi
   fi
 
   if [[ "$target_mode" == "off" && "$MAINTENANCE_IS_ENABLED" == "false" ]]; then
     return 0
   fi
 
-  ENV_FILE="$RUNTIME_ENV_FILE" sh "${ROOT_DIR}/ops/toggle-maintenance.sh" "$target_mode" >> "${RELEASE_DIR}/maintenance.log" 2>&1
+  if [[ -f "${ROOT_DIR}/ops/toggle-maintenance.sh" ]]; then
+    ENV_FILE="$RUNTIME_ENV_FILE" sh "${ROOT_DIR}/ops/toggle-maintenance.sh" "$target_mode" >> "${RELEASE_DIR}/maintenance.log" 2>&1
+  else
+    log "Helper ops/toggle-maintenance.sh nao encontrado; alternando manutencao diretamente em ${RUNTIME_ENV_FILE}"
+    if [[ "$target_mode" == "on" ]]; then
+      write_env_value "$RUNTIME_ENV_FILE" MAINTENANCE_MODE true
+    else
+      write_env_value "$RUNTIME_ENV_FILE" MAINTENANCE_MODE false
+    fi
+    $COMPOSE_CMD up -d --no-deps --force-recreate "$SERVICE_NAME" >> "${RELEASE_DIR}/maintenance.log" 2>&1
+  fi
 
   if [[ "$target_mode" == "on" ]]; then
     MAINTENANCE_IS_ENABLED="true"
+    sync_maintenance_bypass_token
     return 0
   fi
 
@@ -313,9 +461,9 @@ APP_PORT_VALUE="$(read_env_value "$ENV_FILE" APP_PORT || true)"
 APP_HEALTH_BASE_URL="${APP_HEALTH_BASE_URL:-http://127.0.0.1:${APP_PORT_VALUE:-3000}}"
 ROLLBACK_IMAGE_TAG="savepointfinance-web:rollback-${RELEASE_TIMESTAMP}"
 
-log "Iniciando deploy robusto do SavePointFinance"
-log "Release atual: ${RELEASE_TIMESTAMP}"
-log "Evidencias: ${RELEASE_DIR}"
+log "Iniciando update do SavePointFinance"
+log "Release: ${RELEASE_TIMESTAMP}"
+log "Evidencias e logs: ${RELEASE_DIR}"
 
 cat > "$RELEASE_MANIFEST" <<EOF
 RELEASE_TIMESTAMP=${RELEASE_TIMESTAMP}
@@ -326,8 +474,7 @@ ROLLBACK_IMAGE_TAG=${ROLLBACK_IMAGE_TAG}
 EOF
 
 if docker image inspect savepointfinance-web:latest >/dev/null 2>&1; then
-  log "Salvando snapshot local da imagem anterior para rollback"
-  docker tag savepointfinance-web:latest "$ROLLBACK_IMAGE_TAG"
+  run_step "Salvar snapshot local da imagem anterior para rollback" "${RELEASE_DIR}/rollback-snapshot.log" docker tag savepointfinance-web:latest "$ROLLBACK_IMAGE_TAG"
 else
   log "Nenhuma imagem anterior encontrada; rollback automatico por imagem ficara indisponivel neste ciclo."
   sed -i '/^ROLLBACK_IMAGE_TAG=/d' "$RELEASE_MANIFEST"
@@ -337,42 +484,33 @@ fi
 if [[ "$(read_env_value "$RUNTIME_ENV_FILE" MAINTENANCE_MODE || true)" == "true" ]]; then
   MAINTENANCE_WAS_ENABLED="true"
   MAINTENANCE_IS_ENABLED="true"
+  sync_maintenance_bypass_token
+  run_step "Garantir bypass de manutencao para auditorias" "-" set_maintenance_mode on
   log "Modo de manutencao ja estava ativo antes do deploy."
 else
-  log "Ativando modo de manutencao"
-  set_maintenance_mode on
+  run_step "Ativar modo de manutencao" "-" set_maintenance_mode on
 fi
 
 if [[ "$RUN_BACKUP_ON_DEPLOY" == "true" ]]; then
-  log "Executando backup preventivo antes do deploy"
-  $COMPOSE_CMD run --rm backup-once > "${RELEASE_DIR}/backup.log" 2>&1
+  run_compose_step "Executar backup preventivo" "${RELEASE_DIR}/backup.log" --profile ops run --rm backup-once
 fi
 
-log "Atualizando codigo com git pull --ff-only"
-git pull --ff-only > "${RELEASE_DIR}/git-pull.log" 2>&1
+run_step "Atualizar codigo com git pull --ff-only" "${RELEASE_DIR}/git-pull.log" git pull --ff-only
+
+run_compose_step "Construir imagens do Docker Compose" "${RELEASE_DIR}/build.log" --profile ops build
 
 if [[ "$RUN_DB_MIGRATIONS" == "true" ]]; then
-  log "Aplicando migrations do banco"
-  $COMPOSE_CMD run --rm migrate > "${RELEASE_DIR}/migrate.log" 2>&1
+  run_compose_step "Aplicar migrations do banco" "${RELEASE_DIR}/migrate.log" --profile ops run --rm migrate
+else
+  log "Migrations ignoradas porque RUN_DB_MIGRATIONS=false."
 fi
 
-log "Construindo imagens de aplicacao e smoke audit"
-$COMPOSE_CMD build web audit-server-smoke > "${RELEASE_DIR}/build.log" 2>&1
+run_compose_step "Recriar o servico ${SERVICE_NAME}" "${RELEASE_DIR}/up.log" up -d --no-deps --force-recreate "$SERVICE_NAME"
 
-log "Recriando o servico ${SERVICE_NAME}"
-$COMPOSE_CMD up -d --no-deps --force-recreate "$SERVICE_NAME" > "${RELEASE_DIR}/up.log" 2>&1
+run_step "Aguardar healthcheck publico ${APP_HEALTH_BASE_URL}${HEALTH_PATH}" "-" wait_for_health
 
-log "Aguardando healthcheck publico ${APP_HEALTH_BASE_URL}${HEALTH_PATH}"
-wait_for_health
-
-log "Abrindo a aplicacao para executar a auditoria de fumaca"
-set_maintenance_mode off
-
-log "Aguardando healthcheck apos reabrir a aplicacao"
-wait_for_health
-
-log "Executando auditoria de fumaça"
-if $COMPOSE_CMD run --rm audit-server-smoke > "${RELEASE_DIR}/smoke.log" 2>&1; then
+log "Auditoria de fumaca usara bypass de manutencao enquanto o site permanece protegido."
+if run_compose_step "Executar auditoria de fumaca" "${RELEASE_DIR}/smoke.log" --profile ops run --rm -e "AUDIT_MAINTENANCE_BYPASS_TOKEN=${AUDIT_MAINTENANCE_BYPASS_TOKEN:-}" audit-server-smoke; then
   SMOKE_EXIT_CODE=0
 else
   SMOKE_EXIT_CODE=$?
@@ -382,7 +520,7 @@ if (( SMOKE_EXIT_CODE != 0 )); then
   capture_logs
 
   if [[ "$SMOKE_REQUIRED" == "true" ]]; then
-    log "Auditoria de fumaça falhou e esta configurada como obrigatoria."
+    log "Auditoria de fumaca falhou e esta configurada como obrigatoria."
     if [[ "$MAINTENANCE_IS_ENABLED" != "true" ]]; then
       log "Religando modo de manutencao apos falha na auditoria de fumaca"
       set_maintenance_mode on || true
@@ -390,24 +528,22 @@ if (( SMOKE_EXIT_CODE != 0 )); then
     exit "$SMOKE_EXIT_CODE"
   fi
 
-  log "Auditoria de fumaça falhou, mas o deploy seguira porque SMOKE_REQUIRED=false."
+  log "Auditoria de fumaca falhou, mas o deploy seguira porque SMOKE_REQUIRED=false."
   log "Consulte ${RELEASE_DIR}/smoke.log para diagnostico."
 fi
 
 capture_logs
 
-if [[ "$MAINTENANCE_WAS_ENABLED" == "true" ]]; then
-  log "Restaurando o modo de manutencao que ja estava ativo antes do deploy"
-  set_maintenance_mode on
+if [[ "$KEEP_MAINTENANCE_AFTER_DEPLOY" == "true" && "$MAINTENANCE_WAS_ENABLED" == "true" ]]; then
+  run_step "Manter modo de manutencao que ja estava ativo antes do deploy" "-" set_maintenance_mode on
 elif [[ "$MAINTENANCE_IS_ENABLED" == "true" ]]; then
-  log "Desativando modo de manutencao"
-  set_maintenance_mode off
+  run_step "Desativar modo de manutencao" "-" set_maintenance_mode off
 fi
 
 DEPLOY_SUCCEEDED="true"
 DEPLOY_FINISHED_AT_EPOCH="$(date +%s)"
 DEPLOY_ELAPSED_SECONDS=$((DEPLOY_FINISHED_AT_EPOCH - DEPLOY_STARTED_AT_EPOCH))
-cleanup_success_artifacts
+run_step "Limpar artefatos antigos de deploy" "-" cleanup_success_artifacts
 log "Deploy concluido com sucesso"
 log "Tempo total do deploy: $(format_duration "$DEPLOY_ELAPSED_SECONDS")"
 log "Manifesto: ${RELEASE_MANIFEST}"

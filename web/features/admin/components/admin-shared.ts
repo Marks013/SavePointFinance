@@ -20,6 +20,22 @@ export type TenantBillingSummary = {
   } | null;
 };
 
+export function isCheckoutOnlyBilling(input: {
+  billingMode?: string | null;
+  preapprovalId?: string | null;
+  subscriptionStatus?: string | null;
+  latestPaymentId?: string | null;
+  latestPaymentStatus?: string | null;
+}) {
+  return (
+    input.billingMode === "annual_one_time" &&
+    input.subscriptionStatus === "pending" &&
+    !input.preapprovalId &&
+    !input.latestPaymentId &&
+    !input.latestPaymentStatus
+  );
+}
+
 export type TenantItem = {
   id: string;
   name: string;
@@ -120,7 +136,7 @@ export function formatBillingSubscriptionLabel(status: string | null) {
     case "paused":
       return "Cobrança pausada";
     case "pending":
-      return "Aguardando autorização";
+      return "Checkout iniciado";
     case "canceled":
       return "Assinatura cancelada";
     case "expired":

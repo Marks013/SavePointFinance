@@ -18,6 +18,8 @@ type BillingPromotionDraft = {
   couponCode: string;
   discountPercent: number;
   appliesTo: "monthly" | "annual" | "both";
+  visibleInCheckout: boolean;
+  highlightPriceCard: boolean;
   enabled: boolean;
   startsAt: string | null;
   endsAt: string | null;
@@ -67,6 +69,8 @@ function makePromotionDraft(): BillingPromotionDraft {
     couponCode: "",
     discountPercent: 10,
     appliesTo: "annual",
+    visibleInCheckout: true,
+    highlightPriceCard: false,
     enabled: false,
     startsAt: null,
     endsAt: null
@@ -122,7 +126,7 @@ export function BillingSettingsCard() {
           <div className="eyebrow">Billing comercial</div>
           <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em]">Preços, cupons e promoções</h2>
           <p className="mt-2 text-sm leading-7 text-[var(--color-muted-foreground)]">
-            Ajuste valores e campanhas sem mexer no ambiente. O checkout usa estes dados e valida cupons no backend.
+            Ajuste valores, cupons visÃ­veis e cupons secretos que funcionam somente quando o cliente digita o cÃ³digo.
           </p>
         </div>
         <article className="metric-card admin-section-metric">
@@ -174,7 +178,8 @@ export function BillingSettingsCard() {
         <div>
           <p className="text-sm font-semibold">Cards promocionais e cupons</p>
           <p className="mt-1 text-sm text-[var(--color-muted-foreground)]">
-            Promoções ativas aparecem no checkout como cards clicáveis e também funcionam por campo de cupom.
+            Promoções ativas aparecem no checkout como cards clicáveis e também funcionam por campo de cupom. As datas
+            de início e fim são opcionais; deixe vazias para o cupom valer enquanto estiver ativo.
           </p>
         </div>
         <Button
@@ -194,7 +199,11 @@ export function BillingSettingsCard() {
               <div>
                 <p className="text-sm font-semibold">{promotion.title}</p>
                 <p className="mt-1 text-xs text-[var(--color-muted-foreground)]">
-                  {promotion.enabled ? "Ativa no checkout" : "Desativada"}
+                  {promotion.enabled
+                    ? promotion.visibleInCheckout
+                      ? "Ativa e visivel no checkout"
+                      : "Ativa como cupom secreto"
+                    : "Desativada"}
                 </p>
               </div>
               <Button
@@ -266,6 +275,30 @@ export function BillingSettingsCard() {
                 <option value="both">Mensal e anual</option>
               </Select>
               <Select
+                aria-label="Visibilidade do cupom"
+                onChange={(event) => {
+                  const promotions = [...draft.promotions];
+                  promotions[index] = { ...promotion, visibleInCheckout: event.target.value === "true" };
+                  setDraft({ ...draft, promotions });
+                }}
+                value={String(promotion.visibleInCheckout)}
+              >
+                <option value="true">Mostrar no checkout</option>
+                <option value="false">Cupom secreto</option>
+              </Select>
+              <Select
+                aria-label="Destaque visual no card de preço"
+                onChange={(event) => {
+                  const promotions = [...draft.promotions];
+                  promotions[index] = { ...promotion, highlightPriceCard: event.target.value === "true" };
+                  setDraft({ ...draft, promotions });
+                }}
+                value={String(Boolean(promotion.highlightPriceCard))}
+              >
+                <option value="false">Não alterar card de preço</option>
+                <option value="true">Destacar card mensal/anual</option>
+              </Select>
+              <Select
                 aria-label="Status da promoção"
                 onChange={(event) => {
                   const promotions = [...draft.promotions];
@@ -284,7 +317,7 @@ export function BillingSettingsCard() {
                   promotions[index] = { ...promotion, startsAt: event.target.value || null };
                   setDraft({ ...draft, promotions });
                 }}
-                placeholder="Início ISO opcional"
+                placeholder="Começa em, ex: 2026-11-25 00:00"
                 value={promotion.startsAt ?? ""}
               />
               <Input
@@ -294,7 +327,7 @@ export function BillingSettingsCard() {
                   promotions[index] = { ...promotion, endsAt: event.target.value || null };
                   setDraft({ ...draft, promotions });
                 }}
-                placeholder="Fim ISO opcional"
+                placeholder="Expira em, ex: 2026-12-01 23:59"
                 value={promotion.endsAt ?? ""}
               />
             </div>

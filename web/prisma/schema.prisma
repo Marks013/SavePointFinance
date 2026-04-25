@@ -191,6 +191,7 @@ model Tenant {
   whatsappMessages WhatsAppMessage[]
   billingSubscriptions BillingSubscription[]
   billingPayments BillingPayment[]
+  cardStatementCycles CardStatementCycle[]
 
   @@index([planId])
 }
@@ -389,6 +390,7 @@ model Card {
   transactions Transaction[]
   subscriptions Subscription[]
   statementPayments StatementPayment[]
+  statementCycles CardStatementCycle[]
 
   @@index([tenantId])
   @@index([ownerUserId])
@@ -559,6 +561,22 @@ model StatementPayment {
 
   @@unique([tenantId, cardId, month])
   @@index([accountId])
+}
+
+model CardStatementCycle {
+  id        String   @id @default(cuid())
+  tenantId  String
+  cardId    String
+  month     String
+  closeDate DateTime
+  dueDate   DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, cardId, month])
+  @@index([tenantId, cardId, closeDate])
 }
 
 model Invitation {

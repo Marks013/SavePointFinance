@@ -54,6 +54,7 @@ Arquivo: [`.env`](/C:/Users/samue/Desktop/SavePoint/SavePoint/.env)
 - `EMAIL_FROM`
 - `EMAIL_FROM_NAME`
 - `EMAIL_REPLY_TO`
+- `SUPPORT_EMAIL_TO`
 - `RESEND_API_KEY`
 - `BREVO_API_KEY`
 - `NOTIFICATION_EMAIL_WEBHOOK_URL`
@@ -469,6 +470,7 @@ EMAIL_PROVIDER=resend
 EMAIL_FROM=no-reply@seudominio.com
 EMAIL_FROM_NAME=Save Point Finança
 EMAIL_REPLY_TO=suporte@seudominio.com
+SUPPORT_EMAIL_TO=suporte@seudominio.com
 RESEND_API_KEY=seu-token
 ```
 
@@ -556,7 +558,7 @@ O `update.sh` agora faz um fluxo mais seguro:
 7. recria `web`
 8. espera `GET /api/health`
 9. executa `audit-server-smoke` ainda com manutencao ativa
-10. so libera o trafego se tudo passar
+10. desativa a manutencao se tudo passar
 
 Uso padrao:
 
@@ -574,6 +576,12 @@ Com backup preventivo:
 
 ```bash
 RUN_BACKUP_ON_DEPLOY=true ./update.sh
+```
+
+Para manter a manutencao ligada mesmo apos um deploy bem-sucedido:
+
+```bash
+KEEP_MAINTENANCE_AFTER_DEPLOY=true ./update.sh
 ```
 
 ### Evidencias operacionais

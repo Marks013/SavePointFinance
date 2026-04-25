@@ -7,7 +7,6 @@ import { toast } from "sonner";
 import {
   cancelBillingSubscription,
   getBillingOverview,
-  openBillingPortal,
   startBillingCheckout
 } from "@/features/billing/lib/billing-api";
 import type { BillingProfileSnapshot } from "@/features/billing/types";
@@ -41,7 +40,7 @@ function resolveLifecycleCopy(
     return `Cancelada em ${formatDateDisplay(canceledAt)}`;
   }
 
-  return "Sem renovação exposta pelo backend";
+  return "Sem data de renovação informada";
 }
 
 export function BillingSummaryCard({ profile, compact = false }: BillingSummaryCardProps) {
@@ -68,21 +67,6 @@ export function BillingSummaryCard({ profile, compact = false }: BillingSummaryC
     }
   });
 
-  const portalMutation = useMutation({
-    mutationFn: openBillingPortal,
-    onSuccess: (payload) => {
-      if (payload.url) {
-        window.location.href = payload.url;
-        return;
-      }
-
-      toast.success(payload.message ?? "Gerenciamento da assinatura aberto");
-    },
-    onError: (error) => {
-      toast.error(error.message);
-    }
-  });
-
   const cancelMutation = useMutation({
     mutationFn: cancelBillingSubscription,
     onSuccess: async (payload) => {
@@ -100,7 +84,7 @@ export function BillingSummaryCard({ profile, compact = false }: BillingSummaryC
   if (!overview) {
     return (
       <section className="surface content-section">
-        <div className="eyebrow">Billing</div>
+        <div className="eyebrow">Assinatura</div>
         <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em]">Plano e assinatura</h2>
         <p className="mt-4 text-sm text-[var(--color-muted-foreground)]">Carregando status do plano...</p>
       </section>
@@ -119,7 +103,7 @@ export function BillingSummaryCard({ profile, compact = false }: BillingSummaryC
     <section className="surface content-section">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
-          <div className="eyebrow">Billing</div>
+          <div className="eyebrow">Assinatura</div>
           <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em]">Plano e assinatura</h2>
           <p className="mt-2 max-w-3xl text-sm leading-7 text-[var(--color-muted-foreground)]">
             Veja o status atual do plano da conta, acompanhe renovação e acione checkout, gerenciamento ou cancelamento
@@ -187,7 +171,7 @@ export function BillingSummaryCard({ profile, compact = false }: BillingSummaryC
           {overview.subscription.cancelAtPeriodEnd ? (
             <div className="warning-panel mt-5 text-sm">
               A assinatura está marcada para encerrar no fim do ciclo atual. Os recursos premium seguem ativos até a
-              data final informada pelo backend.
+              data final informada.
             </div>
           ) : null}
         </article>
@@ -206,9 +190,14 @@ export function BillingSummaryCard({ profile, compact = false }: BillingSummaryC
                 {checkoutMutation.isPending ? "Abrindo checkout..." : "Fazer upgrade"}
               </Button>
             ) : null}
+            {canManageBilling && overview.subscription.canUpdateCard ? (
+              <Button asChild variant="secondary">
+                <Link href="/billing?intent=manage-card">Trocar cartao de cobranca</Link>
+              </Button>
+            ) : null}
             {canManageBilling && overview.subscription.canManage ? (
-              <Button disabled={portalMutation.isPending} onClick={() => portalMutation.mutate()} type="button" variant="secondary">
-                {portalMutation.isPending ? "Abrindo portal..." : "Gerenciar assinatura"}
+              <Button asChild variant="secondary">
+                <Link href="/billing">Central de gestao do plano</Link>
               </Button>
             ) : null}
             {canManageBilling && overview.subscription.canCancel ? (
@@ -217,7 +206,7 @@ export function BillingSummaryCard({ profile, compact = false }: BillingSummaryC
                 disabled={cancelMutation.isPending}
                 onClick={() => {
                   const confirmed = window.confirm(
-                    "Deseja agendar o cancelamento da assinatura desta conta ao final do ciclo atual?"
+                    "Deseja cancelar a assinatura? Se estiver dentro de 7 dias da primeira assinatura, o valor sera estornado integralmente e a conta voltara imediatamente ao plano Gratuito."
                   );
 
                   if (!confirmed) {
@@ -241,7 +230,7 @@ export function BillingSummaryCard({ profile, compact = false }: BillingSummaryC
           ) : null}
           {overview.permissions.isPlatformAdmin ? (
             <div className="muted-panel mt-5 text-sm text-[var(--color-muted-foreground)]">
-              O superadmin da plataforma visualiza o status de billing, mas não deve cancelar a licença por este fluxo.
+              O superadmin da plataforma visualiza o status da assinatura, mas não deve cancelar a licença por este fluxo.
             </div>
           ) : null}
         </article>

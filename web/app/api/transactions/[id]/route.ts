@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 
 import { requireSessionUser } from "@/lib/auth/session";
 import { revalidateFinanceReports } from "@/lib/cache/finance-read-models";
-import { buildCardBillingSnapshot } from "@/lib/cards/statement";
+import { buildCardBillingSnapshotForDate } from "@/lib/cards/statement";
 import { BenefitWalletRuleError, validateBenefitWalletTransaction } from "@/lib/finance/benefit-wallet";
 import { FOOD_BENEFIT_CATEGORY_SYSTEM_KEYS } from "@/lib/finance/benefit-wallet-rules";
 import { resolveTransactionClassification } from "@/lib/finance/transaction-classification";
@@ -175,12 +175,19 @@ export async function PATCH(request: Request, context: Params) {
 
       const affectedCompetencesBefore = installments.map((installment) => installment.competence);
 
-      await prisma.$transaction(
-        installments.map((installment) => {
+      await Promise.all(
+        installments.map(async (installment) => {
           const monthOffset = installment.installmentNumber - existingTransaction.installmentNumber;
           const nextDate = addMonthsClamped(updatedDate, monthOffset);
           const nextCompetenceDate = addMonthsClamped(baseCompetenceDate, monthOffset);
-          const cardSnapshot = selectedCard ? buildCardBillingSnapshot(selectedCard, nextDate) : null;
+          const cardSnapshot = selectedCard
+            ? await buildCardBillingSnapshotForDate({
+                tenantId: user.tenantId,
+                card: selectedCard,
+                referenceDate: nextDate,
+                client: prisma
+              })
+            : null;
 
           return prisma.transaction.update({
             where: {
@@ -215,19 +222,28 @@ export async function PATCH(request: Request, context: Params) {
       );
 
       if (applyTithe || installments.some((installment) => Number(installment.titheAmount ?? 0) > 0)) {
+        const affectedCompetencesAfter = await Promise.all(
+          installments.map(async (installment) => {
+            const monthOffset = installment.installmentNumber - existingTransaction.installmentNumber;
+            const nextDate = addMonthsClamped(updatedDate, monthOffset);
+            const nextCompetenceDate = addMonthsClamped(baseCompetenceDate, monthOffset);
+            const cardSnapshot = selectedCard
+              ? await buildCardBillingSnapshotForDate({
+                  tenantId: user.tenantId,
+                  card: selectedCard,
+                  referenceDate: nextDate,
+                  client: prisma
+                })
+              : null;
+
+            return cardSnapshot?.competence ?? format(nextCompetenceDate, "yyyy-MM");
+          })
+        );
+
         await syncTitheForMonthKeys({
           tenantId: user.tenantId,
           userId: existingTransaction.userId ?? user.id,
-          monthKeys: [
-            ...affectedCompetencesBefore,
-            ...installments.map((installment) => {
-              const monthOffset = installment.installmentNumber - existingTransaction.installmentNumber;
-              const nextDate = addMonthsClamped(updatedDate, monthOffset);
-              const nextCompetenceDate = addMonthsClamped(baseCompetenceDate, monthOffset);
-              const cardSnapshot = selectedCard ? buildCardBillingSnapshot(selectedCard, nextDate) : null;
-              return cardSnapshot?.competence ?? format(nextCompetenceDate, "yyyy-MM");
-            })
-          ]
+          monthKeys: [...affectedCompetencesBefore, ...affectedCompetencesAfter]
         });
       }
       revalidateFinanceReports(user.tenantId);
@@ -238,7 +254,14 @@ export async function PATCH(request: Request, context: Params) {
       });
     }
 
-    const singleCardSnapshot = selectedCard ? buildCardBillingSnapshot(selectedCard, updatedDate) : null;
+    const singleCardSnapshot = selectedCard
+      ? await buildCardBillingSnapshotForDate({
+          tenantId: user.tenantId,
+          card: selectedCard,
+          referenceDate: updatedDate,
+          client: prisma
+        })
+      : null;
 
     const updated = await prisma.transaction.update({
       where: {

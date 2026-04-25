@@ -2,7 +2,7 @@ import { NotificationChannel, PaymentMethod, Prisma, TransactionSource, Transact
 
 import { deliverNotification } from "@/lib/notifications/delivery";
 import {
-  buildCardBillingSnapshot,
+  buildCardBillingSnapshotForDate,
   getCardStatementSnapshot,
   getCurrentPayableStatementMonth,
   getStatementPaymentDate
@@ -221,7 +221,14 @@ export async function generateSubscriptionTransaction(subscriptionId: string, te
 
   const titheCategoryId =
     subscription.type === "income" && subscription.autoTithe ? await ensureTitheCategory(tenantId) : null;
-  const cardSnapshot = subscription.card ? buildCardBillingSnapshot(subscription.card, nextBillingDate) : null;
+  const cardSnapshot = subscription.card
+    ? await buildCardBillingSnapshotForDate({
+        tenantId,
+        card: subscription.card,
+        referenceDate: nextBillingDate,
+        client: prisma
+      })
+    : null;
   const transaction = await prisma.transaction.create({
     data: {
       tenantId,

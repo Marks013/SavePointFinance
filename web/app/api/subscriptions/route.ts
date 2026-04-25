@@ -60,7 +60,10 @@ export async function GET(request: Request) {
               subscriptionId: {
                 in: subscriptions.map((subscription) => subscription.id)
               },
-              competence: month
+              date: {
+                gte: monthRange!.start,
+                lte: monthRange!.end
+              }
             },
             select: {
               subscriptionId: true,

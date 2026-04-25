@@ -15,8 +15,61 @@ function assertCondition(condition: unknown, message: string): asserts condition
 
 async function main() {
   const { prisma } = await import("../lib/prisma/client");
-  const { getCardStatementSnapshot, getNextPayableStatementSnapshot } = await import("../lib/cards/statement");
+  const { buildCardBillingSnapshot, buildCardBillingSnapshotForDate, getCardStatementSnapshot, getNextPayableStatementSnapshot } = await import("../lib/cards/statement");
   const { ensureTenantCardStatementSnapshots } = await import("../lib/cards/snapshot-sync");
+  const { deriveStatementMonthAnchor } = await import("../features/cards/schemas/card-schema");
+
+  const earlyClosingCard = {
+    closeDay: 3,
+    dueDay: 10,
+    statementMonthAnchor: deriveStatementMonthAnchor(3, 10)
+  };
+  const earlyBeforeClose = buildCardBillingSnapshot(earlyClosingCard, new Date(2026, 3, 2, 12, 0, 0, 0));
+  const earlyOnClose = buildCardBillingSnapshot(earlyClosingCard, new Date(2026, 3, 3, 12, 0, 0, 0));
+  assertCondition(earlyClosingCard.statementMonthAnchor === "previous_month", "Fechamento antes do vencimento deve usar mes anterior");
+  assertCondition(earlyBeforeClose.competence === "2026-03", `Compra antes do fechamento deveria ir para 2026-03: ${earlyBeforeClose.competence}`);
+  assertCondition(earlyBeforeClose.dueDate.toISOString().slice(0, 10) === "2026-04-10", "Vencimento da fatura anterior incorreto");
+  assertCondition(earlyOnClose.competence === "2026-04", `Compra no dia do fechamento deveria ir para 2026-04: ${earlyOnClose.competence}`);
+
+  const lateClosingCard = {
+    closeDay: 24,
+    dueDay: 8,
+    statementMonthAnchor: deriveStatementMonthAnchor(24, 8)
+  };
+  const lateBeforeClose = buildCardBillingSnapshot(lateClosingCard, new Date(2026, 2, 20, 12, 0, 0, 0));
+  const lateOnClose = buildCardBillingSnapshot(lateClosingCard, new Date(2026, 2, 24, 12, 0, 0, 0));
+  assertCondition(lateClosingCard.statementMonthAnchor === "close_month", "Fechamento depois do vencimento deve usar mes do fechamento");
+  assertCondition(lateBeforeClose.competence === "2026-03", `Compra antes do fechamento deveria ir para 2026-03: ${lateBeforeClose.competence}`);
+  assertCondition(lateBeforeClose.dueDate.toISOString().slice(0, 10) === "2026-04-08", "Vencimento da fatura com fechamento tardio incorreto");
+  assertCondition(lateOnClose.competence === "2026-04", `Compra no dia do fechamento deveria ir para 2026-04: ${lateOnClose.competence}`);
+
+  const cycleClient = {
+    cardStatementCycle: {
+      findFirst: async () => ({
+        month: "2026-05",
+        closeDate: new Date(2026, 4, 26, 12, 0, 0, 0),
+        dueDate: new Date(2026, 5, 8, 12, 0, 0, 0)
+      }),
+      findUnique: async ({ where }: { where: { tenantId_cardId_month: { month: string } } }) =>
+        where.tenantId_cardId_month.month === "2026-05"
+          ? {
+              month: "2026-05",
+              closeDate: new Date(2026, 4, 26, 12, 0, 0, 0),
+              dueDate: new Date(2026, 5, 8, 12, 0, 0, 0)
+            }
+          : null
+    },
+    statementPayment: {},
+    transaction: {}
+  };
+  const mayCyclePurchase = await buildCardBillingSnapshotForDate({
+    tenantId: "tenant-audit",
+    card: { id: "card-audit", ...lateClosingCard },
+    referenceDate: new Date(2026, 4, 25, 12, 0, 0, 0),
+    client: cycleClient as never
+  });
+  assertCondition(mayCyclePurchase.competence === "2026-05", "Compra em 25/05 deveria respeitar fechamento real em 26/05");
+  assertCondition(mayCyclePurchase.dueDate.toISOString().slice(0, 10) === "2026-06-08", "Vencimento real de junho nao foi aplicado");
 
   const plan = await prisma.plan.findFirst({
     where: {

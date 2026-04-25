@@ -170,13 +170,16 @@ export async function PATCH(request: Request) {
       autoTithe: permissions.canEditAutoTithe ? body.preferences.autoTithe : currentPreferences.autoTithe
     };
 
+    const canUpdateWhatsAppNumber =
+      permissions.canEditWhatsAppNumber && Object.prototype.hasOwnProperty.call(body, "whatsappNumber");
+
     await prisma.user.update({
       where: {
         id: user.id
       },
       data: {
         name: body.name.trim(),
-        whatsappNumber: formatWhatsAppPhone(body.whatsappNumber) || null,
+        ...(canUpdateWhatsAppNumber ? { whatsappNumber: formatWhatsAppPhone(body.whatsappNumber) || null } : {}),
         preferences: {
           upsert: {
             create: nextPreferences,

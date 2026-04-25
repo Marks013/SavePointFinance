@@ -50,6 +50,99 @@ function randomPassword() {
   return randomBytes(18).toString("base64url");
 }
 
+function buildFallbackRootEnv(modeName) {
+  const appUrl = modeName === "server" ? "https://example.com" : "http://localhost:3000";
+
+  return [
+    "POSTGRES_DB=savepoint",
+    "POSTGRES_USER=savepoint",
+    `POSTGRES_PASSWORD=${randomPassword()}`,
+    "POSTGRES_PORT=5432",
+    "APP_PORT=3000",
+    `AUTH_SECRET=${randomSecret()}`,
+    `AUTOMATION_CRON_SECRET=${randomSecret()}`,
+    `NEXT_PUBLIC_APP_URL=${appUrl}`,
+    `AUTH_URL=${appUrl}`,
+    "ADMIN_EMAIL=admin@savepoint.local",
+    `ADMIN_PASSWORD=${randomPassword()}`,
+    "ADMIN_NAME=Administrador SavePoint",
+    "ADMIN_TENANT_NAME=SavePoint",
+    "ADMIN_TENANT_SLUG=savepoint",
+    "GEMINI_ENABLED=false",
+    "GEMINI_API_KEY=",
+    "GEMINI_MODEL=gemini-1.5-flash",
+    "GEMINI_BASE_URL=",
+    "EMAIL_PROVIDER=console",
+    "EMAIL_FROM=no-reply@savepoint.local",
+    "EMAIL_FROM_NAME=SavePoint",
+    "EMAIL_REPLY_TO=",
+    "RESEND_API_KEY=",
+    "BREVO_API_KEY=",
+    "NOTIFICATION_EMAIL_WEBHOOK_URL=",
+    "NOTIFICATION_WHATSAPP_WEBHOOK_URL=",
+    "WHATSAPP_VERIFY_TOKEN=",
+    "MAINTENANCE_MODE=false",
+    "MP_BILLING_ENABLED=false",
+    "MP_ACCESS_TOKEN=",
+    "MP_PUBLIC_KEY=",
+    "MP_WEBHOOK_SECRET=",
+    "MP_BILLING_AMOUNT=29.90",
+    "MP_BILLING_ANNUAL_AMOUNT=299.00",
+    "MP_BILLING_ANNUAL_MAX_INSTALLMENTS=12",
+    "AUDIT_BASE_URL=",
+    "SMOKE_MONTH="
+  ].join("\n");
+}
+
+function getEnvKey(line) {
+  const trimmed = line.trim();
+
+  if (!trimmed || trimmed.startsWith("#") || !trimmed.includes("=")) {
+    return null;
+  }
+
+  return trimmed.slice(0, trimmed.indexOf("="));
+}
+
+function mergeExistingEnvValues(nextContent) {
+  if (!existsSync(rootEnvPath)) {
+    return nextContent;
+  }
+
+  const existingLines = readFileSync(rootEnvPath, "utf8").split(/\r?\n/);
+  const existingByKey = new Map();
+
+  for (const line of existingLines) {
+    const key = getEnvKey(line);
+
+    if (key && !existingByKey.has(key)) {
+      existingByKey.set(key, line);
+    }
+  }
+
+  const seen = new Set();
+  const mergedLines = nextContent.split(/\r?\n/).map((line) => {
+    const key = getEnvKey(line);
+
+    if (!key) {
+      return line;
+    }
+
+    seen.add(key);
+    return existingByKey.get(key) ?? line;
+  });
+
+  for (const line of existingLines) {
+    const key = getEnvKey(line);
+
+    if (key && !seen.has(key)) {
+      mergedLines.push(line);
+    }
+  }
+
+  return mergedLines.join("\n").replace(/\n*$/, "\n");
+}
+
 function ensureRootEnv(modeName) {
   const templateName = dockerEnvTemplates[modeName];
 
@@ -70,10 +163,9 @@ function ensureRootEnv(modeName) {
       return;
     }
 
-    throw new Error(
-      `[bootstrap] ${rootEnvPath} not found and template ${templateName} is missing. ` +
-        "Crie o arquivo .env manualmente antes de usar o bootstrap."
-    );
+    writeFileSync(rootEnvPath, mergeExistingEnvValues(`${buildFallbackRootEnv(modeName)}\n`), "utf8");
+    console.log(`[bootstrap] created ${rootEnvPath} with built-in defaults because ${templateName} is missing`);
+    return;
   }
 
   const replacements = new Map([
@@ -92,7 +184,7 @@ function ensureRootEnv(modeName) {
     content = content.replaceAll(placeholder, value);
   }
 
-  writeFileSync(rootEnvPath, content, "utf8");
+  writeFileSync(rootEnvPath, mergeExistingEnvValues(content), "utf8");
   console.log(`[bootstrap] created ${rootEnvPath} from ${templateName}`);
 }
 

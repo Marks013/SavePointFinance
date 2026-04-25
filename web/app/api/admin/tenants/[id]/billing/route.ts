@@ -204,6 +204,8 @@ export async function GET(_request: Request, context: Params) {
             lastSyncedAt: currentSubscription.lastSyncedAt?.toISOString() ?? null,
             createdAt: currentSubscription.createdAt.toISOString(),
             updatedAt: currentSubscription.updatedAt.toISOString(),
+            latestPaymentStatus: currentSubscription.payments[0]?.status ?? null,
+            latestPaymentId: currentSubscription.payments[0]?.providerPaymentId ?? null,
             payments: currentSubscription.payments.map((payment) => ({
               ...payment,
               amount: Number(payment.amount),

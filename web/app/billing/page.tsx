@@ -7,7 +7,17 @@ import { CheckoutClient } from "@/features/billing/components/checkout-client";
 import { getBillingCheckoutPageData } from "@/lib/billing/service";
 import { isAuthError, isPermissionError } from "@/lib/observability/errors";
 
-export default async function BillingPage() {
+type BillingPageProps = {
+  searchParams?: Promise<{
+    cycle?: string;
+    intent?: string;
+  }>;
+};
+
+export default async function BillingPage({ searchParams }: BillingPageProps) {
+  const params = searchParams ? await searchParams : undefined;
+  const initialCycle = params?.cycle === "annual" ? "annual" : "monthly";
+  const initialIntent = params?.intent === "manage-card" ? "manage-card" : "checkout";
   let pageData: Awaited<ReturnType<typeof getBillingCheckoutPageData>>;
 
   try {
@@ -69,6 +79,8 @@ export default async function BillingPage() {
           annualAmount={pageData.annualAmount}
           annualMaxInstallments={pageData.annualMaxInstallments}
           currencyId={pageData.currencyId}
+          initialCycle={initialCycle}
+          initialIntent={initialIntent}
           planName={pageData.planName}
           promotions={pageData.promotions}
           publicKey={pageData.publicKey}

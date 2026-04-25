@@ -1,9 +1,11 @@
 import { hash } from "bcryptjs";
 import { config as loadEnv } from "dotenv";
 import { resolve } from "node:path";
+import { installMaintenanceBypassFetch } from "./audit-maintenance-bypass";
 
 loadEnv({ path: resolve(process.cwd(), "../.env"), override: false });
 loadEnv({ path: resolve(process.cwd(), ".env"), override: false });
+installMaintenanceBypassFetch();
 
 const baseUrl = process.env.AUDIT_BASE_URL?.trim() || "http://127.0.0.1:3000";
 
@@ -135,6 +137,7 @@ async function main() {
     getStatementPaymentDate,
     getStatementRange
   } = await import("../lib/cards/statement");
+  const { deriveStatementMonthAnchor } = await import("../features/cards/schemas/card-schema");
   const { advanceSubscriptionBillingDate, getSubscriptionBillingDate } = await import("../lib/subscriptions/recurrence");
 
   await prisma.$connect();
@@ -147,8 +150,16 @@ async function main() {
   const userPassword = "FinanceAudit123!";
   const results: string[] = [];
   assertCondition(
+    deriveStatementMonthAnchor(3, 10) === "previous_month",
+    "Fechamento antes do vencimento deveria ser associado ao mes anterior"
+  );
+  assertCondition(
+    deriveStatementMonthAnchor(24, 8) === "close_month",
+    "Fechamento depois do vencimento deveria ser associado ao mes do fechamento"
+  );
+  assertCondition(
     getCurrentStatementMonth(
-      { closeDay: 24, dueDay: 8, statementMonthAnchor: "close_month" },
+      { closeDay: 24, dueDay: 8, statementMonthAnchor: deriveStatementMonthAnchor(24, 8) },
       new Date(2026, 3, 2, 12, 0, 0, 0)
     ) === "2026-04",
     "Competencia padrao da fatura aberta ficou incorreta para cartao com fechamento apos vencimento"
@@ -156,7 +167,7 @@ async function main() {
   assertCondition(
     formatLocalDateKey(
       getCardExpenseCompetenceDate(
-        { closeDay: 24, dueDay: 8, statementMonthAnchor: "close_month" },
+        { closeDay: 24, dueDay: 8, statementMonthAnchor: deriveStatementMonthAnchor(24, 8) },
         new Date(2026, 2, 20, 12, 0, 0, 0)
       )
     ) ===
@@ -164,7 +175,7 @@ async function main() {
     "Compra antes do fechamento nao entrou na fatura esperada"
   );
   const expenseAfterCloseDate = getCardExpenseCompetenceDate(
-    { closeDay: 24, dueDay: 8, statementMonthAnchor: "close_month" },
+    { closeDay: 24, dueDay: 8, statementMonthAnchor: deriveStatementMonthAnchor(24, 8) },
     new Date(2026, 2, 25, 12, 0, 0, 0)
   );
   const expenseAfterCloseMonth = `${expenseAfterCloseDate.getFullYear()}-${String(expenseAfterCloseDate.getMonth() + 1).padStart(2, "0")}`;
@@ -172,7 +183,7 @@ async function main() {
   assertCondition(
     formatLocalDateKey(
       getCardExpenseDueDate(
-        { closeDay: 24, dueDay: 8, statementMonthAnchor: "close_month" },
+        { closeDay: 24, dueDay: 8, statementMonthAnchor: deriveStatementMonthAnchor(24, 8) },
         new Date(2026, 2, 24, 12, 0, 0, 0)
       )
     ) ===
@@ -192,7 +203,7 @@ async function main() {
   assertCondition(
     formatLocalDateKey(
       getCardExpenseCompetenceDate(
-        { closeDay: 1, dueDay: 10, statementMonthAnchor: "previous_month" },
+        { closeDay: 1, dueDay: 10, statementMonthAnchor: deriveStatementMonthAnchor(1, 10) },
         new Date(2026, 2, 31, 12, 0, 0, 0)
       )
     ) === "2026-03-31",
@@ -201,7 +212,7 @@ async function main() {
   assertCondition(
     formatLocalDateKey(
       getCardExpenseDueDate(
-        { closeDay: 1, dueDay: 10, statementMonthAnchor: "previous_month" },
+        { closeDay: 1, dueDay: 10, statementMonthAnchor: deriveStatementMonthAnchor(1, 10) },
         new Date(2026, 3, 1, 12, 0, 0, 0)
       )
     ) ===

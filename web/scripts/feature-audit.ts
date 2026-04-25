@@ -5,6 +5,10 @@ import { prisma } from "@/lib/prisma/client";
 import { processIncomingWhatsAppTextMessage } from "@/lib/whatsapp/assistant";
 import { formatWhatsAppPhone } from "@/lib/whatsapp/phone";
 
+import { installMaintenanceBypassFetch } from "./audit-maintenance-bypass";
+
+installMaintenanceBypassFetch();
+
 const baseUrl = process.env.AUDIT_BASE_URL?.trim() || "http://web:3000";
 
 class CookieJar {

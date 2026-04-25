@@ -52,6 +52,7 @@ export type BillingOverview = {
     canCheckout: boolean;
     canManage: boolean;
     canCancel: boolean;
+    canUpdateCard: boolean;
   };
   permissions: {
     canManageBilling: boolean;

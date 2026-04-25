@@ -7,6 +7,10 @@ import { getCurrentTenantAccess } from "@/lib/auth/session";
 import { BrandMark } from "@/components/layout/brand-mark";
 import { Button } from "@/components/ui/button";
 
+function isNextRedirectError(error: unknown) {
+  return typeof error === "object" && error !== null && "digest" in error && String(error.digest).startsWith("NEXT_REDIRECT");
+}
+
 export default async function LoginPage() {
   try {
     const access = await getCurrentTenantAccess({
@@ -18,7 +22,11 @@ export default async function LoginPage() {
     }
 
     redirect("/dashboard");
-  } catch {
+  } catch (error) {
+    if (isNextRedirectError(error)) {
+      throw error;
+    }
+
     // Session is absent or invalid; keep the login page public.
   }
 

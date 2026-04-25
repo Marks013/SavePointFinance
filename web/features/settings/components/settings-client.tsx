@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { signOut } from "next-auth/react";
 import { useState } from "react";
-import { useForm, useWatch } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
 import { BillingSummaryCard } from "@/features/billing/components/billing-summary-card";
@@ -131,7 +131,6 @@ type NotificationListPayload = {
 
 type SettingsFormValues = {
   name: string;
-  whatsappNumber: string;
   currency: string;
   dateFormat: string;
   emailNotifications: boolean;
@@ -180,28 +179,6 @@ function formatWarningType(type: AutomationSummary["warningPreview"][number]["ty
   }
 }
 
-function formatBrazilWhatsAppInput(value: string) {
-  const digits = value.replace(/\D/g, "").slice(0, 11);
-
-  if (!digits.length) {
-    return "";
-  }
-
-  if (digits.length <= 2) {
-    return `(${digits}`;
-  }
-
-  if (digits.length <= 3) {
-    return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
-  }
-
-  if (digits.length <= 7) {
-    return `(${digits.slice(0, 2)}) ${digits.slice(2, 3)} ${digits.slice(3)}`;
-  }
-
-  return `(${digits.slice(0, 2)}) ${digits.slice(2, 3)} ${digits.slice(3, 7)}-${digits.slice(7)}`;
-}
-
 async function getProfile() {
   const response = await fetch("/api/profile", { cache: "no-store" });
   await ensureApiResponse(response, { fallbackMessage: "Falha ao carregar perfil", method: "GET", path: "/api/profile" });
@@ -227,7 +204,6 @@ export function SettingsClient() {
   const [automationResult, setAutomationResult] = useState<AutomationRunResult | null>(null);
   const profileQuery = useQuery({ queryKey: ["profile"], queryFn: getProfile });
   const automationEnabled = Boolean(profileQuery.data?.license.features.automation);
-  const whatsappEnabledForPlan = Boolean(profileQuery.data?.license.features.whatsappAssistant);
   const automationQuery = useQuery({
     queryKey: ["automation-summary"],
     queryFn: getAutomationSummary,
@@ -254,7 +230,6 @@ export function SettingsClient() {
   const form = useForm<SettingsFormValues>({
     defaultValues: {
       name: "",
-      whatsappNumber: "",
       currency: "BRL",
       dateFormat: "DD/MM/YYYY",
       emailNotifications: true,
@@ -266,7 +241,6 @@ export function SettingsClient() {
     values: profileQuery.data
       ? {
           name: profileQuery.data.name,
-          whatsappNumber: profileQuery.data.whatsappNumber,
           currency: profileQuery.data.preferences.currency,
           dateFormat: profileQuery.data.preferences.dateFormat,
           emailNotifications: profileQuery.data.preferences.emailNotifications,
@@ -277,7 +251,6 @@ export function SettingsClient() {
         }
       : undefined
   });
-  const whatsappNumber = useWatch({ control: form.control, name: "whatsappNumber" }) ?? "";
 
   const profileMutation = useMutation({
     mutationFn: async (values: SettingsFormValues) => {
@@ -286,7 +259,6 @@ export function SettingsClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: values.name,
-          whatsappNumber: values.whatsappNumber,
           preferences: {
             currency: values.currency,
             dateFormat: values.dateFormat,
@@ -409,30 +381,9 @@ export function SettingsClient() {
               <Label htmlFor="settings-name">Nome</Label>
               <Input disabled={settingsPermissions ? !settingsPermissions.canEditName : false} id="settings-name" {...form.register("name")} />
             </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="settings-email">E-mail</Label>
-                <Input disabled id="settings-email" value={profileQuery.data?.email ?? ""} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="settings-whatsapp">WhatsApp</Label>
-                <Input
-                  disabled={settingsPermissions ? !settingsPermissions.canEditWhatsAppNumber : false}
-                  id="settings-whatsapp"
-                  inputMode="numeric"
-                  placeholder="(DD) 9 0000-0000"
-                  value={whatsappNumber}
-                  onChange={(event) =>
-                    form.setValue("whatsappNumber", formatBrazilWhatsAppInput(event.target.value), {
-                      shouldDirty: true,
-                      shouldTouch: true
-                    })
-                  }
-                />
-                <p className="attention-copy text-xs">
-                  Use o numero que sera vinculado ao assistente no WhatsApp.
-                </p>
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="settings-email">E-mail</Label>
+              <Input disabled id="settings-email" value={profileQuery.data?.email ?? ""} />
             </div>
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
@@ -587,91 +538,6 @@ export function SettingsClient() {
           )}
         </section>
       </div>
-
-      <section id="whatsapp-assistant" className="surface content-section scroll-mt-24">
-        <div className="eyebrow">WhatsApp</div>
-        <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em]">Assistente virtual</h2>
-        <p className="mt-4 max-w-3xl text-sm leading-7 text-[var(--color-muted-foreground)]">
-          Vincule o seu número para lançar receitas, despesas e consultar saldo, limite e fatura por mensagem. O
-          número salvo no perfil será usado para identificar apenas a sua conta.
-        </p>
-        <div className="mt-4">
-          <Button asChild variant="secondary">
-            <Link href="/dashboard/whatsapp">Abrir central do WhatsApp</Link>
-          </Button>
-        </div>
-        <div className="mt-6 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-          <article className="data-card p-5">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold">Status da integração</p>
-                <p className="mt-1 text-sm text-[var(--color-muted-foreground)]">
-                  {!whatsappEnabledForPlan
-                    ? "Disponível apenas no plano Premium."
-                    : profileQuery.data?.integrations.whatsappAssistantEnabled
-                      ? "Assistente habilitado no ambiente."
-                      : "Assistente ainda desabilitado no ambiente."}
-                </p>
-              </div>
-              <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
-                <span className="rounded-full border border-[var(--color-border)] px-3 py-1 text-xs text-[var(--color-muted-foreground)]">
-                  {whatsappEnabledForPlan
-                    ? profileQuery.data?.integrations.whatsappAssistantEnabled
-                      ? "Ativo"
-                      : "Desativado"
-                    : "Plano bloqueado"}
-                </span>
-                <span className="rounded-full border border-[var(--color-border)] px-3 py-1 text-xs text-[var(--color-muted-foreground)]">
-                  {whatsappEnabledForPlan
-                    ? profileQuery.data?.integrations.whatsappConfigured
-                      ? "Webhook configurado"
-                      : "Webhook pendente"
-                    : "Upgrade necessário"}
-                </span>
-              </div>
-            </div>
-            <div className="mt-5 grid gap-3 md:grid-cols-2">
-              <div className="muted-panel">
-                <p className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">
-                  Número vinculado
-                </p>
-                <p className="mt-2 break-words text-sm">
-                  {profileQuery.data?.whatsappNumber || "Cadastre um número no formato (DD) 9 0000-0000"}
-                </p>
-              </div>
-              <div className="muted-panel">
-                <p className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">
-                  Endpoint
-                </p>
-                <p className="mt-2 break-all text-sm">
-                  {whatsappEnabledForPlan ? profileQuery.data?.integrations.whatsappWebhookPath : "Recurso indisponível no plano atual"}
-                </p>
-              </div>
-              <div className="muted-panel md:col-span-2">
-                <p className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">
-                  Classificação inteligente
-                </p>
-                <p className="mt-2 break-words text-sm">
-                  {profileQuery.data?.integrations.smartClassificationEnabled
-                    ? "Ativa para interpretar descrições e ajudar na categoria dos lançamentos."
-                    : "Desativada no ambiente. O sistema usa apenas regras locais e memória do histórico."}
-                </p>
-              </div>
-            </div>
-          </article>
-          <article className="data-card p-5">
-            <p className="text-sm font-semibold">Exemplos de comando</p>
-            <div className="mt-4 space-y-2 text-sm text-[var(--color-muted-foreground)]">
-              <p className="break-words">`gastei 42,50 mercado na Nubank`</p>
-              <p className="break-words">`gastei 120 farmácia no cartão Visa 3x`</p>
-              <p className="break-words">`recebi 3200 salário no Itaú`</p>
-              <p className="break-words">`saldo`</p>
-              <p className="break-words">`fatura Visa`</p>
-              <p className="break-words">`limite Mastercard`</p>
-            </div>
-          </article>
-        </div>
-      </section>
 
       <section className="surface content-section">
         <div className="eyebrow">Notificações</div>

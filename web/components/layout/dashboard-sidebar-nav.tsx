@@ -12,6 +12,7 @@ import {
   FolderTree,
   Landmark,
   LayoutDashboard,
+  LifeBuoy,
   ReceiptText,
   RefreshCcw,
   Settings,
@@ -40,6 +41,7 @@ const navigation = [
   { href: "/dashboard/goals" as Route, label: "Metas", icon: Target },
   { href: "/dashboard/reports" as Route, label: "Relatórios", icon: ChartColumnBig },
   { href: "/dashboard/whatsapp" as Route, label: "WhatsApp", icon: MessageCircleMore },
+  { href: "/dashboard/support" as Route, label: "Suporte", icon: LifeBuoy },
   { href: "/dashboard/settings" as Route, label: "Configurações", icon: Settings }
 ];
 

@@ -1,14 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
-import { MessageCircleMore, ReceiptText, Route, Settings2, Sparkles, Wallet } from "lucide-react";
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { MessageCircleMore, ReceiptText, Route, Sparkles, Wallet } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { ensureApiResponse } from "@/lib/observability/http";
 
 type WhatsAppProfilePayload = {
+  name: string;
   whatsappNumber: string;
+  permissions: {
+    canEditWhatsAppNumber: boolean;
+  };
   license: {
     planLabel: string;
     features: {
@@ -21,6 +29,15 @@ type WhatsAppProfilePayload = {
     whatsappWebhookPath: string;
     smartClassificationEnabled: boolean;
     whatsappIssue: string | null;
+  };
+  preferences: {
+    currency: string;
+    dateFormat: string;
+    emailNotifications: boolean;
+    monthlyReports: boolean;
+    budgetAlerts: boolean;
+    dueReminders: boolean;
+    autoTithe: boolean;
   };
 };
 
@@ -51,9 +68,31 @@ const guidance = [
   "Evite misturar duas compras na mesma mensagem."
 ];
 
-const whatsappSettingsHref = "/dashboard/settings#whatsapp-assistant";
+function formatBrazilWhatsAppInput(value: string) {
+  const digits = value.replace(/\D/g, "").slice(0, 11);
+
+  if (!digits.length) {
+    return "";
+  }
+
+  if (digits.length <= 2) {
+    return `(${digits}`;
+  }
+
+  if (digits.length <= 3) {
+    return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  }
+
+  if (digits.length <= 7) {
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 3)} ${digits.slice(3)}`;
+  }
+
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 3)} ${digits.slice(3, 7)}-${digits.slice(7)}`;
+}
 
 export function WhatsAppClient() {
+  const queryClient = useQueryClient();
+  const [whatsappNumberDraft, setWhatsAppNumberDraft] = useState<string | null>(null);
   const profileQuery = useQuery({
     queryKey: ["profile", "whatsapp-hub"],
     queryFn: getProfile,
@@ -64,6 +103,40 @@ export function WhatsAppClient() {
   const whatsappEnabledForPlan = Boolean(profile?.license.features.whatsappAssistant);
   const assistantEnabled = Boolean(profile?.integrations.whatsappAssistantEnabled);
   const webhookConfigured = Boolean(profile?.integrations.whatsappConfigured);
+  const canEditWhatsAppNumber = Boolean(profile?.permissions.canEditWhatsAppNumber);
+  const whatsappNumber = whatsappNumberDraft ?? profile?.whatsappNumber ?? "";
+
+  const whatsappMutation = useMutation({
+    mutationFn: async () => {
+      if (!profile) {
+        return;
+      }
+
+      const response = await fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: profile.name,
+          whatsappNumber,
+          preferences: profile.preferences
+        })
+      });
+
+      await ensureApiResponse(response, {
+        fallbackMessage: "Falha ao salvar WhatsApp",
+        method: "PATCH",
+        path: "/api/profile"
+      });
+    },
+    onSuccess: async () => {
+      toast.success("WhatsApp atualizado");
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["profile"] }),
+        queryClient.invalidateQueries({ queryKey: ["profile", "whatsapp-hub"] })
+      ]);
+    },
+    onError: (error) => toast.error(error.message)
+  });
 
   return (
     <div className="space-y-6">
@@ -78,9 +151,6 @@ export function WhatsAppClient() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button asChild variant="secondary">
-              <Link href={whatsappSettingsHref}>Configurar WhatsApp</Link>
-            </Button>
             <Button asChild>
               <Link href="/dashboard/transactions">Ver transações</Link>
             </Button>
@@ -111,6 +181,59 @@ export function WhatsAppClient() {
         {!webhookConfigured && profile?.integrations.whatsappIssue ? (
           <div className="warning-panel mt-6 text-sm">{profile.integrations.whatsappIssue}</div>
         ) : null}
+      </section>
+
+      <section className="surface content-section">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <div className="eyebrow">Configuracao</div>
+            <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em]">Numero e integracao</h2>
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--color-muted-foreground)]">
+              Cadastre aqui o numero que identifica sua conta nas mensagens do assistente.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-6 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+          <article className="data-card p-5">
+            <div className="space-y-2">
+              <Label htmlFor="whatsapp-number">WhatsApp</Label>
+              <Input
+                disabled={!canEditWhatsAppNumber || whatsappMutation.isPending}
+                id="whatsapp-number"
+                inputMode="numeric"
+                placeholder="(DD) 9 0000-0000"
+                value={whatsappNumber}
+                onChange={(event) => setWhatsAppNumberDraft(formatBrazilWhatsAppInput(event.target.value))}
+              />
+            </div>
+            <Button
+              className="mt-4 w-full"
+              disabled={!canEditWhatsAppNumber || whatsappMutation.isPending}
+              onClick={() => whatsappMutation.mutate()}
+              type="button"
+            >
+              {whatsappMutation.isPending ? "Salvando..." : "Salvar WhatsApp"}
+            </Button>
+          </article>
+          <article className="data-card p-5">
+            <p className="text-sm font-semibold">Status da integracao</p>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <div className="muted-panel">
+                <p className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">Endpoint</p>
+                <p className="mt-2 break-all text-sm">
+                  {whatsappEnabledForPlan ? profile?.integrations.whatsappWebhookPath : "Recurso indisponivel no plano atual"}
+                </p>
+              </div>
+              <div className="muted-panel">
+                <p className="text-xs uppercase tracking-[0.18em] text-[var(--color-muted-foreground)]">Leitura inteligente</p>
+                <p className="mt-2 break-words text-sm">
+                  {profile?.integrations.smartClassificationEnabled ? "Ativa" : "Desativada"}
+                </p>
+              </div>
+            </div>
+          </article>
+        </div>
       </section>
 
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
@@ -207,12 +330,6 @@ export function WhatsAppClient() {
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <Button asChild variant="secondary">
-                <Link href={whatsappSettingsHref}>
-                  <Settings2 className="size-4" />
-                  Ajustar integração
-                </Link>
-              </Button>
               <Button asChild variant="secondary">
                 <Link href="/dashboard/transactions">
                   <ReceiptText className="size-4" />

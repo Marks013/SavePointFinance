@@ -37,6 +37,8 @@ type CardItem = {
   payableStatementAmount: number;
   payableStatementMonth: string;
   payableDueDate: string;
+  payableOverdue: boolean;
+  payableDaysLate: number;
   dueDay: number;
   closeDay: number;
   statementMonthAnchor: "close_month" | "previous_month";
@@ -72,6 +74,7 @@ type StatementPayload = {
     cycleEnd: string;
     closeDate: string;
     dueDate: string;
+    customCycle: boolean;
   };
   itemsMeta: {
     returned: number;
@@ -181,6 +184,32 @@ async function payStatement(cardId: string, month: string, accountId: string) {
   return response.json();
 }
 
+async function updateStatementCycle(cardId: string, month: string, closeDate: string, dueDate: string) {
+  const response = await fetch(`/api/cards/${cardId}/statement`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      month,
+      closeDate,
+      dueDate
+    })
+  });
+  await ensureApiResponse(response, {
+    fallbackMessage: "Falha ao atualizar ciclo da fatura",
+    method: "PATCH",
+    path: `/api/cards/${cardId}/statement`
+  });
+
+  if (!response.ok) {
+    const payload = (await response.json()) as { message?: string };
+    throw new Error(payload.message ?? "Falha ao atualizar ciclo da fatura");
+  }
+
+  return response.json();
+}
+
 export function CardsClient() {
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
@@ -194,6 +223,7 @@ export function CardsClient() {
   const statementMonth = statementMonthState.sourceMonth === month ? statementMonthState.value : month;
   const [statementPaymentAccountId, setStatementPaymentAccountId] = useState<string>("");
   const [statementItemsLimit, setStatementItemsLimit] = useState<string>("50");
+  const [statementCycleDates, setStatementCycleDates] = useState({ closeDate: "", dueDate: "" });
   const cardsQuery = useQuery({
     queryKey: ["cards", month],
     queryFn: () => getCards(month),
@@ -258,6 +288,38 @@ export function CardsClient() {
       });
     }
   });
+  const updateStatementCycleMutation = useMutation({
+    mutationFn: async () => {
+      const closeDate = statementCycleDates.closeDate || statementQuery.data?.summary.closeDate.slice(0, 10) || "";
+      const dueDate = statementCycleDates.dueDate || statementQuery.data?.summary.dueDate.slice(0, 10) || "";
+
+      if (!selectedStatementCardId || !closeDate || !dueDate) {
+        throw new Error("Informe fechamento e vencimento da fatura");
+      }
+
+      return updateStatementCycle(
+        selectedStatementCardId,
+        statementMonth,
+        closeDate,
+        dueDate
+      );
+    },
+    onSuccess: async () => {
+      toast.success("Ciclo da fatura atualizado");
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["card-statement", selectedStatementCardId, statementMonth] }),
+        queryClient.invalidateQueries({ queryKey: ["transactions"] }),
+        queryClient.invalidateQueries({ queryKey: ["reports-summary"] }),
+        queryClient.invalidateQueries({ queryKey: ["cards"] }),
+        queryClient.invalidateQueries({ queryKey: ["dashboard"] })
+      ]);
+    },
+    onError: (error) => {
+      toast.error("Não foi possível atualizar o ciclo", {
+        description: error.message
+      });
+    }
+  });
   const form = useForm<z.input<typeof cardFormSchema>, unknown, CardFormValues>({
     resolver: zodResolver(cardFormSchema),
     defaultValues: {
@@ -267,7 +329,6 @@ export function CardsClient() {
       limitAmount: 0,
       dueDay: 10,
       closeDay: 3,
-      statementMonthAnchor: "close_month",
       color: cardColorPresets[0].value,
       institution: brazilianInstitutions[0].value
     }
@@ -330,7 +391,6 @@ export function CardsClient() {
       limitAmount: card.limitAmount,
       dueDay: card.dueDay,
       closeDay: card.closeDay,
-      statementMonthAnchor: card.statementMonthAnchor,
       color: card.color,
       institution: card.institution ?? ""
     });
@@ -354,6 +414,18 @@ export function CardsClient() {
   const statementIsPaid = Boolean(statementQuery.data?.payment);
   const statementOutstandingAmount = statementQuery.data?.summary.statementOutstandingAmount ?? 0;
   const canPayStatement = Boolean(statementQuery.data && !statementIsPaid && statementOutstandingAmount > 0);
+  const statementDueBoundary = statementQuery.data
+    ? new Date(statementQuery.data.summary.dueDate.slice(0, 10) + "T00:00:00")
+    : null;
+  const todayBoundary = new Date();
+  todayBoundary.setHours(0, 0, 0, 0);
+  const selectedStatementOverdue = Boolean(
+    statementDueBoundary && canPayStatement && statementDueBoundary.getTime() < todayBoundary.getTime()
+  );
+  const statementCycleCloseDate =
+    statementCycleDates.closeDate || statementQuery.data?.summary.closeDate.slice(0, 10) || "";
+  const statementCycleDueDate =
+    statementCycleDates.dueDate || statementQuery.data?.summary.dueDate.slice(0, 10) || "";
   const selectedBrand = useWatch({ control: form.control, name: "brand" }) ?? cardBrandPresets[0].value;
   const selectedInstitution = useWatch({ control: form.control, name: "institution" }) ?? "";
   const selectedColor = useWatch({ control: form.control, name: "color" }) ?? cardColorPresets[0].value;
@@ -383,6 +455,7 @@ export function CardsClient() {
     setStatementPaymentAccountId("");
     setStatementMonthState({ sourceMonth: month, value: month });
     setStatementItemsLimit("50");
+    setStatementCycleDates({ closeDate: "", dueDate: "" });
   };
 
   const applyStatementSelection = (card: CardItem, monthOverride?: string, options?: { scroll?: boolean }) => {
@@ -390,6 +463,7 @@ export function CardsClient() {
     setStatementPaymentAccountId("");
     setStatementMonthState({ sourceMonth: month, value: monthOverride ?? getDefaultStatementMonth(card) });
     setStatementItemsLimit("50");
+    setStatementCycleDates({ closeDate: "", dueDate: "" });
     if (options?.scroll) {
       scrollToStatementWorkspace();
     }
@@ -508,22 +582,7 @@ export function CardsClient() {
                 {...form.register("closeDay")}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="card-anchor">Regra da competência</Label>
-              <Select
-                className={form.formState.errors.statementMonthAnchor ? invalidFieldClassName : undefined}
-                id="card-anchor"
-                {...form.register("statementMonthAnchor")}
-              >
-                <option value="close_month">Mês do fechamento</option>
-                <option value="previous_month">Mês anterior ao fechamento</option>
-              </Select>
-            </div>
           </div>
-          <p className="text-xs leading-6 text-[var(--color-muted-foreground)]">
-            Use <strong>mês do fechamento</strong> quando a fatura de abril fecha em abril. Use{" "}
-            <strong>mês anterior ao fechamento</strong> quando a fatura de abril fecha em maio.
-          </p>
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="card-institution">Instituição</Label>
@@ -754,6 +813,11 @@ export function CardsClient() {
                         <p className="mt-1 break-words text-xs text-[var(--color-muted-foreground)]">
                           {formatCurrency(card.payableStatementAmount)} • {formatMonthKeyLabel(card.payableStatementMonth)}
                         </p>
+                        {card.payableOverdue ? (
+                          <p className="mt-2 rounded-full border border-[var(--color-destructive)]/25 bg-[var(--color-destructive)]/8 px-2 py-1 text-xs font-semibold text-[var(--color-destructive)]">
+                            Vencida há {card.payableDaysLate} dia{card.payableDaysLate === 1 ? "" : "s"}
+                          </p>
+                        ) : null}
                       </>
                     ) : (
                       <p className="mt-1 break-words text-sm font-semibold leading-5 text-[var(--color-muted-foreground)]">
@@ -852,6 +916,11 @@ export function CardsClient() {
                         {formatMonthKeyLabel(statementQuery.data.month)} • vence em{" "}
                         {new Date(statementQuery.data.summary.dueDate).toLocaleDateString("pt-BR")}
                       </p>
+                      {selectedStatementOverdue ? (
+                        <p className="mt-2 inline-flex rounded-full border border-white/16 bg-white/10 px-3 py-1 text-xs font-semibold text-white/86">
+                          Fatura anterior vencida e em aberto
+                        </p>
+                      ) : null}
                     </div>
                     <div className="rounded-full border border-white/16 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-white/80">
                       {statementIsPaid
@@ -970,12 +1039,55 @@ export function CardsClient() {
             <Label htmlFor="statement-month">Ciclo</Label>
             <DatePickerInput
               id="statement-month"
-              onChange={(event) => setStatementMonthState({ sourceMonth: month, value: event.target.value })}
+              onChange={(event) => {
+                setStatementMonthState({ sourceMonth: month, value: event.target.value });
+                setStatementCycleDates({ closeDate: "", dueDate: "" });
+              }}
               type="month"
               value={statementMonth}
             />
           </div>
         </div>
+        {statementQuery.data ? (
+          <div className="mt-4 grid gap-4 rounded-[1.15rem] border border-[var(--color-border)]/70 bg-[var(--color-muted)]/18 p-4 md:grid-cols-[1fr_1fr_auto]">
+            <div className="space-y-2">
+              <Label htmlFor="statement-close-date">Fechamento real</Label>
+              <DatePickerInput
+                id="statement-close-date"
+                onChange={(event) =>
+                  setStatementCycleDates((current) => ({ ...current, closeDate: event.target.value }))
+                }
+                type="date"
+                value={statementCycleCloseDate}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="statement-due-date">Vencimento real</Label>
+              <DatePickerInput
+                id="statement-due-date"
+                onChange={(event) =>
+                  setStatementCycleDates((current) => ({ ...current, dueDate: event.target.value }))
+                }
+                type="date"
+                value={statementCycleDueDate}
+              />
+            </div>
+            <div className="flex items-end">
+              <Button
+                disabled={
+                  updateStatementCycleMutation.isPending ||
+                  !statementCycleCloseDate ||
+                  !statementCycleDueDate
+                }
+                onClick={() => updateStatementCycleMutation.mutate()}
+                type="button"
+                variant={statementQuery.data.summary.customCycle ? "secondary" : "default"}
+              >
+                {updateStatementCycleMutation.isPending ? "Salvando..." : "Salvar ciclo"}
+              </Button>
+            </div>
+          </div>
+        ) : null}
         <div className="muted-panel mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-[var(--color-muted-foreground)]">
           <p>
             {selectedStatementCardId

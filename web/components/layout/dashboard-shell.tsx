@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 
 import { auth, signOut } from "@/auth";
 import { BrandMark } from "@/components/layout/brand-mark";
@@ -11,6 +12,7 @@ import { getSharingAuthority } from "@/lib/sharing/access";
 
 type DashboardShellProps = {
   children: ReactNode;
+  currentPathname?: string | null;
 };
 
 function formatLastAccess(value: Date | null) {
@@ -40,7 +42,7 @@ function formatLastAccess(value: Date | null) {
   return formatDateTimeDisplay(access);
 }
 
-export async function DashboardShell({ children }: DashboardShellProps) {
+export async function DashboardShell({ children, currentPathname }: DashboardShellProps) {
   const session = await auth();
   const accessAudit = session?.user?.id
     ? await prisma.adminAuditLog.findMany({
@@ -59,6 +61,47 @@ export async function DashboardShell({ children }: DashboardShellProps) {
     : null;
   const previousAccessAt = accessAudit?.[1]?.createdAt ?? accessAudit?.[0]?.createdAt ?? null;
   const isPlatformAdmin = Boolean(session?.user?.isPlatformAdmin);
+  const usageLock =
+    !isPlatformAdmin && session?.user?.tenantId
+      ? await prisma.tenant
+          .findUnique({
+            where: { id: session.user.tenantId },
+            select: {
+              planConfig: {
+                select: {
+                  tier: true,
+                  maxAccounts: true,
+                  maxCards: true
+                }
+              },
+              _count: {
+                select: {
+                  financials: { where: { isActive: true } },
+                  cards: { where: { isActive: true } }
+                }
+              }
+            }
+          })
+          .then((tenant) => {
+            if (!tenant || tenant.planConfig.tier !== "free") {
+              return null;
+            }
+
+            const accountsLimit = tenant.planConfig.maxAccounts;
+            const cardsLimit = tenant.planConfig.maxCards;
+            const accountsExceeded = accountsLimit !== null && tenant._count.financials > accountsLimit;
+            const cardsExceeded = cardsLimit !== null && tenant._count.cards > cardsLimit;
+
+            return accountsExceeded || cardsExceeded
+              ? {
+                  accounts: tenant._count.financials,
+                  accountsLimit,
+                  cards: tenant._count.cards,
+                  cardsLimit
+                }
+              : null;
+          })
+      : null;
   const canManageSharing = session?.user?.id && session.user.tenantId
     ? (
         await getSharingAuthority({
@@ -76,6 +119,9 @@ export async function DashboardShell({ children }: DashboardShellProps) {
       : session?.user?.role === "admin"
         ? "Admin de Conta"
         : "Familiar da carteira compartilhada";
+  const showUsageLock = Boolean(
+    usageLock && currentPathname !== "/dashboard/accounts" && currentPathname !== "/dashboard/cards"
+  );
 
   return (
     <div className="page-shell flex min-h-screen flex-col gap-5 py-4 md:py-5 lg:grid lg:h-screen lg:grid-cols-[256px_minmax(0,1fr)] lg:gap-5 lg:overflow-y-hidden xl:grid-cols-[264px_minmax(0,1fr)] xl:gap-6">
@@ -131,6 +177,40 @@ export async function DashboardShell({ children }: DashboardShellProps) {
       >
         {children}
       </main>
+      {showUsageLock && usageLock ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[color-mix(in_srgb,var(--color-background)_82%,black)] p-4 backdrop-blur-sm">
+          <section className="surface max-w-xl p-6">
+            <div className="eyebrow">Plano gratuito</div>
+            <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em]">Regularize os limites para continuar</h2>
+            <p className="mt-3 text-sm leading-7 text-[var(--color-muted-foreground)]">
+              Sua conta voltou ao plano gratuito e possui itens acima do limite permitido. Exclua contas bancarias ou
+              cartoes excedentes para liberar a plataforma novamente.
+            </p>
+            <div className="mt-5 grid gap-3 md:grid-cols-2">
+              <div className="muted-panel">
+                <p className="text-sm font-semibold">Contas bancarias</p>
+                <p className="mt-1 text-sm text-[var(--color-muted-foreground)]">
+                  {usageLock.accounts} de {usageLock.accountsLimit ?? "ilimitado"}
+                </p>
+              </div>
+              <div className="muted-panel">
+                <p className="text-sm font-semibold">Cartoes de credito</p>
+                <p className="mt-1 text-sm text-[var(--color-muted-foreground)]">
+                  {usageLock.cards} de {usageLock.cardsLimit ?? "ilimitado"}
+                </p>
+              </div>
+            </div>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <Button asChild>
+                <Link href="/dashboard/accounts">Ajustar contas</Link>
+              </Button>
+              <Button asChild variant="secondary">
+                <Link href="/dashboard/cards">Ajustar cartoes</Link>
+              </Button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -1,23 +1,40 @@
 import { config as loadEnv } from "dotenv";
 import { resolve } from "node:path";
+import { installMaintenanceBypassFetch } from "./audit-maintenance-bypass";
 
 loadEnv({ path: resolve(process.cwd(), "../.env"), override: false });
 loadEnv({ path: resolve(process.cwd(), ".env"), override: false });
 loadEnv({ path: resolve(process.cwd(), ".env.local"), override: false });
+installMaintenanceBypassFetch();
 
 const baseUrl = process.env.AUDIT_BASE_URL?.trim() || "http://127.0.0.1:3000";
 const adminEmail = process.env.ADMIN_EMAIL?.trim();
 const adminPassword = process.env.ADMIN_PASSWORD?.trim();
-const smokeUserEmail = process.env.SMOKE_USER_EMAIL?.trim() || adminEmail;
-const smokeUserPassword = process.env.SMOKE_USER_PASSWORD?.trim() || adminPassword;
-const familyUserEmail = process.env.FAMILY_USER_EMAIL?.trim();
-const familyUserPassword = process.env.FAMILY_USER_PASSWORD?.trim();
+const localOwnerEmail = process.env.LOCAL_OWNER_EMAIL?.trim() || "owner@savepoint.local";
+const localOwnerPassword = process.env.LOCAL_OWNER_PASSWORD?.trim() || adminPassword;
+const configuredSmokeUserEmail = process.env.SMOKE_USER_EMAIL?.trim();
+const configuredSmokeUserPassword = process.env.SMOKE_USER_PASSWORD?.trim();
+const configuredFamilyUserEmail = process.env.FAMILY_USER_EMAIL?.trim();
+const configuredFamilyUserPassword = process.env.FAMILY_USER_PASSWORD?.trim();
+const smokeUserEmail = configuredSmokeUserEmail || localOwnerEmail || adminEmail;
+const smokeUserPassword = configuredSmokeUserPassword || localOwnerPassword || adminPassword;
+const familyUserEmail = configuredFamilyUserEmail || "family@savepoint.local";
 const smokeMonth = process.env.SMOKE_MONTH?.trim() || new Date().toISOString().slice(0, 7);
+
+type SmokeCredential = {
+  email: string;
+  password: string;
+  label: string;
+};
 
 type HealthPayload = {
   status?: string;
   checks?: {
-    database?: string;
+    database?:
+      | string
+      | {
+          status?: string;
+        };
     email?: {
       provider?: string;
       configured?: boolean;
@@ -27,6 +44,10 @@ type HealthPayload = {
     };
   };
 };
+
+function healthCheckStatus(check: string | { status?: string } | undefined) {
+  return typeof check === "string" ? check : check?.status;
+}
 
 type ProfilePayload = {
   id?: string;
@@ -307,6 +328,43 @@ async function signIn(email: string, password: string) {
   return jar;
 }
 
+async function signInFirstAvailable(candidates: SmokeCredential[]) {
+  let lastError: unknown;
+
+  for (const candidate of candidates) {
+    try {
+      const jar = await signIn(candidate.email, candidate.password);
+      return { jar, credential: candidate };
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError;
+}
+
+function uniqueCredentials(candidates: Array<SmokeCredential | null>) {
+  const seen = new Set<string>();
+  const unique: SmokeCredential[] = [];
+
+  for (const candidate of candidates) {
+    if (!candidate?.email || !candidate.password) {
+      continue;
+    }
+
+    const key = candidate.email.toLowerCase();
+
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    unique.push(candidate);
+  }
+
+  return unique;
+}
+
 async function signOut(jar: CookieJar) {
   const csrfToken = await getCsrfToken(jar);
   const form = new URLSearchParams();
@@ -367,7 +425,7 @@ async function expectHealthcheck() {
   const { response, payload } = await getJson<HealthPayload>(new CookieJar(), "/api/health");
   assertCondition(response.ok, `/api/health respondeu ${response.status}`);
   assertCondition(payload.status === "ok", "Healthcheck nao retornou status ok");
-  assertCondition(payload.checks?.database === "ok", "Healthcheck nao confirmou o banco");
+  assertCondition(healthCheckStatus(payload.checks?.database) === "ok", "Healthcheck nao confirmou o banco");
 }
 
 async function patchProfile(jar: CookieJar, payload: Record<string, unknown>) {
@@ -381,13 +439,28 @@ async function patchProfile(jar: CookieJar, payload: Record<string, unknown>) {
 }
 
 async function auditFamilyRestrictions(results: string[]) {
-  if (!familyUserEmail || !familyUserPassword) {
-    results.push("Auditoria de Familiar ignorada porque FAMILY_USER_EMAIL/FAMILY_USER_PASSWORD nao foram definidos");
+  const familyCredentials = uniqueCredentials([
+    configuredFamilyUserEmail && configuredFamilyUserPassword
+      ? {
+          email: configuredFamilyUserEmail,
+          password: configuredFamilyUserPassword,
+          label: "Familiar configurado no ambiente"
+        }
+      : null,
+    {
+      email: "family@savepoint.local",
+      password: localOwnerPassword || adminPassword || "",
+      label: "Familiar padrao do bootstrap"
+    }
+  ]);
+
+  if (familyCredentials.length === 0) {
+    results.push("Auditoria de Familiar ignorada porque nao ha senha disponivel para o usuario padrao");
     return;
   }
 
-  const familyJar = await signIn(familyUserEmail, familyUserPassword);
-  results.push("Login do Familiar estabelece sessao valida");
+  const { jar: familyJar, credential: familyCredential } = await signInFirstAvailable(familyCredentials);
+  results.push(`Login do Familiar estabelece sessao valida (${familyCredential.label})`);
 
   const familyProfileBefore = await getJson<ProfilePayload>(familyJar, "/api/profile");
   assertCondition(familyProfileBefore.response.ok, `/api/profile (familiar) respondeu ${familyProfileBefore.response.status}`);
@@ -557,8 +630,23 @@ async function run() {
     results.push("Logout do admin encerra a sessao");
     await expectRedirect("/dashboard", "/login");
     results.push("Area protegida volta a exigir autenticacao apos logout do admin");
-    dataJar = await signIn(smokeUserEmail, smokeUserPassword);
-    results.push("Login do usuario de dados estabelece sessao valida");
+    const dataCredentials = uniqueCredentials([
+      configuredSmokeUserEmail && configuredSmokeUserPassword
+        ? {
+            email: configuredSmokeUserEmail,
+            password: configuredSmokeUserPassword,
+            label: "Usuario de dados configurado no ambiente"
+          }
+        : null,
+      {
+        email: localOwnerEmail,
+        password: localOwnerPassword || adminPassword || "",
+        label: "Usuario de dados padrao do bootstrap"
+      }
+    ]);
+    const dataLogin = await signInFirstAvailable(dataCredentials);
+    dataJar = dataLogin.jar;
+    results.push(`Login do usuario de dados estabelece sessao valida (${dataLogin.credential.label})`);
   } else {
     await signOut(adminJar);
     results.push("Logout do Superadmin encerra a sessao");

@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma/client";
 
 export const statementMonthSchema = z.string().regex(/^\d{4}-\d{2}$/, "Competencia invalida");
 
-type StatementClient = Pick<PrismaClient, "transaction" | "statementPayment">;
+type StatementClient = Pick<PrismaClient, "transaction" | "statementPayment" | "cardStatementCycle">;
 
 type CardStatementCard = {
   id: string;
@@ -48,6 +48,14 @@ function clampDay(year: number, month: number, day: number) {
 function getCompetenceMonthDate(month: string) {
   const { year, month: parsedMonth } = parseStatementMonth(month);
   return new Date(year, parsedMonth - 1, 1, 12, 0, 0, 0);
+}
+
+function getDateBoundary(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0);
+}
+
+function getDateDisplayTime(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0, 0);
 }
 
 function getStatementMonthAnchorOffset(anchor: StatementMonthAnchor) {
@@ -231,6 +239,125 @@ export function buildCardBillingSnapshot(
   };
 }
 
+async function getCardStatementCycle(
+  client: StatementClient,
+  tenantId: string,
+  cardId: string,
+  month: string
+) {
+  return client.cardStatementCycle.findUnique({
+    where: {
+      tenantId_cardId_month: {
+        tenantId,
+        cardId,
+        month
+      }
+    },
+    select: {
+      month: true,
+      closeDate: true,
+      dueDate: true
+    }
+  });
+}
+
+async function getNextConfiguredCycle(
+  client: StatementClient,
+  tenantId: string,
+  cardId: string,
+  referenceDate: Date
+) {
+  return client.cardStatementCycle.findFirst({
+    where: {
+      tenantId,
+      cardId,
+      closeDate: {
+        gt: getDateBoundary(referenceDate)
+      }
+    },
+    orderBy: {
+      closeDate: "asc"
+    },
+    select: {
+      month: true,
+      closeDate: true,
+      dueDate: true
+    }
+  });
+}
+
+async function getStatementCycleDates({
+  tenantId,
+  card,
+  month,
+  client
+}: {
+  tenantId: string;
+  card: CardStatementCard;
+  month: string;
+  client: StatementClient;
+}) {
+  const currentCycle = await getCardStatementCycle(client, tenantId, card.id, month);
+  const previousStatementMonth = addMonthsToStatementMonth(month, -1);
+  const previousCycle = await getCardStatementCycle(client, tenantId, card.id, previousStatementMonth);
+
+  const closeDate = currentCycle?.closeDate ?? getStatementCloseDate(month, card.closeDay, card.statementMonthAnchor);
+  const dueDate = currentCycle?.dueDate ?? getStatementPaymentDate(month, card.dueDay, card.closeDay, card.statementMonthAnchor);
+  const previousCloseDate =
+    previousCycle?.closeDate ?? getStatementCloseDate(previousStatementMonth, card.closeDay, card.statementMonthAnchor);
+  const currentCloseBoundary = getDateBoundary(closeDate);
+
+  return {
+    start: getDateBoundary(previousCloseDate),
+    end: new Date(currentCloseBoundary.getTime() - 1),
+    closeDate: getDateDisplayTime(closeDate),
+    dueDate: getDateDisplayTime(dueDate),
+    customCycle: Boolean(currentCycle)
+  };
+}
+
+export async function buildCardBillingSnapshotForDate({
+  tenantId,
+  card,
+  referenceDate,
+  installmentOffset = 0,
+  client = prisma
+}: {
+  tenantId: string;
+  card: Pick<CardStatementCard, "id" | "closeDay" | "dueDay" | "statementMonthAnchor">;
+  referenceDate: Date;
+  installmentOffset?: number;
+  client?: StatementClient;
+}) {
+  const configuredCycle = await getNextConfiguredCycle(client, tenantId, card.id, referenceDate);
+
+  if (!configuredCycle) {
+    return buildCardBillingSnapshot(card, referenceDate, installmentOffset);
+  }
+
+  const previousStatementMonth = addMonthsToStatementMonth(configuredCycle.month, -1);
+  const previousCycle = await getCardStatementCycle(client, tenantId, card.id, previousStatementMonth);
+  const previousCloseDate =
+    previousCycle?.closeDate ?? getStatementCloseDate(previousStatementMonth, card.closeDay, card.statementMonthAnchor);
+
+  if (referenceDate < getDateBoundary(previousCloseDate)) {
+    return buildCardBillingSnapshot(card, referenceDate, installmentOffset);
+  }
+
+  const competence = addMonthsToStatementMonth(configuredCycle.month, installmentOffset);
+  const cycle = installmentOffset === 0 ? configuredCycle : await getCardStatementCycle(client, tenantId, card.id, competence);
+
+  if (!cycle) {
+    return buildCardBillingSnapshot(card, referenceDate, installmentOffset);
+  }
+
+  return {
+    competence,
+    closeDate: getDateDisplayTime(cycle.closeDate),
+    dueDate: getDateDisplayTime(cycle.dueDate)
+  };
+}
+
 export function calculateStatementTotal(transactions: StatementTransactionLike[]) {
   return transactions.reduce((sum, item) => {
     const amount = Number(item.amount);
@@ -268,7 +395,12 @@ export async function getCardStatementSnapshot({
   client?: StatementClient;
 }) {
   const statementMonth = month ?? getCurrentStatementMonth(card);
-  const { start, end } = getStatementRange(statementMonth, card.closeDay, card.statementMonthAnchor);
+  const statementDates = await getStatementCycleDates({
+    tenantId,
+    card,
+    month: statementMonth,
+    client
+  });
   const [statementTransactions, allCardTransactions, payments] = await Promise.all([
     client.transaction.findMany({
       where: {
@@ -311,14 +443,15 @@ export async function getCardStatementSnapshot({
 
   return {
     month: statementMonth,
-    start,
-    end,
+    start: statementDates.start,
+    end: statementDates.end,
     totalAmount,
     statementOutstandingAmount,
     outstandingAmount,
     availableLimit: Number(card.limitAmount) - outstandingAmount,
-    closeDate: getStatementCloseDate(statementMonth, card.closeDay, card.statementMonthAnchor),
-    dueDate: getStatementPaymentDate(statementMonth, card.dueDay, card.closeDay, card.statementMonthAnchor)
+    closeDate: statementDates.closeDate,
+    dueDate: statementDates.dueDate,
+    customCycle: statementDates.customCycle
   };
 }
 

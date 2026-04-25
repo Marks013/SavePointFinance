@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { requireSessionUser } from "@/lib/auth/session";
 import { getCardStatementSnapshot, statementMonthSchema } from "@/lib/cards/statement";
-import { ensureTenantCardStatementSnapshots } from "@/lib/cards/snapshot-sync";
+import { ensureTenantCardStatementSnapshots, recomputeCardStatementSnapshots } from "@/lib/cards/snapshot-sync";
 import { captureRequestError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
 
@@ -16,6 +16,25 @@ const statementQuerySchema = z.object({
   month: statementMonthSchema.optional(),
   limit: z.coerce.number().int().min(10).max(200).default(50)
 });
+
+const statementCycleSchema = z
+  .object({
+    month: statementMonthSchema,
+    closeDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data de fechamento invalida"),
+    dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data de vencimento invalida")
+  })
+  .superRefine((value, ctx) => {
+    const closeDate = new Date(`${value.closeDate}T12:00:00`);
+    const dueDate = new Date(`${value.dueDate}T12:00:00`);
+
+    if (dueDate <= closeDate) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["dueDate"],
+        message: "O vencimento deve ser posterior ao fechamento"
+      });
+    }
+  });
 
 export async function GET(request: Request, context: Params) {
   try {
@@ -120,7 +139,8 @@ export async function GET(request: Request, context: Params) {
         cycleStart: statement.start.toISOString(),
         cycleEnd: statement.end.toISOString(),
         closeDate: statement.closeDate.toISOString(),
-        dueDate: statement.dueDate.toISOString()
+        dueDate: statement.dueDate.toISOString(),
+        customCycle: statement.customCycle
       },
       itemsMeta: {
         returned: transactions.length,
@@ -159,5 +179,63 @@ export async function GET(request: Request, context: Params) {
 
     captureRequestError(error, { request, feature: "cards" });
     return NextResponse.json({ message: "Failed to load statement" }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: Request, context: Params) {
+  try {
+    const user = await requireSessionUser();
+    const { id } = await context.params;
+    const body = statementCycleSchema.parse(await request.json());
+    const card = await prisma.card.findFirst({
+      where: {
+        id,
+        tenantId: user.tenantId
+      },
+      select: {
+        id: true
+      }
+    });
+
+    if (!card) {
+      return NextResponse.json({ message: "Card not found" }, { status: 404 });
+    }
+
+    const cycle = await prisma.cardStatementCycle.upsert({
+      where: {
+        tenantId_cardId_month: {
+          tenantId: user.tenantId,
+          cardId: id,
+          month: body.month
+        }
+      },
+      create: {
+        tenantId: user.tenantId,
+        cardId: id,
+        month: body.month,
+        closeDate: new Date(`${body.closeDate}T12:00:00`),
+        dueDate: new Date(`${body.dueDate}T12:00:00`)
+      },
+      update: {
+        closeDate: new Date(`${body.closeDate}T12:00:00`),
+        dueDate: new Date(`${body.dueDate}T12:00:00`)
+      }
+    });
+
+    await recomputeCardStatementSnapshots(user.tenantId, id, prisma);
+
+    return NextResponse.json({
+      id: cycle.id,
+      month: cycle.month,
+      closeDate: cycle.closeDate.toISOString(),
+      dueDate: cycle.dueDate.toISOString()
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    }
+
+    captureRequestError(error, { request, feature: "cards" });
+    return NextResponse.json({ message: "Failed to update statement cycle" }, { status: 400 });
   }
 }

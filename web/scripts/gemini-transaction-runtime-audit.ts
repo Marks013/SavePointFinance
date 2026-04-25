@@ -1,9 +1,11 @@
 import { hash } from "bcryptjs";
 import { config as loadEnv } from "dotenv";
 import { resolve } from "node:path";
+import { installMaintenanceBypassFetch } from "./audit-maintenance-bypass";
 
 loadEnv({ path: resolve(process.cwd(), "../.env"), override: false });
 loadEnv({ path: resolve(process.cwd(), ".env"), override: false });
+installMaintenanceBypassFetch();
 
 const baseUrl = process.env.AUDIT_BASE_URL?.trim() || "http://web:3000";
 

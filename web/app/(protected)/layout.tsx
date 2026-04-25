@@ -81,5 +81,5 @@ export default async function ProtectedLayout({ children }: ProtectedLayoutProps
     throw error;
   }
 
-  return <DashboardShell>{children}</DashboardShell>;
+  return <DashboardShell currentPathname={(await headers()).get("x-savepoint-pathname")}>{children}</DashboardShell>;
 }

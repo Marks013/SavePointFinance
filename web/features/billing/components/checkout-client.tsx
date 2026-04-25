@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { CardPayment, initMercadoPago } from "@mercadopago/sdk-react";
@@ -18,6 +18,8 @@ type CheckoutPromotion = {
   couponCode: string;
   discountPercent: number;
   appliesTo: "monthly" | "annual" | "both";
+  visibleInCheckout: boolean;
+  highlightPriceCard: boolean;
 };
 
 type CheckoutClientProps = {
@@ -28,6 +30,8 @@ type CheckoutClientProps = {
   planName: string;
   promotions: CheckoutPromotion[];
   publicKey: string | null;
+  initialCycle?: "monthly" | "annual";
+  initialIntent?: "checkout" | "manage-card";
 };
 
 type CreateSubscriptionPayload = {
@@ -86,6 +90,24 @@ async function createAnnualPayment(body: Record<string, unknown>) {
   return (await response.json()) as CreateSubscriptionPayload;
 }
 
+async function updateBillingCard(body: Record<string, unknown>) {
+  const response = await fetch("/api/billing/card", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(body)
+  });
+
+  await ensureApiResponse(response, {
+    fallbackMessage: "Falha ao atualizar cartao de cobranca",
+    method: "POST",
+    path: "/api/billing/card"
+  });
+
+  return (await response.json()) as CreateSubscriptionPayload;
+}
+
 function formatMoney(amount: number, currencyId: string) {
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
@@ -98,15 +120,21 @@ export function CheckoutClient({
   annualAmount,
   annualMaxInstallments,
   currencyId,
+  initialCycle = "monthly",
+  initialIntent = "checkout",
   planName,
   promotions,
   publicKey
 }: CheckoutClientProps) {
   const queryClient = useQueryClient();
+  const annualAutoStartedRef = useRef(false);
   const [isBrickReady, setIsBrickReady] = useState(false);
   const [brickError, setBrickError] = useState<string | null>(null);
   const [brickDiagnostic, setBrickDiagnostic] = useState<string | null>(null);
   const [couponCode, setCouponCode] = useState("");
+  const [formMode, setFormMode] = useState<"subscribe" | "update-card">(
+    initialIntent === "manage-card" ? "update-card" : "subscribe"
+  );
   const activeCoupon = couponCode.trim().toUpperCase();
   const matchingPromotion = useMemo(
     () =>
@@ -131,6 +159,15 @@ export function CheckoutClient({
     typeof annualAmount === "number" && annualPromotion
       ? Number(Math.max(annualAmount - annualAmount * (annualPromotion.discountPercent / 100), 0.01).toFixed(2))
       : annualAmount;
+  const visiblePromotions = promotions.filter((promotion) => promotion.visibleInCheckout);
+  const monthlyCardPromotion =
+    visiblePromotions.find(
+      (promotion) => promotion.highlightPriceCard && (promotion.appliesTo === "monthly" || promotion.appliesTo === "both")
+    ) ?? null;
+  const annualCardPromotion =
+    visiblePromotions.find(
+      (promotion) => promotion.highlightPriceCard && (promotion.appliesTo === "annual" || promotion.appliesTo === "both")
+    ) ?? null;
   const createSubscriptionMutation = useMutation({
     mutationFn: createSubscription,
     onSuccess: async (payload) => {
@@ -159,6 +196,21 @@ export function CheckoutClient({
       toast.error(error.message);
     }
   });
+  const updateCardMutation = useMutation({
+    mutationFn: updateBillingCard,
+    onSuccess: async (payload) => {
+      toast.success(payload.message ?? "Cartao atualizado");
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["billing"] }),
+        queryClient.invalidateQueries({ queryKey: ["profile"] })
+      ]);
+
+      window.location.href = payload.url ?? "/billing";
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    }
+  });
 
   useEffect(() => {
     if (!publicKey) {
@@ -178,6 +230,15 @@ export function CheckoutClient({
   }, [publicKey]);
 
   useEffect(() => {
+    if (initialCycle !== "annual" || annualAutoStartedRef.current || createAnnualPaymentMutation.isPending) {
+      return;
+    }
+
+    annualAutoStartedRef.current = true;
+    createAnnualPaymentMutation.mutate({ couponCode: activeCoupon || null });
+  }, [activeCoupon, createAnnualPaymentMutation, initialCycle]);
+
+  useEffect(() => {
     if (!publicKey || typeof monthlyCheckoutAmount !== "number" || monthlyCheckoutAmount <= 0 || isBrickReady) {
       return;
     }
@@ -192,8 +253,8 @@ export function CheckoutClient({
         return;
       }
 
-      setBrickDiagnostic("O SDK do Mercado Pago carregou, mas ainda nao inseriu os campos no container.");
-    }, 6000);
+      setBrickDiagnostic("Os campos seguros de pagamento ainda estao carregando. Aguarde alguns instantes ou atualize a pagina.");
+    }, 9000);
 
     return () => window.clearTimeout(timer);
   }, [isBrickReady, monthlyCheckoutAmount, publicKey]);
@@ -217,7 +278,7 @@ export function CheckoutClient({
   }, []);
 
   const handleSubmit = async (formData: CardPaymentFormData, additionalData?: CardPaymentAdditionalData) => {
-    await createSubscriptionMutation.mutateAsync({
+    const payload = {
       cardToken: formData.token,
       paymentMethodId: formData.payment_method_id,
       issuerId: formData.issuer_id || null,
@@ -228,7 +289,16 @@ export function CheckoutClient({
         lastFourDigits: additionalData?.lastFourDigits ?? null,
         cardholderName: additionalData?.cardholderName ?? null,
         paymentTypeId: additionalData?.paymentTypeId ?? null
-      },
+      }
+    };
+
+    if (formMode === "update-card") {
+      await updateCardMutation.mutateAsync(payload);
+      return;
+    }
+
+    await createSubscriptionMutation.mutateAsync({
+      ...payload,
       couponCode: activeCoupon || null
     });
   };
@@ -237,7 +307,7 @@ export function CheckoutClient({
     return (
       <section className="surface content-section">
         <div className="eyebrow">Checkout</div>
-        <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em]">Billing ainda não está pronto</h2>
+        <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em]">Checkout ainda não está pronto</h2>
         <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--color-muted-foreground)]">
           O ambiente precisa expor chave pública e valor da recorrência para liberar o Brick do Mercado Pago.
         </p>
@@ -252,9 +322,14 @@ export function CheckoutClient({
           <div className="eyebrow">Checkout</div>
           <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em]">{planName}</h2>
           <p className="mt-4 max-w-3xl text-sm leading-7 text-[var(--color-muted-foreground)]">
-            O cartão é tokenizado pelo Brick do Mercado Pago e a assinatura recorrente é criada no backend com
-            idempotência, webhook e sincronização automática da licença.
+            Escolha a forma de pagamento, aplique um cupom se tiver um e conclua a assinatura com segurança pelo Mercado Pago.
           </p>
+          {initialCycle === "annual" ? (
+            <div className="warning-panel mt-4 text-sm">
+              Estamos abrindo o checkout anual no Mercado Pago. Se o navegador bloquear o redirecionamento, use o botao
+              do plano anual abaixo.
+            </div>
+          ) : null}
         </div>
         <Button asChild variant="secondary">
           <Link href="/license">Voltar para licença</Link>
@@ -281,8 +356,7 @@ export function CheckoutClient({
           <div>
             <p className="text-sm font-semibold">Cupom de desconto</p>
             <p className="mt-2 text-sm leading-7 text-[var(--color-muted-foreground)]">
-              Digite um cupom ou escolha uma promoção ativa. O desconto é validado novamente no backend antes de criar
-              o pagamento.
+              Digite um cupom ou escolha uma promoção disponível. O desconto será conferido antes de finalizar o pagamento.
             </p>
           </div>
           <Input
@@ -292,9 +366,9 @@ export function CheckoutClient({
             value={couponCode}
           />
         </div>
-        {promotions.length ? (
+        {visiblePromotions.length ? (
           <div className="mt-4 grid gap-3 md:grid-cols-2">
-            {promotions.map((promotion) => (
+            {visiblePromotions.map((promotion) => (
               <button
                 className="rounded-[1rem] border border-[var(--color-border)] bg-[var(--color-panel)] p-4 text-left transition hover:border-[var(--color-primary)]"
                 key={promotion.id}
@@ -320,8 +394,19 @@ export function CheckoutClient({
       </div>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
-        <article className="data-card p-5">
-          <p className="text-sm font-semibold">Mensal recorrente</p>
+        <article
+          className={
+            monthlyCardPromotion
+              ? "relative overflow-hidden rounded-[1.5rem] border border-[var(--color-primary)] bg-[color-mix(in_srgb,var(--color-primary)_10%,var(--color-card))] p-5"
+              : "data-card p-5"
+          }
+        >
+          {monthlyCardPromotion ? (
+            <div className="mb-4 inline-flex rounded-full bg-[var(--color-primary)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--color-primary-foreground)]">
+              {monthlyCardPromotion.badge || "Oferta"}
+            </div>
+          ) : null}
+          <p className="text-sm font-semibold">{monthlyCardPromotion?.title || "Mensal recorrente"}</p>
           <p className="mt-2 text-3xl font-semibold tracking-[-0.05em]">
             {formatMoney(monthlyCheckoutAmount ?? amount, currencyId)}
           </p>
@@ -331,12 +416,24 @@ export function CheckoutClient({
             </p>
           ) : null}
           <p className="mt-3 text-sm leading-7 text-[var(--color-muted-foreground)]">
-            Cobrança automática mensal por cartão de crédito. Ideal para começar pagando menos agora.
+            {monthlyCardPromotion?.description ||
+              "Cobrança automática mensal por cartão de crédito. Ideal para começar pagando menos agora."}
           </p>
         </article>
 
-        <article className="data-card p-5">
-          <p className="text-sm font-semibold">Anual sem renovação automática</p>
+        <article
+          className={
+            annualCardPromotion
+              ? "relative overflow-hidden rounded-[1.5rem] border border-[var(--color-primary)] bg-[color-mix(in_srgb,var(--color-primary)_10%,var(--color-card))] p-5"
+              : "data-card p-5"
+          }
+        >
+          {annualCardPromotion ? (
+            <div className="mb-4 inline-flex rounded-full bg-[var(--color-primary)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--color-primary-foreground)]">
+              {annualCardPromotion.badge || "Oferta"}
+            </div>
+          ) : null}
+          <p className="text-sm font-semibold">{annualCardPromotion?.title || "Anual sem renovação automática"}</p>
           <p className="mt-2 text-3xl font-semibold tracking-[-0.05em]">
             {typeof annualCheckoutAmount === "number" && annualCheckoutAmount > 0
               ? formatMoney(annualCheckoutAmount, currencyId)
@@ -348,8 +445,8 @@ export function CheckoutClient({
             </p>
           ) : null}
           <p className="mt-3 text-sm leading-7 text-[var(--color-muted-foreground)]">
-            Pagamento único para 12 meses de acesso premium, com Pix, boleto, saldo Mercado Pago ou cartão parcelado
-            conforme disponibilidade do Mercado Pago.
+            {annualCardPromotion?.description ||
+              "Pagamento único para 12 meses de acesso premium, com Pix, boleto, saldo Mercado Pago ou cartão parcelado conforme disponibilidade do Mercado Pago."}
           </p>
           <Button
             className="mt-5 w-full"
@@ -366,10 +463,30 @@ export function CheckoutClient({
       </div>
 
       <div className="data-card mt-6 p-5">
+        <div className="mb-5 flex flex-wrap gap-3">
+          <Button
+            onClick={() => setFormMode("subscribe")}
+            type="button"
+            variant={formMode === "subscribe" ? "default" : "secondary"}
+          >
+            Assinar mensal
+          </Button>
+          <Button
+            onClick={() => setFormMode("update-card")}
+            type="button"
+            variant={formMode === "update-card" ? "default" : "secondary"}
+          >
+            Trocar cartao
+          </Button>
+        </div>
         <div className="mb-5">
-          <p className="text-sm font-semibold">Assinar mensal com cartão</p>
+          <p className="text-sm font-semibold">
+            {formMode === "update-card" ? "Trocar cartao de cobranca" : "Assinar mensal com cartao"}
+          </p>
           <p className="mt-2 text-sm text-[var(--color-muted-foreground)]">
-            Use este formulário apenas para a assinatura mensal recorrente.
+            {formMode === "update-card"
+              ? "Use este formulario para substituir o cartao da assinatura recorrente ativa."
+              : "Use este formulario apenas para a assinatura mensal recorrente."}
           </p>
         </div>
         {!isBrickReady ? (
@@ -405,6 +522,11 @@ export function CheckoutClient({
       {createAnnualPaymentMutation.isPending ? (
         <div className="muted-panel mt-5 text-sm text-[var(--color-muted-foreground)]">
           Criando checkout anual no Mercado Pago...
+        </div>
+      ) : null}
+      {updateCardMutation.isPending ? (
+        <div className="muted-panel mt-5 text-sm text-[var(--color-muted-foreground)]">
+          Atualizando cartao da assinatura...
         </div>
       ) : null}
     </section>

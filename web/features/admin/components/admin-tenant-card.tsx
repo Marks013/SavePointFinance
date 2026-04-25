@@ -10,7 +10,8 @@ import {
   formatBillingModeLabel,
   formatBillingSubscriptionLabel,
   formatLifecycleLabel,
-  formatPlanLabel
+  formatPlanLabel,
+  isCheckoutOnlyBilling
 } from "@/features/admin/components/admin-shared";
 import { formatDateTimeDisplay } from "@/lib/date";
 
@@ -102,9 +103,15 @@ export function AdminTenantCard({
               {tenant.activeUsers} pessoas ativas
             </span>
           </div>
-          <p className="break-words text-xs leading-5 text-[var(--color-muted-foreground)]">
-            Billing: {formatBillingSubscriptionLabel(tenant.billing.subscriptionStatus)} • {formatBillingModeLabel(tenant.billing.billingMode)} • Próxima cobrança: {getNextBillingLabel(tenant)}
-          </p>
+          {isCheckoutOnlyBilling(tenant.billing) ? (
+            <p className="break-words text-xs leading-5 text-[var(--color-muted-foreground)]">
+              Billing: checkout anual iniciado, sem pagamento confirmado. A licença da conta ainda segue pelo plano aplicado.
+            </p>
+          ) : (
+            <p className="break-words text-xs leading-5 text-[var(--color-muted-foreground)]">
+              Billing: {formatBillingSubscriptionLabel(tenant.billing.subscriptionStatus)} • {formatBillingModeLabel(tenant.billing.billingMode)} • Próxima cobrança: {getNextBillingLabel(tenant)}
+            </p>
+          )}
           <p className="break-words text-xs leading-5 text-[var(--color-muted-foreground)]">Última sincronização: {getLastSyncLabel(tenant)}</p>
         </div>
         <div className="flex flex-wrap gap-2">

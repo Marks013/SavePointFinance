@@ -51,8 +51,8 @@ export default function MaintenancePage() {
           </div>
 
           <div className="mt-8 rounded-[28px] border border-[var(--color-border)] bg-[var(--color-panel)]/82 p-5 text-sm leading-7 text-[var(--color-muted-foreground)]">
-            Se você administra a infraestrutura, desative o modo de manutenção no ambiente e recrie apenas o
-            container <code>web</code> para liberar o tráfego novamente.
+            Nenhuma ação é necessária da sua parte. Estamos concluindo uma atualização e o acesso será liberado assim
+            que o serviço estiver pronto.
           </div>
 
           <div className="mt-8 flex flex-wrap gap-3">

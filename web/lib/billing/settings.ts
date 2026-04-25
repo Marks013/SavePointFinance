@@ -15,6 +15,8 @@ export const billingPromotionSchema = z.object({
   couponCode: z.string().trim().optional().default(""),
   discountPercent: z.coerce.number().min(0).max(95).default(0),
   appliesTo: billingCycleSchema.default("both"),
+  visibleInCheckout: z.boolean().default(true),
+  highlightPriceCard: z.boolean().default(false),
   enabled: z.boolean().default(false),
   startsAt: z.string().trim().nullable().optional().default(null),
   endsAt: z.string().trim().nullable().optional().default(null)
@@ -59,6 +61,8 @@ export function getDefaultBillingSettings(): BillingSettings {
         couponCode: "BLACKFRIDAY",
         discountPercent: 20,
         appliesTo: "annual",
+        visibleInCheckout: true,
+        highlightPriceCard: true,
         enabled: false,
         startsAt: null,
         endsAt: null
@@ -71,6 +75,8 @@ export function getDefaultBillingSettings(): BillingSettings {
         couponCode: "FUNDADORES",
         discountPercent: 15,
         appliesTo: "both",
+        visibleInCheckout: true,
+        highlightPriceCard: false,
         enabled: false,
         startsAt: null,
         endsAt: null

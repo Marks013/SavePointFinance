@@ -466,10 +466,19 @@ export async function syncMercadoPagoPaymentById(paymentId: string) {
 
 async function createBillingOverview(access: BillingAccess): Promise<BillingOverview> {
   const subscription = await getLatestBillingSubscription(prisma, access.tenantId);
+  const isProviderSubscriptionManageable = subscription ? isManagedSubscriptionStatus(subscription.status) : false;
+  const isProviderSubscriptionCancellable = subscription ? isCancellableSubscriptionStatus(subscription.status) : false;
   const subscribed =
     access.license.plan === "pro" &&
     (access.license.canAccessApp || Boolean(access.tenant.expiresAt && access.tenant.expiresAt > new Date()));
-  const subscriptionStatus = subscription?.status ?? (subscribed ? "authorized" : "inactive");
+  const subscriptionStatus = subscription?.status ?? (subscribed ? "externally_granted" : "inactive");
+  const subscriptionStatusLabel = subscription
+    ? subscription.status === "pending"
+      ? "Checkout iniciado, pagamento não confirmado"
+      : formatSubscriptionStatusLabel(subscriptionStatus, subscribed)
+    : subscribed
+      ? "Premium liberado sem assinatura Mercado Pago"
+      : "Sem assinatura Mercado Pago";
   const canManageSelfService = access.canManageBilling && !access.isPlatformAdmin;
 
   return {
@@ -484,7 +493,7 @@ async function createBillingOverview(access: BillingAccess): Promise<BillingOver
     subscription: {
       provider: subscription ? MERCADO_PAGO_PROVIDER : null,
       status: subscriptionStatus,
-      statusLabel: formatSubscriptionStatusLabel(subscriptionStatus, subscribed),
+      statusLabel: subscriptionStatusLabel,
       subscribed,
       cancelAtPeriodEnd: Boolean(subscription?.cancelRequestedAt),
       canceledAt: subscription?.canceledAt?.toISOString() ?? null,
@@ -496,14 +505,16 @@ async function createBillingOverview(access: BillingAccess): Promise<BillingOver
       checkoutUrl:
         canManageSelfService && !subscribed && isMercadoPagoBillingEnabled() ? BILLING_CHECKOUT_PATH : null,
       portalUrl:
-        canManageSelfService && subscription && isManagedSubscriptionStatus(subscription.status)
+        canManageSelfService && isProviderSubscriptionManageable
           ? BILLING_MANAGE_PATH
           : null,
       canCheckout: canManageSelfService && !subscribed && isMercadoPagoBillingEnabled(),
-      canManage:
-        canManageSelfService && subscription ? isManagedSubscriptionStatus(subscription.status) : false,
-      canCancel:
-        canManageSelfService && subscription ? isCancellableSubscriptionStatus(subscription.status) : false
+      canManage: canManageSelfService && isProviderSubscriptionManageable,
+      canCancel: canManageSelfService && isProviderSubscriptionCancellable,
+      canUpdateCard:
+        canManageSelfService && subscription
+          ? Boolean(subscription.mercadoPagoPreapprovalId) && isProviderSubscriptionCancellable
+          : false
     },
     permissions: {
       canManageBilling: access.canManageBilling,
@@ -837,6 +848,86 @@ export async function createAnnualBillingPaymentForSession(input: { couponCode?:
   };
 }
 
+export async function updateBillingSubscriptionCardForSession(input: CheckoutSubscriptionInput) {
+  const access = await getBillingSessionAccess({
+    requireManager: true
+  });
+
+  if (access.isPlatformAdmin) {
+    throw new BillingError("O superadmin não deve alterar cartão por este fluxo", 403);
+  }
+
+  if (!isMercadoPagoBillingEnabled()) {
+    throw new BillingError("Billing do Mercado Pago está desabilitado no ambiente", 409);
+  }
+
+  const subscription = await prisma.billingSubscription.findFirst({
+    where: {
+      tenantId: access.tenantId,
+      mercadoPagoPreapprovalId: {
+        not: null
+      },
+      status: {
+        in: ["authorized", "paused", "payment_required"]
+      }
+    },
+    orderBy: [{ createdAt: "desc" }]
+  });
+
+  if (!subscription?.mercadoPagoPreapprovalId) {
+    throw new BillingError("Nenhuma assinatura recorrente ativa foi encontrada para troca de cartão", 404);
+  }
+
+  await updateMercadoPagoPreApproval({
+    id: subscription.mercadoPagoPreapprovalId,
+    body: {
+      card_token_id: input.cardToken
+    },
+    requestOptions: {
+      idempotencyKey: randomUUID()
+    }
+  });
+
+  const updatedSubscription = await prisma.billingSubscription.update({
+    where: {
+      id: subscription.id
+    },
+    data: {
+      status: subscription.status === "payment_required" ? "authorized" : subscription.status,
+      lastSyncedAt: new Date(),
+      metadata: {
+        ...((subscription.metadata ?? {}) as Prisma.JsonObject),
+        cardUpdate: {
+          paymentMethodId: input.paymentMethodId,
+          issuerId: input.issuerId ?? null,
+          installments: input.installments ?? null,
+          metadata: (input.metadata ?? null) as Prisma.InputJsonValue,
+          updatedAt: new Date().toISOString()
+        }
+      }
+    }
+  });
+
+  await logBillingAdminAudit({
+    actor: access,
+    action: "billing.subscription_card.updated",
+    entityId: updatedSubscription.id,
+    summary: `Cartão de cobrança atualizado para a conta ${access.tenant.name}`,
+    metadata: {
+      provider: MERCADO_PAGO_PROVIDER,
+      mercadoPagoPreapprovalId: updatedSubscription.mercadoPagoPreapprovalId,
+      paymentMethodId: input.paymentMethodId,
+      issuerId: input.issuerId ?? null
+    }
+  });
+
+  return {
+    url: buildBillingManageUrl(),
+    message: "Cartão de cobrança atualizado",
+    billing: await createBillingOverview(access)
+  };
+}
+
 export async function cancelBillingSubscriptionForSession() {
   const access = await getBillingSessionAccess({
     requireManager: true
@@ -979,7 +1070,9 @@ export async function getBillingCheckoutPageData() {
       description: promotion.description,
       couponCode: promotion.couponCode,
       discountPercent: promotion.discountPercent,
-      appliesTo: promotion.appliesTo
+      appliesTo: promotion.appliesTo,
+      visibleInCheckout: promotion.visibleInCheckout,
+      highlightPriceCard: promotion.highlightPriceCard
     }))
   };
 }

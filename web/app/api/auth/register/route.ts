@@ -120,10 +120,9 @@ export async function POST(request: Request) {
     if (existingUser) {
       return NextResponse.json(
         {
-          success: true,
-          nextPath: nextPathByIntent[body.plan]
+          message: "Este e-mail já possui uma conta. Entre no painel ou use outro e-mail para criar uma nova conta."
         },
-        { status: 201 }
+        { status: 409 }
       );
     }
 

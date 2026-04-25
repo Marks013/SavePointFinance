@@ -9,6 +9,8 @@ const { Client } = pg;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const env = process.env;
+
 const {
   DATABASE_URL,
   ADMIN_EMAIL = "admin@savepoint.local",
@@ -17,12 +19,13 @@ const {
   ADMIN_TENANT_NAME = "SavePoint",
   ADMIN_TENANT_SLUG = "savepoint",
   LOCAL_OWNER_EMAIL = "owner@savepoint.local",
-  LOCAL_OWNER_PASSWORD,
   LOCAL_OWNER_NAME = "Titular SavePoint",
-  FAMILY_USER_EMAIL,
-  FAMILY_USER_PASSWORD,
   FAMILY_USER_NAME = "Familiar SavePoint"
-} = process.env;
+} = env;
+
+const LOCAL_OWNER_PASSWORD = env.LOCAL_OWNER_PASSWORD || ADMIN_PASSWORD;
+const FAMILY_USER_EMAIL = env.FAMILY_USER_EMAIL || "family@savepoint.local";
+const FAMILY_USER_PASSWORD = env.FAMILY_USER_PASSWORD || LOCAL_OWNER_PASSWORD;
 
 const DEFAULT_PLANS = [
   {

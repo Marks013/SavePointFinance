@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma/client";
 import { AuthError } from "@/lib/observability/errors";
 import { syncSentryAccessScope } from "@/lib/observability/sentry";
+import { getFallbackFreePlan } from "@/lib/billing/plans";
 import {
   type LicenseFeature,
   getLicenseBlockedReason,
@@ -67,7 +68,55 @@ export async function getCurrentTenantAccess(options: CurrentAccessOptions = {})
     throw new AuthError();
   }
 
-  const resolvedLicense = resolveTenantLicenseState(user.tenant);
+  let tenantForLicense = user.tenant;
+  const now = new Date();
+  const shouldCheckCanceledSubscriptionDowngrade =
+    !user.isPlatformAdmin &&
+    user.tenant.planConfig.tier === "pro" &&
+    Boolean(user.tenant.expiresAt && user.tenant.expiresAt <= now);
+
+  if (shouldCheckCanceledSubscriptionDowngrade) {
+    const canceledSubscription = await prisma.billingSubscription.findFirst({
+      where: {
+        tenantId: user.tenantId,
+        status: "canceled",
+        nextBillingAt: {
+          lte: now
+        }
+      },
+      orderBy: [{ canceledAt: "desc" }, { createdAt: "desc" }]
+    });
+
+    if (canceledSubscription) {
+      const freePlan = await getFallbackFreePlan();
+
+      if (freePlan) {
+        await prisma.tenant.update({
+          where: {
+            id: user.tenantId
+          },
+          data: {
+            planId: freePlan.id,
+            trialStart: null,
+            trialDays: 0,
+            trialExpiresAt: null,
+            expiresAt: null,
+            isActive: true
+          }
+        });
+
+        tenantForLicense = {
+          ...user.tenant,
+          trialDays: 0,
+          trialExpiresAt: null,
+          expiresAt: null,
+          planConfig: freePlan
+        };
+      }
+    }
+  }
+
+  const resolvedLicense = resolveTenantLicenseState(tenantForLicense);
   const license = user.isPlatformAdmin
     ? {
         ...resolvedLicense,
@@ -107,7 +156,7 @@ export async function getCurrentTenantAccess(options: CurrentAccessOptions = {})
   Sentry.setContext("tenant", {
     id: user.tenant.id,
     slug: user.tenant.slug,
-    planSlug: user.tenant.planConfig?.slug ?? null
+    planSlug: tenantForLicense.planConfig?.slug ?? null
   });
 
   return {
@@ -118,7 +167,7 @@ export async function getCurrentTenantAccess(options: CurrentAccessOptions = {})
     email: user.email,
     name: user.name,
     isActive: user.isActive,
-    tenant: user.tenant,
+    tenant: tenantForLicense,
     license,
     blockedReason: getLicenseBlockedReason(license)
   };

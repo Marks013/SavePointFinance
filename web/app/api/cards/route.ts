@@ -47,6 +47,14 @@ export async function GET(request: Request) {
           referenceDate,
           client: prisma
         });
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const payableDueDate = new Date(payableStatement.dueDate);
+        payableDueDate.setHours(0, 0, 0, 0);
+        const payableDaysLate = Math.max(
+          0,
+          Math.floor((today.getTime() - payableDueDate.getTime()) / (1000 * 60 * 60 * 24))
+        );
 
         return {
           id: card.id,
@@ -64,6 +72,8 @@ export async function GET(request: Request) {
           payableStatementAmount: payableStatement.statementOutstandingAmount,
           payableStatementMonth: payableStatement.month,
           payableDueDate: payableStatement.dueDate.toISOString(),
+          payableOverdue: payableStatement.statementOutstandingAmount > 0 && payableDaysLate > 0,
+          payableDaysLate,
           dueDay: card.dueDay,
           closeDay: card.closeDay,
           statementMonthAnchor: card.statementMonthAnchor,

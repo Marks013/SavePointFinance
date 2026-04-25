@@ -21,6 +21,7 @@
     "audit:invitations": "tsx scripts/invitation-isolation-audit.ts",
     "audit:billing-webhook": "tsx scripts/billing-webhook-e2e-sim.ts",
     "audit:cards-smoke": "tsx scripts/card-statement-smoke-audit.ts",
+    "audit:finance-consistency": "tsx scripts/finance-consistency-audit.ts",
     "audit:server-smoke": "tsx scripts/server-smoke-audit.ts",
     "audit:encoding": "tsx scripts/encoding-audit.ts"
   },

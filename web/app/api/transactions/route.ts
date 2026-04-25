@@ -5,7 +5,7 @@ import { format } from "date-fns";
 import { syncDueSubscriptionTransactions } from "@/lib/automation/subscriptions";
 import { requireSessionUser } from "@/lib/auth/session";
 import { revalidateFinanceReports } from "@/lib/cache/finance-read-models";
-import { buildCardBillingSnapshot } from "@/lib/cards/statement";
+import { buildCardBillingSnapshotForDate } from "@/lib/cards/statement";
 import { BenefitWalletRuleError, validateBenefitWalletTransaction } from "@/lib/finance/benefit-wallet";
 import { FOOD_BENEFIT_CATEGORY_SYSTEM_KEYS } from "@/lib/finance/benefit-wallet-rules";
 import { ensureTenantCardStatementSnapshots } from "@/lib/cards/snapshot-sync";
@@ -253,7 +253,14 @@ export async function POST(request: Request) {
     for (let index = 0; index < body.installments; index += 1) {
       const transactionDate = addMonthsClamped(parsedData.date, index);
       const manualCompetenceDate = addMonthsClamped(baseCompetenceDate, index);
-      const cardSnapshot = selectedCard ? buildCardBillingSnapshot(selectedCard, transactionDate) : null;
+      const cardSnapshot = selectedCard
+        ? await buildCardBillingSnapshotForDate({
+            tenantId: user.tenantId,
+            card: selectedCard,
+            referenceDate: transactionDate,
+            client: prisma
+          })
+        : null;
       const competenceForInstallment = cardSnapshot?.competence ?? format(manualCompetenceDate, "yyyy-MM");
 
       const created: Transaction = await prisma.transaction.create({

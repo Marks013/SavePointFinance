@@ -14,6 +14,7 @@ function buildFallbackSubscription(profile: BillingProfileSnapshot): BillingOver
   const isSubscribed = profile.license.plan === "pro";
   const canManageBilling = resolveCanManageBilling(profile);
   const canRunSelfServiceActions = canManageBilling && !profile.isPlatformAdmin;
+  const hasManagedProviderSubscription = false;
 
   return {
     provider: null,
@@ -27,8 +28,9 @@ function buildFallbackSubscription(profile: BillingProfileSnapshot): BillingOver
     checkoutUrl: null,
     portalUrl: null,
     canCheckout: canRunSelfServiceActions && !isSubscribed,
-    canManage: canRunSelfServiceActions && isSubscribed,
-    canCancel: canRunSelfServiceActions && isSubscribed
+    canManage: canRunSelfServiceActions && hasManagedProviderSubscription,
+    canCancel: canRunSelfServiceActions && hasManagedProviderSubscription,
+    canUpdateCard: canRunSelfServiceActions && hasManagedProviderSubscription
   };
 }
 
@@ -56,7 +58,8 @@ function normalizeBillingOverview(
       portalUrl: payload.subscription?.portalUrl ?? fallbackSubscription.portalUrl,
       canCheckout: payload.subscription?.canCheckout ?? fallbackSubscription.canCheckout,
       canManage: payload.subscription?.canManage ?? fallbackSubscription.canManage,
-      canCancel: payload.subscription?.canCancel ?? fallbackSubscription.canCancel
+      canCancel: payload.subscription?.canCancel ?? fallbackSubscription.canCancel,
+      canUpdateCard: payload.subscription?.canUpdateCard ?? fallbackSubscription.canUpdateCard
     },
     permissions: {
       canManageBilling,
