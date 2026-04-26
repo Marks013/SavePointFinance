@@ -67,12 +67,14 @@ function PlatformAdminRouteIsolation() {
       return;
     }
 
-    if (pathname === "/dashboard/admin" && searchParams.has("month")) {
-      router.replace("/dashboard/admin");
+    const isAdminRoute = pathname === "/dashboard/admin" || pathname.startsWith("/dashboard/admin/");
+
+    if (isAdminRoute && searchParams.has("month")) {
+      router.replace(pathname);
       return;
     }
 
-    if (pathname.startsWith("/dashboard") && pathname !== "/dashboard/admin") {
+    if (pathname.startsWith("/dashboard") && !isAdminRoute) {
       router.replace("/dashboard/admin");
     }
   }, [pathname, router, searchParams, session, status]);

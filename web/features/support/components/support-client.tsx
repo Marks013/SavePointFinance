@@ -1,8 +1,9 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { AlertCircle, CheckCircle2, Clock3, History, MailCheck, SendHorizonal } from "lucide-react";
+import { AlertCircle, CheckCircle2, Clock3, History, MailCheck, SendHorizonal, Star } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -40,10 +41,17 @@ type SupportTicketItem = {
   topicLabel: string;
   priorityLabel: string;
   subject: string;
+  message: string;
   messagePreview: string;
   status: string;
   deliveryStatus: string;
   expectedResponseAt: string | null;
+  closedAt: string | null;
+  rating: number | null;
+  ratingProblemResolved: boolean | null;
+  ratingReason: string | null;
+  ratingImprovement: string | null;
+  ratedAt: string | null;
   createdAt: string;
   updatedAt: string;
   replies: Array<{
@@ -125,8 +133,29 @@ async function getSupportHistory() {
   return (await response.json()) as SupportHistoryResponse;
 }
 
+async function rateSupportTicket(
+  ticketId: string,
+  values: { rating: number; problemResolved: boolean; reason?: string; improvement?: string }
+) {
+  const response = await fetch(`/api/support/${ticketId}/rating`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(values)
+  });
+  const payload = (await response.json().catch(() => ({}))) as { message?: string };
+
+  if (!response.ok) {
+    throw new Error(payload.message ?? "Não foi possível registrar a avaliação");
+  }
+
+  return payload;
+}
+
 export function SupportClient({ initialEmail, initialName }: SupportClientProps) {
   const queryClient = useQueryClient();
+  const [ratingDrafts, setRatingDrafts] = useState<Record<string, { rating: number; problemResolved: boolean; reason: string; improvement: string }>>({});
   const form = useForm<z.input<typeof supportRequestSchema>, unknown, SupportRequestValues>({
     resolver: zodResolver(supportRequestSchema),
     defaultValues: {
@@ -172,6 +201,17 @@ export function SupportClient({ initialEmail, initialName }: SupportClientProps)
   const historyQuery = useQuery({
     queryKey: ["support-history"],
     queryFn: getSupportHistory
+  });
+  const ratingMutation = useMutation({
+    mutationFn: ({ ticketId, values }: { ticketId: string; values: { rating: number; problemResolved: boolean; reason?: string; improvement?: string } }) =>
+      rateSupportTicket(ticketId, values),
+    onSuccess: async (payload) => {
+      await queryClient.invalidateQueries({ queryKey: ["support-history"] });
+      toast.success(payload.message ?? "Avaliação registrada");
+    },
+    onError: (error) => {
+      toast.error("Avaliação não registrada", { description: error.message });
+    }
   });
   const responseWindow =
     historyQuery.data?.responseWindow ??
@@ -353,24 +393,142 @@ export function SupportClient({ initialEmail, initialName }: SupportClientProps)
                       </span>
                     </div>
                     <p className="mt-3 break-words font-semibold">{ticket.subject}</p>
-                    <p className="mt-2 break-words text-sm leading-6 text-[var(--color-muted-foreground)]">
-                      {ticket.messagePreview}
-                    </p>
+                    <div className="mt-3 rounded-[1rem] border border-[var(--color-border)] bg-[var(--color-panel)] px-3 py-2">
+                      <p className="text-xs font-semibold text-[var(--color-foreground)]">Sua mensagem</p>
+                      <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-[var(--color-muted-foreground)]">
+                        {ticket.message}
+                      </p>
+                    </div>
                     {ticket.replies.length ? (
-                      <div className="mt-3 rounded-[1rem] border border-[var(--color-border)] bg-[var(--color-panel)] px-3 py-2">
-                        <p className="text-xs font-semibold text-[var(--color-foreground)]">
-                          Resposta do suporte em {formatDateTimeDisplay(ticket.replies[ticket.replies.length - 1].createdAt)}
-                        </p>
-                        <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-[var(--color-muted-foreground)]">
-                          {ticket.replies[ticket.replies.length - 1].message}
-                        </p>
+                      <div className="mt-3 space-y-2">
+                        {ticket.replies.map((reply) => (
+                          <div key={reply.id} className="rounded-[1rem] border border-[var(--color-border)] bg-[var(--color-panel)] px-3 py-2">
+                            <p className="text-xs font-semibold text-[var(--color-foreground)]">
+                              Resposta do suporte em {formatDateTimeDisplay(reply.createdAt)}
+                            </p>
+                            <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-[var(--color-muted-foreground)]">
+                              {reply.message}
+                            </p>
+                          </div>
+                        ))}
                       </div>
+                    ) : null}
+                    {ticket.status === "closed" && !ticket.ratedAt ? (
+                      <div className="mt-4 rounded-[1rem] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-card)_92%,var(--color-muted))] p-4">
+                        <p className="text-sm font-semibold">Essa conversa resolveu seu problema?</p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {[1, 2, 3, 4, 5].map((value) => {
+                            const draft = ratingDrafts[ticket.id] ?? { rating: 0, problemResolved: true, reason: "", improvement: "" };
+                            const selected = draft.rating >= value;
+
+                            return (
+                              <button
+                                key={value}
+                                aria-label={`Avaliar com ${value} estrela${value > 1 ? "s" : ""}`}
+                                className="rounded-full border border-[var(--color-border)] bg-[var(--color-panel)] p-2 text-[var(--color-primary)] transition hover:-translate-y-0.5"
+                                type="button"
+                                onClick={() =>
+                                  setRatingDrafts((current) => ({
+                                    ...current,
+                                    [ticket.id]: { ...(current[ticket.id] ?? { problemResolved: true, reason: "", improvement: "" }), rating: value }
+                                  }))
+                                }
+                              >
+                                <Star className={selected ? "size-5 fill-current" : "size-5"} />
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <label className="mt-4 flex items-start gap-3 text-sm leading-6">
+                          <input
+                            className="app-checkbox mt-1"
+                            checked={ratingDrafts[ticket.id]?.problemResolved ?? true}
+                            type="checkbox"
+                            onChange={(event) =>
+                              setRatingDrafts((current) => ({
+                                ...current,
+                                [ticket.id]: {
+                                  ...(current[ticket.id] ?? { rating: 0, reason: "", improvement: "" }),
+                                  problemResolved: event.target.checked
+                                }
+                              }))
+                            }
+                          />
+                          <span>Sim, meu problema foi resolvido.</span>
+                        </label>
+                        {(ratingDrafts[ticket.id]?.rating ?? 0) > 0 && (ratingDrafts[ticket.id]?.rating ?? 0) < 4 ? (
+                          <div className="mt-3 space-y-2">
+                            <Label htmlFor={`rating-${ticket.id}-reason`}>O que faltou no atendimento?</Label>
+                            <textarea
+                              className="min-h-24 w-full rounded-[1rem] border border-[var(--color-border)] bg-[var(--color-input)] px-3 py-2 text-sm leading-6 outline-none transition duration-200 focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary)]/12"
+                              id={`rating-${ticket.id}-reason`}
+                              value={ratingDrafts[ticket.id]?.reason ?? ""}
+                              onChange={(event) =>
+                                setRatingDrafts((current) => ({
+                                  ...current,
+                                  [ticket.id]: {
+                                    ...(current[ticket.id] ?? { rating: 0, problemResolved: true, improvement: "" }),
+                                    reason: event.target.value
+                                  }
+                                }))
+                              }
+                            />
+                          </div>
+                        ) : null}
+                        <div className="mt-3 space-y-2">
+                          <Label htmlFor={`rating-${ticket.id}-improvement`}>Como podemos melhorar?</Label>
+                          <textarea
+                            className="min-h-24 w-full rounded-[1rem] border border-[var(--color-border)] bg-[var(--color-input)] px-3 py-2 text-sm leading-6 outline-none transition duration-200 focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary)]/12"
+                            id={`rating-${ticket.id}-improvement`}
+                            value={ratingDrafts[ticket.id]?.improvement ?? ""}
+                            onChange={(event) =>
+                              setRatingDrafts((current) => ({
+                                ...current,
+                                [ticket.id]: {
+                                  ...(current[ticket.id] ?? { rating: 0, problemResolved: true, reason: "" }),
+                                  improvement: event.target.value
+                                }
+                              }))
+                            }
+                          />
+                        </div>
+                        <Button
+                          className="mt-3"
+                          disabled={
+                            ratingMutation.isPending ||
+                            !ratingDrafts[ticket.id]?.rating ||
+                            ((ratingDrafts[ticket.id]?.rating ?? 0) < 4 && (ratingDrafts[ticket.id]?.reason ?? "").trim().length < 10)
+                          }
+                          type="button"
+                          onClick={() => {
+                            const draft = ratingDrafts[ticket.id];
+                            if (!draft) return;
+                            ratingMutation.mutate({
+                              ticketId: ticket.id,
+                              values: {
+                                rating: draft.rating,
+                                problemResolved: draft.problemResolved,
+                                reason: draft.reason,
+                                improvement: draft.improvement
+                              }
+                            });
+                          }}
+                        >
+                          Enviar avaliação
+                        </Button>
+                      </div>
+                    ) : null}
+                    {ticket.ratedAt ? (
+                      <p className="mt-3 text-sm leading-6 text-[var(--color-muted-foreground)]">
+                        Avaliação registrada: {ticket.rating} estrela{ticket.rating === 1 ? "" : "s"}.
+                      </p>
                     ) : null}
                   </div>
                   <div className="min-w-48 text-sm leading-6 text-[var(--color-muted-foreground)]">
                     <p>{formatDateTimeDisplay(ticket.createdAt)}</p>
                     <p>{formatDeliveryStatus(ticket.deliveryStatus)}</p>
                     {ticket.expectedResponseAt ? <p>Previsão: {formatDateTimeDisplay(ticket.expectedResponseAt)}</p> : null}
+                    {ticket.closedAt ? <p>Encerrado: {formatDateTimeDisplay(ticket.closedAt)}</p> : null}
                   </div>
                 </div>
               </article>

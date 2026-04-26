@@ -39,6 +39,12 @@ function serializeTicket(ticket: {
   status: string;
   deliveryStatus: string;
   expectedResponseAt: Date | null;
+  closedAt: Date | null;
+  rating: number | null;
+  ratingProblemResolved: boolean | null;
+  ratingReason: string | null;
+  ratingImprovement: string | null;
+  ratedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
   replies?: Array<{
@@ -53,10 +59,17 @@ function serializeTicket(ticket: {
     topicLabel: ticket.topicLabel,
     priorityLabel: ticket.priorityLabel,
     subject: ticket.subject,
+    message: ticket.message,
     messagePreview: ticket.message.length > 180 ? `${ticket.message.slice(0, 177)}...` : ticket.message,
     status: ticket.status,
     deliveryStatus: ticket.deliveryStatus,
     expectedResponseAt: ticket.expectedResponseAt?.toISOString() ?? null,
+    closedAt: ticket.closedAt?.toISOString() ?? null,
+    rating: ticket.rating,
+    ratingProblemResolved: ticket.ratingProblemResolved,
+    ratingReason: ticket.ratingReason,
+    ratingImprovement: ticket.ratingImprovement,
+    ratedAt: ticket.ratedAt?.toISOString() ?? null,
     createdAt: ticket.createdAt.toISOString(),
     updatedAt: ticket.updatedAt.toISOString(),
     replies:

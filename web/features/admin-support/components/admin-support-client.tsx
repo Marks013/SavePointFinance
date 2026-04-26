@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { RotateCw, SendHorizonal } from "lucide-react";
+import { CheckCircle2, RotateCw, SendHorizonal, Star } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -35,6 +35,12 @@ type SupportTicket = {
   deliveryAttempts: number;
   providerError: string | null;
   expectedResponseAt: string | null;
+  closedAt: string | null;
+  rating: number | null;
+  ratingProblemResolved: boolean | null;
+  ratingReason: string | null;
+  ratingImprovement: string | null;
+  ratedAt: string | null;
   createdAt: string;
   replies: SupportReply[];
 };
@@ -92,6 +98,19 @@ async function retryTicket(ticketId: string) {
   return payload;
 }
 
+async function closeTicket(ticketId: string) {
+  const response = await fetch(`/api/admin/support/${ticketId}/close`, {
+    method: "POST"
+  });
+  const payload = (await response.json().catch(() => ({}))) as { message?: string };
+
+  if (!response.ok) {
+    throw new Error(payload.message ?? "Falha ao encerrar solicitação");
+  }
+
+  return payload;
+}
+
 function formatTicketStatus(status: string) {
   switch (status) {
     case "answered":
@@ -131,6 +150,7 @@ export function AdminSupportClient() {
   const [deliveryStatus, setDeliveryStatus] = useState("all");
   const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
   const [retryingTicketId, setRetryingTicketId] = useState<string | null>(null);
+  const [closingTicketId, setClosingTicketId] = useState<string | null>(null);
   const ticketsQuery = useQuery({
     queryKey: ["admin-support", search, status, deliveryStatus],
     queryFn: () =>
@@ -174,6 +194,25 @@ export function AdminSupportClient() {
     },
     onSettled: () => {
       setRetryingTicketId(null);
+    }
+  });
+  const closeMutation = useMutation({
+    mutationFn: ({ ticketId }: { ticketId: string }) => {
+      setClosingTicketId(ticketId);
+      return closeTicket(ticketId);
+    },
+    onSuccess: async (payload) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin-support"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-audit"] })
+      ]);
+      toast.success(payload.message ?? "Conversa encerrada");
+    },
+    onError: (error) => {
+      toast.error("Não foi possível encerrar", { description: error.message });
+    },
+    onSettled: () => {
+      setClosingTicketId(null);
     }
   });
   const tickets = ticketsQuery.data?.items ?? [];
@@ -240,6 +279,7 @@ export function AdminSupportClient() {
                   <h2 className="mt-3 break-words text-xl font-semibold">{ticket.subject}</h2>
                   <p className="mt-2 text-sm leading-6 text-[var(--color-muted-foreground)]">
                     {ticket.contactName} • {ticket.contactEmail} • {ticket.tenant.name} • {formatDateTimeDisplay(ticket.createdAt)}
+                    {ticket.closedAt ? ` • Encerrado em ${formatDateTimeDisplay(ticket.closedAt)}` : ""}
                   </p>
                   <p className="mt-4 whitespace-pre-wrap break-words text-sm leading-7">{ticket.message}</p>
 
@@ -276,9 +316,51 @@ export function AdminSupportClient() {
                       ))}
                     </div>
                   ) : null}
+                  {ticket.ratedAt ? (
+                    <div className="mt-5 rounded-[1rem] border border-[var(--color-border)] bg-[var(--color-panel)] p-4">
+                      <p className="text-sm font-semibold">Avaliação do usuário</p>
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-[var(--color-primary)]">
+                        {[1, 2, 3, 4, 5].map((value) => (
+                          <Star key={value} className={ticket.rating && ticket.rating >= value ? "size-4 fill-current" : "size-4"} />
+                        ))}
+                        <span className="text-sm text-[var(--color-muted-foreground)]">
+                          {ticket.rating}/5 em {formatDateTimeDisplay(ticket.ratedAt)}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-sm leading-6 text-[var(--color-muted-foreground)]">
+                        Problema resolvido: {ticket.ratingProblemResolved ? "sim" : "não"}
+                      </p>
+                      {ticket.ratingReason ? (
+                        <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-[var(--color-muted-foreground)]">
+                          Motivo: {ticket.ratingReason}
+                        </p>
+                      ) : null}
+                      {ticket.ratingImprovement ? (
+                        <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-[var(--color-muted-foreground)]">
+                          Como melhorar: {ticket.ratingImprovement}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : ticket.status === "closed" ? (
+                    <p className="mt-5 rounded-[1rem] border border-[var(--color-border)] bg-[var(--color-panel)] px-3 py-2 text-sm leading-6 text-[var(--color-muted-foreground)]">
+                      Avaliação solicitada ao usuário.
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="w-full shrink-0 space-y-3 xl:w-[360px]">
+                  {ticket.status !== "closed" ? (
+                    <Button
+                      className="w-full"
+                      disabled={closingTicketId === ticket.id || closeMutation.isPending}
+                      onClick={() => closeMutation.mutate({ ticketId: ticket.id })}
+                      type="button"
+                      variant="secondary"
+                    >
+                      <CheckCircle2 className="size-4" />
+                      {closingTicketId === ticket.id ? "Encerrando..." : "Fechar como resolvido"}
+                    </Button>
+                  ) : null}
                   <textarea
                     className="min-h-36 w-full rounded-[1.15rem] border border-[var(--color-border)] bg-[var(--color-input)] px-4 py-3 text-sm leading-7 outline-none transition duration-200 focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary)]/12"
                     placeholder="Escreva a resposta para o usuário"

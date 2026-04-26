@@ -284,6 +284,13 @@ model SupportTicket {
   providerMessageId   String?
   providerError       String?
   expectedResponseAt  DateTime?
+  closedAt            DateTime?
+  closedByAdminUserId String?
+  rating              Int?
+  ratingProblemResolved Boolean?
+  ratingReason        String?
+  ratingImprovement   String?
+  ratedAt             DateTime?
   createdAt           DateTime            @default(now())
   updatedAt           DateTime            @updatedAt
 
@@ -294,6 +301,7 @@ model SupportTicket {
   @@index([tenantId, createdAt])
   @@index([userId, createdAt])
   @@index([status, createdAt])
+  @@index([rating, ratedAt])
 }
 
 model SupportTicketReply {

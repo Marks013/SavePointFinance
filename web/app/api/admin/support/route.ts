@@ -66,6 +66,13 @@ export async function GET(request: Request) {
         lastDeliveryAttemptAt: serializeDate(ticket.lastDeliveryAttemptAt),
         providerError: ticket.providerError,
         expectedResponseAt: serializeDate(ticket.expectedResponseAt),
+        closedAt: serializeDate(ticket.closedAt),
+        closedByAdminUserId: ticket.closedByAdminUserId,
+        rating: ticket.rating,
+        ratingProblemResolved: ticket.ratingProblemResolved,
+        ratingReason: ticket.ratingReason,
+        ratingImprovement: ticket.ratingImprovement,
+        ratedAt: serializeDate(ticket.ratedAt),
         createdAt: ticket.createdAt.toISOString(),
         updatedAt: ticket.updatedAt.toISOString(),
         replies: ticket.replies.map((reply) => ({
