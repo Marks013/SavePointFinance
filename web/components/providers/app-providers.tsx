@@ -70,7 +70,7 @@ function PlatformAdminRouteIsolation() {
     const isAdminRoute = pathname === "/dashboard/admin" || pathname.startsWith("/dashboard/admin/");
 
     if (isAdminRoute && searchParams.has("month")) {
-      router.replace(pathname);
+      router.replace(pathname as Parameters<typeof router.replace>[0]);
       return;
     }
 

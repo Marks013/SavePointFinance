@@ -35,7 +35,7 @@ export default async function ProtectedLayout({ children }: ProtectedLayoutProps
       const isAdminRoute = pathname === "/dashboard/admin" || pathname?.startsWith("/dashboard/admin/");
 
       if (isAdminRoute && new URLSearchParams(search).has("month")) {
-        redirect(pathname);
+        redirect(pathname as Parameters<typeof redirect>[0]);
       }
 
       if (!isAdminRoute) {
