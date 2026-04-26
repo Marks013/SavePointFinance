@@ -1,9 +1,16 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
+import { supportPriorityLabels, supportTopicLabels } from "@/features/support/schemas/support-schema";
 import { requireSessionUser } from "@/lib/auth/session";
 import { revalidateAdminUsers } from "@/lib/cache/admin-read-models";
 import { captureRequestError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
+import { SUPPORT_RESPONSE_COPY, sendSupportEmail } from "@/lib/support/email";
+
+const reopenSchema = z.object({
+  reason: z.string().trim().min(10, "Explique brevemente por que deseja reabrir o chamado.").max(2000)
+});
 
 type Params = {
   params: Promise<{
@@ -15,17 +22,16 @@ export async function POST(request: Request, context: Params) {
   try {
     const user = await requireSessionUser();
     const { id } = await context.params;
+    const body = reopenSchema.parse(await request.json());
     const ticket = await prisma.supportTicket.findFirst({
       where: {
         id,
         tenantId: user.tenantId,
         userId: user.id
       },
-      select: {
-        id: true,
-        tenantId: true,
-        status: true,
-        ratedAt: true
+      include: {
+        user: { select: { name: true, email: true, role: true } },
+        tenant: { select: { name: true } }
       }
     });
 
@@ -46,8 +52,35 @@ export async function POST(request: Request, context: Params) {
       data: {
         status: "open",
         closedAt: null,
-        closedByAdminUserId: null
+        closedByAdminUserId: null,
+        reopenReason: body.reason,
+        reopenedAt: new Date(),
+        reopenCount: { increment: 1 }
       }
+    });
+    await sendSupportEmail({
+      id: `#${ticket.ticketNumber}`,
+      contactName: ticket.contactName,
+      contactEmail: ticket.contactEmail,
+      topicLabel: supportTopicLabels[ticket.topic as keyof typeof supportTopicLabels] ?? ticket.topicLabel,
+      priorityLabel: supportPriorityLabels[ticket.priority as keyof typeof supportPriorityLabels] ?? ticket.priorityLabel,
+      subject: `Reabertura: ${ticket.subject}`,
+      message: [
+        `O usuário reabriu o chamado #${ticket.ticketNumber}.`,
+        "",
+        "Motivo da reabertura:",
+        body.reason,
+        "",
+        "Mensagem original:",
+        ticket.message
+      ].join("\n"),
+      context: [
+        ["Chamado", `#${ticket.ticketNumber}`],
+        ["Usuário", `${ticket.user.name ?? ticket.contactName} <${ticket.user.email ?? ticket.contactEmail}>`],
+        ["Conta", ticket.tenant.name],
+        ["Papel", ticket.user.role],
+        ["Prazo informado", SUPPORT_RESPONSE_COPY]
+      ]
     });
     revalidateAdminUsers(ticket.tenantId);
 

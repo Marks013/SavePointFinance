@@ -41,6 +41,9 @@ function serializeTicket(ticket: {
   deliveryStatus: string;
   expectedResponseAt: Date | null;
   closedAt: Date | null;
+  reopenReason: string | null;
+  reopenedAt: Date | null;
+  reopenCount: number;
   rating: number | null;
   ratingProblemResolved: boolean | null;
   ratingReason: string | null;
@@ -67,6 +70,9 @@ function serializeTicket(ticket: {
     deliveryStatus: ticket.deliveryStatus,
     expectedResponseAt: ticket.expectedResponseAt?.toISOString() ?? null,
     closedAt: ticket.closedAt?.toISOString() ?? null,
+    reopenReason: ticket.reopenReason,
+    reopenedAt: ticket.reopenedAt?.toISOString() ?? null,
+    reopenCount: ticket.reopenCount,
     rating: ticket.rating,
     ratingProblemResolved: ticket.ratingProblemResolved,
     ratingReason: ticket.ratingReason,

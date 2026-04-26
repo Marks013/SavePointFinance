@@ -48,6 +48,9 @@ type SupportTicketItem = {
   deliveryStatus: string;
   expectedResponseAt: string | null;
   closedAt: string | null;
+  reopenReason: string | null;
+  reopenedAt: string | null;
+  reopenCount: number;
   rating: number | null;
   ratingProblemResolved: boolean | null;
   ratingReason: string | null;
@@ -154,9 +157,13 @@ async function rateSupportTicket(
   return payload;
 }
 
-async function reopenSupportTicket(ticketId: string) {
+async function reopenSupportTicket(ticketId: string, reason: string) {
   const response = await fetch(`/api/support/${ticketId}/reopen`, {
-    method: "POST"
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ reason })
   });
   const payload = (await response.json().catch(() => ({}))) as { message?: string };
 
@@ -170,6 +177,7 @@ async function reopenSupportTicket(ticketId: string) {
 export function SupportClient({ initialEmail, initialName }: SupportClientProps) {
   const queryClient = useQueryClient();
   const [ratingDrafts, setRatingDrafts] = useState<Record<string, { rating: number; problemResolved: boolean; reason: string; improvement: string }>>({});
+  const [reopenDrafts, setReopenDrafts] = useState<Record<string, string>>({});
   const form = useForm<z.input<typeof supportRequestSchema>, unknown, SupportRequestValues>({
     resolver: zodResolver(supportRequestSchema),
     defaultValues: {
@@ -228,8 +236,9 @@ export function SupportClient({ initialEmail, initialName }: SupportClientProps)
     }
   });
   const reopenMutation = useMutation({
-    mutationFn: ({ ticketId }: { ticketId: string }) => reopenSupportTicket(ticketId),
-    onSuccess: async (payload) => {
+    mutationFn: ({ ticketId, reason }: { ticketId: string; reason: string }) => reopenSupportTicket(ticketId, reason),
+    onSuccess: async (payload, variables) => {
+      setReopenDrafts((current) => ({ ...current, [variables.ticketId]: "" }));
       await queryClient.invalidateQueries({ queryKey: ["support-history"] });
       toast.success(payload.message ?? "Conversa reaberta");
     },
@@ -440,10 +449,18 @@ export function SupportClient({ initialEmail, initialName }: SupportClientProps)
                     {ticket.status === "closed" && !ticket.ratedAt ? (
                       <div className="mt-4 rounded-[1rem] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-card)_92%,var(--color-muted))] p-4">
                         <p className="text-sm font-semibold">Essa conversa resolveu seu problema?</p>
-                        <div className="mt-3 flex flex-wrap gap-2">
+                        <div className="mt-3 space-y-2">
+                          <Label htmlFor={`reopen-${ticket.id}-reason`}>Por que deseja reabrir este chamado?</Label>
+                          <textarea
+                            className="min-h-24 w-full rounded-[1rem] border border-[var(--color-border)] bg-[var(--color-input)] px-3 py-2 text-sm leading-6 outline-none transition duration-200 focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary)]/12"
+                            id={`reopen-${ticket.id}-reason`}
+                            placeholder="Explique o que ainda não foi resolvido ou o que precisa continuar sendo analisado."
+                            value={reopenDrafts[ticket.id] ?? ""}
+                            onChange={(event) => setReopenDrafts((current) => ({ ...current, [ticket.id]: event.target.value }))}
+                          />
                           <Button
-                            disabled={reopenMutation.isPending}
-                            onClick={() => reopenMutation.mutate({ ticketId: ticket.id })}
+                            disabled={reopenMutation.isPending || (reopenDrafts[ticket.id] ?? "").trim().length < 10}
+                            onClick={() => reopenMutation.mutate({ ticketId: ticket.id, reason: reopenDrafts[ticket.id] ?? "" })}
                             type="button"
                             variant="secondary"
                           >

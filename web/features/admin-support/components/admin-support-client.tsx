@@ -37,6 +37,9 @@ type SupportTicket = {
   providerError: string | null;
   expectedResponseAt: string | null;
   closedAt: string | null;
+  reopenReason: string | null;
+  reopenedAt: string | null;
+  reopenCount: number;
   rating: number | null;
   ratingProblemResolved: boolean | null;
   ratingReason: string | null;
@@ -295,6 +298,19 @@ export function AdminSupportClient() {
                     {ticket.contactName} • {ticket.contactEmail} • {ticket.tenant.name} • {formatDateTimeDisplay(ticket.createdAt)}
                     {ticket.closedAt ? ` • Encerrado em ${formatDateTimeDisplay(ticket.closedAt)}` : ""}
                   </p>
+                  {ticket.reopenedAt ? (
+                    <div className="mt-4 rounded-[1rem] border border-[var(--color-border)] bg-[var(--color-panel)] px-3 py-2">
+                      <p className="text-xs font-semibold text-[var(--color-foreground)]">
+                        Reaberto em {formatDateTimeDisplay(ticket.reopenedAt)}
+                        {ticket.reopenCount > 1 ? ` • ${ticket.reopenCount} reaberturas` : ""}
+                      </p>
+                      {ticket.reopenReason ? (
+                        <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-[var(--color-muted-foreground)]">
+                          {ticket.reopenReason}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
                   <p className="mt-4 whitespace-pre-wrap break-words text-sm leading-7">{ticket.message}</p>
 
                   {ticket.providerError ? (

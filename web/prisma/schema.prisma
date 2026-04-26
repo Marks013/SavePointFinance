@@ -287,6 +287,9 @@ model SupportTicket {
   expectedResponseAt  DateTime?
   closedAt            DateTime?
   closedByAdminUserId String?
+  reopenReason        String?
+  reopenedAt          DateTime?
+  reopenCount         Int                 @default(0)
   rating              Int?
   ratingProblemResolved Boolean?
   ratingReason        String?
