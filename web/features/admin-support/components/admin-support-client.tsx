@@ -53,6 +53,20 @@ type TicketsResponse = {
   items: SupportTicket[];
 };
 
+type AdminSupportUser = {
+  id: string;
+  name: string | null;
+  email: string;
+  tenant: {
+    name: string;
+    slug: string;
+  };
+};
+
+type AdminUsersResponse = {
+  items: AdminSupportUser[];
+};
+
 type SupportPopupDraft = {
   title: string;
   body: string;
@@ -79,6 +93,16 @@ async function getSupportTickets(filters: { search?: string; status?: string; de
   }
 
   return (await response.json()) as TicketsResponse;
+}
+
+async function getSupportPopupUsers(search?: string) {
+  const response = await fetch(`/api/admin/users${buildQuery({ search, status: "active", pageSize: "50" })}`, { cache: "no-store" });
+
+  if (!response.ok) {
+    throw new Error("Falha ao carregar usuários para popup individual");
+  }
+
+  return (await response.json()) as AdminUsersResponse;
 }
 
 async function replyTicket(ticketId: string, message: string) {
@@ -178,12 +202,24 @@ function buildDefaultPopupDraft(ticket: SupportTicket): SupportPopupDraft {
   };
 }
 
+function buildDefaultSupportPopupDraft(): SupportPopupDraft {
+  return {
+    title: "Mensagem do suporte",
+    body: "Temos uma atualização importante para você. Acesse sua área de suporte para acompanhar os detalhes.",
+    ctaLabel: "Ver suporte",
+    ctaUrl: "/dashboard/support"
+  };
+}
+
 export function AdminSupportClient() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
   const [deliveryStatus, setDeliveryStatus] = useState("all");
   const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
+  const [supportPopupTargetUserId, setSupportPopupTargetUserId] = useState("");
+  const [supportPopupUserSearch, setSupportPopupUserSearch] = useState("");
+  const [supportPopupDraft, setSupportPopupDraft] = useState<SupportPopupDraft>(buildDefaultSupportPopupDraft);
   const [popupDrafts, setPopupDrafts] = useState<Record<string, SupportPopupDraft>>({});
   const [activePopupTicketId, setActivePopupTicketId] = useState<string | null>(null);
   const [retryingTicketId, setRetryingTicketId] = useState<string | null>(null);
@@ -196,6 +232,10 @@ export function AdminSupportClient() {
         status,
         deliveryStatus
       })
+  });
+  const popupUsersQuery = useQuery({
+    queryKey: ["admin-support-popup-users", supportPopupUserSearch],
+    queryFn: () => getSupportPopupUsers(supportPopupUserSearch || undefined)
   });
   const replyMutation = useMutation({
     mutationFn: ({ ticketId, message }: { ticketId: string; message: string }) => replyTicket(ticketId, message),
@@ -253,17 +293,16 @@ export function AdminSupportClient() {
     }
   });
   const popupMutation = useMutation({
-    mutationFn: ({ ticket, draft }: { ticket: SupportTicket; draft: SupportPopupDraft }) =>
+    mutationFn: ({ targetUserId, draft }: { targetUserId: string; draft: SupportPopupDraft }) =>
       sendSupportPopup({
-        targetUserId: ticket.user.id,
+        targetUserId,
         title: draft.title,
         body: draft.body,
         ctaLabel: draft.ctaLabel.trim() || null,
         ctaUrl: draft.ctaUrl.trim() || null
       }),
-    onSuccess: async (payload, variables) => {
+    onSuccess: async (payload) => {
       setActivePopupTicketId(null);
-      setPopupDrafts((current) => ({ ...current, [variables.ticket.id]: buildDefaultPopupDraft(variables.ticket) }));
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["admin-support"] }),
         queryClient.invalidateQueries({ queryKey: ["admin-audit"] })
@@ -275,6 +314,12 @@ export function AdminSupportClient() {
     }
   });
   const tickets = ticketsQuery.data?.items ?? [];
+  const popupUsers = popupUsersQuery.data?.items ?? [];
+  const supportPopupCanSend =
+    Boolean(supportPopupTargetUserId) &&
+    supportPopupDraft.title.trim().length >= 3 &&
+    supportPopupDraft.body.trim().length >= 12 &&
+    (!supportPopupDraft.ctaLabel.trim() || Boolean(supportPopupDraft.ctaUrl.trim()));
   const openTickets = tickets.filter((ticket) => ticket.status !== "closed");
   const closedTickets = tickets.filter((ticket) => ticket.status === "closed");
   const ticketGroups = [
@@ -297,6 +342,75 @@ export function AdminSupportClient() {
             <p className="metric-label">No recorte</p>
             <p className="metric-value">{tickets.length}</p>
           </article>
+        </div>
+
+        <div className="mt-6 rounded-[1.25rem] border border-[var(--color-border)] bg-[var(--color-panel)] p-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0">
+              <div className="eyebrow">Popup individual</div>
+              <h2 className="mt-2 text-lg font-semibold tracking-[-0.02em]">Enviar aviso para um usuário</h2>
+              <p className="mt-1 text-sm leading-6 text-[var(--color-muted-foreground)]">
+                Mensagem pontual dentro do módulo de suporte, separada dos anúncios gerais.
+              </p>
+            </div>
+            <Button
+              disabled={!supportPopupCanSend || popupMutation.isPending}
+              onClick={() => popupMutation.mutate({ targetUserId: supportPopupTargetUserId, draft: supportPopupDraft })}
+              type="button"
+            >
+              <Megaphone className="size-4" />
+              {popupMutation.isPending ? "Enviando popup..." : "Enviar popup individual"}
+            </Button>
+          </div>
+
+          <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+            <div className="space-y-3">
+              <Input
+                aria-label="Buscar usuário para popup individual"
+                placeholder="Buscar usuário por nome, e-mail ou conta"
+                value={supportPopupUserSearch}
+                onChange={(event) => setSupportPopupUserSearch(event.target.value)}
+              />
+              <Select value={supportPopupTargetUserId} onChange={(event) => setSupportPopupTargetUserId(event.target.value)}>
+                <option value="">{popupUsersQuery.isLoading ? "Carregando usuários..." : "Selecione o usuário"}</option>
+                {popupUsers.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {(user.name || user.email)} • {user.email} • {user.tenant.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+
+            <div className="space-y-3">
+              <Input
+                aria-label="Título do popup individual"
+                placeholder="Título do popup"
+                value={supportPopupDraft.title}
+                onChange={(event) => setSupportPopupDraft((current) => ({ ...current, title: event.target.value }))}
+              />
+              <textarea
+                aria-label="Mensagem do popup individual"
+                className="min-h-28 w-full rounded-[1.15rem] border border-[var(--color-border)] bg-[var(--color-input)] px-4 py-3 text-sm leading-7 outline-none transition duration-200 focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary)]/12"
+                placeholder="Mensagem que aparecerá para este usuário"
+                value={supportPopupDraft.body}
+                onChange={(event) => setSupportPopupDraft((current) => ({ ...current, body: event.target.value }))}
+              />
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Input
+                  aria-label="Texto do botão do popup individual"
+                  placeholder="Botão, opcional"
+                  value={supportPopupDraft.ctaLabel}
+                  onChange={(event) => setSupportPopupDraft((current) => ({ ...current, ctaLabel: event.target.value }))}
+                />
+                <Input
+                  aria-label="Link do botão do popup individual"
+                  placeholder="/dashboard/support"
+                  value={supportPopupDraft.ctaUrl}
+                  onChange={(event) => setSupportPopupDraft((current) => ({ ...current, ctaUrl: event.target.value }))}
+                />
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="mt-6 grid gap-3 md:grid-cols-3">
@@ -518,7 +632,7 @@ export function AdminSupportClient() {
                               (Boolean((popupDrafts[ticket.id] ?? buildDefaultPopupDraft(ticket)).ctaLabel.trim()) &&
                                 !Boolean((popupDrafts[ticket.id] ?? buildDefaultPopupDraft(ticket)).ctaUrl.trim()))
                             }
-                            onClick={() => popupMutation.mutate({ ticket, draft: popupDrafts[ticket.id] ?? buildDefaultPopupDraft(ticket) })}
+                            onClick={() => popupMutation.mutate({ targetUserId: ticket.user.id, draft: popupDrafts[ticket.id] ?? buildDefaultPopupDraft(ticket) })}
                             type="button"
                           >
                             <Megaphone className="size-4" />
