@@ -266,6 +266,7 @@ model User {
 
 model SupportTicket {
   id                  String              @id @default(cuid())
+  ticketNumber        Int                 @unique @default(autoincrement())
   tenantId            String
   userId              String
   topic               String

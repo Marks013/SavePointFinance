@@ -38,6 +38,7 @@ type SupportResponse = {
 
 type SupportTicketItem = {
   id: string;
+  ticketNumber: number;
   topicLabel: string;
   priorityLabel: string;
   subject: string;
@@ -153,6 +154,19 @@ async function rateSupportTicket(
   return payload;
 }
 
+async function reopenSupportTicket(ticketId: string) {
+  const response = await fetch(`/api/support/${ticketId}/reopen`, {
+    method: "POST"
+  });
+  const payload = (await response.json().catch(() => ({}))) as { message?: string };
+
+  if (!response.ok) {
+    throw new Error(payload.message ?? "Não foi possível reabrir a conversa");
+  }
+
+  return payload;
+}
+
 export function SupportClient({ initialEmail, initialName }: SupportClientProps) {
   const queryClient = useQueryClient();
   const [ratingDrafts, setRatingDrafts] = useState<Record<string, { rating: number; problemResolved: boolean; reason: string; improvement: string }>>({});
@@ -211,6 +225,16 @@ export function SupportClient({ initialEmail, initialName }: SupportClientProps)
     },
     onError: (error) => {
       toast.error("Avaliação não registrada", { description: error.message });
+    }
+  });
+  const reopenMutation = useMutation({
+    mutationFn: ({ ticketId }: { ticketId: string }) => reopenSupportTicket(ticketId),
+    onSuccess: async (payload) => {
+      await queryClient.invalidateQueries({ queryKey: ["support-history"] });
+      toast.success(payload.message ?? "Conversa reaberta");
+    },
+    onError: (error) => {
+      toast.error("Não foi possível reabrir", { description: error.message });
     }
   });
   const responseWindow =
@@ -392,7 +416,7 @@ export function SupportClient({ initialEmail, initialName }: SupportClientProps)
                         {formatTicketStatus(ticket.status)}
                       </span>
                     </div>
-                    <p className="mt-3 break-words font-semibold">{ticket.subject}</p>
+                    <p className="mt-3 break-words font-semibold">#{ticket.ticketNumber} • {ticket.subject}</p>
                     <div className="mt-3 rounded-[1rem] border border-[var(--color-border)] bg-[var(--color-panel)] px-3 py-2">
                       <p className="text-xs font-semibold text-[var(--color-foreground)]">Sua mensagem</p>
                       <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-[var(--color-muted-foreground)]">
@@ -416,6 +440,16 @@ export function SupportClient({ initialEmail, initialName }: SupportClientProps)
                     {ticket.status === "closed" && !ticket.ratedAt ? (
                       <div className="mt-4 rounded-[1rem] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-card)_92%,var(--color-muted))] p-4">
                         <p className="text-sm font-semibold">Essa conversa resolveu seu problema?</p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <Button
+                            disabled={reopenMutation.isPending}
+                            onClick={() => reopenMutation.mutate({ ticketId: ticket.id })}
+                            type="button"
+                            variant="secondary"
+                          >
+                            {reopenMutation.isPending ? "Reabrindo..." : "Reabrir conversa"}
+                          </Button>
+                        </div>
                         <div className="mt-3 flex flex-wrap gap-2">
                           {[1, 2, 3, 4, 5].map((value) => {
                             const draft = ratingDrafts[ticket.id] ?? { rating: 0, problemResolved: true, reason: "", improvement: "" };

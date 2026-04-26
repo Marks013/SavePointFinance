@@ -22,6 +22,7 @@ type SupportReply = {
 
 type SupportTicket = {
   id: string;
+  ticketNumber: number;
   tenant: { id: string; name: string; slug: string };
   user: { id: string; name: string; email: string };
   topicLabel: string;
@@ -216,6 +217,12 @@ export function AdminSupportClient() {
     }
   });
   const tickets = ticketsQuery.data?.items ?? [];
+  const openTickets = tickets.filter((ticket) => ticket.status !== "closed");
+  const closedTickets = tickets.filter((ticket) => ticket.status === "closed");
+  const ticketGroups = [
+    { key: "open", title: "Chamados abertos", items: openTickets },
+    { key: "closed", title: "Chamados encerrados", items: closedTickets }
+  ];
 
   return (
     <div className="space-y-6">
@@ -235,7 +242,7 @@ export function AdminSupportClient() {
         </div>
 
         <div className="mt-6 grid gap-3 md:grid-cols-3">
-          <Input placeholder="Buscar por assunto, e-mail, conta ou mensagem" value={search} onChange={(event) => setSearch(event.target.value)} />
+          <Input placeholder="Buscar por número, assunto, e-mail, conta ou mensagem" value={search} onChange={(event) => setSearch(event.target.value)} />
           <Select value={status} onChange={(event) => setStatus(event.target.value)}>
             <option value="all">Todos os status</option>
             <option value="open">Abertos</option>
@@ -258,7 +265,14 @@ export function AdminSupportClient() {
         {ticketsQuery.isLoading ? (
           <div className="surface content-section text-sm text-[var(--color-muted-foreground)]">Carregando solicitações...</div>
         ) : tickets.length ? (
-          tickets.map((ticket) => (
+          ticketGroups.map((group) =>
+            group.items.length ? (
+              <div key={group.key} className="space-y-3">
+                <div className="flex items-center justify-between gap-3 px-1">
+                  <h2 className="text-lg font-semibold tracking-[-0.02em]">{group.title}</h2>
+                  <span className="text-sm text-[var(--color-muted-foreground)]">{group.items.length}</span>
+                </div>
+                {group.items.map((ticket) => (
             <article key={ticket.id} className="data-card p-5">
               <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                 <div className="min-w-0 flex-1">
@@ -276,7 +290,7 @@ export function AdminSupportClient() {
                       {formatDeliveryStatus(ticket.deliveryStatus)}
                     </span>
                   </div>
-                  <h2 className="mt-3 break-words text-xl font-semibold">{ticket.subject}</h2>
+                  <h2 className="mt-3 break-words text-xl font-semibold">#{ticket.ticketNumber} • {ticket.subject}</h2>
                   <p className="mt-2 text-sm leading-6 text-[var(--color-muted-foreground)]">
                     {ticket.contactName} • {ticket.contactEmail} • {ticket.tenant.name} • {formatDateTimeDisplay(ticket.createdAt)}
                     {ticket.closedAt ? ` • Encerrado em ${formatDateTimeDisplay(ticket.closedAt)}` : ""}
@@ -350,36 +364,45 @@ export function AdminSupportClient() {
 
                 <div className="w-full shrink-0 space-y-3 xl:w-[360px]">
                   {ticket.status !== "closed" ? (
-                    <Button
-                      className="w-full"
-                      disabled={closingTicketId === ticket.id || closeMutation.isPending}
-                      onClick={() => closeMutation.mutate({ ticketId: ticket.id })}
-                      type="button"
-                      variant="secondary"
-                    >
-                      <CheckCircle2 className="size-4" />
-                      {closingTicketId === ticket.id ? "Encerrando..." : "Fechar como resolvido"}
-                    </Button>
-                  ) : null}
-                  <textarea
-                    className="min-h-36 w-full rounded-[1.15rem] border border-[var(--color-border)] bg-[var(--color-input)] px-4 py-3 text-sm leading-7 outline-none transition duration-200 focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary)]/12"
-                    placeholder="Escreva a resposta para o usuário"
-                    value={replyDrafts[ticket.id] ?? ""}
-                    onChange={(event) => setReplyDrafts((current) => ({ ...current, [ticket.id]: event.target.value }))}
-                  />
-                  <Button
-                    className="w-full"
-                    disabled={(replyDrafts[ticket.id] ?? "").trim().length < 10 || replyMutation.isPending}
-                    onClick={() => replyMutation.mutate({ ticketId: ticket.id, message: replyDrafts[ticket.id] ?? "" })}
-                    type="button"
-                  >
-                    <SendHorizonal className="size-4" />
-                    {replyMutation.isPending ? "Enviando resposta..." : "Responder"}
-                  </Button>
+                    <>
+                      <Button
+                        className="w-full"
+                        disabled={closingTicketId === ticket.id || closeMutation.isPending}
+                        onClick={() => closeMutation.mutate({ ticketId: ticket.id })}
+                        type="button"
+                        variant="secondary"
+                      >
+                        <CheckCircle2 className="size-4" />
+                        {closingTicketId === ticket.id ? "Encerrando..." : "Fechar como resolvido"}
+                      </Button>
+                      <textarea
+                        className="min-h-36 w-full rounded-[1.15rem] border border-[var(--color-border)] bg-[var(--color-input)] px-4 py-3 text-sm leading-7 outline-none transition duration-200 focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary)]/12"
+                        placeholder="Escreva a resposta para o usuário"
+                        value={replyDrafts[ticket.id] ?? ""}
+                        onChange={(event) => setReplyDrafts((current) => ({ ...current, [ticket.id]: event.target.value }))}
+                      />
+                      <Button
+                        className="w-full"
+                        disabled={(replyDrafts[ticket.id] ?? "").trim().length < 10 || replyMutation.isPending}
+                        onClick={() => replyMutation.mutate({ ticketId: ticket.id, message: replyDrafts[ticket.id] ?? "" })}
+                        type="button"
+                      >
+                        <SendHorizonal className="size-4" />
+                        {replyMutation.isPending ? "Enviando resposta..." : "Responder"}
+                      </Button>
+                    </>
+                  ) : (
+                    <p className="rounded-[1rem] border border-[var(--color-border)] bg-[var(--color-panel)] px-3 py-2 text-sm leading-6 text-[var(--color-muted-foreground)]">
+                      Conversa concluída. O campo de resposta será liberado se o usuário reabrir antes de avaliar.
+                    </p>
+                  )}
                 </div>
               </div>
             </article>
-          ))
+                ))}
+              </div>
+            ) : null
+          )
         ) : (
           <div className="surface content-section text-sm text-[var(--color-muted-foreground)]">
             Nenhuma solicitação encontrada para os filtros atuais.

@@ -15,7 +15,8 @@ export async function GET(request: Request) {
     const status = searchParams.get("status")?.trim();
     const deliveryStatus = searchParams.get("deliveryStatus")?.trim();
     const search = searchParams.get("search")?.trim();
-    const pageSize = Math.min(50, Math.max(1, Number(searchParams.get("pageSize") ?? "25") || 25));
+const pageSize = Math.min(50, Math.max(1, Number(searchParams.get("pageSize") ?? "25") || 25));
+    const ticketNumberSearch = search && /^\d+$/.test(search) ? Number(search) : null;
 
     const tickets = await prisma.supportTicket.findMany({
       where: {
@@ -26,6 +27,7 @@ export async function GET(request: Request) {
           ? {
               OR: [
                 { subject: { contains: search, mode: "insensitive" } },
+                ...(ticketNumberSearch ? [{ ticketNumber: ticketNumberSearch }] : []),
                 { message: { contains: search, mode: "insensitive" } },
                 { contactEmail: { contains: search, mode: "insensitive" } },
                 { contactName: { contains: search, mode: "insensitive" } },
@@ -45,13 +47,40 @@ export async function GET(request: Request) {
           orderBy: { createdAt: "asc" }
         }
       },
-      orderBy: [{ createdAt: "desc" }],
-      take: pageSize
+      orderBy: [{ createdAt: "asc" }],
+      take: 200
     });
+    const priorityRank: Record<string, number> = {
+      urgent: 0,
+      high: 1,
+      normal: 2,
+      low: 3
+    };
+    const sortedTickets = tickets
+      .sort((left, right) => {
+        const leftClosed = left.status === "closed" ? 1 : 0;
+        const rightClosed = right.status === "closed" ? 1 : 0;
+
+        if (leftClosed !== rightClosed) {
+          return leftClosed - rightClosed;
+        }
+
+        if (left.status !== "closed" && right.status !== "closed") {
+          const priorityDelta = (priorityRank[left.priority] ?? 99) - (priorityRank[right.priority] ?? 99);
+
+          if (priorityDelta !== 0) {
+            return priorityDelta;
+          }
+        }
+
+        return left.createdAt.getTime() - right.createdAt.getTime();
+      })
+      .slice(0, pageSize);
 
     return NextResponse.json({
-      items: tickets.map((ticket) => ({
+      items: sortedTickets.map((ticket) => ({
         id: ticket.id,
+        ticketNumber: ticket.ticketNumber,
         tenant: ticket.tenant,
         user: ticket.user,
         topicLabel: ticket.topicLabel,

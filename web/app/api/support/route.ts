@@ -32,6 +32,7 @@ function resolveExpectedResponseAt(now = new Date()) {
 
 function serializeTicket(ticket: {
   id: string;
+  ticketNumber: number;
   topicLabel: string;
   priorityLabel: string;
   subject: string;
@@ -56,6 +57,7 @@ function serializeTicket(ticket: {
 }) {
   return {
     id: ticket.id,
+    ticketNumber: ticket.ticketNumber,
     topicLabel: ticket.topicLabel,
     priorityLabel: ticket.priorityLabel,
     subject: ticket.subject,
@@ -107,7 +109,7 @@ export async function POST(request: Request) {
     });
     const context: Array<[string, string]> = body.allowAccountContext
       ? [
-          ["Chamado", ticket.id],
+          ["Chamado", `#${ticket.ticketNumber}`],
           ["Usuário", `${user.name ?? "Sem nome"} <${user.email ?? "sem e-mail"}>`],
           ["Conta", user.tenant?.name ?? user.tenantId],
           ["Papel", user.role],
@@ -118,7 +120,7 @@ export async function POST(request: Request) {
       : [];
     const attemptAt = new Date();
     const result = await sendSupportEmail({
-      id: ticket.id,
+      id: `#${ticket.ticketNumber}`,
       contactName: body.contactName,
       contactEmail: body.contactEmail,
       topicLabel,
@@ -143,6 +145,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           id: ticket.id,
+          ticketNumber: ticket.ticketNumber,
           deliveryStatus: result.error.includes("ausente") ? "not_configured" : "failed",
           expectedResponseAt: expectedResponseAt.toISOString(),
           responseWindow: SUPPORT_RESPONSE_COPY,
@@ -169,6 +172,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       id: ticket.id,
+      ticketNumber: ticket.ticketNumber,
       deliveryStatus: "sent",
       providerMessageId: result.providerMessageId,
       expectedResponseAt: expectedResponseAt.toISOString(),

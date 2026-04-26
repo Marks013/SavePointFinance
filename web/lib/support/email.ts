@@ -34,6 +34,11 @@ export type SupportReplyEmailInput = {
   contactName: string;
   contactEmail: string;
   adminName: string;
+  conversationHistory: Array<{
+    author: string;
+    message: string;
+    createdAt: Date;
+  }>;
 };
 
 export function resolveSupportEmailSender() {
@@ -237,6 +242,43 @@ export async function sendSupportReplyEmail(input: SupportReplyEmailInput): Prom
   }
 
   let response: Response;
+  const historyText = input.conversationHistory.length
+    ? [
+        "Histórico da conversa:",
+        ...input.conversationHistory.flatMap((item) => [
+          "",
+          `${item.author} em ${new Intl.DateTimeFormat("pt-BR", {
+            dateStyle: "short",
+            timeStyle: "short",
+            timeZone: "America/Sao_Paulo"
+          }).format(item.createdAt)}:`,
+          item.message
+        ])
+      ]
+    : [];
+  const historyHtml = input.conversationHistory.length
+    ? `
+      <h2 style="margin:24px 0 10px;font-size:16px;">Histórico da conversa</h2>
+      <div style="display:grid;gap:10px;">
+        ${input.conversationHistory
+          .map(
+            (item) => `
+              <div style="padding:14px 16px;background:#FFFFFF;border:1px solid #EAECF0;border-radius:12px;line-height:1.7;">
+                <p style="margin:0 0 8px;color:#667085;font-size:12px;">
+                  ${escapeHtml(item.author)} em ${escapeHtml(
+                    new Intl.DateTimeFormat("pt-BR", {
+                      dateStyle: "short",
+                      timeStyle: "short",
+                      timeZone: "America/Sao_Paulo"
+                    }).format(item.createdAt)
+                  )}
+                </p>
+                <div style="color:#475467;">${formatMultiline(item.message)}</div>
+              </div>`
+          )
+          .join("")}
+      </div>`
+    : "";
 
   try {
     response = await fetchWithTimeout(
@@ -258,6 +300,8 @@ export async function sendSupportReplyEmail(input: SupportReplyEmailInput): Prom
             "",
             `Chamado: ${input.id}`,
             "",
+            ...historyText,
+            historyText.length ? "" : "",
             "Mensagem original:",
             input.originalMessage
           ].join("\n"),
@@ -274,6 +318,7 @@ export async function sendSupportReplyEmail(input: SupportReplyEmailInput): Prom
                     ${formatMultiline(input.replyMessage)}
                   </div>
                   <p style="margin:20px 0 0;color:#667085;font-size:13px;">Chamado ${escapeHtml(input.id)} respondido por ${escapeHtml(input.adminName)}.</p>
+                  ${historyHtml}
                   <h2 style="margin:24px 0 10px;font-size:16px;">Mensagem original</h2>
                   <div style="padding:14px 16px;background:#FFFFFF;border:1px solid #EAECF0;border-radius:12px;color:#475467;line-height:1.7;">
                     ${formatMultiline(input.originalMessage)}

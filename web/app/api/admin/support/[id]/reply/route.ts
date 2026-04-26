@@ -30,12 +30,22 @@ export async function POST(request: Request, context: Params) {
       },
       include: {
         tenant: { select: { id: true, name: true } },
-        user: { select: { id: true, name: true, email: true } }
+        user: { select: { id: true, name: true, email: true } },
+        replies: {
+          include: {
+            adminUser: { select: { name: true } }
+          },
+          orderBy: { createdAt: "asc" }
+        }
       }
     });
 
     if (!ticket) {
       return NextResponse.json({ message: "Chamado de suporte não encontrado" }, { status: 404 });
+    }
+
+    if (ticket.status === "closed") {
+      return NextResponse.json({ message: "Conversa encerrada. Reabra antes de responder." }, { status: 409 });
     }
 
     const reply = await prisma.supportTicketReply.create({
@@ -47,13 +57,25 @@ export async function POST(request: Request, context: Params) {
     });
     const attemptAt = new Date();
     const result = await sendSupportReplyEmail({
-      id: ticket.id,
+      id: `#${ticket.ticketNumber}`,
       subject: ticket.subject,
       originalMessage: ticket.message,
       replyMessage: body.message,
       contactName: ticket.contactName,
       contactEmail: ticket.contactEmail,
-      adminName: admin.name
+      adminName: admin.name,
+      conversationHistory: [
+        {
+          author: ticket.contactName,
+          message: ticket.message,
+          createdAt: ticket.createdAt
+        },
+        ...ticket.replies.map((item) => ({
+          author: item.adminUser.name,
+          message: item.message,
+          createdAt: item.createdAt
+        }))
+      ]
     });
 
     await prisma.supportTicketReply.update({

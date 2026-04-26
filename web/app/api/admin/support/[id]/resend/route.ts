@@ -53,7 +53,7 @@ export async function POST(request: Request, context: Params) {
 
     const attemptAt = new Date();
     const result = await sendSupportEmail({
-      id: ticket.id,
+      id: `#${ticket.ticketNumber}`,
       contactName: ticket.contactName,
       contactEmail: ticket.contactEmail,
       topicLabel: ticket.topicLabel,
@@ -61,7 +61,7 @@ export async function POST(request: Request, context: Params) {
       subject: ticket.subject,
       message: ticket.message,
       context: [
-        ["Chamado", ticket.id],
+        ["Chamado", `#${ticket.ticketNumber}`],
         ["Usuário", `${ticket.user.name} <${ticket.user.email}>`],
         ["Conta", ticket.tenant.name],
         ["Papel", ticket.user.role],
