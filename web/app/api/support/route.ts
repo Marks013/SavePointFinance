@@ -41,6 +41,12 @@ function serializeTicket(ticket: {
   expectedResponseAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
+  replies?: Array<{
+    id: string;
+    message: string;
+    deliveryStatus: string;
+    createdAt: Date;
+  }>;
 }) {
   return {
     id: ticket.id,
@@ -52,36 +58,15 @@ function serializeTicket(ticket: {
     deliveryStatus: ticket.deliveryStatus,
     expectedResponseAt: ticket.expectedResponseAt?.toISOString() ?? null,
     createdAt: ticket.createdAt.toISOString(),
-    updatedAt: ticket.updatedAt.toISOString()
+    updatedAt: ticket.updatedAt.toISOString(),
+    replies:
+      ticket.replies?.map((reply) => ({
+        id: reply.id,
+        message: reply.message,
+        deliveryStatus: reply.deliveryStatus,
+        createdAt: reply.createdAt.toISOString()
+      })) ?? []
   };
-}
-
-async function pruneSupportHistory(tenantId: string, userId: string) {
-  const ticketsToPrune = await prisma.supportTicket.findMany({
-    where: {
-      tenantId,
-      userId
-    },
-    orderBy: {
-      createdAt: "desc"
-    },
-    skip: SUPPORT_HISTORY_LIMIT,
-    select: {
-      id: true
-    }
-  });
-
-  if (!ticketsToPrune.length) {
-    return;
-  }
-
-  await prisma.supportTicket.deleteMany({
-    where: {
-      id: {
-        in: ticketsToPrune.map((item) => item.id)
-      }
-    }
-  });
 }
 
 export async function POST(request: Request) {
@@ -140,12 +125,12 @@ export async function POST(request: Request) {
           providerError: result.error
         }
       });
-      await pruneSupportHistory(user.tenantId, user.id);
       revalidateAdminUsers(user.tenantId);
 
       return NextResponse.json(
         {
           id: ticket.id,
+          deliveryStatus: result.error.includes("ausente") ? "not_configured" : "failed",
           expectedResponseAt: expectedResponseAt.toISOString(),
           responseWindow: SUPPORT_RESPONSE_COPY,
           message:
@@ -153,7 +138,7 @@ export async function POST(request: Request) {
               ? "Chamado registrado, mas o suporte por e-mail ainda não está configurado. O superadmin verá a falha para reenviar."
               : "Chamado registrado, mas houve falha ao enviar o e-mail. O superadmin verá a falha para reenviar."
         },
-        { status: result.error.includes("ausente") ? 503 : 502 }
+        { status: 202 }
       );
     }
 
@@ -167,11 +152,11 @@ export async function POST(request: Request) {
         providerError: null
       }
     });
-    await pruneSupportHistory(user.tenantId, user.id);
     revalidateAdminUsers(user.tenantId);
 
     return NextResponse.json({
       id: ticket.id,
+      deliveryStatus: "sent",
       providerMessageId: result.providerMessageId,
       expectedResponseAt: expectedResponseAt.toISOString(),
       responseWindow: SUPPORT_RESPONSE_COPY,
@@ -200,6 +185,24 @@ export async function GET(request: Request) {
       },
       orderBy: {
         createdAt: "desc"
+      },
+      include: {
+        replies: {
+          where: {
+            deliveryStatus: {
+              in: ["sent", "delivered"]
+            }
+          },
+          orderBy: {
+            createdAt: "asc"
+          },
+          select: {
+            id: true,
+            message: true,
+            deliveryStatus: true,
+            createdAt: true
+          }
+        }
       },
       take: limit
     });

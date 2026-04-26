@@ -45,7 +45,10 @@ const navigation = [
   { href: "/dashboard/settings" as Route, label: "Configurações", icon: Settings }
 ];
 
-const platformAdminNavigation = [{ href: "/dashboard/admin" as Route, label: "Admin", icon: ShieldCheck }];
+const platformAdminNavigation = [
+  { href: "/dashboard/admin" as Route, label: "Admin", icon: ShieldCheck },
+  { href: "/dashboard/admin/support" as Route, label: "Suporte", icon: LifeBuoy }
+];
 
 type DashboardSidebarNavProps = {
   canManageSharing: boolean;
@@ -189,7 +192,7 @@ export function DashboardSidebarNav({ canManageSharing, isPlatformAdmin }: Dashb
       <nav className="space-y-2">
         {items.map((item) => {
           const Icon = item.icon;
-          const isActive = pathname === item.href;
+          const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname?.startsWith(`${item.href}/`));
 
           return (
             <Link

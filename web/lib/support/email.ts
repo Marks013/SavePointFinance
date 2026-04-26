@@ -26,6 +26,16 @@ export type SupportEmailResult =
       error: string;
     };
 
+export type SupportReplyEmailInput = {
+  id: string;
+  subject: string;
+  originalMessage: string;
+  replyMessage: string;
+  contactName: string;
+  contactEmail: string;
+  adminName: string;
+};
+
 export function resolveSupportEmailSender() {
   if (!serverEnv.EMAIL_FROM) {
     return null;
@@ -175,6 +185,103 @@ export async function sendSupportEmail(input: SupportEmailInput): Promise<Suppor
           text,
           html: buildSupportHtml(input),
           reply_to: input.contactEmail
+        })
+      },
+      SUPPORT_EMAIL_TIMEOUT_MS
+    );
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Falha de rede ao enviar via Resend"
+    };
+  }
+
+  const payloadText = await response.text().catch(() => "");
+
+  if (!response.ok) {
+    let providerMessage = payloadText.trim();
+
+    try {
+      const payload = JSON.parse(payloadText) as { message?: string; error?: { message?: string } };
+      providerMessage = payload.error?.message ?? payload.message ?? providerMessage;
+    } catch {
+      // Keep providerMessage as the plain response body.
+    }
+
+    return {
+      ok: false,
+      status: response.status,
+      error: providerMessage ? `Resend ${response.status}: ${providerMessage}` : "Falha ao enviar via Resend"
+    };
+  }
+
+  try {
+    return {
+      ok: true,
+      providerMessageId: (JSON.parse(payloadText) as { id?: string }).id
+    };
+  } catch {
+    return { ok: true };
+  }
+}
+
+export async function sendSupportReplyEmail(input: SupportReplyEmailInput): Promise<SupportEmailResult> {
+  const from = resolveSupportEmailSender();
+  const target = input.contactEmail;
+
+  if (!serverEnv.RESEND_API_KEY || !from || !target) {
+    return {
+      ok: false,
+      error: "RESEND_API_KEY, EMAIL_FROM ou e-mail de contato ausente."
+    };
+  }
+
+  let response: Response;
+
+  try {
+    response = await fetchWithTimeout(
+      "https://api.resend.com/emails",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${serverEnv.RESEND_API_KEY}`
+        },
+        body: JSON.stringify({
+          from,
+          to: [target],
+          subject: `Resposta do suporte: ${input.subject}`,
+          text: [
+            `Olá, ${input.contactName}.`,
+            "",
+            input.replyMessage,
+            "",
+            `Chamado: ${input.id}`,
+            "",
+            "Mensagem original:",
+            input.originalMessage
+          ].join("\n"),
+          html: `
+            <div style="font-family:Inter,Arial,sans-serif;background:#F6F4EF;padding:28px;color:#101828;">
+              <div style="max-width:680px;margin:0 auto;background:#FFFFFF;border:1px solid #E4DED4;border-radius:20px;overflow:hidden;">
+                <div style="background:#123D35;color:#FFFFFF;padding:24px 28px;">
+                  <p style="margin:0 0 8px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#CDE8DD;">Save Point Finance</p>
+                  <h1 style="margin:0;font-size:24px;line-height:1.25;">Resposta do suporte</h1>
+                </div>
+                <div style="padding:26px 28px;">
+                  <p style="margin:0 0 16px;color:#475467;">Olá, ${escapeHtml(input.contactName)}.</p>
+                  <div style="padding:18px 20px;background:#F9FAFB;border:1px solid #EAECF0;border-radius:14px;line-height:1.7;">
+                    ${formatMultiline(input.replyMessage)}
+                  </div>
+                  <p style="margin:20px 0 0;color:#667085;font-size:13px;">Chamado ${escapeHtml(input.id)} respondido por ${escapeHtml(input.adminName)}.</p>
+                  <h2 style="margin:24px 0 10px;font-size:16px;">Mensagem original</h2>
+                  <div style="padding:14px 16px;background:#FFFFFF;border:1px solid #EAECF0;border-radius:12px;color:#475467;line-height:1.7;">
+                    ${formatMultiline(input.originalMessage)}
+                  </div>
+                </div>
+              </div>
+            </div>`,
+          reply_to: serverEnv.EMAIL_REPLY_TO ?? serverEnv.SUPPORT_EMAIL_TO ?? undefined
         })
       },
       SUPPORT_EMAIL_TIMEOUT_MS

@@ -29,6 +29,7 @@ type SupportClientProps = {
 
 type SupportResponse = {
   id?: string;
+  deliveryStatus?: string;
   expectedResponseAt?: string;
   responseWindow?: string;
   message?: string;
@@ -45,6 +46,12 @@ type SupportTicketItem = {
   expectedResponseAt: string | null;
   createdAt: string;
   updatedAt: string;
+  replies: Array<{
+    id: string;
+    message: string;
+    deliveryStatus: string;
+    createdAt: string;
+  }>;
 };
 
 type SupportHistoryResponse = {
@@ -136,9 +143,15 @@ export function SupportClient({ initialEmail, initialName }: SupportClientProps)
   const mutation = useMutation({
     mutationFn: submitSupportRequest,
     onSuccess: (payload) => {
-      toast.success("Mensagem enviada ao suporte", {
-        description: payload.responseWindow ?? "Resposta em até 24 horas em dias úteis."
-      });
+      if (payload.deliveryStatus === "failed" || payload.deliveryStatus === "not_configured") {
+        toast.warning("Solicitação registrada", {
+          description: payload.message ?? "Nossa equipe verá a pendência para acompanhar."
+        });
+      } else {
+        toast.success("Mensagem enviada ao suporte", {
+          description: payload.responseWindow ?? "Resposta em até 24 horas em dias úteis."
+        });
+      }
       queryClient.invalidateQueries({ queryKey: ["support-history"] });
       form.reset({
         topic: "technical",
@@ -170,8 +183,7 @@ export function SupportClient({ initialEmail, initialName }: SupportClientProps)
         <div className="eyebrow">Suporte</div>
         <h1 className="mt-3 text-3xl font-semibold tracking-[-0.03em]">Fale com o suporte</h1>
         <p className="mt-4 max-w-2xl text-sm leading-7 text-[var(--color-muted-foreground)]">
-          Envie uma solicitação com o contexto certo para acelerar a triagem. O formulário encaminha sua mensagem por
-          e-mail transacional via Resend.
+          Envie sua solicitação com as informações principais para nossa equipe acompanhar e responder com clareza.
         </p>
         <div className="mt-5 rounded-[1.15rem] border border-[var(--color-border)] bg-[var(--color-panel)] px-4 py-3 text-sm leading-6 text-[var(--color-muted-foreground)]">
           {responseWindow}
@@ -259,8 +271,7 @@ export function SupportClient({ initialEmail, initialName }: SupportClientProps)
             <p className="metric-label text-white/70">Canal oficial</p>
             <h2 className="mt-3 text-2xl font-semibold">Atendimento por e-mail transacional</h2>
             <p className="mt-3 text-sm leading-7 text-white/78">
-              A mensagem é enviada pelo backend com Resend, sem expor token no navegador, e já chega com assunto,
-              prioridade e dados de contato organizados.
+              Sua solicitação chega organizada para atendimento, com assunto, prioridade e dados de contato.
             </p>
           </article>
 
@@ -345,6 +356,16 @@ export function SupportClient({ initialEmail, initialName }: SupportClientProps)
                     <p className="mt-2 break-words text-sm leading-6 text-[var(--color-muted-foreground)]">
                       {ticket.messagePreview}
                     </p>
+                    {ticket.replies.length ? (
+                      <div className="mt-3 rounded-[1rem] border border-[var(--color-border)] bg-[var(--color-panel)] px-3 py-2">
+                        <p className="text-xs font-semibold text-[var(--color-foreground)]">
+                          Resposta do suporte em {formatDateTimeDisplay(ticket.replies[ticket.replies.length - 1].createdAt)}
+                        </p>
+                        <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-[var(--color-muted-foreground)]">
+                          {ticket.replies[ticket.replies.length - 1].message}
+                        </p>
+                      </div>
+                    ) : null}
                   </div>
                   <div className="min-w-48 text-sm leading-6 text-[var(--color-muted-foreground)]">
                     <p>{formatDateTimeDisplay(ticket.createdAt)}</p>

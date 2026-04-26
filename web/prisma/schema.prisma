@@ -258,6 +258,7 @@ model User {
   auditTargets      AdminAuditLog[] @relation("AuditTargetUser")
   popupCampaignViews PopupCampaignView[]
   supportTickets   SupportTicket[]
+  supportReplies   SupportTicketReply[] @relation("SupportReplyAdmin")
 
   @@index([tenantId])
   @@index([resetToken])
@@ -288,10 +289,31 @@ model SupportTicket {
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  replies SupportTicketReply[]
 
   @@index([tenantId, createdAt])
   @@index([userId, createdAt])
   @@index([status, createdAt])
+}
+
+model SupportTicketReply {
+  id                    String   @id @default(cuid())
+  ticketId              String
+  adminUserId           String
+  message               String
+  deliveryStatus        String   @default("pending")
+  deliveryAttempts      Int      @default(0)
+  lastDeliveryAttemptAt DateTime?
+  providerMessageId     String?
+  providerError         String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  ticket    SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  adminUser User          @relation("SupportReplyAdmin", fields: [adminUserId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId, createdAt])
+  @@index([adminUserId, createdAt])
 }
 
 model UserPreference {

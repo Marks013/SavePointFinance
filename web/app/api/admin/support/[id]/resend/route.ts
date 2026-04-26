@@ -44,6 +44,13 @@ export async function POST(request: Request, context: Params) {
       return NextResponse.json({ message: "Chamado de suporte não encontrado" }, { status: 404 });
     }
 
+    if (!["failed", "not_configured", "bounced", "complained", "delayed"].includes(ticket.deliveryStatus)) {
+      return NextResponse.json(
+        { message: "Este chamado já possui entrega registrada e não precisa de reenvio." },
+        { status: 409 }
+      );
+    }
+
     const attemptAt = new Date();
     const result = await sendSupportEmail({
       id: ticket.id,

@@ -22,47 +22,13 @@ type AdminUserCardProps = {
   onToggleActive: () => void;
   onMoveTenant: () => void;
   onDeleteUser: () => void;
-  onRetrySupportTicket: (ticketId: string) => void;
   passwordActionDisabled: boolean;
   moveTenantDisabled: boolean;
   deleteUserDisabled: boolean;
-  retrySupportTicketId?: string | null;
 };
 
 function getLastLoginLabel(user: UserItem) {
   return user.lastLogin ? formatDateTimeDisplay(user.lastLogin) : "Nunca acessou";
-}
-
-function formatSupportTicketStatus(status: string) {
-  switch (status) {
-    case "answered":
-      return "Respondido";
-    case "closed":
-      return "Encerrado";
-    default:
-      return "Aberto";
-  }
-}
-
-function formatSupportDeliveryStatus(status: string) {
-  switch (status) {
-    case "delivered":
-      return "Entregue";
-    case "bounced":
-      return "E-mail retornou";
-    case "complained":
-      return "Marcado como spam";
-    case "delayed":
-      return "Entrega atrasada";
-    case "sent":
-      return "Enviado";
-    case "failed":
-      return "Falha no envio";
-    case "not_configured":
-      return "E-mail pendente";
-    default:
-      return "Registrado";
-  }
 }
 
 export function AdminUserCard({
@@ -81,11 +47,9 @@ export function AdminUserCard({
   onToggleActive,
   onMoveTenant,
   onDeleteUser,
-  onRetrySupportTicket,
   passwordActionDisabled,
   moveTenantDisabled,
-  deleteUserDisabled,
-  retrySupportTicketId
+  deleteUserDisabled
 }: AdminUserCardProps) {
   const roleLabel = formatRoleLabel({
     role: user.role,
@@ -131,71 +95,6 @@ export function AdminUserCard({
               )}
             </p>
           ) : null}
-          <details className="admin-disclosure mt-4">
-            <summary className="admin-disclosure-summary">
-              <div>
-                <p className="admin-disclosure-kicker">Suporte</p>
-                <p className="admin-disclosure-title">Histórico de mensagens deste usuário</p>
-              </div>
-              <p className="admin-disclosure-copy">
-                Mostra até 5 chamados, sempre do mais recente para o mais antigo.
-              </p>
-            </summary>
-            <div className="admin-disclosure-body space-y-3">
-              {user.supportTickets.length ? (
-                user.supportTickets.map((ticket) => (
-                  <article
-                    key={ticket.id}
-                    className="rounded-[1.2rem] border border-[var(--color-border)] bg-[color-mix(in_srgb,var(--color-card)_92%,var(--color-muted))] p-4"
-                  >
-                    <div className="flex flex-wrap gap-2">
-                      <span className="inline-flex items-center rounded-full border border-[var(--color-border)] bg-[var(--color-panel)] px-3 py-1 text-xs text-[var(--color-muted-foreground)]">
-                        {ticket.topicLabel}
-                      </span>
-                      <span className="inline-flex items-center rounded-full border border-[var(--color-border)] bg-[var(--color-panel)] px-3 py-1 text-xs text-[var(--color-muted-foreground)]">
-                        {ticket.priorityLabel}
-                      </span>
-                      <span className="inline-flex items-center rounded-full border border-[var(--color-border)] bg-[var(--color-panel)] px-3 py-1 text-xs text-[var(--color-muted-foreground)]">
-                        {formatSupportTicketStatus(ticket.status)}
-                      </span>
-                    </div>
-                    <p className="mt-3 break-words text-sm font-semibold">{ticket.subject}</p>
-                    <p className="mt-2 break-words text-xs leading-5 text-[var(--color-muted-foreground)]">
-                      {ticket.messagePreview}
-                    </p>
-                    <p className="mt-3 text-xs leading-5 text-[var(--color-muted-foreground)]">
-                      {formatDateTimeDisplay(ticket.createdAt)} • {formatSupportDeliveryStatus(ticket.deliveryStatus)}
-                      {ticket.expectedResponseAt ? ` • Previsão: ${formatDateTimeDisplay(ticket.expectedResponseAt)}` : ""}
-                    </p>
-                    <p className="mt-1 text-xs leading-5 text-[var(--color-muted-foreground)]">
-                      Tentativas: {ticket.deliveryAttempts}
-                      {ticket.lastDeliveryAttemptAt ? ` • Última tentativa: ${formatDateTimeDisplay(ticket.lastDeliveryAttemptAt)}` : ""}
-                    </p>
-                    {ticket.providerError ? (
-                      <p className="mt-2 rounded-[1rem] border border-[var(--color-destructive)]/20 bg-[var(--color-destructive)]/8 px-3 py-2 text-xs leading-5 text-[var(--color-destructive)]">
-                        Falha registrada: {ticket.providerError}
-                      </p>
-                    ) : null}
-                    {["failed", "not_configured", "bounced", "complained", "delayed"].includes(ticket.deliveryStatus) ? (
-                      <Button
-                        className="mt-3"
-                        disabled={retrySupportTicketId === ticket.id}
-                        onClick={() => onRetrySupportTicket(ticket.id)}
-                        type="button"
-                        variant="secondary"
-                      >
-                        {retrySupportTicketId === ticket.id ? "Reenviando..." : "Reenviar ao suporte"}
-                      </Button>
-                    ) : null}
-                  </article>
-                ))
-              ) : (
-                <p className="rounded-[1rem] border border-[var(--color-border)] bg-[var(--color-panel)] px-3 py-2 text-xs leading-5 text-[var(--color-muted-foreground)]">
-                  Nenhuma mensagem de suporte registrada para este usuário.
-                </p>
-              )}
-            </div>
-          </details>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button onClick={onToggleActive} type="button" variant="ghost">
