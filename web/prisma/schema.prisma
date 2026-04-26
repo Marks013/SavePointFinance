@@ -709,6 +709,7 @@ model WhatsAppMessage {
   phoneNumber String
   direction   WhatsAppMessageDirection
   messageId   String?
+  idempotencyKey String?                   @unique
   body        String
   intent      String?
   status      String?
@@ -843,6 +844,7 @@ model PopupCampaign {
   showToPlatformAdmins   Boolean             @default(false)
   showToTenantAdmins     Boolean             @default(true)
   showToMembers          Boolean             @default(true)
+  targetUserId           String?
   createdByUserId        String?
   createdAt              DateTime            @default(now())
   updatedAt              DateTime            @updatedAt
@@ -850,6 +852,7 @@ model PopupCampaign {
 
   @@index([status, startsAt, endsAt, priority])
   @@index([kind, status])
+  @@index([targetUserId, status])
 }
 
 model PopupCampaignView {

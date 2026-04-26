@@ -59,24 +59,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ status: "ignored" }, { status: 200 });
   }
 
-  const queuedEventIds: string[] = [];
+  const enqueueResults = await Promise.all(
+    messages.map(async (message) => {
+      const queued = await enqueueWhatsAppMessage({
+        eventId: message.eventId,
+        phoneNumber: message.phoneNumber,
+        body: message.body,
+        type: message.type,
+        mediaId: message.mediaId,
+        mimeType: message.mimeType,
+        caption: message.caption,
+        payload
+      });
 
-  for (const message of messages) {
-    const queued = await enqueueWhatsAppMessage({
-      eventId: message.eventId,
-      phoneNumber: message.phoneNumber,
-      body: message.body,
-      type: message.type,
-      mediaId: message.mediaId,
-      mimeType: message.mimeType,
-      caption: message.caption,
-      payload
-    });
-
-    if (queued) {
-      queuedEventIds.push(message.eventId);
-    }
-  }
+      return queued ? message.eventId : null;
+    })
+  );
+  const queuedEventIds = enqueueResults.filter((eventId): eventId is string => Boolean(eventId));
 
   if (!queuedEventIds.length) {
     return NextResponse.json({ status: "duplicate" }, { status: 200 });

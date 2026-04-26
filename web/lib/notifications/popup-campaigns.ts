@@ -38,7 +38,8 @@ const popupCampaignInputSchema = z.object({
   showToReturningUsers: z.boolean().default(true),
   showToPlatformAdmins: z.boolean().default(false),
   showToTenantAdmins: z.boolean().default(true),
-  showToMembers: z.boolean().default(true)
+  showToMembers: z.boolean().default(true),
+  targetUserId: z.string().trim().min(1).optional().nullable()
 });
 
 const popupCampaignAckSchema = z.object({
@@ -78,6 +79,7 @@ function mapPopupCampaign(campaign: PopupCampaignRecord) {
     showToPlatformAdmins: campaign.showToPlatformAdmins,
     showToTenantAdmins: campaign.showToTenantAdmins,
     showToMembers: campaign.showToMembers,
+    targetUserId: campaign.targetUserId,
     uniqueViews: campaign._count?.views ?? 0,
     createdAt: campaign.createdAt.toISOString(),
     updatedAt: campaign.updatedAt.toISOString()
@@ -125,6 +127,7 @@ function normalizePopupCampaignInput(input: unknown) {
     ctaLabel: normalizeOptionalText(parsed.ctaLabel),
     ctaUrl: normalizeOptionalText(parsed.ctaUrl),
     dismissLabel: normalizeOptionalText(parsed.dismissLabel) ?? "Agora não",
+    targetUserId: normalizeOptionalText(parsed.targetUserId),
     startsAt,
     endsAt
   };
@@ -179,6 +182,9 @@ export function parsePopupCampaignAck(input: unknown) {
 
 export async function listPopupCampaigns() {
   const campaigns = await prisma.popupCampaign.findMany({
+    where: {
+      targetUserId: null
+    },
     include: {
       _count: {
         select: {
@@ -332,7 +338,8 @@ export async function getActivePopupCampaignForUser(userId: string) {
   const now = new Date();
   const campaigns = await prisma.popupCampaign.findMany({
     where: {
-      status: "active"
+      status: "active",
+      OR: [{ targetUserId: null }, { targetUserId: user.id }]
     },
     orderBy: [{ priority: "desc" }, { createdAt: "desc" }]
   });
@@ -341,6 +348,10 @@ export async function getActivePopupCampaignForUser(userId: string) {
   const campaign = campaigns.find((item) => {
     if (!canCampaignRunNow(item, now)) {
       return false;
+    }
+
+    if (item.targetUserId) {
+      return item.targetUserId === user.id && canCampaignBeShownByHistory(item, viewMap.get(item.id) ?? null);
     }
 
     if (!canCampaignTargetRole(item, user)) {

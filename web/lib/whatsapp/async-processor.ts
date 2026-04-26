@@ -36,6 +36,14 @@ function getErrorMessage(error: unknown) {
   return "Unknown webhook processing error";
 }
 
+function isNonRetryableWhatsAppDeliveryStatus(status: number) {
+  if (status === 408 || status === 409 || status === 425 || status === 429) {
+    return false;
+  }
+
+  return status >= 400 && status < 500;
+}
+
 async function markWebhookStatus(eventId: string, status: "SUCCESS", error?: string) {
   try {
     await prisma.$executeRaw`
@@ -294,25 +302,81 @@ export async function processWhatsAppMessageAsync(input: ProcessWhatsAppMessageA
 
     if (result.handled) {
       const sanitizedResponse = sanitizeAssistantText(result.response);
-      const delivery = await sendWhatsAppTextMessage(result.to, sanitizedResponse);
+      const outboundIdempotencyKey = `outbound:${input.eventId}`;
+      let outboundLogId: string | null = null;
 
       if (result.logContext) {
-        await prisma.whatsAppMessage.create({
-          data: {
-            tenantId: result.logContext.tenantId,
-            userId: result.logContext.userId,
-            phoneNumber: result.logContext.phoneNumber,
-            direction: "outbound",
-            messageId: delivery.messageId,
-            body: sanitizedResponse,
-            intent: result.logContext.intent,
-            status: delivery.ok ? "sent" : `failed:${delivery.status}`,
-            response: sanitizedResponse
+        try {
+          const reservedLog = await prisma.whatsAppMessage.create({
+            data: {
+              tenantId: result.logContext.tenantId,
+              userId: result.logContext.userId,
+              phoneNumber: result.logContext.phoneNumber,
+              direction: "outbound",
+              idempotencyKey: outboundIdempotencyKey,
+              messageId: null,
+              body: sanitizedResponse,
+              intent: result.logContext.intent,
+              status: "sending",
+              response: sanitizedResponse
+            },
+            select: {
+              id: true
+            }
+          });
+          outboundLogId = reservedLog.id;
+        } catch (reserveError) {
+          const existingLog = await prisma.whatsAppMessage.findUnique({
+            where: {
+              idempotencyKey: outboundIdempotencyKey
+            },
+            select: {
+              id: true,
+              status: true
+            }
+          });
+
+          if (existingLog) {
+            await markWebhookStatus(input.eventId, "SUCCESS", `Duplicate outbound response suppressed. Existing status: ${existingLog.status ?? "unknown"}`);
+            return;
           }
-        });
+
+          throw reserveError;
+        }
+      }
+
+      const delivery = await sendWhatsAppTextMessage(result.to, sanitizedResponse);
+
+      if (result.logContext && outboundLogId) {
+        try {
+          await prisma.whatsAppMessage.update({
+            where: {
+              id: outboundLogId
+            },
+            data: {
+              messageId: delivery.messageId,
+              status: delivery.ok ? "sent" : `failed:${delivery.status}`
+            }
+          });
+        } catch (logError) {
+          captureUnexpectedError(logError, {
+            surface: "webhook-outbound-log",
+            route: "/api/integrations/whatsapp/webhook",
+            operation: "POST",
+            feature: "whatsapp",
+            entityId: input.eventId,
+            dedupeKey: `whatsapp:webhook-outbound-log:${input.eventId}`
+          });
+          console.error(`[WhatsApp] Outbound log failed after send attempt for ${input.eventId}`, logError);
+        }
       }
 
       if (!delivery.ok) {
+        if (isNonRetryableWhatsAppDeliveryStatus(delivery.status)) {
+          await markWebhookDeadLetter(input.eventId, `WhatsApp delivery rejected with non-retryable status ${delivery.status}.`);
+          return;
+        }
+
         await markWebhookFailure(input.eventId, `WhatsApp delivery failed with status ${delivery.status}.`);
         return;
       }

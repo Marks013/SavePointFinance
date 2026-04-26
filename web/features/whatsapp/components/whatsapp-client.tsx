@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { MessageCircleMore, ReceiptText, Route, Sparkles, Wallet } from "lucide-react";
+import { CheckCircle2, MessageCircleMore, ReceiptText, Route, Sparkles, Wallet } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -90,6 +90,10 @@ function formatBrazilWhatsAppInput(value: string) {
   return `(${digits.slice(0, 2)}) ${digits.slice(2, 3)} ${digits.slice(3, 7)}-${digits.slice(7)}`;
 }
 
+function normalizePhoneDigits(value: string) {
+  return value.replace(/\D/g, "");
+}
+
 export function WhatsAppClient() {
   const queryClient = useQueryClient();
   const [whatsappNumberDraft, setWhatsAppNumberDraft] = useState<string | null>(null);
@@ -105,6 +109,9 @@ export function WhatsAppClient() {
   const webhookConfigured = Boolean(profile?.integrations.whatsappConfigured);
   const canEditWhatsAppNumber = Boolean(profile?.permissions.canEditWhatsAppNumber);
   const whatsappNumber = whatsappNumberDraft ?? profile?.whatsappNumber ?? "";
+  const savedWhatsAppNumber = profile?.whatsappNumber ?? "";
+  const hasWhatsAppChange = normalizePhoneDigits(whatsappNumber) !== normalizePhoneDigits(savedWhatsAppNumber);
+  const hasSavedWhatsAppNumber = Boolean(normalizePhoneDigits(savedWhatsAppNumber));
 
   const whatsappMutation = useMutation({
     mutationFn: async () => {
@@ -130,6 +137,7 @@ export function WhatsAppClient() {
     },
     onSuccess: async () => {
       toast.success("WhatsApp atualizado");
+      setWhatsAppNumberDraft(null);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["profile"] }),
         queryClient.invalidateQueries({ queryKey: ["profile", "whatsapp-hub"] })
@@ -209,11 +217,23 @@ export function WhatsAppClient() {
             </div>
             <Button
               className="mt-4 w-full"
-              disabled={!canEditWhatsAppNumber || whatsappMutation.isPending}
+              disabled={!canEditWhatsAppNumber || whatsappMutation.isPending || !hasWhatsAppChange}
               onClick={() => whatsappMutation.mutate()}
               type="button"
+              variant={hasWhatsAppChange ? "default" : "secondary"}
             >
-              {whatsappMutation.isPending ? "Salvando..." : "Salvar WhatsApp"}
+              {whatsappMutation.isPending ? (
+                "Salvando..."
+              ) : hasWhatsAppChange ? (
+                "Salvar WhatsApp"
+              ) : hasSavedWhatsAppNumber ? (
+                <>
+                  <CheckCircle2 className="size-4" />
+                  WhatsApp salvo
+                </>
+              ) : (
+                "Informe um WhatsApp"
+              )}
             </Button>
           </article>
           <article className="data-card p-5">

@@ -96,6 +96,33 @@ export async function POST(request: Request, context: Params) {
           updatedAt: new Date()
         }
       });
+      await prisma.popupCampaign.create({
+        data: {
+          name: `Resposta do suporte #${ticket.ticketNumber}`,
+          status: "active",
+          kind: "announcement",
+          tone: "spotlight",
+          eyebrow: "Suporte",
+          title: `Seu chamado #${ticket.ticketNumber} foi respondido`,
+          body: "Nossa equipe respondeu sua solicitação. Abra o histórico de suporte para acompanhar a conversa.",
+          ctaLabel: "Ver resposta",
+          ctaUrl: "/dashboard/support",
+          dismissLabel: "Depois eu vejo",
+          priority: 980,
+          delayMs: 800,
+          autoHideMs: null,
+          dismissible: true,
+          oncePerUser: true,
+          maxViews: 1,
+          showToNewUsers: true,
+          showToReturningUsers: true,
+          showToPlatformAdmins: true,
+          showToTenantAdmins: true,
+          showToMembers: true,
+          targetUserId: ticket.userId,
+          createdByUserId: admin.id
+        }
+      });
     }
     await logAdminAudit({
       actorUserId: admin.id,
