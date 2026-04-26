@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Trash2 } from "lucide-react";
+import { CheckCircle2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -84,6 +84,29 @@ function formatMoney(value: number, currencyId: string) {
   }).format(value || 0);
 }
 
+function serializeBillingSettings(settings: BillingSettingsDraft) {
+  return JSON.stringify({
+    monthlyAmount: Number(settings.monthlyAmount),
+    annualAmount: Number(settings.annualAmount),
+    annualMaxInstallments: Number(settings.annualMaxInstallments),
+    currencyId: settings.currencyId,
+    promotions: settings.promotions.map((promotion) => ({
+      id: promotion.id,
+      title: promotion.title.trim(),
+      badge: promotion.badge.trim(),
+      description: promotion.description.trim(),
+      couponCode: promotion.couponCode.trim().toUpperCase(),
+      discountPercent: Number(promotion.discountPercent),
+      appliesTo: promotion.appliesTo,
+      visibleInCheckout: Boolean(promotion.visibleInCheckout),
+      highlightPriceCard: Boolean(promotion.highlightPriceCard),
+      enabled: Boolean(promotion.enabled),
+      startsAt: promotion.startsAt || null,
+      endsAt: promotion.endsAt || null
+    }))
+  });
+}
+
 export function BillingSettingsCard() {
   const queryClient = useQueryClient();
   const settingsQuery = useQuery({
@@ -94,6 +117,9 @@ export function BillingSettingsCard() {
   const updateMutation = useMutation({
     mutationFn: updateBillingSettings,
     onSuccess: async (payload) => {
+      if (payload.settings) {
+        setDraft(payload.settings);
+      }
       toast.success(payload.message ?? "Configurações comerciais salvas");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["admin-billing-settings"] }),
@@ -118,6 +144,7 @@ export function BillingSettingsCard() {
       </section>
     );
   }
+  const hasBillingChanges = serializeBillingSettings(draft) !== serializeBillingSettings(settingsQuery.data?.settings ?? draft);
 
   return (
     <section className="surface content-section">
@@ -348,11 +375,21 @@ export function BillingSettingsCard() {
 
       <Button
         className="mt-6"
-        disabled={updateMutation.isPending}
+        disabled={updateMutation.isPending || !hasBillingChanges}
         onClick={() => updateMutation.mutate(draft)}
         type="button"
+        variant={hasBillingChanges ? "default" : "secondary"}
       >
-        {updateMutation.isPending ? "Salvando..." : "Salvar preços e promoções"}
+        {updateMutation.isPending ? (
+          "Salvando..."
+        ) : hasBillingChanges ? (
+          "Salvar preços e promoções"
+        ) : (
+          <>
+            <CheckCircle2 className="size-4" />
+            Preços e promoções salvos
+          </>
+        )}
       </Button>
     </section>
   );

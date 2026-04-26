@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, RotateCw, SendHorizonal, Star } from "lucide-react";
+import { CheckCircle2, Megaphone, RotateCw, SendHorizonal, Star } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -51,6 +51,13 @@ type SupportTicket = {
 
 type TicketsResponse = {
   items: SupportTicket[];
+};
+
+type SupportPopupDraft = {
+  title: string;
+  body: string;
+  ctaLabel: string;
+  ctaUrl: string;
 };
 
 function buildQuery(params: Record<string, string | undefined>) {
@@ -115,6 +122,21 @@ async function closeTicket(ticketId: string) {
   return payload;
 }
 
+async function sendSupportPopup(input: { targetUserId: string; title: string; body: string; ctaLabel?: string | null; ctaUrl?: string | null }) {
+  const response = await fetch("/api/admin/support/popup", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input)
+  });
+  const payload = (await response.json().catch(() => ({}))) as { message?: string };
+
+  if (!response.ok) {
+    throw new Error(payload.message ?? "Falha ao enviar popup individual");
+  }
+
+  return payload;
+}
+
 function formatTicketStatus(status: string) {
   switch (status) {
     case "answered":
@@ -147,12 +169,23 @@ function formatDeliveryStatus(status: string) {
   }
 }
 
+function buildDefaultPopupDraft(ticket: SupportTicket): SupportPopupDraft {
+  return {
+    title: `Atualização do chamado #${ticket.ticketNumber}`,
+    body: `Olá, ${ticket.user.name || ticket.contactName}. Temos uma atualização sobre o chamado #${ticket.ticketNumber}: ${ticket.subject}.`,
+    ctaLabel: "Ver chamado",
+    ctaUrl: "/dashboard/support"
+  };
+}
+
 export function AdminSupportClient() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
   const [deliveryStatus, setDeliveryStatus] = useState("all");
   const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
+  const [popupDrafts, setPopupDrafts] = useState<Record<string, SupportPopupDraft>>({});
+  const [activePopupTicketId, setActivePopupTicketId] = useState<string | null>(null);
   const [retryingTicketId, setRetryingTicketId] = useState<string | null>(null);
   const [closingTicketId, setClosingTicketId] = useState<string | null>(null);
   const ticketsQuery = useQuery({
@@ -217,6 +250,28 @@ export function AdminSupportClient() {
     },
     onSettled: () => {
       setClosingTicketId(null);
+    }
+  });
+  const popupMutation = useMutation({
+    mutationFn: ({ ticket, draft }: { ticket: SupportTicket; draft: SupportPopupDraft }) =>
+      sendSupportPopup({
+        targetUserId: ticket.user.id,
+        title: draft.title,
+        body: draft.body,
+        ctaLabel: draft.ctaLabel.trim() || null,
+        ctaUrl: draft.ctaUrl.trim() || null
+      }),
+    onSuccess: async (payload, variables) => {
+      setActivePopupTicketId(null);
+      setPopupDrafts((current) => ({ ...current, [variables.ticket.id]: buildDefaultPopupDraft(variables.ticket) }));
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin-support"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin-audit"] })
+      ]);
+      toast.success(payload.message ?? "Popup individual enviado");
+    },
+    onError: (error) => {
+      toast.error("Não foi possível enviar o popup", { description: error.message });
     }
   });
   const tickets = ticketsQuery.data?.items ?? [];
@@ -381,6 +436,96 @@ export function AdminSupportClient() {
                 <div className="w-full shrink-0 space-y-3 xl:w-[360px]">
                   {ticket.status !== "closed" ? (
                     <>
+                      <Button
+                        className="w-full"
+                        onClick={() => {
+                          setPopupDrafts((current) => ({ ...current, [ticket.id]: current[ticket.id] ?? buildDefaultPopupDraft(ticket) }));
+                          setActivePopupTicketId((current) => (current === ticket.id ? null : ticket.id));
+                        }}
+                        type="button"
+                        variant="secondary"
+                      >
+                        <Megaphone className="size-4" />
+                        Popup individual
+                      </Button>
+                      {activePopupTicketId === ticket.id ? (
+                        <div className="space-y-3 rounded-[1rem] border border-[var(--color-border)] bg-[var(--color-panel)] p-3">
+                          <Input
+                            aria-label="Título do popup"
+                            placeholder="Título do popup"
+                            value={(popupDrafts[ticket.id] ?? buildDefaultPopupDraft(ticket)).title}
+                            onChange={(event) =>
+                              setPopupDrafts((current) => ({
+                                ...current,
+                                [ticket.id]: {
+                                  ...(current[ticket.id] ?? buildDefaultPopupDraft(ticket)),
+                                  title: event.target.value
+                                }
+                              }))
+                            }
+                          />
+                          <textarea
+                            aria-label="Mensagem do popup"
+                            className="min-h-28 w-full rounded-[1.15rem] border border-[var(--color-border)] bg-[var(--color-input)] px-4 py-3 text-sm leading-7 outline-none transition duration-200 focus:border-[var(--color-primary)] focus:ring-4 focus:ring-[var(--color-primary)]/12"
+                            placeholder="Mensagem que aparecerá para este usuário"
+                            value={(popupDrafts[ticket.id] ?? buildDefaultPopupDraft(ticket)).body}
+                            onChange={(event) =>
+                              setPopupDrafts((current) => ({
+                                ...current,
+                                [ticket.id]: {
+                                  ...(current[ticket.id] ?? buildDefaultPopupDraft(ticket)),
+                                  body: event.target.value
+                                }
+                              }))
+                            }
+                          />
+                          <div className="grid gap-2 sm:grid-cols-2">
+                            <Input
+                              aria-label="Texto do botão do popup"
+                              placeholder="Botão, opcional"
+                              value={(popupDrafts[ticket.id] ?? buildDefaultPopupDraft(ticket)).ctaLabel}
+                              onChange={(event) =>
+                                setPopupDrafts((current) => ({
+                                  ...current,
+                                  [ticket.id]: {
+                                    ...(current[ticket.id] ?? buildDefaultPopupDraft(ticket)),
+                                    ctaLabel: event.target.value
+                                  }
+                                }))
+                              }
+                            />
+                            <Input
+                              aria-label="Link do botão do popup"
+                              placeholder="/dashboard/support"
+                              value={(popupDrafts[ticket.id] ?? buildDefaultPopupDraft(ticket)).ctaUrl}
+                              onChange={(event) =>
+                                setPopupDrafts((current) => ({
+                                  ...current,
+                                  [ticket.id]: {
+                                    ...(current[ticket.id] ?? buildDefaultPopupDraft(ticket)),
+                                    ctaUrl: event.target.value
+                                  }
+                                }))
+                              }
+                            />
+                          </div>
+                          <Button
+                            className="w-full"
+                            disabled={
+                              popupMutation.isPending ||
+                              (popupDrafts[ticket.id] ?? buildDefaultPopupDraft(ticket)).title.trim().length < 3 ||
+                              (popupDrafts[ticket.id] ?? buildDefaultPopupDraft(ticket)).body.trim().length < 12 ||
+                              (Boolean((popupDrafts[ticket.id] ?? buildDefaultPopupDraft(ticket)).ctaLabel.trim()) &&
+                                !Boolean((popupDrafts[ticket.id] ?? buildDefaultPopupDraft(ticket)).ctaUrl.trim()))
+                            }
+                            onClick={() => popupMutation.mutate({ ticket, draft: popupDrafts[ticket.id] ?? buildDefaultPopupDraft(ticket) })}
+                            type="button"
+                          >
+                            <Megaphone className="size-4" />
+                            {popupMutation.isPending ? "Enviando popup..." : "Enviar popup ao usuário"}
+                          </Button>
+                        </div>
+                      ) : null}
                       <Button
                         className="w-full"
                         disabled={closingTicketId === ticket.id || closeMutation.isPending}
