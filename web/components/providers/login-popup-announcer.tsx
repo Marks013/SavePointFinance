@@ -31,6 +31,7 @@ type PopupCampaignItem = {
   showToPlatformAdmins: boolean;
   showToTenantAdmins: boolean;
   showToMembers: boolean;
+  targetUserId: string | null;
   uniqueViews: number;
   createdAt: string;
   updatedAt: string;
@@ -85,7 +86,9 @@ export function LoginPopupAnnouncer() {
   const canRequestPopup = status === "authenticated" && Boolean(sessionUserId) && pathname.startsWith("/dashboard");
   const [campaign, setCampaign] = useState<PopupCampaignItem | null>(null);
   const [visible, setVisible] = useState(false);
-  const styles = useMemo(() => toneStyles(campaign?.tone ?? "calm"), [campaign?.tone]);
+  const popupTone =
+    campaign?.targetUserId && campaign.eyebrow?.toLowerCase() === "suporte" ? "calm" : campaign?.tone ?? "calm";
+  const styles = useMemo(() => toneStyles(popupTone), [popupTone]);
 
   useEffect(() => {
     if (!canRequestPopup || !sessionUserId) {

@@ -101,7 +101,7 @@ export async function POST(request: Request, context: Params) {
           name: `Resposta do suporte #${ticket.ticketNumber}`,
           status: "active",
           kind: "announcement",
-          tone: "spotlight",
+          tone: "calm",
           eyebrow: "Suporte",
           title: `Seu chamado #${ticket.ticketNumber} foi respondido`,
           body: "Nossa equipe respondeu sua solicitação. Abra o histórico de suporte para acompanhar a conversa.",

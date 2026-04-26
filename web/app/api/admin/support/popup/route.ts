@@ -44,7 +44,7 @@ export async function POST(request: Request) {
         name: `Suporte individual - ${targetUser.email} - ${new Date().toISOString()}`,
         status: "active",
         kind: "announcement",
-        tone: "spotlight",
+        tone: "calm",
         eyebrow: "Suporte",
         title: body.title,
         body: body.body,
