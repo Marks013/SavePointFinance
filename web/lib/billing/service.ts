@@ -621,25 +621,56 @@ export async function createRecurringBillingSubscriptionForSession(input: Checko
     tenantId: access.tenantId,
     planId: plan.id
   });
-  const resource = await createMercadoPagoPreApproval<MercadoPagoSubscriptionResource>({
-    body: {
-      auto_recurring: {
-        frequency: billingConfig.frequency,
-        frequency_type: billingConfig.frequencyType,
-        transaction_amount: pricing.finalAmount,
-        currency_id: pricing.currencyId
+  let resource: MercadoPagoSubscriptionResource;
+  let checkoutKind = "card_authorized";
+
+  try {
+    resource = await createMercadoPagoPreApproval<MercadoPagoSubscriptionResource>({
+      body: {
+        auto_recurring: {
+          frequency: billingConfig.frequency,
+          frequency_type: billingConfig.frequencyType,
+          transaction_amount: pricing.finalAmount,
+          currency_id: pricing.currencyId
+        },
+        back_url: buildBillingManageUrl(),
+        card_token_id: input.cardToken,
+        external_reference: externalReference,
+        payer_email: payerEmail,
+        reason: getMercadoPagoBillingReason(plan.name),
+        status: "authorized"
       },
-      back_url: buildBillingManageUrl(),
-      card_token_id: input.cardToken,
-      external_reference: externalReference,
-      payer_email: payerEmail,
-      reason: getMercadoPagoBillingReason(plan.name),
-      status: "authorized"
-    },
-    requestOptions: {
-      idempotencyKey: randomUUID()
+      requestOptions: {
+        idempotencyKey: randomUUID()
+      }
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+
+    if (!message.toLowerCase().includes("card token service not found")) {
+      throw error;
     }
-  });
+
+    checkoutKind = "pending_checkout";
+    resource = await createMercadoPagoPreApproval<MercadoPagoSubscriptionResource>({
+      body: {
+        auto_recurring: {
+          frequency: billingConfig.frequency,
+          frequency_type: billingConfig.frequencyType,
+          transaction_amount: pricing.finalAmount,
+          currency_id: pricing.currencyId
+        },
+        back_url: buildBillingManageUrl(),
+        external_reference: externalReference,
+        payer_email: payerEmail,
+        reason: getMercadoPagoBillingReason(plan.name),
+        status: "pending"
+      },
+      requestOptions: {
+        idempotencyKey: randomUUID()
+      }
+    });
+  }
 
   if (!resource.id) {
     throw new BillingError("Mercado Pago não retornou uma assinatura válida", 502);
@@ -672,6 +703,7 @@ export async function createRecurringBillingSubscriptionForSession(input: Checko
         paymentMethodId: input.paymentMethodId,
         issuerId: input.issuerId ?? null,
         installments: input.installments ?? null,
+        checkoutKind,
         checkoutMetadata: (input.metadata ?? null) as Prisma.InputJsonValue,
         couponCode: input.couponCode?.trim() || null,
         pricing
@@ -697,8 +729,8 @@ export async function createRecurringBillingSubscriptionForSession(input: Checko
   });
 
   return {
-    url: buildBillingManageUrl(),
-    message: "Assinatura criada com sucesso",
+    url: resource.init_point ?? buildBillingManageUrl(),
+    message: checkoutKind === "pending_checkout" ? "Checkout mensal iniciado" : "Assinatura criada com sucesso",
     billing: await createBillingOverview(access)
   };
 }
