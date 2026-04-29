@@ -20,7 +20,6 @@ import {
   Split,
   Target,
   MessageCircleMore,
-  PackageSearch,
   Wallet,
   UsersRound
 } from "lucide-react";
@@ -48,7 +47,6 @@ const navigation = [
 
 const platformAdminNavigation = [
   { href: "/dashboard/admin" as Route, label: "Admin", icon: ShieldCheck },
-  { href: "/dashboard/admin/products" as Route, label: "Produtos", icon: PackageSearch },
   { href: "/dashboard/admin/support" as Route, label: "Suporte", icon: LifeBuoy }
 ];
 
