@@ -12,7 +12,7 @@ type Params = {
 
 export async function POST(request: Request, context: Params) {
   try {
-    const user = await requireSessionUser();
+    const user = await requireSessionUser({ feature: "automation" });
     const { id } = await context.params;
     const result = await generateSubscriptionTransaction(id, user.tenantId, user.id);
     revalidateFinanceReports(user.tenantId);

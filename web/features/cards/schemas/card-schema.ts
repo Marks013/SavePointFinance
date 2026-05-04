@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { StatementMonthAnchor } from "@prisma/client";
 
 export const statementMonthAnchorValues = ["close_month", "previous_month"] as const;
+const MAX_DECIMAL_15_2 = 9_999_999_999_999.99;
 
 export function deriveStatementMonthAnchor(closeDay: number, dueDay: number): StatementMonthAnchor {
   return closeDay < dueDay ? "previous_month" : "close_month";
@@ -16,7 +17,7 @@ export const cardFormSchema = z
       .trim()
       .regex(/^\d{0,4}$/, "Use ate 4 digitos")
       .default(""),
-    limitAmount: z.coerce.number().min(0).default(0),
+    limitAmount: z.coerce.number().min(0).max(MAX_DECIMAL_15_2).default(0),
     dueDay: z.coerce.number().int().min(1).max(31).default(10),
     closeDay: z.coerce.number().int().min(1).max(31).default(3),
     statementMonthAnchor: z.enum(statementMonthAnchorValues).optional(),

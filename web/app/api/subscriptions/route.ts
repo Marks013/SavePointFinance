@@ -34,10 +34,6 @@ function getProjectedOccurrenceDate(subscription: { nextBillingDate: Date; billi
 export async function GET(request: Request) {
   try {
     const user = await requireSessionUser();
-    await syncDueSubscriptionTransactions({
-      tenantId: user.tenantId,
-      userId: user.id
-    });
     const { searchParams } = new URL(request.url);
     const month = normalizeMonthKey(searchParams.get("month"));
     const monthRange = month ? getMonthRange(month) : null;
@@ -124,7 +120,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const user = await requireSessionUser();
+    const user = await requireSessionUser({ feature: "automation" });
     const body = subscriptionFormSchema.parse(await request.json());
     const nextBillingDate = new Date(`${body.nextBillingDate}T12:00:00`);
 

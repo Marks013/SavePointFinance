@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
 import { logAdminAudit } from "@/lib/admin/audit";
 import { requireAdminUser } from "@/lib/auth/admin";
@@ -23,6 +24,19 @@ function normalizeOptionalLimit(value: number | null | undefined) {
 
   return Number.isFinite(value) && value > 0 ? Math.floor(value) : null;
 }
+
+const createPlanSchema = z.object({
+  name: z.string().trim().min(1),
+  slug: z.string().trim().optional().nullable(),
+  tier: z.enum(["free", "pro"]).optional().default("free"),
+  description: z.string().trim().optional().nullable(),
+  maxAccounts: z.coerce.number().int().positive().optional().nullable(),
+  maxCards: z.coerce.number().int().positive().optional().nullable(),
+  trialDays: z.coerce.number().int().min(0).max(365).optional().default(0),
+  whatsappAssistant: z.boolean().optional().default(false),
+  automation: z.boolean().optional().default(false),
+  pdfExport: z.boolean().optional().default(false)
+}).strict();
 
 export async function GET(request: Request) {
   try {
@@ -99,20 +113,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "Forbidden" }, { status: 403 });
     }
 
-    const body = (await request.json()) as {
-      name?: string;
-      slug?: string;
-      tier?: "free" | "pro";
-      description?: string;
-      maxAccounts?: number | null;
-      maxCards?: number | null;
-      trialDays?: number;
-      whatsappAssistant?: boolean;
-      automation?: boolean;
-      pdfExport?: boolean;
-    };
+    const body = createPlanSchema.parse(await request.json());
 
-    const name = body.name?.trim();
+    const name = body.name;
     const slug = slugify(body.slug?.trim() || name || "");
 
     if (!name || !slug) {
@@ -133,19 +136,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "Já existe um plano com esse nome ou slug" }, { status: 409 });
     }
 
-    const tier = body.tier === "pro" ? "pro" : "free";
     const plan = await prisma.plan.create({
       data: {
         name,
         slug,
-        tier,
+        tier: body.tier,
         description: body.description?.trim() || null,
         maxAccounts: normalizeOptionalLimit(body.maxAccounts),
         maxCards: normalizeOptionalLimit(body.maxCards),
-        trialDays: Math.max(0, body.trialDays ?? 0),
-        whatsappAssistant: Boolean(body.whatsappAssistant),
-        automation: Boolean(body.automation),
-        pdfExport: Boolean(body.pdfExport),
+        trialDays: body.trialDays,
+        whatsappAssistant: body.whatsappAssistant,
+        automation: body.automation,
+        pdfExport: body.pdfExport,
         isDefault: false,
         isActive: true,
         sortOrder: 100

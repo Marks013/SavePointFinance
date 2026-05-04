@@ -6,12 +6,25 @@ import { requireAdminUser } from "@/lib/auth/admin";
 import { captureRequestError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
 
+function isSafePopupUrl(value: string) {
+  if (value.startsWith("/")) {
+    return !value.startsWith("//");
+  }
+
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
 const supportPopupSchema = z.object({
   targetUserId: z.string().trim().min(1),
   title: z.string().trim().min(3, "Informe um título para o popup.").max(90),
   body: z.string().trim().min(12, "Escreva uma mensagem objetiva.").max(700),
   ctaLabel: z.string().trim().max(32).optional().nullable(),
-  ctaUrl: z.string().trim().max(500).optional().nullable()
+  ctaUrl: z.string().trim().max(500).refine(isSafePopupUrl, "URL invalida").optional().nullable()
 });
 
 export async function POST(request: Request) {

@@ -1,6 +1,7 @@
 {
   "name": "savepoint-tooling",
   "private": true,
+  "packageManager": "npm@11.12.0",
   "scripts": {
     "bootstrap:web": "node scripts/bootstrap.mjs web-local",
     "bootstrap:docker": "node scripts/bootstrap.mjs docker-local",

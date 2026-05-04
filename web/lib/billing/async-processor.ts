@@ -243,7 +243,7 @@ export async function enqueueMercadoPagoWebhookEvent(input: {
       signatureTs: signature.signatureTs,
       dedupeKey,
       payload: payload as unknown as Prisma.InputJsonValue,
-      status: signature.isValid ? "pending" : "failed",
+      status: signature.isValid ? "pending" : "ignored",
       error: signature.isValid ? null : "Invalid Mercado Pago webhook signature",
       nextAttemptAt: signature.isValid ? new Date() : null
     }

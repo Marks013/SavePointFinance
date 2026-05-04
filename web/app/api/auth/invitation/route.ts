@@ -11,9 +11,10 @@ export async function GET(request: Request) {
     return NextResponse.json({ message: "Token obrigatorio" }, { status: 400 });
   }
 
+  const hashedToken = hashInvitationToken(token);
   const invitation = await prisma.invitation.findFirst({
     where: {
-      OR: [{ token: hashInvitationToken(token) }, { token }]
+      OR: [{ token: hashedToken }, { token }]
     },
     include: {
       invitedBy: {
@@ -32,6 +33,17 @@ export async function GET(request: Request) {
 
   if (!invitation || invitation.revokedAt || invitation.acceptedAt || invitation.expiresAt < new Date()) {
     return NextResponse.json({ message: "Convite invalido ou expirado" }, { status: 404 });
+  }
+
+  if (invitation.token === token) {
+    await prisma.invitation.update({
+      where: {
+        id: invitation.id
+      },
+      data: {
+        token: hashedToken
+      }
+    });
   }
 
   const invitationRole = invitation.kind === "shared_wallet" ? "member" : "admin";

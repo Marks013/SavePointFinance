@@ -1,9 +1,19 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
 import { logAdminAudit } from "@/lib/admin/audit";
 import { requireAdminUser } from "@/lib/auth/admin";
 import { captureRequestError } from "@/lib/observability/sentry";
 import { getRetentionStats, runRetentionLifecycle, updateRetentionPolicy } from "@/lib/retention/service";
+
+const retentionRunSchema = z.object({
+  dryRun: z.boolean().optional().default(true),
+  confirm: z.string().optional()
+}).strict();
+const retentionPolicySchema = z.object({
+  enabled: z.boolean(),
+  closureDays: z.coerce.number().int().min(90).max(3650)
+}).strict();
 
 async function requirePlatformAdmin() {
   const admin = await requireAdminUser();
@@ -33,7 +43,7 @@ export async function POST(request: Request) {
   try {
     await requirePlatformAdmin();
 
-    const body = (await request.json().catch(() => ({}))) as { dryRun?: boolean; confirm?: string };
+    const body = retentionRunSchema.parse(await request.json().catch(() => ({})));
     const dryRun = body.dryRun !== false;
 
     if (!dryRun && body.confirm !== "ENCERRAR-CONTAS") {
@@ -63,19 +73,11 @@ export async function PATCH(request: Request) {
   try {
     const admin = await requirePlatformAdmin();
 
-    const body = (await request.json().catch(() => ({}))) as { enabled?: boolean; closureDays?: number };
-    const closureDays = Number(body.closureDays);
-
-    if (typeof body.enabled !== "boolean" || !Number.isFinite(closureDays) || closureDays < 90) {
-      return NextResponse.json(
-        { message: "Informe se a política está ativa e um prazo de encerramento de pelo menos 90 dias." },
-        { status: 400 }
-      );
-    }
+    const body = retentionPolicySchema.parse(await request.json().catch(() => ({})));
 
     const policy = await updateRetentionPolicy({
       enabled: body.enabled,
-      closureDays
+      closureDays: body.closureDays
     });
 
     await logAdminAudit({

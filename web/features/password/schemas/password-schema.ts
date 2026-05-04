@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+const passwordSchema = z.string().min(8, "Minimo de 8 caracteres").max(128, "Senha muito longa");
+
 function normalizeTokenValue(value: unknown) {
   if (typeof value !== "string") {
     return value;
@@ -31,8 +33,8 @@ export const forgotPasswordSchema = z.object({
 export const resetPasswordSchema = z
   .object({
     token: z.preprocess(normalizeTokenValue, z.string().min(1, "Token obrigatorio")),
-    newPassword: z.string().min(8, "Minimo de 8 caracteres"),
-    confirmPassword: z.string().min(8, "Confirme a senha")
+    newPassword: passwordSchema,
+    confirmPassword: passwordSchema
   })
   .refine((value) => value.newPassword === value.confirmPassword, {
     path: ["confirmPassword"],
@@ -49,8 +51,8 @@ export const acceptInvitationSchema = z
   .object({
     token: z.preprocess(normalizeTokenValue, z.string().min(1, "Token obrigatorio")),
     name: z.string().min(2, "Informe seu nome"),
-    password: z.string().min(8, "Minimo de 8 caracteres"),
-    confirmPassword: z.string().min(8, "Confirme a senha"),
+    password: passwordSchema,
+    confirmPassword: passwordSchema,
     acceptTermsOfUse: z.boolean(),
     acceptPrivacyPolicy: z.boolean()
   })
@@ -73,8 +75,8 @@ export const publicRegistrationSchema = z
     name: z.string().min(2, "Informe seu nome"),
     organizationName: z.string().min(2, "Informe o nome da conta"),
     email: z.string().trim().email("Informe um e-mail valido"),
-    password: z.string().min(8, "Minimo de 8 caracteres"),
-    confirmPassword: z.string().min(8, "Confirme a senha"),
+    password: passwordSchema,
+    confirmPassword: passwordSchema,
     acceptTermsOfUse: z.boolean(),
     acceptPrivacyPolicy: z.boolean()
   })

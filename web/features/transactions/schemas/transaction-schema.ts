@@ -6,10 +6,53 @@ export const transactionTypeValues = ["income", "expense", "transfer"] as const;
 export const paymentMethodValues = ["pix", "money", "credit_card", "debit_card", "transfer"] as const;
 export const transactionEditScopeValues = ["single", "group"] as const;
 
+const MAX_DECIMAL_15_2 = 9_999_999_999_999.99;
+const calendarDateSchema = z
+  .union([
+    z.string().trim().regex(/^\d{4}-\d{2}-\d{2}$/, "Data invalida. Use YYYY-MM-DD"),
+    z.date()
+  ])
+  .transform((value, ctx) => {
+    if (value instanceof Date) {
+      if (Number.isNaN(value.getTime())) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Data invalida"
+        });
+
+        return z.NEVER;
+      }
+
+      return normalizeCalendarDate(value);
+    }
+
+    const [year, month, day] = value.split("-").map(Number);
+    const date = new Date(Date.UTC(year, month - 1, day));
+
+    if (
+      date.getUTCFullYear() !== year ||
+      date.getUTCMonth() !== month - 1 ||
+      date.getUTCDate() !== day
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Data inexistente"
+      });
+
+      return z.NEVER;
+    }
+
+    return normalizeCalendarDate(date);
+  });
+const moneySchema = z.coerce
+  .number()
+  .positive("Informe um valor maior que zero")
+  .max(MAX_DECIMAL_15_2, "Valor excede o limite permitido");
+
 export const transactionFormSchema = z
   .object({
-    date: z.coerce.date().transform((value) => normalizeCalendarDate(value)),
-    amount: z.coerce.number().positive("Informe um valor maior que zero"),
+    date: calendarDateSchema,
+    amount: moneySchema,
     description: z.string().trim().min(3, "Informe uma descricao"),
     type: z.enum(transactionTypeValues),
     paymentMethod: z.enum(paymentMethodValues),

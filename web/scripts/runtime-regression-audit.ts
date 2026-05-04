@@ -7,6 +7,8 @@ loadEnv({ path: resolve(process.cwd(), "../.env"), override: false });
 loadEnv({ path: resolve(process.cwd(), ".env"), override: false });
 installMaintenanceBypassFetch();
 
+process.env.DATABASE_URL ||= `postgresql://${process.env.POSTGRES_USER ?? "savepoint"}:${process.env.POSTGRES_PASSWORD ?? "savepoint"}@localhost:${process.env.POSTGRES_PORT ?? "5433"}/${process.env.POSTGRES_DB ?? "savepoint"}`;
+
 const baseUrl = process.env.AUDIT_BASE_URL?.trim() || "http://127.0.0.1:3000";
 const adminEmail = process.env.ADMIN_EMAIL?.trim();
 const adminPassword = process.env.ADMIN_PASSWORD?.trim();
@@ -213,6 +215,11 @@ async function run() {
   assertCondition(adminPassword, "ADMIN_PASSWORD não definido");
 
   await prisma.$connect();
+  await prisma.requestThrottle.deleteMany({
+    where: {
+      namespace: "credentials-login"
+    }
+  });
   await ensureDefaultPlans(prisma);
   const premiumPlan = await getDefaultPlanBySlug(prisma, "premium-completo");
   assertCondition(premiumPlan, "Plano premium padrao nao encontrado");

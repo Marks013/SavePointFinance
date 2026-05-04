@@ -5,6 +5,7 @@ import { hasSensitiveSearchParams, sanitizeSearchParams } from "@/lib/security/s
 
 const MAINTENANCE_PATH = "/manutencao";
 const ALLOWED_API_PREFIXES = ["/api/health", "/api/integrations"];
+const CSRF_EXEMPT_API_PREFIXES = ["/api/cron", "/api/health", "/api/integrations", "/api/webhooks"];
 const MAINTENANCE_BYPASS_HEADER = "x-savepoint-maintenance-bypass";
 const INVITATION_TOKEN_COOKIE = "savepoint-invitation-token";
 const RESET_TOKEN_COOKIE = "savepoint-reset-token";
@@ -60,7 +61,7 @@ function buildContentSecurityPolicy(nonce: string, options: { allowMercadoPagoCh
     `img-src 'self' data: blob: ${mercadoPagoSources}`,
     "font-src 'self' data:",
     isProduction ? `connect-src 'self' ${mercadoPagoSources}` : "connect-src 'self' ws: wss: http: https:",
-    `script-src 'self' 'nonce-${nonce}' 'unsafe-eval'`,
+    isProduction ? `script-src 'self' 'nonce-${nonce}'` : `script-src 'self' 'nonce-${nonce}' 'unsafe-eval'`,
     scriptElementPolicy,
     "script-src-attr 'none'",
     "style-src 'self' 'unsafe-inline'",
@@ -87,6 +88,31 @@ function applySecurityHeaders(response: NextResponse, contentSecurityPolicy: str
   }
 
   return response;
+}
+
+function isStateChangingApiRequest(request: NextRequest) {
+  return (
+    request.nextUrl.pathname.startsWith("/api/") &&
+    ["POST", "PUT", "PATCH", "DELETE"].includes(request.method.toUpperCase())
+  );
+}
+
+function isCsrfExemptApiPath(pathname: string) {
+  return CSRF_EXEMPT_API_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+}
+
+function hasValidOrigin(request: NextRequest) {
+  const origin = request.headers.get("origin");
+
+  if (!origin) {
+    return true;
+  }
+
+  try {
+    return new URL(origin).host === request.nextUrl.host;
+  } catch {
+    return false;
+  }
 }
 
 export function proxy(request: NextRequest) {
@@ -127,6 +153,10 @@ export function proxy(request: NextRequest) {
 
   requestHeaders.set("x-savepoint-pathname", pathname);
   requestHeaders.set("x-savepoint-search", sanitizedSearch);
+
+  if (isStateChangingApiRequest(request) && !isCsrfExemptApiPath(pathname) && !hasValidOrigin(request)) {
+    return applySecurityHeaders(NextResponse.json({ message: "Forbidden" }, { status: 403 }), contentSecurityPolicy, request);
+  }
 
   if (isMaintenanceModeEnabled && !isAllowedDuringMaintenance(pathname) && !hasMaintenanceBypass(request)) {
     if (pathname.startsWith("/api/")) {

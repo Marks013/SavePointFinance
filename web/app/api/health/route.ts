@@ -82,12 +82,6 @@ export async function GET() {
     {
       status,
       service: "savepointfinance-web",
-      checks,
-      runtime: {
-        nodeEnv: process.env.NODE_ENV ?? "unknown",
-        maintenanceMode: process.env.MAINTENANCE_MODE === "true",
-        uptimeSeconds: Math.round(process.uptime())
-      },
       latencyMs: Date.now() - startedAt,
       timestamp: new Date().toISOString()
     },

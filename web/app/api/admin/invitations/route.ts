@@ -1,8 +1,9 @@
 import { InvitationKind, NotificationChannel } from "@prisma/client";
 import crypto from "node:crypto";
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
-import { invitationSchema, type InvitationValues } from "@/features/password/schemas/password-schema";
+import { invitationSchema } from "@/features/password/schemas/password-schema";
 import { logAdminAudit } from "@/lib/admin/audit";
 import { requireAdminUser } from "@/lib/auth/admin";
 import { normalizeEmail } from "@/lib/auth/normalize-email";
@@ -13,6 +14,10 @@ import { buildInvitationMessage } from "@/lib/notifications/invitation";
 import { prisma } from "@/lib/prisma/client";
 import { buildInvitationPath, createInvitationToken } from "@/lib/security/invitation-token";
 import { assessUserReassignment, buildReassignmentBlockReason } from "@/lib/users/reassign-user";
+
+const adminInvitationSchema = invitationSchema.extend({
+  planId: z.string().trim().min(1, "Selecione o plano inicial do usuario")
+});
 
 function slugify(value: string) {
   return value
@@ -116,8 +121,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const payload = (await request.json()) as InvitationValues & { planId?: string };
-    const body = invitationSchema.parse(payload);
+    const body = adminInvitationSchema.parse(await request.json());
     const normalizedEmail = normalizeEmail(body.email);
 
     const existingUser = await prisma.user.findFirst({
@@ -140,6 +144,7 @@ export async function POST(request: Request) {
 
     const activeInvitation = await prisma.invitation.findFirst({
       where: {
+        kind: InvitationKind.admin_isolated,
         email: {
           equals: normalizedEmail,
           mode: "insensitive"
@@ -152,8 +157,10 @@ export async function POST(request: Request) {
       },
       select: {
         id: true,
+        tenantId: true,
         email: true,
         name: true,
+        kind: true,
         role: true,
         expiresAt: true
       }
@@ -175,6 +182,8 @@ export async function POST(request: Request) {
         id: activeInvitation.id,
         email: activeInvitation.email,
         name: activeInvitation.name,
+        tenantId: activeInvitation.tenantId,
+        kind: activeInvitation.kind,
         role: activeInvitation.role,
         inviteUrl: buildInvitationPath(rawToken),
         expiresAt: activeInvitation.expiresAt.toISOString(),
@@ -183,16 +192,10 @@ export async function POST(request: Request) {
       });
     }
 
-    const requestedPlanId = payload.planId?.trim();
-
-    if (!requestedPlanId) {
-      return NextResponse.json({ message: "Selecione o plano inicial do usuario" }, { status: 400 });
-    }
-
     await ensureDefaultPlans(prisma);
     const plan = await prisma.plan.findFirst({
       where: {
-        id: requestedPlanId,
+        id: body.planId,
         isActive: true
       }
     });

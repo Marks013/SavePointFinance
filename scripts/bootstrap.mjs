@@ -143,6 +143,15 @@ function mergeExistingEnvValues(nextContent) {
   return mergedLines.join("\n").replace(/\n*$/, "\n");
 }
 
+async function runPreMigrationBackup(modeName) {
+  if (modeName !== "server" || process.env.SKIP_PRE_MIGRATION_BACKUP === "true") {
+    return;
+  }
+
+  console.log("[bootstrap] running pre-migration backup for server mode");
+  await run("docker compose --profile ops run --rm backup-once");
+}
+
 function ensureRootEnv(modeName) {
   const templateName = dockerEnvTemplates[modeName];
 
@@ -203,6 +212,9 @@ async function bootstrapDocker(modeName) {
     console.log("[bootstrap] ambiente configurado.");
     console.log("[bootstrap] Para subir tudo:");
     console.log("  docker compose up -d postgres");
+    if (modeName === "server") {
+      console.log("  docker compose --profile ops run --rm backup-once");
+    }
     console.log("  docker compose --profile ops run --rm migrate");
     console.log("  docker compose --profile ops run --rm bootstrap-admin");
     console.log("  docker compose up -d web");
@@ -210,6 +222,7 @@ async function bootstrapDocker(modeName) {
   }
 
   await run("docker compose up -d postgres");
+  await runPreMigrationBackup(modeName);
   await run("docker compose --profile ops run --rm migrate");
   await run("docker compose --profile ops run --rm bootstrap-admin");
   await run("docker compose up -d web");

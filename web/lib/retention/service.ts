@@ -457,9 +457,13 @@ async function closeTenantForRetention(input: {
     }
   });
 
-  await prisma.tenant.delete({
+  await prisma.tenant.update({
     where: {
       id: input.tenant.id
+    },
+    data: {
+      isActive: false,
+      expiresAt: new Date()
     }
   });
 }

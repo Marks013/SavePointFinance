@@ -118,12 +118,7 @@ export async function POST(request: Request) {
     });
 
     if (existingUser) {
-      return NextResponse.json(
-        {
-          message: "Este e-mail já possui uma conta. Entre no painel ou use outro e-mail para criar uma nova conta."
-        },
-        { status: 409 }
-      );
+      return NextResponse.json({ success: true, nextPath: "/login" }, { status: 202 });
     }
 
     await ensureDefaultPlans(prisma);

@@ -2,6 +2,7 @@
   "name": "savepoint-web",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "npm@11.12.0",
   "engines": {
     "node": "24.x"
   },
@@ -23,7 +24,23 @@
     "audit:cards-smoke": "tsx scripts/card-statement-smoke-audit.ts",
     "audit:finance-consistency": "tsx scripts/finance-consistency-audit.ts",
     "audit:server-smoke": "tsx scripts/server-smoke-audit.ts",
-    "audit:encoding": "tsx scripts/encoding-audit.ts"
+    "audit:encoding": "tsx scripts/encoding-audit.ts",
+    "audit:maintenance-bypass": "tsx scripts/audit-maintenance-bypass.ts",
+    "audit:category-classification": "tsx scripts/category-classification-audit.ts",
+    "audit:feature": "tsx scripts/feature-audit.ts",
+    "audit:gemini-runtime": "tsx scripts/gemini-transaction-runtime-audit.ts",
+    "audit:notification-template": "tsx scripts/notification-template-smoke.ts",
+    "audit:resend-delivery": "tsx scripts/resend-delivery-audit.ts",
+    "audit:runtime-regression": "tsx scripts/runtime-regression-audit.ts",
+    "audit:subscription-classification": "tsx scripts/subscription-classification-audit.ts",
+    "audit:transaction-classification": "tsx scripts/transaction-classification-precedence-audit.ts",
+    "audit:whatsapp-assistant": "tsx scripts/whatsapp-assistant-audit.ts",
+    "audit:whatsapp-media": "tsx scripts/whatsapp-media-audit.ts",
+    "audit:whatsapp-phone": "tsx scripts/whatsapp-phone-lookup-audit.ts",
+    "audit:whatsapp-smoke": "tsx scripts/whatsapp-smoke-test.ts",
+    "audit:whatsapp-webhook": "tsx scripts/whatsapp-webhook-e2e-sim.ts",
+    "audit:all:local": "npm run typecheck && npm run lint && npm run audit:encoding && npm run audit:billing-webhook && npm run audit:transaction-classification && npm run audit:category-classification && npm run audit:notification-template",
+    "audit:all:server": "npm run audit:runtime-regression && npm run audit:server-smoke"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.2",

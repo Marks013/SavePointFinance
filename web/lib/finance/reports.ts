@@ -43,6 +43,7 @@ type AccountBalancePoint = {
 
 type PeriodScope = "month" | "year" | "custom";
 type InsightTone = "positive" | "attention" | "warning";
+const MAX_REPORT_MONTHS = 36;
 
 type MonthlySnapshot = {
   key: string;
@@ -112,12 +113,20 @@ function listMonthKeysBetween(start: Date, end: Date) {
   const cursor = new Date(start.getFullYear(), start.getMonth(), 1, 12, 0, 0, 0);
   const limit = new Date(end.getFullYear(), end.getMonth(), 1, 12, 0, 0, 0);
 
-  while (cursor <= limit) {
+  while (cursor <= limit && keys.length < MAX_REPORT_MONTHS) {
     keys.push(getMonthBucketKey(cursor));
     cursor.setMonth(cursor.getMonth() + 1);
   }
 
   return keys;
+}
+
+function clampReportRange(start: Date, end: Date) {
+  const maxEnd = new Date(start.getFullYear(), start.getMonth() + MAX_REPORT_MONTHS, 0, 23, 59, 59, 999);
+  return {
+    start,
+    end: end > maxEnd ? maxEnd : end
+  };
 }
 
 function detectPeriodScope(start: Date, end: Date): PeriodScope {
@@ -234,7 +243,7 @@ function getFilterRange(filters: FinanceReportFilters) {
       const end = new Date(`${parsedTo.data}T23:59:59.999`);
 
       if (start <= end) {
-        return { start, end };
+        return clampReportRange(start, end);
       }
     }
   }

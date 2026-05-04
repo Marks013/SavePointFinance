@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
 import { logAdminAudit } from "@/lib/admin/audit";
 import { requireAdminUser } from "@/lib/auth/admin";
@@ -16,6 +17,20 @@ function normalizeOptionalLimit(value: number | null | undefined) {
   return Number.isFinite(value) && value > 0 ? Math.floor(value) : null;
 }
 
+const updatePlanSchema = z.object({
+  name: z.string().trim().min(1).optional(),
+  description: z.string().trim().nullable().optional(),
+  tier: z.enum(["free", "pro"]).optional(),
+  maxAccounts: z.coerce.number().int().positive().nullable().optional(),
+  maxCards: z.coerce.number().int().positive().nullable().optional(),
+  trialDays: z.coerce.number().int().min(0).max(365).optional(),
+  whatsappAssistant: z.boolean().optional(),
+  automation: z.boolean().optional(),
+  pdfExport: z.boolean().optional(),
+  isActive: z.boolean().optional(),
+  sortOrder: z.coerce.number().int().min(0).max(10_000).optional()
+}).strict();
+
 export async function PATCH(request: Request, context: Params) {
   try {
     const admin = await requireAdminUser();
@@ -25,19 +40,7 @@ export async function PATCH(request: Request, context: Params) {
     }
 
     const { id } = await context.params;
-    const body = (await request.json()) as {
-      name?: string;
-      description?: string | null;
-      tier?: "free" | "pro";
-      maxAccounts?: number | null;
-      maxCards?: number | null;
-      trialDays?: number;
-      whatsappAssistant?: boolean;
-      automation?: boolean;
-      pdfExport?: boolean;
-      isActive?: boolean;
-      sortOrder?: number;
-    };
+    const body = updatePlanSchema.parse(await request.json());
 
     const target = await prisma.plan.findUnique({
       where: {

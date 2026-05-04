@@ -293,9 +293,13 @@ export async function getCachedAdminUsers(input: AdminUsersQueryInput) {
 }
 
 export function revalidateAdminUsers(tenantId?: string | null) {
-  revalidateTag(getAdminUsersTag("all"), { expire: 0 });
+  try {
+    revalidateTag(getAdminUsersTag("all"), { expire: 0 });
 
-  if (tenantId) {
-    revalidateTag(getAdminUsersTag(tenantId), { expire: 0 });
+    if (tenantId) {
+      revalidateTag(getAdminUsersTag(tenantId), { expire: 0 });
+    }
+  } catch {
+    // CLI/audit scripts can run outside the Next cache runtime.
   }
 }

@@ -37,5 +37,9 @@ export async function getCachedFinanceReport(
 }
 
 export function revalidateFinanceReports(tenantId: string) {
-  revalidateTag(getFinanceReportsTag(tenantId), { expire: 0 });
+  try {
+    revalidateTag(getFinanceReportsTag(tenantId), { expire: 0 });
+  } catch {
+    // Some CLI/audit scripts reuse domain functions outside the Next cache runtime.
+  }
 }

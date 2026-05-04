@@ -4,10 +4,7 @@ import { z } from "zod";
 import { requireSessionUser } from "@/lib/auth/session";
 import { revalidateFinanceReports } from "@/lib/cache/finance-read-models";
 import { deriveAiLearnedRuleKeyword, deriveRuleKeyword } from "@/lib/finance/category-rules";
-import {
-  invalidateGlobalClassificationCache,
-  invalidateTenantClassificationCache
-} from "@/lib/finance/classification-cache";
+import { invalidateTenantClassificationCache } from "@/lib/finance/classification-cache";
 import { captureRequestError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
 
@@ -91,7 +88,7 @@ export async function PATCH(request: Request, context: Params) {
       description: target.description,
       notes: target.notes
     });
-    const globalRuleKeyword =
+    const learnedRuleKeyword =
       target.aiClassified && category.systemKey
         ? deriveAiLearnedRuleKeyword({
             existingKeyword: target.classificationKeyword,
@@ -99,28 +96,20 @@ export async function PATCH(request: Request, context: Params) {
             notes: target.notes
           })
         : null;
-    const shouldPromoteAiSuggestionGlobally =
+    const shouldPersistAiSuggestionLocally =
       target.aiClassified &&
       target.categoryId === category.id &&
       Boolean(category.systemKey) &&
-      Boolean(globalRuleKeyword);
+      Boolean(learnedRuleKeyword);
     const rootId = target.parentId ?? target.id;
 
     await prisma.$transaction(async (tx) => {
-      const globalCategoryRuleDelegate = (
-        tx as typeof tx & {
-          globalCategoryRule: {
-            upsert: (args: Record<string, unknown>) => Promise<unknown>;
-          };
-        }
-      ).globalCategoryRule;
-
-      const transactionData = shouldPromoteAiSuggestionGlobally
+      const transactionData = shouldPersistAiSuggestionLocally
         ? {
             categoryId: category.id,
             classificationSource: "ai_learned" as const,
-            classificationKeyword: globalRuleKeyword,
-            classificationReason: "Sugestao de IA validada e promovida para memoria global",
+            classificationKeyword: learnedRuleKeyword,
+            classificationReason: "Sugestao de IA validada e salva na memoria local",
             classificationVersion: 2,
             aiClassified: true,
             aiConfidence: target.aiConfidence
@@ -153,41 +142,48 @@ export async function PATCH(request: Request, context: Params) {
         });
       }
 
-      if (shouldPromoteAiSuggestionGlobally && globalRuleKeyword && category.systemKey) {
-        await globalCategoryRuleDelegate.upsert({
+      if (shouldPersistAiSuggestionLocally && learnedRuleKeyword) {
+        const existingAiRule = await tx.categoryRule.findFirst({
           where: {
-            type_normalizedKeyword_matchMode: {
-              type: categoryType,
-              normalizedKeyword: globalRuleKeyword,
-              matchMode: "exact_phrase"
-            }
-          },
-          update: {
-            categorySystemKey: category.systemKey,
-            priority: 750,
-            confidence: target.aiConfidence ?? 0.99,
-            acceptedCount: {
-              increment: 1
-            },
-            lastAcceptedAt: new Date(),
-            isActive: true,
-            createdFromTenantId: user.tenantId,
-            createdFromTransactionId: target.id
-          },
-          create: {
+            tenantId: user.tenantId,
             type: categoryType,
-            categorySystemKey: category.systemKey,
-            normalizedKeyword: globalRuleKeyword,
-            matchMode: "exact_phrase",
-            priority: 750,
-            confidence: target.aiConfidence ?? 0.99,
-            acceptedCount: 1,
-            lastAcceptedAt: new Date(),
-            isActive: true,
-            createdFromTenantId: user.tenantId,
-            createdFromTransactionId: target.id
+            normalizedKeyword: learnedRuleKeyword,
+            source: "ai_learned",
+            matchMode: "exact_phrase"
+          },
+          select: {
+            id: true
           }
         });
+
+        if (existingAiRule) {
+          await tx.categoryRule.update({
+            where: {
+              id: existingAiRule.id
+            },
+            data: {
+              categoryId: category.id,
+              priority: 750,
+              confidence: target.aiConfidence ?? 0.99,
+              isActive: true,
+              createdFromTransactionId: target.id
+            }
+          });
+        } else {
+          await tx.categoryRule.create({
+            data: {
+              tenantId: user.tenantId,
+              categoryId: category.id,
+              type: categoryType,
+              normalizedKeyword: learnedRuleKeyword,
+              source: "ai_learned",
+              matchMode: "exact_phrase",
+              priority: 750,
+              confidence: target.aiConfidence ?? 0.99,
+              createdFromTransactionId: target.id
+            }
+          });
+        }
 
         return;
       }
@@ -253,7 +249,6 @@ export async function PATCH(request: Request, context: Params) {
     });
 
     invalidateTenantClassificationCache(user.tenantId);
-    invalidateGlobalClassificationCache();
     revalidateFinanceReports(user.tenantId);
 
     return NextResponse.json({ success: true });

@@ -9,9 +9,47 @@ import { requireSessionUser } from "@/lib/auth/session";
 import { revalidateAdminUsers } from "@/lib/cache/admin-read-models";
 import { captureRequestError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
+import { getClientIpAddress, takeThrottleHit } from "@/lib/security/request-throttle";
 import { SUPPORT_RESPONSE_COPY, sendSupportEmail } from "@/lib/support/email";
 
 const SUPPORT_HISTORY_LIMIT = 5;
+const SUPPORT_WINDOW_MS = 60 * 60 * 1000;
+
+function buildThrottleResponse(retryAfterMs: number) {
+  return NextResponse.json(
+    { message: "Muitas solicitações de suporte. Aguarde alguns minutos e tente novamente." },
+    {
+      status: 429,
+      headers: {
+        "Retry-After": String(Math.max(1, Math.ceil(retryAfterMs / 1000)))
+      }
+    }
+  );
+}
+
+async function enforceSupportThrottle(request: Request, userId: string) {
+  const keys = [`user:${userId}`];
+  const clientIp = getClientIpAddress(request);
+
+  if (clientIp) {
+    keys.push(`ip:${clientIp}`);
+  }
+
+  for (const key of keys) {
+    const result = await takeThrottleHit({
+      namespace: "support-request",
+      key,
+      limit: 5,
+      windowMs: SUPPORT_WINDOW_MS
+    });
+
+    if (!result.allowed) {
+      return buildThrottleResponse(result.retryAfterMs);
+    }
+  }
+
+  return null;
+}
 
 function resolveExpectedResponseAt(now = new Date()) {
   const expected = new Date(now.getTime() + 24 * 60 * 60 * 1000);
@@ -93,6 +131,12 @@ function serializeTicket(ticket: {
 export async function POST(request: Request) {
   try {
     const user = await requireSessionUser();
+    const throttled = await enforceSupportThrottle(request, user.id);
+
+    if (throttled) {
+      return throttled;
+    }
+
     const body = supportRequestSchema.parse(await request.json());
     const topicLabel = supportTopicLabels[body.topic];
     const priorityLabel = supportPriorityLabels[body.priority];

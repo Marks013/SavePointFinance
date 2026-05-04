@@ -2,7 +2,6 @@ import { renderToBuffer, type DocumentProps } from "@react-pdf/renderer";
 import type { ReactElement } from "react";
 
 import { SummaryDocument } from "@/features/reports/pdf/summary-document";
-import { syncDueSubscriptionTransactions } from "@/lib/automation/subscriptions";
 import { requireSessionUser } from "@/lib/auth/session";
 import { formatDateTimeDisplay } from "@/lib/date";
 import { getFinanceReport } from "@/lib/finance/reports";
@@ -95,10 +94,6 @@ function buildExecutiveSummary(report: ExtendedReport): ExecutiveSummary {
 export async function GET(request: Request) {
   try {
     const user = await requireSessionUser({ feature: "pdfExport" });
-    await syncDueSubscriptionTransactions({
-      tenantId: user.tenantId,
-      userId: user.id
-    });
     const { searchParams } = new URL(request.url);
     const month = searchParams.get("month");
     const resolvedMonth = month ? normalizeMonthKey(month) : null;

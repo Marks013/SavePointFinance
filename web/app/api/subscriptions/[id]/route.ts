@@ -17,7 +17,7 @@ type Params = {
 
 export async function PATCH(request: Request, context: Params) {
   try {
-    const user = await requireSessionUser();
+    const user = await requireSessionUser({ feature: "automation" });
     const { id } = await context.params;
     const body = subscriptionFormSchema.parse(await request.json());
     const nextBillingDate = new Date(`${body.nextBillingDate}T12:00:00`);
@@ -109,7 +109,7 @@ export async function PATCH(request: Request, context: Params) {
 
 export async function DELETE(request: Request, context: Params) {
   try {
-    const user = await requireSessionUser();
+    const user = await requireSessionUser({ feature: "automation" });
     const { id } = await context.params;
 
     await prisma.subscription.delete({

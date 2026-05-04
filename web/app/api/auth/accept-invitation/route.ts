@@ -11,6 +11,7 @@ import { PRIVACY_POLICY_VERSION, TERMS_OF_USE_VERSION } from "@/lib/legal/docume
 import { getTenantSeatSummary } from "@/lib/licensing/server";
 import { captureRequestError } from "@/lib/observability/sentry";
 import { prisma } from "@/lib/prisma/client";
+import { getClientIpAddress, takeThrottleHit } from "@/lib/security/request-throttle";
 import { hashInvitationToken } from "@/lib/security/invitation-token";
 import { assessUserReassignment, buildReassignmentBlockReason } from "@/lib/users/reassign-user";
 
@@ -27,9 +28,51 @@ async function tenantHasFinancialData(tenantId: string) {
   return accounts + cards + transactions + goals + subscriptions + statementPayments > 0;
 }
 
+function buildThrottleResponse(retryAfterMs: number) {
+  return NextResponse.json(
+    { message: "Muitas tentativas de aceite de convite. Aguarde alguns minutos e tente novamente." },
+    {
+      status: 429,
+      headers: {
+        "Retry-After": String(Math.max(1, Math.ceil(retryAfterMs / 1000)))
+      }
+    }
+  );
+}
+
+async function enforceInvitationThrottle(request: Request, token: string) {
+  const keys = [`token:${hashInvitationToken(token)}`];
+  const clientIp = getClientIpAddress(request);
+
+  if (clientIp) {
+    keys.push(`ip:${clientIp}`);
+  }
+
+  for (const key of keys) {
+    const result = await takeThrottleHit({
+      namespace: "accept-invitation",
+      key,
+      limit: 8,
+      windowMs: 15 * 60 * 1000
+    });
+
+    if (!result.allowed) {
+      return buildThrottleResponse(result.retryAfterMs);
+    }
+  }
+
+  return null;
+}
+
 export async function POST(request: Request) {
   try {
     const body = acceptInvitationSchema.parse(await request.json());
+    const throttled = await enforceInvitationThrottle(request, body.token);
+
+    if (throttled) {
+      return throttled;
+    }
+
     const hashedToken = hashInvitationToken(body.token);
 
     const invitation = await prisma.invitation.findFirst({
@@ -40,6 +83,17 @@ export async function POST(request: Request) {
 
     if (!invitation || invitation.revokedAt || invitation.acceptedAt || invitation.expiresAt < new Date()) {
       return NextResponse.json({ message: "Convite invalido ou expirado" }, { status: 400 });
+    }
+
+    if (invitation.token === body.token) {
+      await prisma.invitation.update({
+        where: {
+          id: invitation.id
+        },
+        data: {
+          token: hashedToken
+        }
+      });
     }
 
     const seatSummary = await getTenantSeatSummary(invitation.tenantId);

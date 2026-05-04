@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 
 import { config as loadEnv } from "dotenv";
 
-for (const envFile of [".env", ".env.local"]) {
+for (const envFile of ["../.env", ".env", ".env.local"]) {
   const envPath = resolve(process.cwd(), envFile);
 
   if (existsSync(envPath)) {
@@ -23,6 +23,12 @@ function setDefaultEnv(key: string, value: string) {
 }
 
 process.env.MP_BILLING_ENABLED = "true";
+setDefaultEnv(
+  "DATABASE_URL",
+  `postgresql://${process.env.POSTGRES_USER ?? "audit"}:${process.env.POSTGRES_PASSWORD ?? "auditoria"}@localhost:${process.env.POSTGRES_PORT ?? "5432"}/${process.env.POSTGRES_DB ?? "audit"}`
+);
+setDefaultEnv("AUTH_SECRET", "audit-secret");
+setDefaultEnv("AUTOMATION_CRON_SECRET", "audit-cron-secret");
 setDefaultEnv("MP_ACCESS_TOKEN", "TEST-access-token");
 setDefaultEnv("MP_PUBLIC_KEY", "TEST-public-key");
 setDefaultEnv("MP_WEBHOOK_SECRET", "test-webhook-secret");

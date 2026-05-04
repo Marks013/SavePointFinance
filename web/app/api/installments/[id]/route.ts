@@ -19,7 +19,24 @@ export async function DELETE(request: Request, context: Params) {
     const user = await requireSessionUser();
     const { id } = await context.params;
 
-    await prisma.transaction.deleteMany({
+    const root = await prisma.transaction.findFirst({
+      where: {
+        id,
+        tenantId: user.tenantId,
+        installmentsTotal: {
+          gt: 1
+        }
+      },
+      select: {
+        id: true
+      }
+    });
+
+    if (!root) {
+      return NextResponse.json({ message: "Installment group not found" }, { status: 404 });
+    }
+
+    const deleted = await prisma.transaction.deleteMany({
       where: {
         tenantId: user.tenantId,
         OR: [{ id }, { parentId: id }]
@@ -27,7 +44,7 @@ export async function DELETE(request: Request, context: Params) {
     });
     revalidateFinanceReports(user.tenantId);
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, deleted: deleted.count });
   } catch (error) {
     if (error instanceof Error && error.message === "Unauthorized") {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
