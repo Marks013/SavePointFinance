@@ -101,6 +101,50 @@ function isCsrfExemptApiPath(pathname: string) {
   return CSRF_EXEMPT_API_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }
 
+function normalizeHost(value: string | null) {
+  const host = value?.split(",")[0]?.trim().toLowerCase();
+  return host || null;
+}
+
+function addUrlHost(hosts: Set<string>, value: string | undefined) {
+  const normalized = value?.trim();
+
+  if (!normalized) {
+    return;
+  }
+
+  try {
+    hosts.add(new URL(normalized).host.toLowerCase());
+  } catch {
+    const host = normalizeHost(normalized);
+
+    if (host) {
+      hosts.add(host);
+    }
+  }
+}
+
+function getTrustedOriginHosts(request: NextRequest) {
+  const hosts = new Set<string>();
+
+  for (const host of [
+    request.nextUrl.host,
+    request.headers.get("host"),
+    request.headers.get("x-forwarded-host")
+  ]) {
+    const normalized = normalizeHost(host);
+
+    if (normalized) {
+      hosts.add(normalized);
+    }
+  }
+
+  addUrlHost(hosts, process.env.NEXT_PUBLIC_APP_URL);
+  addUrlHost(hosts, process.env.AUTH_URL);
+
+  return hosts;
+}
+
 function hasValidOrigin(request: NextRequest) {
   const origin = request.headers.get("origin");
 
@@ -109,7 +153,7 @@ function hasValidOrigin(request: NextRequest) {
   }
 
   try {
-    return new URL(origin).host === request.nextUrl.host;
+    return getTrustedOriginHosts(request).has(new URL(origin).host.toLowerCase());
   } catch {
     return false;
   }
