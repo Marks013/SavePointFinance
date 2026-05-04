@@ -241,7 +241,9 @@ services:
                -c 'work_mem=64MB'
                -c 'maintenance_work_mem=512MB'
     volumes:
-      - savepoint_postgres:/var/lib/postgresql/data
+      - type: bind
+        source: ${POSTGRES_DATA_DIR:-/srv/savepoint/postgres-data}
+        target: /var/lib/postgresql/data
     ports:
       - "${POSTGRES_HOST_BIND:-127.0.0.1}:${POSTGRES_PORT:-5433}:5432"
     networks:
@@ -252,5 +254,4 @@ networks:
     driver: bridge
 
 volumes:
-  savepoint_postgres:
   savepoint_backups:
